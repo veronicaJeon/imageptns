@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────
+   Lumina Editorial Design System
+   "The Digital Curator" — Image Partners
+   ───────────────────────────────────────────── */
+
+@theme {
+  /* ── Colors ── */
+  --color-primary:            #006d31;
+  --color-primary-container:  #00ff7b;
+  --color-on-primary:         #ffffff;
+  --color-on-primary-container: #002110;
+
+  --color-secondary:          #4e6354;
+  --color-secondary-container: #d0e8d6;
+  --color-on-secondary:       #ffffff;
+
+  --color-tertiary:           #5f5e5e;
+  --color-on-tertiary:        #ffffff;
+
+  --color-error:              #ba1a1a;
+  --color-error-container:    #ffdad6;
+  --color-on-error:           #ffffff;
+
+  /* Surfaces */
+  --color-surface:            #f9f9f9;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low:    #f3f3f3;
+  --color-surface-container:        #efefef;
+  --color-surface-container-high:   #e8e8e8;
+  --color-surface-container-highest:#e2e2e2;
+
+  --color-on-surface:         #1a1c1c;
+  --color-on-surface-variant: #3f4947;
+  --color-outline:            #6f7977;
+  --color-outline-variant:    #bec9c6;
+
+  /* Dark mode surfaces */
+  --color-surface-dark:               #0e1512;
+  --color-surface-container-low-dark: #1a211e;
+  --color-surface-container-dark:     #1e2523;
+  --color-on-surface-dark:            #dde4e0;
+
+  /* ── Typography ── */
+  --font-display:  "Epilogue", sans-serif;
+  --font-body:     "Inter", sans-serif;
+  --font-sans:     "Inter", sans-serif;
+
+  /* ── Shadows ── */
+  --shadow-ghost:  0px 20px 40px rgba(26, 28, 28, 0.06);
+  --shadow-card:   0px 4px 16px rgba(26, 28, 28, 0.08);
+  --shadow-modal:  0px 24px 48px rgba(26, 28, 28, 0.12);
+
+  /* ── Border Radius ── */
+  --radius-none: 0px;
+  --radius-xs:   4px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;
+  --radius-full: 9999px;
+
+  /* ── Backdrop Blur ── */
+  --blur-glass: 24px;
+}
+
+/* ─────────────────────────────────────────────
+   Base Styles
+   ───────────────────────────────────────────── */
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─────────────────────────────────────────────
+   Utility Classes
+   ───────────────────────────────────────────── */
+
+/* Glass morphism */
+.glass {
+  background: rgba(255, 255, 255, 0.70);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+}
+
+.glass-dark {
+  background: rgba(14, 21, 18, 0.70);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+}
+
+/* Ghost shadow */
+.shadow-ghost {
+  box-shadow: var(--shadow-ghost);
+}
+
+/* Gradient CTA — primary → primary-container */
+.gradient-cta {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-container) 100%);
+}
+
+/* Masonry grid */
+.masonry-grid {
+  column-count: 1;
+  column-gap: 1rem;
+}
+@media (min-width: 640px)  { .masonry-grid { column-count: 2; } }
+@media (min-width: 1024px) { .masonry-grid { column-count: 3; } }
+@media (min-width: 1280px) { .masonry-grid { column-count: 4; } }
+
+.masonry-item {
+  break-inside: avoid;
+  margin-bottom: 1rem;
+}
