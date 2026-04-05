@@ -43,9 +43,10 @@
   --color-on-surface-dark:            #dde4e0;
 
   /* ── Typography ── */
-  --font-display:  "Epilogue", sans-serif;
-  --font-body:     "Inter", sans-serif;
-  --font-sans:     "Inter", sans-serif;
+  --font-display:   "Epilogue", sans-serif;
+  --font-headline:  "Epilogue", sans-serif;  /* alias */
+  --font-body:      "Inter", sans-serif;
+  --font-sans:      "Inter", sans-serif;
 
   /* ── Shadows ── */
   --shadow-ghost:  0px 20px 40px rgba(26, 28, 28, 0.06);
