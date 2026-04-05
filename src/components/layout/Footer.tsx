@@ -1,47 +1,60 @@
-import Link from "next/link";
+"use client";
 
-const FOOTER_LINKS = {
-  Resources: [
-    { href: "/library",  label: "Image Library" },
-    { href: "/support",  label: "Q&A" },
-    { href: "#",         label: "Pricing" },
-    { href: "#",         label: "Blog" },
-  ],
-  Legal: [
-    { href: "#", label: "Terms of Service" },
-    { href: "#", label: "Privacy Policy" },
-    { href: "#", label: "License Guide" },
-    { href: "#", label: "Cookie Policy" },
-  ],
-  Company: [
-    { href: "/",    label: "About Us" },
-    { href: "#",    label: "Careers" },
-    { href: "#",    label: "Press" },
-    { href: "#",    label: "Contact" },
-  ],
-};
+import Link from "next/link";
+import { useLang } from "@/lib/i18n/store";
 
 export function Footer() {
+  const { t } = useLang();
+  const f = t.footer;
+
+  const FOOTER_DATA = [
+    {
+      key: "Resources",
+      links: [
+        { href: "/library", label: f.links.imageLibrary },
+        { href: "/support", label: f.links.qa },
+        { href: "#",        label: f.links.pricing },
+        { href: "#",        label: f.links.blog },
+      ],
+    },
+    {
+      key: "Legal",
+      links: [
+        { href: "#", label: f.links.terms },
+        { href: "#", label: f.links.privacy },
+        { href: "#", label: f.links.licenseGuide },
+        { href: "#", label: f.links.cookie },
+      ],
+    },
+    {
+      key: "Company",
+      links: [
+        { href: "/",  label: f.links.about },
+        { href: "#",  label: f.links.careers },
+        { href: "#",  label: f.links.press },
+        { href: "#",  label: f.links.contact },
+      ],
+    },
+  ];
+
   return (
-    <footer className="bg-surface-container-low dark:bg-zinc-950 w-full py-16 px-6 md:px-8 font-body text-sm">
+    <footer className="bg-surface-container-low w-full py-16 px-6 md:px-8 font-body text-sm">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-12 max-w-7xl mx-auto">
 
-        {/* ── 브랜드 컬럼 ── */}
+        {/* 브랜드 컬럼 */}
         <div className="col-span-1">
           <div className="text-base font-headline font-black uppercase tracking-tighter text-on-surface mb-4">
             IMAGE PARTNERS
           </div>
-          <p className="text-on-surface-variant leading-relaxed mb-6">
-            The Digital Curator. 1994년 런던에서 시작된 프리미엄 스톡 이미지 플랫폼.
-          </p>
-          <p className="text-outline text-xs">© 2026 Image Partners. All rights reserved.</p>
+          <p className="text-on-surface-variant leading-relaxed mb-6">{f.tagline}</p>
+          <p className="text-outline text-xs">{f.copyright}</p>
         </div>
 
-        {/* ── 링크 컬럼들 ── */}
-        {Object.entries(FOOTER_LINKS).map(([category, links]) => (
-          <div key={category} className="flex flex-col gap-4">
+        {/* 링크 컬럼들 */}
+        {FOOTER_DATA.map(({ key, links }) => (
+          <div key={key} className="flex flex-col gap-4">
             <h6 className="font-bold text-on-surface uppercase tracking-widest text-xs">
-              {category}
+              {f.sections[key as keyof typeof f.sections]}
             </h6>
             {links.map(({ href, label }) => (
               <Link

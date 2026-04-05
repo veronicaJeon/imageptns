@@ -5,19 +5,14 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/Button";
-
-const NAV_LINKS = [
-  { href: "/library", label: "Library" },
-  { href: "/",        label: "Company" },
-  { href: "/support", label: "Q&A" },
-];
+import { useLang } from "@/lib/i18n/store";
 
 export function TopNavBar() {
   const pathname = usePathname();
   const [isDark, setIsDark] = useState(false);
-  const [lang, setLang] = useState<"KO" | "EN">("KO");
+  const { lang, t, toggle } = useLang();
 
-  // ── 초기화: localStorage에서 테마 복원 ──
+  // 초기화: localStorage에서 테마 복원
   useEffect(() => {
     const saved = localStorage.getItem("theme");
     if (saved === "dark") {
@@ -26,7 +21,6 @@ export function TopNavBar() {
     }
   }, []);
 
-  // ── 다크모드 토글 ──
   function toggleDark() {
     const next = !isDark;
     setIsDark(next);
@@ -39,11 +33,11 @@ export function TopNavBar() {
     }
   }
 
-  // ── 언어 토글 ──
-  function toggleLang() {
-    setLang((l) => (l === "KO" ? "EN" : "KO"));
-    // TODO: next-intl 연동 시 실제 라우팅으로 교체
-  }
+  const NAV_LINKS = [
+    { href: "/library", label: t.nav.library },
+    { href: "/",        label: t.nav.company },
+    { href: "/support", label: t.nav.qa },
+  ];
 
   return (
     <nav
@@ -54,7 +48,7 @@ export function TopNavBar() {
     >
       <div className="flex justify-between items-center px-6 md:px-8 h-20 max-w-[1920px] mx-auto">
 
-        {/* ── 브랜드 로고 ── */}
+        {/* 브랜드 로고 */}
         <Link
           href="/"
           className="text-lg font-headline font-black uppercase tracking-tighter text-on-surface hover:text-primary transition-colors duration-200"
@@ -62,7 +56,7 @@ export function TopNavBar() {
           IMAGE PARTNERS
         </Link>
 
-        {/* ── 네비 링크 (데스크탑) ── */}
+        {/* 네비 링크 */}
         <div className="hidden md:flex items-center gap-10">
           {NAV_LINKS.map(({ href, label }) => {
             const isActive =
@@ -84,12 +78,12 @@ export function TopNavBar() {
           })}
         </div>
 
-        {/* ── 우측 액션 ── */}
+        {/* 우측 액션 */}
         <div className="flex items-center gap-2">
 
           {/* 언어 토글 */}
           <button
-            onClick={toggleLang}
+            onClick={toggle}
             className={cn(
               "flex items-center gap-1 px-3 py-2 rounded-full text-xs font-bold tracking-widest",
               "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
@@ -98,7 +92,7 @@ export function TopNavBar() {
             aria-label="언어 변경"
           >
             <span className="material-symbols-outlined text-base">language</span>
-            <span>{lang}</span>
+            <span>{lang === "ko" ? "KO" : "EN"}</span>
           </button>
 
           {/* 다크모드 토글 */}
@@ -108,24 +102,21 @@ export function TopNavBar() {
               "p-2 rounded-full transition-all duration-200",
               "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
             )}
-            aria-label={isDark ? "라이트 모드로 변경" : "다크 모드로 변경"}
+            aria-label={isDark ? "라이트 모드" : "다크 모드"}
           >
             <span className="material-symbols-outlined text-xl">
               {isDark ? "light_mode" : "dark_mode"}
             </span>
           </button>
 
-          {/* 구분선 */}
           <div className="w-px h-5 bg-outline-variant/40 mx-1" />
 
-          {/* 로그인 */}
           <Link href="/login">
-            <Button variant="ghost" size="sm">Login</Button>
+            <Button variant="ghost" size="sm">{t.nav.login}</Button>
           </Link>
 
-          {/* 가입 */}
           <Link href="/signup">
-            <Button variant="primary" size="sm">Sign Up</Button>
+            <Button variant="primary" size="sm">{t.nav.signup}</Button>
           </Link>
         </div>
       </div>
