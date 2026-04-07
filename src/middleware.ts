@@ -28,11 +28,13 @@ export async function middleware(request: NextRequest) {
   // Refresh session
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Protect /dashboard routes
-  if (request.nextUrl.pathname.startsWith("/dashboard") && !user) {
+  const { pathname } = request.nextUrl;
+
+  // Protect /dashboard and /admin routes — redirect unauthenticated users to /login
+  if ((pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("next", request.nextUrl.pathname);
+    url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
@@ -40,5 +42,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/dashboard/:path*", "/admin/:path*"],
 };
