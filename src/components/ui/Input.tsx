@@ -12,10 +12,13 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, icon, suffix, className, type, ...props }, ref) => {
+  ({ label, error, hint, icon, suffix, className, type, value, onChange, ...props }, ref) => {
     const [showPassword, setShowPassword] = useState(false);
+    const [internalValue, setInternalValue] = useState("");
     const isPassword = type === "password";
     const inputType = isPassword ? (showPassword ? "text" : "password") : type;
+    // Show eye toggle only when the field has content
+    const hasValue = isPassword && (String(value ?? internalValue).length > 0);
 
     return (
       <div className="flex flex-col gap-2 w-full">
@@ -35,6 +38,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             type={inputType}
+            value={value}
+            onChange={(e) => {
+              setInternalValue(e.target.value);
+              onChange?.(e);
+            }}
             className={cn(
               "w-full h-12 bg-surface-container-lowest",
               "ring-1 ring-outline-variant",
@@ -43,15 +51,17 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               "text-on-surface placeholder:text-outline",
               "text-sm font-body outline-none",
               "transition-all duration-200",
+              // Hide browser-native password reveal button
+              "[&::-ms-reveal]:hidden [&::-ms-clear]:hidden",
               icon && "pl-12",
-              (suffix || isPassword) && "pr-12",
+              (suffix || hasValue) && "pr-12",
               error && "ring-error focus:ring-error",
               className
             )}
             {...props}
           />
 
-          {isPassword && (
+          {hasValue && (
             <button
               type="button"
               className="absolute right-4 text-outline hover:text-on-surface transition-colors"

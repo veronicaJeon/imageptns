@@ -97,31 +97,31 @@ export function TopNavBar() {
         </div>
 
         {/* Right actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 h-9">
 
           {/* Language toggle */}
           <button
             onClick={toggle}
-            className="flex items-center gap-1 px-3 py-2 rounded-full text-xs font-bold tracking-widest text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200"
+            className="inline-flex items-center gap-1 h-9 px-3 rounded-lg text-xs font-bold tracking-widest text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200"
             aria-label="언어 변경"
           >
-            <span className="material-symbols-outlined text-base">language</span>
+            <span className="material-symbols-outlined text-base leading-none">language</span>
             <span>{lang === "ko" ? "KO" : "EN"}</span>
           </button>
 
           {/* Dark mode toggle */}
           <button
             onClick={toggleDark}
-            className="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200"
+            className="inline-flex items-center justify-center h-9 w-9 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200"
             aria-label={isDark ? "라이트 모드" : "다크 모드"}
           >
-            <span className="material-symbols-outlined text-xl">
+            <span className="material-symbols-outlined text-xl leading-none">
               {isDark ? "light_mode" : "dark_mode"}
             </span>
           </button>
 
           {/* Cart */}
-          <Link href="/cart" className="relative p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200">
+          <Link href="/cart" className="relative inline-flex items-center justify-center h-9 w-9 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200">
             <span className="material-symbols-outlined text-xl">shopping_cart</span>
             {cartCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-white text-[9px] font-black flex items-center justify-center">

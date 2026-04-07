@@ -6,9 +6,9 @@ import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
 import { useCart } from "@/lib/store/cart";
 
-function StatCard({ icon, label, value, color }: { icon: string; label: string; value: string; color: string }) {
-  return (
-    <div className="bg-surface-container-lowest p-6 shadow-ghost flex flex-col gap-3">
+function StatCard({ icon, label, value, color, href }: { icon: string; label: string; value: string; color: string; href?: string }) {
+  const content = (
+    <div className={`bg-surface-container-lowest p-6 shadow-ghost flex flex-col gap-3 ${href ? "hover:bg-surface-container-low transition-colors cursor-pointer" : ""}`}>
       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${color}`}>
         <span className="material-symbols-outlined text-xl">{icon}</span>
       </div>
@@ -16,6 +16,8 @@ function StatCard({ icon, label, value, color }: { icon: string; label: string; 
       <p className="text-xs text-outline uppercase tracking-widest font-bold">{label}</p>
     </div>
   );
+  if (href) return <Link href={href}>{content}</Link>;
+  return content;
 }
 
 const ACTION_STYLE: Record<string, string> = {
@@ -70,9 +72,9 @@ export default function DashboardPage() {
         <section>
           <p className="text-xs text-outline uppercase tracking-widest font-bold mb-4">Buyer Overview</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
-            <StatCard icon="favorite"      label={d.statFavorites} value={String(stats?.favorites_count ?? 0)} color="bg-red-50 text-red-400 dark:bg-red-900/20" />
-            <StatCard icon="receipt_long"  label={d.statOrders}    value={String(stats?.orders_count ?? 0)}    color="bg-blue-50 text-blue-400 dark:bg-blue-900/20" />
-            <StatCard icon="shopping_cart" label={d.statCart}      value={String(cartCount)}                    color="bg-primary/10 text-primary" />
+            <StatCard icon="favorite"      label={d.statFavorites} value={String(stats?.favorites_count ?? 0)} color="bg-red-50 text-red-400 dark:bg-red-900/20"   href="/dashboard/favorites" />
+            <StatCard icon="receipt_long"  label={d.statOrders}    value={String(stats?.orders_count ?? 0)}    color="bg-blue-50 text-blue-400 dark:bg-blue-900/20" href="/dashboard/orders" />
+            <StatCard icon="shopping_cart" label={d.statCart}      value={String(cartCount)}                    color="bg-primary/10 text-primary"                  href="/cart" />
           </div>
 
           <p className="text-xs text-outline uppercase tracking-widest font-bold mb-4">{d.recentTitle}</p>

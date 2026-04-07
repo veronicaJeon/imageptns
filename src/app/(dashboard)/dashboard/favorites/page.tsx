@@ -50,7 +50,8 @@ export default function FavoritesPage() {
           {items.map((item: any) => {
             const img  = item.image;
             const id   = img?.id ?? item.image_id;
-            const title = img?.title ?? "";
+            const isDeleted = !img || (img.status && img.status !== "approved");
+            const title = img?.title ?? "삭제된 이미지";
             const category = img?.category ?? "";
             const photographer = img?.photographer?.full_name ?? "";
             const src   = img?.storage_path_preview ?? "";
@@ -59,32 +60,50 @@ export default function FavoritesPage() {
             });
             return (
               <div key={item.id} className="bg-surface-container-lowest shadow-ghost overflow-hidden group">
-                <Link href={`/library/${id}`}>
-                  <div className="relative overflow-hidden aspect-[4/3] bg-surface-container-low">
-                    {src ? (
-                      <img src={src} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span className="material-symbols-outlined text-outline text-4xl">image</span>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                {/* Thumbnail */}
+                {isDeleted ? (
+                  <div className="aspect-[4/3] bg-surface-container-low flex flex-col items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-3xl text-outline">hide_image</span>
+                    <span className="text-xs text-outline">삭제된 이미지</span>
                   </div>
-                </Link>
+                ) : (
+                  <Link href={`/library/${id}`}>
+                    <div className="relative overflow-hidden aspect-[4/3] bg-surface-container-low">
+                      {src ? (
+                        <img src={src} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span className="material-symbols-outlined text-outline text-4xl">image</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </Link>
+                )}
+
+                {/* Info row */}
                 <div className="p-4 flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline mb-1">{category}</p>
-                    <Link href={`/library/${id}`}>
-                      <p className="text-sm font-semibold text-on-surface truncate hover:text-primary transition-colors">{title}</p>
-                    </Link>
-                    <p className="text-xs text-outline mt-0.5">{photographer} · {savedAt}</p>
+                    {category && <p className="text-[10px] font-bold uppercase tracking-widest text-outline mb-1">{category}</p>}
+                    {isDeleted ? (
+                      <p className="text-sm font-semibold text-outline line-through truncate">삭제된 이미지</p>
+                    ) : (
+                      <Link href={`/library/${id}`}>
+                        <p className="text-sm font-semibold text-on-surface truncate hover:text-primary transition-colors">{title}</p>
+                      </Link>
+                    )}
+                    <p className="text-xs text-outline mt-0.5">{photographer}{photographer && " · "}{savedAt}</p>
                   </div>
+                  {/* Heart — always filled red since it IS favorited */}
                   <button
                     onClick={() => remove(id)}
-                    className="shrink-0 w-8 h-8 rounded-full hover:bg-surface-container-high flex items-center justify-center text-outline hover:text-error transition-colors"
+                    className="shrink-0 w-8 h-8 rounded-full hover:bg-surface-container-high flex items-center justify-center transition-colors"
                     aria-label={fav.removeBtn}
                   >
-                    <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+                    <span
+                      className="material-symbols-outlined text-xl text-error"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >favorite</span>
                   </button>
                 </div>
               </div>

@@ -21,31 +21,48 @@ export async function GET(_req: NextRequest) {
       supabase.from("orders").select("id", { count: "exact", head: true }).eq("buyer_id", user.id).eq("status", "completed"),
     ]);
 
-    const { data: recent } = await supabase
-      .from("orders")
-      .select(`
-        id, order_number, created_at, total_krw,
-        order_items(
-          image:images!image_id(title, category, storage_path_preview)
-        )
-      `)
-      .eq("buyer_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(5);
+    const [recentOrders, recentFavs] = await Promise.all([
+      supabase
+        .from("orders")
+        .select(`id, created_at, order_items(image:images!image_id(title, storage_path_preview))`)
+        .eq("buyer_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("favorites")
+        .select(`id, created_at, image:images!image_id(title, storage_path_preview)`)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
+
+    const orderActivity = (recentOrders.data ?? []).flatMap((o: any) =>
+      (o.order_items ?? []).map((item: any) => ({
+        title:  item.image?.title ?? "",
+        action: "Licensed",
+        date:   new Date(o.created_at).getTime(),
+        dateStr: new Date(o.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        src:    previewUrl(item.image?.storage_path_preview),
+      }))
+    );
+    const favActivity = (recentFavs.data ?? []).map((f: any) => ({
+      title:  f.image?.title ?? "",
+      action: "Favorited",
+      date:   new Date(f.created_at).getTime(),
+      dateStr: new Date(f.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      src:    previewUrl(f.image?.storage_path_preview),
+    }));
+
+    const recent = [...orderActivity, ...favActivity]
+      .sort((a, b) => b.date - a.date)
+      .slice(0, 5)
+      .map(({ dateStr, date: _d, ...rest }) => ({ ...rest, date: dateStr }));
 
     return NextResponse.json({
       role,
       favorites_count: favRes.count ?? 0,
       orders_count:    ordRes.count ?? 0,
-      recent: (recent ?? []).flatMap((o: any) =>
-        (o.order_items ?? []).map((item: any) => ({
-          id:     o.id,
-          title:  item.image?.title ?? "",
-          action: "Licensed",
-          date:   new Date(o.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-          src:    previewUrl(item.image?.storage_path_preview),
-        }))
-      ).slice(0, 5),
+      recent,
     });
   }
 

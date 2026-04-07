@@ -47,14 +47,17 @@ export default function SettingsPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await fetch("/api/profile", {
+      const res = await fetch("/api/profile", {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ full_name: name, bio }),
       });
-      await init(); // refresh auth store
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+        // Silently refresh auth store in background (don't await — avoids hang)
+        init().catch(() => {});
+      }
     } finally {
       setLoading(false);
     }
@@ -139,23 +142,25 @@ export default function SettingsPage() {
               newsletter: "Newsletter & promotions",
             };
             return (
-              <label key={key} className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-on-surface">{labels[key]}</span>
+              <div key={key} className="flex items-center justify-between gap-4">
+                <span className="text-sm text-on-surface min-w-0 truncate">{labels[key]}</span>
                 <button
                   type="button"
+                  role="switch"
+                  aria-checked={notifications[key]}
                   disabled={notifSaving}
                   onClick={() => toggleNotif(key)}
                   className={[
-                    "relative w-10 h-6 rounded-full transition-colors duration-200 shrink-0 disabled:opacity-60",
+                    "relative inline-flex w-11 h-6 rounded-full transition-colors duration-200 shrink-0 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                     notifications[key] ? "bg-primary" : "bg-outline-variant",
                   ].join(" ")}
                 >
                   <span className={[
-                    "absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200",
-                    notifications[key] ? "translate-x-5" : "translate-x-1",
+                    "absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200",
+                    notifications[key] ? "translate-x-5" : "translate-x-0",
                   ].join(" ")} />
                 </button>
-              </label>
+              </div>
             );
           })}
         </div>

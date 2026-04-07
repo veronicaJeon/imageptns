@@ -10,8 +10,8 @@ export async function GET(_req: NextRequest) {
   const { data, error } = await supabase
     .from("favorites")
     .select(`
-      id, created_at,
-      image:images!image_id(id, title, category, storage_path_preview, width, height,
+      id, image_id, created_at,
+      image:images!image_id(id, title, category, status, storage_path_preview, width, height,
         photographer:profiles!photographer_id(full_name))
     `)
     .eq("user_id", user.id)
