@@ -25,14 +25,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { t } = useLang();
   const d = t.dashboard;
   const pathname  = usePathname();
-  const { user, init, signOut } = useAuth();
+  const { user, loading, init, signOut } = useAuth();
 
   useEffect(() => { init(); }, [init]);
 
-  // Fall back to demo toggle if not authenticated yet
+  // Demo toggle only shown when truly not authenticated (not during loading)
   const [demoRole, setDemoRole] = useState<"buyer" | "photographer">("buyer");
   const role = user?.role ?? demoRole;
-  const navItems = role === "buyer" ? NAV_ITEMS_BUYER : NAV_ITEMS_PHOTOGRAPHER;
+  const navItems = role === "photographer" ? NAV_ITEMS_PHOTOGRAPHER : NAV_ITEMS_BUYER;
 
   return (
     <div className="min-h-screen flex bg-surface-container-low">
@@ -46,14 +46,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Link>
         </div>
 
-        {/* Role indicator (or toggle in demo mode) */}
+        {/* Role indicator (or demo toggle if not authenticated) */}
         <div className="px-4 py-4 border-b border-outline-variant/20">
-          {user ? (
+          {loading ? (
+            <div className="h-9 rounded-lg bg-surface-container-low animate-pulse" />
+          ) : user ? (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low">
               <span className="material-symbols-outlined text-base text-primary">
                 {user.role === "photographer" ? "photo_camera" : "shopping_bag"}
               </span>
               <span className="text-xs font-bold text-on-surface capitalize">{d.role[user.role]}</span>
+              {user.is_admin && (
+                <span className="ml-auto text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded">Admin</span>
+              )}
             </div>
           ) : (
             <div className="flex rounded-lg overflow-hidden bg-surface-container-low p-1 gap-1">

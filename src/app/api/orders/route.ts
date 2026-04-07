@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { previewUrl } from "@/lib/supabase/storage";
 
 export async function GET(_req: NextRequest) {
   const supabase = await createClient();
@@ -21,5 +22,14 @@ export async function GET(_req: NextRequest) {
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ orders: data ?? [] });
+
+  const orders = (data ?? []).map((order: any) => ({
+    ...order,
+    order_items: (order.order_items ?? []).map((item: any) => ({
+      ...item,
+      image: item.image ? { ...item.image, storage_path_preview: previewUrl(item.image.storage_path_preview) } : null,
+    })),
+  }));
+
+  return NextResponse.json({ orders });
 }

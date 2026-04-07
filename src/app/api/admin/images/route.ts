@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { previewUrl } from "@/lib/supabase/storage";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -42,5 +43,10 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ images: data ?? [] });
+  const images = (data ?? []).map((img: any) => ({
+    ...img,
+    storage_path_preview: previewUrl(img.storage_path_preview),
+  }));
+
+  return NextResponse.json({ images });
 }

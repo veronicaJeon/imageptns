@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n/store";
 import { useCart } from "@/lib/store/cart";
 import { cn } from "@/lib/utils/cn";
@@ -20,6 +21,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const { t } = useLang();
   const d = t.imageDetail;
+  const router = useRouter();
 
   const [imageData, setImageData]     = useState<any>(null);
   const [similar, setSimilar]         = useState<ImageCardData[]>([]);
@@ -58,16 +60,21 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
     setFavorited(next);
     try {
       if (next) {
-        await fetch("/api/favorites", {
+        const res = await fetch("/api/favorites", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ image_id: id }),
         });
+        if (res.status === 401) {
+          setFavorited(!next);
+          router.push(`/login?next=/library/${id}`);
+          return;
+        }
       } else {
         await fetch(`/api/favorites/${id}`, { method: "DELETE" });
       }
     } catch {
-      setFavorited(!next); // revert on error
+      setFavorited(!next);
     } finally {
       setFavLoading(false);
     }

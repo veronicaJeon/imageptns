@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { previewUrl } from "@/lib/supabase/storage";
 
 export async function GET(_req: NextRequest) {
   const supabase = await createClient();
@@ -18,7 +19,12 @@ export async function GET(_req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ favorites: data ?? [] });
+  const favorites = (data ?? []).map((fav: any) => ({
+    ...fav,
+    image: fav.image ? { ...fav.image, storage_path_preview: previewUrl(fav.image.storage_path_preview) } : null,
+  }));
+
+  return NextResponse.json({ favorites });
 }
 
 export async function POST(req: NextRequest) {

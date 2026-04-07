@@ -7,6 +7,7 @@ export interface AuthUser {
   full_name: string;
   role: "buyer" | "photographer";
   avatar_url: string | null;
+  is_admin: boolean;
 }
 
 interface AuthStore {
@@ -31,7 +32,7 @@ export const useAuth = create<AuthStore>((set) => ({
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("full_name, role, avatar_url")
+      .select("full_name, role, avatar_url, is_admin")
       .eq("id", user.id)
       .single();
 
@@ -42,6 +43,7 @@ export const useAuth = create<AuthStore>((set) => ({
         full_name: profile?.full_name ?? "",
         role: (profile?.role as "buyer" | "photographer") ?? "buyer",
         avatar_url: profile?.avatar_url ?? null,
+        is_admin: profile?.is_admin ?? false,
       },
       loading: false,
     });
@@ -54,7 +56,7 @@ export const useAuth = create<AuthStore>((set) => ({
       }
       const { data: p } = await supabase
         .from("profiles")
-        .select("full_name, role, avatar_url")
+        .select("full_name, role, avatar_url, is_admin")
         .eq("id", session.user.id)
         .single();
 
@@ -65,6 +67,7 @@ export const useAuth = create<AuthStore>((set) => ({
           full_name: p?.full_name ?? "",
           role: (p?.role as "buyer" | "photographer") ?? "buyer",
           avatar_url: p?.avatar_url ?? null,
+          is_admin: p?.is_admin ?? false,
         },
         loading: false,
       });

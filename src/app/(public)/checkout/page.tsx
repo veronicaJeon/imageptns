@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n/store";
 import { useCart } from "@/lib/store/cart";
+import { useAuth } from "@/lib/store/auth";
 import { loadPaymentWidget, type PaymentWidgetInstance } from "@tosspayments/payment-widget-sdk";
 
 function formatKRW(n: number) {
@@ -15,6 +17,17 @@ export default function CheckoutPage() {
   const { t } = useLang();
   const ch = t.checkout;
   const { items } = useCart();
+  const { user, loading: authLoading, init } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => { init(); }, [init]);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/login?next=/checkout");
+    }
+  }, [authLoading, user, router]);
 
   const subtotal = items.reduce((s, i) => s + i.price, 0);
   const vat      = Math.round(subtotal * 0.1);
@@ -24,6 +37,17 @@ export default function CheckoutPage() {
   const [loading, setLoading]   = useState(false);
   const [widgetReady, setWidgetReady] = useState(false);
   const widgetRef = useRef<PaymentWidgetInstance | null>(null);
+
+  // Pre-fill billing from user profile
+  useEffect(() => {
+    if (user) {
+      setBilling((b) => ({
+        ...b,
+        name:  b.name  || user.full_name || "",
+        email: b.email || user.email     || "",
+      }));
+    }
+  }, [user]);
 
   function setB(k: keyof typeof billing) {
     return (v: string) => setBilling((p) => ({ ...p, [k]: v }));
@@ -81,6 +105,14 @@ export default function CheckoutPage() {
       console.error(err);
       setLoading(false);
     }
+  }
+
+  if (authLoading || !user) {
+    return (
+      <div className="pt-36 pb-24 flex items-center justify-center min-h-screen">
+        <span className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
   if (items.length === 0) {

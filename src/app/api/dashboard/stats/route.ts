@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { previewUrl } from "@/lib/supabase/storage";
 
 export async function GET(_req: NextRequest) {
   const supabase = await createClient();
@@ -42,7 +43,7 @@ export async function GET(_req: NextRequest) {
           title:  item.image?.title ?? "",
           action: "Licensed",
           date:   new Date(o.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-          src:    item.image?.storage_path_preview ?? "",
+          src:    previewUrl(item.image?.storage_path_preview),
         }))
       ).slice(0, 5),
     });
@@ -81,7 +82,7 @@ export async function GET(_req: NextRequest) {
       title:  img.title,
       action: statusLabel[img.status] ?? img.status,
       date:   new Date(img.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      src:    img.storage_path_preview ?? "",
+      src:    previewUrl(img.storage_path_preview),
     })),
   });
 }
