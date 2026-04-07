@@ -1,31 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useLang } from "@/lib/i18n/store";
 import Link from "next/link";
 import { MasonryGrid } from "@/components/gallery/MasonryGrid";
 import { ImageCard, ImageCardData } from "@/components/gallery/ImageCard";
 import { CategoryPill } from "@/components/ui/CategoryPill";
-
-/* ── Mock data ─────────────────────────────────────────── */
-const MOCK_IMAGES: ImageCardData[] = [
-  { id: "1",  title: "Morning Mist Over Mountains",      category: "nature",       src: "https://picsum.photos/seed/mist1/800/1100",   alt: "Morning mist over mountains",    photographer: "Elena Novak",    width: 800, height: 1100 },
-  { id: "2",  title: "Street Portrait — Seoul",          category: "people",       src: "https://picsum.photos/seed/portrait2/800/600", alt: "Street portrait Seoul",          photographer: "James Okafor",   width: 800, height: 600  },
-  { id: "3",  title: "Tokyo at 3AM",                     category: "urban",        src: "https://picsum.photos/seed/tokyo3/800/900",   alt: "Tokyo cityscape at night",       photographer: "Aiko Tanaka",    width: 800, height: 900  },
-  { id: "4",  title: "Annual Press Summit 2024",         category: "editorial",    src: "https://picsum.photos/seed/press4/800/500",   alt: "Press summit editorial",         photographer: "Marc Devlin",    width: 800, height: 500  },
-  { id: "5",  title: "Brutalist Geometry",               category: "architecture", src: "https://picsum.photos/seed/brutal5/800/1000", alt: "Brutalist architecture detail",  photographer: "Lena Kroft",     width: 800, height: 1000 },
-  { id: "6",  title: "Chromatic Flow #12",               category: "abstract",     src: "https://picsum.photos/seed/chroma6/800/800",  alt: "Abstract chromatic flow",        photographer: "Rui Santos",     width: 800, height: 800  },
-  { id: "7",  title: "Sahara Dunes — Golden Hour",       category: "nature",       src: "https://picsum.photos/seed/sahara7/800/600",  alt: "Sahara dunes golden hour",       photographer: "Fatima Al-Nur",  width: 800, height: 600  },
-  { id: "8",  title: "Community Market — Lagos",         category: "people",       src: "https://picsum.photos/seed/lagos8/800/1050",  alt: "Community market Lagos",         photographer: "Chioma Eze",     width: 800, height: 1050 },
-  { id: "9",  title: "Glass Towers — Frankfurt",         category: "architecture", src: "https://picsum.photos/seed/frank9/800/950",   alt: "Glass towers Frankfurt",         photographer: "Hans Richter",   width: 800, height: 950  },
-  { id: "10", title: "UN General Assembly",              category: "editorial",    src: "https://picsum.photos/seed/un10/800/550",     alt: "UN General Assembly hall",       photographer: "Claire Dubois",  width: 800, height: 550  },
-  { id: "11", title: "Signal & Noise #3",                category: "abstract",     src: "https://picsum.photos/seed/signal11/800/900", alt: "Abstract signal and noise",      photographer: "Yuki Hara",      width: 800, height: 900  },
-  { id: "12", title: "Canal — Amsterdam Dusk",           category: "urban",        src: "https://picsum.photos/seed/canal12/800/700",  alt: "Amsterdam canal at dusk",        photographer: "Pieter van Dam", width: 800, height: 700  },
-  { id: "13", title: "Glacial Lake — Patagonia",         category: "nature",       src: "https://picsum.photos/seed/glacier13/800/1100",alt: "Glacial lake Patagonia",        photographer: "Sofia Herrera",  width: 800, height: 1100 },
-  { id: "14", title: "Fashion Week Backstage",           category: "editorial",    src: "https://picsum.photos/seed/fashion14/800/600", alt: "Fashion week backstage",        photographer: "Nina Koch",      width: 800, height: 600  },
-  { id: "15", title: "The Elder",                        category: "people",       src: "https://picsum.photos/seed/elder15/800/900",  alt: "Portrait of an elder",           photographer: "Ali Hassan",     width: 800, height: 900  },
-  { id: "16", title: "Concrete Cathedral",               category: "architecture", src: "https://picsum.photos/seed/concathed/800/1000",alt: "Concrete cathedral interior",  photographer: "Eva Moreau",     width: 800, height: 1000 },
-];
 
 const CATEGORY_KEYS = ["all", "nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
 type CategoryKey = typeof CATEGORY_KEYS[number];
@@ -41,21 +21,35 @@ export default function LibraryPage() {
   const [query, setQuery]       = useState("");
   const [category, setCategory] = useState<CategoryKey>("all");
   const [sort, setSort]         = useState<SortKey>("newest");
+  const [images, setImages]     = useState<ImageCardData[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  const filtered = useMemo(() => {
-    const base = MOCK_IMAGES.filter((img) => {
-      const matchCat = category === "all" || img.category === category;
-      const q = query.toLowerCase();
-      const matchQ = !q || img.title.toLowerCase().includes(q) || img.photographer?.toLowerCase().includes(q) || img.category.toLowerCase().includes(q);
-      return matchCat && matchQ;
-    });
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 350);
+    return () => clearTimeout(t);
+  }, [query]);
 
-    // Sort
-    if (sort === "newest")   return [...base].sort((a, b) => Number(b.id) - Number(a.id));
-    if (sort === "popular")  return [...base].sort((a, b) => (b.width * b.height) - (a.width * a.height));
-    if (sort === "relevant") return [...base].sort((a, b) => a.title.localeCompare(b.title));
-    return base;
-  }, [query, category, sort]);
+  const fetchImages = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ sort, limit: "40" });
+      if (category !== "all") params.set("category", category);
+      if (debouncedQuery)     params.set("query", debouncedQuery);
+
+      const res = await fetch(`/api/images?${params}`);
+      if (!res.ok) throw new Error();
+      const { images: data } = await res.json();
+      setImages(data ?? []);
+    } catch {
+      setImages([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [category, sort, debouncedQuery]);
+
+  useEffect(() => { fetchImages(); }, [fetchImages]);
 
   return (
     <>
@@ -117,7 +111,7 @@ export default function LibraryPage() {
           {/* Sort + result count */}
           <div className="flex items-center gap-4 shrink-0">
             <span className="text-xs text-outline font-medium">
-              {filtered.length} {l.results}
+              {loading ? "…" : images.length} {l.results}
             </span>
             <div className="flex items-center gap-2">
               <span className="text-xs text-outline uppercase tracking-widest hidden sm:inline">
@@ -140,14 +134,18 @@ export default function LibraryPage() {
       {/* ── Gallery ───────────────────────────────── */}
       <section className="py-12 px-6 md:px-8 bg-surface-container-low min-h-[60vh]">
         <div className="max-w-7xl mx-auto">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-40 text-outline">
+              <span className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : images.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-40 gap-4 text-outline">
               <span className="material-symbols-outlined text-6xl">image_search</span>
               <p className="text-base">{l.noResults}</p>
             </div>
           ) : (
             <MasonryGrid>
-              {filtered.map((img) => (
+              {images.map((img) => (
                 <Link key={img.id} href={`/library/${img.id}`}>
                   <ImageCard
                     image={img}

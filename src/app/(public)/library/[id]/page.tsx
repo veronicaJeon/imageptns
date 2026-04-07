@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, use } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n/store";
@@ -8,44 +8,80 @@ import { useCart } from "@/lib/store/cart";
 import { cn } from "@/lib/utils/cn";
 import { ImageCard, ImageCardData } from "@/components/gallery/ImageCard";
 
-/* ── Mock data ─────────────────────────────────────────── */
-const MOCK_DETAIL: Record<string, {
-  title: string; category: string; photographer: string;
-  src: string; width: number; height: number;
-  resolution: string; format: string; size: string; uploaded: string; id: string;
-}> = {
-  "1":  { title: "Morning Mist Over Mountains",   category: "Nature",       photographer: "Elena Novak",    src: "https://picsum.photos/seed/mist1/1600/1100",     width: 1600, height: 1100, resolution: "7952 × 5304 px", format: "TIFF / JPEG", size: "48 MB",  uploaded: "Jan 12, 2026", id: "IP-00001" },
-  "2":  { title: "Street Portrait — Seoul",        category: "People",       photographer: "James Okafor",   src: "https://picsum.photos/seed/portrait2/1600/1200", width: 1600, height: 1200, resolution: "6240 × 4680 px", format: "TIFF / JPEG", size: "36 MB",  uploaded: "Feb 3, 2026",  id: "IP-00002" },
-  "3":  { title: "Tokyo at 3AM",                   category: "Urban",        photographer: "Aiko Tanaka",    src: "https://picsum.photos/seed/tokyo3/1600/900",     width: 1600, height: 900,  resolution: "8192 × 4608 px", format: "TIFF / JPEG", size: "55 MB",  uploaded: "Mar 1, 2026",  id: "IP-00003" },
-  "default": { title: "Untitled Archive Image",    category: "Editorial",    photographer: "IMAGE PARTNERS", src: "https://picsum.photos/seed/default/1600/1000",   width: 1600, height: 1000, resolution: "5472 × 3648 px", format: "TIFF / JPEG", size: "30 MB",  uploaded: "Jan 1, 2026",  id: "IP-00000" },
+const LICENSE_PRICES: Record<string, number> = {
+  editorial:  15000,
+  commercial: 55000,
+  extended:  180000,
 };
-
-const SIMILAR: ImageCardData[] = [
-  { id: "7",  title: "Sahara Dunes",        category: "nature",   src: "https://picsum.photos/seed/sahara7/600/400",   alt: "Sahara dunes",   width: 600, height: 400 },
-  { id: "13", title: "Glacial Lake",        category: "nature",   src: "https://picsum.photos/seed/glacier13/600/800", alt: "Glacial lake",   width: 600, height: 800 },
-  { id: "5",  title: "Brutalist Geometry",  category: "architecture", src: "https://picsum.photos/seed/brutal5/600/750", alt: "Brutalist",    width: 600, height: 750 },
-  { id: "9",  title: "Glass Towers",        category: "architecture", src: "https://picsum.photos/seed/frank9/600/700", alt: "Glass towers",  width: 600, height: 700 },
-];
 
 type LicenseKey = "editorial" | "commercial" | "extended";
 
-export default function ImageDetailPage({ params }: { params: { id: string } }) {
+export default function ImageDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const { t } = useLang();
   const d = t.imageDetail;
 
-  const image = MOCK_DETAIL[params.id] ?? MOCK_DETAIL["default"];
-  const [license, setLicense]       = useState<LicenseKey>("editorial");
-  const [isFavorited, setFavorited] = useState(false);
-  const [cartFeedback, setCartFeedback] = useState<"idle"|"added">("idle");
+  const [imageData, setImageData]     = useState<any>(null);
+  const [similar, setSimilar]         = useState<ImageCardData[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [notFound, setNotFound]       = useState(false);
+
+  const [license, setLicense]         = useState<LicenseKey>("editorial");
+  const [isFavorited, setFavorited]   = useState(false);
+  const [favLoading, setFavLoading]   = useState(false);
+  const [cartFeedback, setCartFeedback] = useState<"idle" | "added">("idle");
   const addItem = useCart((s) => s.addItem);
 
+  useEffect(() => {
+    fetch(`/api/images/${id}`)
+      .then(async (res) => {
+        if (!res.ok) { setNotFound(true); return; }
+        const { image, similar: sim } = await res.json();
+        setImageData(image);
+        setSimilar(sim ?? []);
+      })
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  // Check favorite status
+  useEffect(() => {
+    fetch(`/api/favorites/${id}`)
+      .then((r) => r.json())
+      .then(({ favorited }) => setFavorited(!!favorited))
+      .catch(() => {});
+  }, [id]);
+
+  async function toggleFavorite() {
+    if (favLoading) return;
+    setFavLoading(true);
+    const next = !isFavorited;
+    setFavorited(next);
+    try {
+      if (next) {
+        await fetch("/api/favorites", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_id: id }),
+        });
+      } else {
+        await fetch(`/api/favorites/${id}`, { method: "DELETE" });
+      }
+    } catch {
+      setFavorited(!next); // revert on error
+    } finally {
+      setFavLoading(false);
+    }
+  }
+
   function handleAddToCart() {
+    if (!imageData) return;
+    const photographer = imageData.photographer?.full_name ?? "";
     addItem({
-      id: params.id,
-      title: image.title,
-      photographer: image.photographer,
-      src: image.src,
-      category: image.category,
+      id,
+      title:        imageData.title,
+      photographer,
+      src:          imageData.storage_path_preview ?? "",
+      category:     imageData.category,
       license,
     });
     setCartFeedback("added");
@@ -54,6 +90,33 @@ export default function ImageDetailPage({ params }: { params: { id: string } }) 
 
   const licenseKeys: LicenseKey[] = ["editorial", "commercial", "extended"];
 
+  if (loading) {
+    return (
+      <div className="pt-36 min-h-screen bg-surface flex items-center justify-center">
+        <span className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (notFound || !imageData) {
+    return (
+      <div className="pt-36 min-h-screen bg-surface flex flex-col items-center justify-center gap-4 text-outline">
+        <span className="material-symbols-outlined text-6xl">image_not_supported</span>
+        <p>Image not found.</p>
+        <Link href="/library" className="text-primary font-bold text-sm hover:underline">← Back to Library</Link>
+      </div>
+    );
+  }
+
+  const photographer = imageData.photographer?.full_name ?? "";
+  const uploadedDate = imageData.approved_at
+    ? new Date(imageData.approved_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : new Date(imageData.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  const resolutionStr = imageData.width && imageData.height
+    ? `${imageData.width.toLocaleString()} × ${imageData.height.toLocaleString()} px`
+    : "—";
+
   return (
     <>
       {/* ── Breadcrumb ── */}
@@ -61,7 +124,7 @@ export default function ImageDetailPage({ params }: { params: { id: string } }) 
         <nav className="flex items-center gap-2 text-xs text-outline">
           <Link href="/library" className="hover:text-primary transition-colors">Library</Link>
           <span className="material-symbols-outlined text-sm">chevron_right</span>
-          <span className="text-on-surface-variant">{image.title}</span>
+          <span className="text-on-surface-variant">{imageData.title}</span>
         </nav>
       </div>
 
@@ -72,15 +135,17 @@ export default function ImageDetailPage({ params }: { params: { id: string } }) 
           {/* Image */}
           <div className="lg:col-span-7">
             <div className="relative overflow-hidden shadow-ghost bg-surface-container-low">
-              <Image
-                src={image.src}
-                alt={image.title}
-                width={image.width}
-                height={image.height}
-                className="w-full h-auto object-cover"
-                unoptimized
-                priority
-              />
+              {imageData.storage_path_preview ? (
+                <img
+                  src={imageData.storage_path_preview}
+                  alt={imageData.title}
+                  className="w-full h-auto object-cover"
+                />
+              ) : (
+                <div className="aspect-[4/3] flex items-center justify-center text-outline">
+                  <span className="material-symbols-outlined text-6xl">image</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -89,15 +154,18 @@ export default function ImageDetailPage({ params }: { params: { id: string } }) 
 
             {/* Meta */}
             <div>
-              <p className="text-xs font-bold text-outline uppercase tracking-[0.3em] mb-3">
-                {image.category}
+              <p className="text-xs font-bold text-outline uppercase tracking-[0.3em] mb-3 capitalize">
+                {imageData.category}
               </p>
               <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface mb-2">
-                {image.title}
+                {imageData.title}
               </h1>
               <p className="text-on-surface-variant text-sm">
-                {d.by} <span className="text-on-surface font-semibold">{image.photographer}</span>
+                {d.by} <span className="text-on-surface font-semibold">{photographer}</span>
               </p>
+              {imageData.description && (
+                <p className="text-on-surface-variant text-sm mt-3 leading-relaxed">{imageData.description}</p>
+              )}
             </div>
 
             {/* License selector */}
@@ -131,7 +199,9 @@ export default function ImageDetailPage({ params }: { params: { id: string } }) 
                       </div>
                       <span className="text-sm font-semibold text-on-surface">{d.licenseTypes[key]}</span>
                     </div>
-                    <span className="text-sm font-bold text-primary">{d.prices[key]}</span>
+                    <span className="text-sm font-bold text-primary">
+                      ₩{LICENSE_PRICES[key].toLocaleString("ko-KR")}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -155,9 +225,10 @@ export default function ImageDetailPage({ params }: { params: { id: string } }) 
               </button>
               <div className="flex gap-3">
                 <button
-                  onClick={() => setFavorited((v) => !v)}
+                  onClick={toggleFavorite}
+                  disabled={favLoading}
                   className={[
-                    "flex-1 py-3 rounded border text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
+                    "flex-1 py-3 rounded border text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50",
                     isFavorited
                       ? "border-primary bg-primary/5 text-primary"
                       : "border-outline-variant text-on-surface-variant hover:border-outline",
@@ -171,7 +242,10 @@ export default function ImageDetailPage({ params }: { params: { id: string } }) 
                   </span>
                   {d.favorite}
                 </button>
-                <button className="flex-1 py-3 rounded border border-outline-variant text-on-surface-variant text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:border-outline transition-colors">
+                <button
+                  onClick={() => navigator.clipboard?.writeText(window.location.href)}
+                  className="flex-1 py-3 rounded border border-outline-variant text-on-surface-variant text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:border-outline transition-colors"
+                >
                   <span className="material-symbols-outlined text-base">share</span>
                   {d.share}
                 </button>
@@ -181,11 +255,11 @@ export default function ImageDetailPage({ params }: { params: { id: string } }) 
             {/* Asset details */}
             <div className="border-t border-outline-variant/20 pt-6 grid grid-cols-2 gap-4">
               {[
-                { label: d.details.format,   value: image.format },
-                { label: d.resolution,        value: image.resolution },
-                { label: d.details.size,      value: image.size },
-                { label: d.details.uploaded,  value: image.uploaded },
-                { label: d.details.id,        value: image.id },
+                { label: d.details.format,   value: imageData.file_format ?? "TIFF / JPEG" },
+                { label: d.resolution,        value: resolutionStr },
+                { label: d.details.size,      value: imageData.file_size_mb ? `${imageData.file_size_mb} MB` : "—" },
+                { label: d.details.uploaded,  value: uploadedDate },
+                { label: d.details.id,        value: imageData.asset_id ?? "—" },
               ].map(({ label, value }) => (
                 <div key={label}>
                   <p className="text-[10px] text-outline uppercase tracking-widest font-bold mb-1">{label}</p>
@@ -198,20 +272,22 @@ export default function ImageDetailPage({ params }: { params: { id: string } }) 
       </section>
 
       {/* ── Similar images ── */}
-      <section className="py-16 px-6 md:px-12 bg-surface-container-low">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="font-headline text-xl font-extrabold text-on-surface mb-8 tracking-tight uppercase">
-            {d.similarTitle}
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {SIMILAR.map((img) => (
-              <Link key={img.id} href={`/library/${img.id}`}>
-                <ImageCard image={img} />
-              </Link>
-            ))}
+      {similar.length > 0 && (
+        <section className="py-16 px-6 md:px-12 bg-surface-container-low">
+          <div className="max-w-7xl mx-auto">
+            <h2 className="font-headline text-xl font-extrabold text-on-surface mb-8 tracking-tight uppercase">
+              {d.similarTitle}
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {similar.map((img) => (
+                <Link key={img.id} href={`/library/${img.id}`}>
+                  <ImageCard image={img} />
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </>
   );
 }
