@@ -25,6 +25,6 @@ export const useLang = create<LangStore>()(
         }),
       setLang: (lang) => set({ lang, t: lang === "ko" ? ko : en }),
     }),
-    { name: "imageptns-lang" }
+    { name: "imageptns-lang-v2" }
   )
 );

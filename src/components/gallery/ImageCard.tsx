@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 import { useState } from "react";
+import { useCart } from "@/lib/store/cart";
 
 export interface ImageCardData {
   id: string;
@@ -31,6 +32,22 @@ export function ImageCard({
   className,
 }: ImageCardProps) {
   const [isFavorited, setIsFavorited] = useState(false);
+  const [cartAdded, setCartAdded] = useState(false);
+  const addItem = useCart((s) => s.addItem);
+
+  function handleAddToCart() {
+    addItem({
+      id: image.id,
+      title: image.title,
+      photographer: image.photographer ?? "",
+      src: image.src,
+      category: image.category,
+      license: "editorial",
+    });
+    onAddToCart?.(image.id);
+    setCartAdded(true);
+    setTimeout(() => setCartAdded(false), 1500);
+  }
 
   return (
     <div
@@ -89,11 +106,18 @@ export function ImageCard({
             </button>
 
             <button
-              onClick={() => onAddToCart?.(image.id)}
-              className="w-8 h-8 rounded-full bg-primary-container text-on-primary-container hover:opacity-90 transition-opacity flex items-center justify-center"
+              onClick={handleAddToCart}
+              className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                cartAdded
+                  ? "bg-primary-container text-on-primary-container scale-110"
+                  : "bg-primary-container text-on-primary-container hover:opacity-90"
+              )}
               aria-label="장바구니 추가"
             >
-              <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
+              <span className="material-symbols-outlined text-lg">
+                {cartAdded ? "check" : "add_shopping_cart"}
+              </span>
             </button>
           </div>
         </div>

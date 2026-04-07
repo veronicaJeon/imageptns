@@ -11,28 +11,28 @@ export function Footer() {
     {
       key: "Resources",
       links: [
-        { href: "/library", label: f.links.imageLibrary },
-        { href: "/support", label: f.links.qa },
-        { href: "#",        label: f.links.pricing },
-        { href: "#",        label: f.links.blog },
+        { href: "/library",  label: f.links.imageLibrary },
+        { href: "/support",  label: f.links.qa },
+        { href: "/pricing",  label: f.links.pricing },
+        { href: "#",         label: f.links.blog },
       ],
     },
     {
       key: "Legal",
       links: [
-        { href: "#", label: f.links.terms },
-        { href: "#", label: f.links.privacy },
-        { href: "#", label: f.links.licenseGuide },
-        { href: "#", label: f.links.cookie },
+        { href: "/terms",         label: f.links.terms },
+        { href: "/privacy",       label: f.links.privacy },
+        { href: "/license-guide", label: f.links.licenseGuide },
+        { href: "/cookie",        label: f.links.cookie },
       ],
     },
     {
       key: "Company",
       links: [
-        { href: "/",  label: f.links.about },
-        { href: "#",  label: f.links.careers },
-        { href: "#",  label: f.links.press },
-        { href: "#",  label: f.links.contact },
+        { href: "/",        label: f.links.about },
+        { href: "#",        label: f.links.careers },
+        { href: "#",        label: f.links.press },
+        { href: "/contact", label: f.links.contact },
       ],
     },
   ];

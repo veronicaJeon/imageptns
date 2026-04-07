@@ -193,9 +193,12 @@ export default function HomePage() {
             >
               {h.cta.browse}
             </Link>
-            <button className="px-10 py-5 border border-white/30 text-white font-bold rounded hover:bg-white/10 transition-colors uppercase tracking-widest text-sm">
+            <Link
+              href="/contact"
+              className="px-10 py-5 border border-white/30 text-white font-bold rounded hover:bg-white/10 transition-colors uppercase tracking-widest text-sm"
+            >
               {h.cta.contact}
-            </button>
+            </Link>
           </div>
         </div>
       </section>

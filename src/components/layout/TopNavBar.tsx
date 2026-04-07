@@ -6,11 +6,13 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/Button";
 import { useLang } from "@/lib/i18n/store";
+import { useCart } from "@/lib/store/cart";
 
 export function TopNavBar() {
   const pathname = usePathname();
   const [isDark, setIsDark] = useState(false);
   const { lang, t, toggle } = useLang();
+  const cartCount = useCart((s) => s.items.length);
 
   // 초기화: localStorage에서 테마 복원
   useEffect(() => {
@@ -108,6 +110,16 @@ export function TopNavBar() {
               {isDark ? "light_mode" : "dark_mode"}
             </span>
           </button>
+
+          {/* 장바구니 */}
+          <Link href="/cart" className="relative p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200">
+            <span className="material-symbols-outlined text-xl">shopping_cart</span>
+            {cartCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-white text-[9px] font-black flex items-center justify-center">
+                {cartCount > 9 ? "9+" : cartCount}
+              </span>
+            )}
+          </Link>
 
           <div className="w-px h-5 bg-outline-variant/40 mx-1" />
 
