@@ -44,17 +44,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const images = (data ?? []).map((img: any) => ({
-    id: img.id,
-    assetId: img.asset_id,
-    title: img.title,
-    category: img.category,
-    photographer: img.photographer?.full_name ?? "",
-    src: img.storage_path_preview ?? "",
-    alt: img.title,
-    width: img.width ?? 800,
-    height: img.height ?? 600,
-  }));
+  const images = (data ?? []).map((img: any) => {
+    let src = "";
+    if (img.storage_path_preview) {
+      // Convert storage path → public URL
+      const { data: urlData } = supabase.storage
+        .from("images-preview")
+        .getPublicUrl(img.storage_path_preview);
+      src = urlData.publicUrl;
+    }
+    return {
+      id: img.id,
+      assetId: img.asset_id,
+      title: img.title,
+      category: img.category,
+      photographer: img.photographer?.full_name ?? "",
+      src,
+      alt: img.title,
+      width: img.width ?? 800,
+      height: img.height ?? 600,
+    };
+  });
 
   return NextResponse.json({ images, total: images.length });
 }

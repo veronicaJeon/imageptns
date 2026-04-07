@@ -41,8 +41,9 @@ export async function POST(req: NextRequest) {
       category,
       tags:                 tags ?? [],
       storage_path_original,
-      storage_path_preview: null,
-      storage_path_full:    null,
+      // For MVP: preview = same file uploaded to images-preview bucket
+      storage_path_preview: storage_path_original,
+      storage_path_full:    storage_path_original,
       width:                width ?? null,
       height:               height ?? null,
       resolution_mp:        resolution_mp ?? null,

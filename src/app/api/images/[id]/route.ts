@@ -41,14 +41,26 @@ export async function GET(
     .neq("id", id)
     .limit(4);
 
+  // Convert storage paths → public URLs
+  function previewUrl(path: string | null | undefined): string {
+    if (!path) return "";
+    const { data } = supabase.storage.from("images-preview").getPublicUrl(path);
+    return data.publicUrl;
+  }
+
+  const imgAny = img as any;
+
   return NextResponse.json({
-    image: img,
+    image: {
+      ...imgAny,
+      storage_path_preview: previewUrl(imgAny.storage_path_preview),
+    },
     similar: (similar ?? []).map((s: any) => ({
       id: s.id,
       title: s.title,
       category: s.category,
       photographer: s.photographer?.full_name ?? "",
-      src: s.storage_path_preview ?? "",
+      src: previewUrl(s.storage_path_preview),
       alt: s.title,
       width: s.width ?? 600,
       height: s.height ?? 400,

@@ -15,9 +15,10 @@ export async function POST(req: NextRequest) {
   const ext = filename.split(".").pop() ?? "jpg";
   const objectPath = `${user.id}/${randomUUID()}.${ext}`;
 
-  // Signed upload URL valid for 30 minutes
+  // Upload to images-preview (public bucket) so thumbnails are displayable.
+  // For MVP, original and preview are the same file.
   const { data, error } = await supabase.storage
-    .from("images-original")
+    .from("images-preview")
     .createSignedUploadUrl(objectPath);
 
   if (error || !data) {
