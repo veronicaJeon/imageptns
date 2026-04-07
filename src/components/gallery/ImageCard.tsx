@@ -4,6 +4,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 import { useState } from "react";
 import { useCart } from "@/lib/store/cart";
+import { useRouter } from "next/navigation";
 
 export interface ImageCardData {
   id: string;
@@ -18,7 +19,8 @@ export interface ImageCardData {
 
 interface ImageCardProps {
   image: ImageCardData;
-  onFavorite?: (id: string) => void;
+  initialFavorited?: boolean;
+  onFavorite?: (id: string, favorited: boolean) => void;
   onAddToCart?: (id: string) => void;
   onQuickView?: (id: string) => void;
   className?: string;
@@ -26,14 +28,41 @@ interface ImageCardProps {
 
 export function ImageCard({
   image,
+  initialFavorited = false,
   onFavorite,
   onAddToCart,
   onQuickView,
   className,
 }: ImageCardProps) {
-  const [isFavorited, setIsFavorited] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(initialFavorited);
+  const [favoriting, setFavoriting] = useState(false);
   const [cartAdded, setCartAdded] = useState(false);
   const addItem = useCart((s) => s.addItem);
+  const router = useRouter();
+
+  async function handleFavorite() {
+    if (favoriting) return;
+    setFavoriting(true);
+    const next = !isFavorited;
+    setIsFavorited(next);
+    try {
+      if (next) {
+        const res = await fetch("/api/favorites", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_id: image.id }),
+        });
+        if (res.status === 401) { setIsFavorited(false); router.push("/login"); return; }
+      } else {
+        await fetch(`/api/favorites/${image.id}`, { method: "DELETE" });
+      }
+      onFavorite?.(image.id, next);
+    } catch {
+      setIsFavorited(!next); // revert on error
+    } finally {
+      setFavoriting(false);
+    }
+  }
 
   function handleAddToCart() {
     addItem({
@@ -87,11 +116,9 @@ export function ImageCard({
           {/* 액션 버튼 */}
           <div className="flex gap-2 ml-3 shrink-0">
             <button
-              onClick={() => {
-                setIsFavorited((v) => !v);
-                onFavorite?.(image.id);
-              }}
-              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/30 transition-colors flex items-center justify-center"
+              onClick={handleFavorite}
+              disabled={favoriting}
+              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/30 transition-colors flex items-center justify-center disabled:opacity-50"
               aria-label="즐겨찾기"
             >
               <span
