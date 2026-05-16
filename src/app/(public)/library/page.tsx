@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLang } from "@/lib/i18n/store";
 import Link from "next/link";
 import { MasonryGrid } from "@/components/gallery/MasonryGrid";
@@ -25,6 +25,9 @@ export default function LibraryPage() {
   const [loading, setLoading]   = useState(true);
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [liveStats, setLiveStats] = useState<{ images: number; photographers: number; orders: number } | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch("/api/stats")
@@ -33,9 +36,26 @@ export default function LibraryPage() {
       .catch(() => {});
   }, []);
 
-  // Debounce search input
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 350);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    if (query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const t = setTimeout(() => {
+      fetch(`/api/search/suggest?q=${encodeURIComponent(query)}`)
+        .then((r) => r.json())
+        .then((data: { suggestions: string[] }) => {
+          setSuggestions(data.suggestions ?? []);
+          setShowSuggestions((data.suggestions ?? []).length > 0);
+        })
+        .catch(() => {});
+    }, 200);
     return () => clearTimeout(t);
   }, [query]);
 
@@ -70,25 +90,50 @@ export default function LibraryPage() {
           <p className="text-on-surface-variant mb-10 text-lg">{l.hero.sub}</p>
 
           {/* Search bar */}
-          <div className="relative flex items-center bg-surface-container-lowest shadow-ghost rounded-lg overflow-hidden">
-            <span className="material-symbols-outlined text-outline pl-5 pr-3 text-2xl shrink-0">
-              search
-            </span>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={l.hero.searchPlaceholder}
-              className="flex-1 py-5 pr-5 bg-transparent text-on-surface placeholder:text-outline text-base outline-none"
-            />
-            {query && (
-              <button
-                onClick={() => setQuery("")}
-                className="px-4 text-outline hover:text-on-surface transition-colors"
-                aria-label="Clear search"
-              >
-                <span className="material-symbols-outlined text-xl">close</span>
-              </button>
+          <div className="relative">
+            <div className="flex items-center bg-surface-container-lowest shadow-ghost rounded-lg overflow-hidden">
+              <span className="material-symbols-outlined text-outline pl-5 pr-3 text-2xl shrink-0">
+                search
+              </span>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={l.hero.searchPlaceholder}
+                className="flex-1 py-5 pr-5 bg-transparent text-on-surface placeholder:text-outline text-base outline-none"
+                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                onBlur={() => {
+                  blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 150);
+                }}
+                onKeyDown={(e) => { if (e.key === "Escape") setShowSuggestions(false); }}
+              />
+              {query && (
+                <button
+                  onClick={() => { setQuery(""); setSuggestions([]); setShowSuggestions(false); }}
+                  className="px-4 text-outline hover:text-on-surface transition-colors"
+                  aria-label="Clear search"
+                >
+                  <span className="material-symbols-outlined text-xl">close</span>
+                </button>
+              )}
+            </div>
+            {showSuggestions && suggestions.length > 0 && (
+              <ul className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-lg shadow-lg overflow-hidden">
+                {suggestions.map((s) => (
+                  <li key={s}>
+                    <button
+                      className="w-full text-left px-5 py-2.5 text-sm text-on-surface hover:bg-surface-container-low transition-colors"
+                      onMouseDown={() => {
+                        if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+                        setQuery(s);
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      {s}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 

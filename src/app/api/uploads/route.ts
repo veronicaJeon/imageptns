@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { previewUrl } from "@/lib/supabase/storage";
+import { applyWatermark } from "@/lib/utils/watermark";
 
 export async function GET(_req: NextRequest) {
   const supabase = await createClient();
@@ -69,5 +71,25 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const previewPath = storage_path_original;
+  (async () => {
+    const admin = createAdminClient();
+    const { data: downloaded, error: downloadErr } = await admin.storage
+      .from("images-preview")
+      .download(previewPath);
+    if (downloadErr || !downloaded) throw downloadErr ?? new Error("download returned null");
+    const arrayBuffer = await downloaded.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const watermarked = await applyWatermark(buffer);
+    const { error: uploadErr } = await admin.storage
+      .from("images-preview")
+      .upload(previewPath, watermarked, {
+        contentType: "image/jpeg",
+        upsert: true,
+      });
+    if (uploadErr) throw uploadErr;
+  })().catch(console.error);
+
   return NextResponse.json({ image: data }, { status: 201 });
 }
