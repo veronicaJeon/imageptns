@@ -42,7 +42,7 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -53,8 +53,10 @@ export default function SignupPage() {
     if (error) {
       setError(error.message);
       setLoading(false);
+    } else if (data.session) {
+      // Email confirmations disabled — session issued immediately
+      window.location.href = "/dashboard";
     } else {
-      // Session may not exist yet if email confirmation is required
       setEmailSent(true);
       setLoading(false);
     }

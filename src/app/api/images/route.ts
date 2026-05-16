@@ -27,13 +27,45 @@ export async function GET(req: NextRequest) {
     q = q.textSearch("fts", query, { type: "plain" });
   }
 
+  if (sort === "relevant" && query) {
+    const { data: rpcData, error: rpcError } = await supabase.rpc("search_images", {
+      search_query:    query,
+      category_filter: category === "all" ? "" : category,
+      lim:             limit,
+      off:             offset,
+    });
+
+    if (rpcError) {
+      console.error("search_images RPC error, falling back to newest:", rpcError.message);
+    } else {
+      const images = (rpcData ?? []).map((img: any) => {
+        let src = "";
+        if (img.storage_path_preview) {
+          const { data: urlData } = supabase.storage
+            .from("images-preview")
+            .getPublicUrl(img.storage_path_preview);
+          src = urlData.publicUrl;
+        }
+        return {
+          id:           img.id,
+          assetId:      img.asset_id,
+          title:        img.title,
+          category:     img.category,
+          photographer: img.photographer_name ?? "",
+          src,
+          alt:          img.title,
+          width:        img.width ?? 800,
+          height:       img.height ?? 600,
+        };
+      });
+      return NextResponse.json({ images, total: images.length });
+    }
+  }
+
   if (sort === "newest") {
     q = q.order("created_at", { ascending: false });
   } else if (sort === "popular") {
     q = q.order("sales_count", { ascending: false });
-  } else if (sort === "relevant" && query) {
-    // ts_rank ordering done via RPC if needed; fallback to newest
-    q = q.order("created_at", { ascending: false });
   } else {
     q = q.order("created_at", { ascending: false });
   }
@@ -47,22 +79,21 @@ export async function GET(req: NextRequest) {
   const images = (data ?? []).map((img: any) => {
     let src = "";
     if (img.storage_path_preview) {
-      // Convert storage path → public URL
       const { data: urlData } = supabase.storage
         .from("images-preview")
         .getPublicUrl(img.storage_path_preview);
       src = urlData.publicUrl;
     }
     return {
-      id: img.id,
-      assetId: img.asset_id,
-      title: img.title,
-      category: img.category,
+      id:           img.id,
+      assetId:      img.asset_id,
+      title:        img.title,
+      category:     img.category,
       photographer: img.photographer?.full_name ?? "",
       src,
-      alt: img.title,
-      width: img.width ?? 800,
-      height: img.height ?? 600,
+      alt:          img.title,
+      width:        img.width ?? 800,
+      height:       img.height ?? 600,
     };
   });
 
