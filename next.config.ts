@@ -1,12 +1,19 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone", // Docker 프로덕션 빌드용
+  output: "standalone",
+  turbopack: {
+    root: __dirname,
+  },
   images: {
     remotePatterns: [
       {
         protocol: "https",
         hostname: "*.supabase.co",
+      },
+      {
+        protocol: "http",
+        hostname: "127.0.0.1",
       },
     ],
   },
