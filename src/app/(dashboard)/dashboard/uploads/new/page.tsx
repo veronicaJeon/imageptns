@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { extractExif, type ExifData } from "@/lib/utils/exif";
 
 const CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
 type Category = typeof CATEGORIES[number];
@@ -22,7 +23,45 @@ export default function NewUploadPage() {
   const [progress, setProgress] = useState(0);
   const [status, setStatus]     = useState<"idle" | "uploading" | "saving" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [aiStatus, setAiStatus] = useState<"idle" | "analyzing" | "done" | "failed">("idle");
+  const [exifData, setExifData] = useState<ExifData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function runAiAnalysis(f: File) {
+    setAiStatus("analyzing");
+    try {
+      // Convert file to base64 data URL
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(f);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+      });
+
+      // Run EXIF extraction and AI analysis in parallel
+      const [exif, aiRes] = await Promise.all([
+        extractExif(f),
+        fetch("/api/ai/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: base64 }),
+        }),
+      ]);
+
+      setExifData(exif);
+
+      if (aiRes.ok) {
+        const { caption, tags: aiTags } = await aiRes.json();
+        if (caption) setDesc(caption);
+        if (Array.isArray(aiTags) && aiTags.length > 0) setTags(aiTags.join(", "));
+      }
+
+      setAiStatus("done");
+    } catch {
+      // Silently fail — leave fields empty
+      setAiStatus("failed");
+    }
+  }
 
   function handleFileChange(f: File | null) {
     if (!f) return;
@@ -40,6 +79,10 @@ export default function NewUploadPage() {
     setPreview(url);
     // Auto-fill title from filename
     if (!title) setTitle(f.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
+    // Trigger AI analysis
+    setAiStatus("idle");
+    setExifData(null);
+    runAiAnalysis(f);
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -97,6 +140,11 @@ export default function NewUploadPage() {
           storage_path_original: storagePath,
           file_size_mb: parseFloat((file.size / 1024 / 1024).toFixed(2)),
           file_format: file.type === "image/tiff" ? "TIFF" : file.type === "image/jpeg" ? "JPEG" : file.type.split("/")[1].toUpperCase(),
+          exif_taken_at: exifData?.takenAt?.toISOString() ?? null,
+          exif_lat: exifData?.lat ?? null,
+          exif_lng: exifData?.lng ?? null,
+          exif_location: exifData?.locationLabel ?? null,
+          exif_camera: exifData?.camera ?? null,
         }),
       });
 
@@ -171,6 +219,20 @@ export default function NewUploadPage() {
             </p>
           )}
 
+          {/* AI analysis status */}
+          {aiStatus === "analyzing" && (
+            <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+              <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin inline-block shrink-0" />
+              AI가 이미지를 분석하고 있어요...
+            </div>
+          )}
+
+          {aiStatus === "done" && (
+            <div className="px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm">
+              AI가 내용을 자동으로 채웠어요. 수정하셔도 됩니다.
+            </div>
+          )}
+
           {/* Upload progress */}
           {status === "uploading" && (
             <div>
@@ -241,6 +303,25 @@ export default function NewUploadPage() {
               className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
             />
           </div>
+
+          {/* EXIF info display */}
+          {exifData && (exifData.takenAt || exifData.camera || exifData.locationLabel) && (
+            <div className="rounded-lg bg-surface-container-low border border-outline-variant px-4 py-3 flex flex-col gap-1 text-xs text-on-surface-variant">
+              {exifData.camera && (
+                <span>📷 카메라: {exifData.camera}</span>
+              )}
+              {exifData.takenAt && (
+                <span>
+                  📅 촬영일시: {exifData.takenAt.toLocaleDateString("ko-KR", {
+                    year: "numeric", month: "2-digit", day: "2-digit",
+                  })}
+                </span>
+              )}
+              {exifData.locationLabel && (
+                <span>📍 위치: {exifData.locationLabel}</span>
+              )}
+            </div>
+          )}
 
           {errorMsg && (
             <div className="px-4 py-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm flex items-center gap-2">

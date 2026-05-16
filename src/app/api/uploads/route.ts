@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     title, description, category, tags,
     storage_path_original,
     width, height, resolution_mp, file_format, file_size_mb,
+    exif_taken_at, exif_lat, exif_lng, exif_location, exif_camera,
   } = body;
 
   if (!title || !category || !storage_path_original) {
@@ -56,6 +57,12 @@ export async function POST(req: NextRequest) {
       resolution_mp:        resolution_mp ?? null,
       file_format:          file_format ?? null,
       file_size_mb:         file_size_mb ?? null,
+      exif_taken_at:        exif_taken_at ?? null,
+      exif_lat:             exif_lat ?? null,
+      exif_lng:             exif_lng ?? null,
+      exif_location:        exif_location ?? null,
+      exif_camera:          exif_camera ?? null,
+      ai_analyzed:          false,
       status:               "pending",
     })
     .select()
