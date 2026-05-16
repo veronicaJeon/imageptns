@@ -27,38 +27,66 @@ export default function NewUploadPage() {
   const [exifData, setExifData] = useState<ExifData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function runAiAnalysis(f: File) {
-    setAiStatus("analyzing");
-    try {
-      // Convert file to base64 data URL
-      const base64 = await new Promise<string>((resolve, reject) => {
+  // Resize image to max 800px for AI analysis (canvas can't render TIFF — send as-is)
+  async function resizeForAI(f: File): Promise<string> {
+    if (f.type === "image/tiff") {
+      return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(f);
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = reject;
       });
+    }
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(f);
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 800;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        // Fallback: send original
+        const reader = new FileReader();
+        reader.readAsDataURL(f);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+      };
+      img.src = url;
+    });
+  }
 
-      // Run EXIF extraction and AI analysis in parallel
-      const [exif, aiRes] = await Promise.all([
+  async function runAiAnalysis(f: File) {
+    setAiStatus("analyzing");
+    try {
+      const [exif, imageBase64] = await Promise.all([
         extractExif(f),
-        fetch("/api/ai/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: base64 }),
-        }),
+        resizeForAI(f),
       ]);
 
       setExifData(exif);
 
+      const aiRes = await fetch("/api/ai/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64 }),
+      });
+
       if (aiRes.ok) {
-        const { caption, tags: aiTags } = await aiRes.json();
+        const { caption, tags: aiTags, category: aiCategory } = await aiRes.json();
         if (caption) setDesc(caption);
         if (Array.isArray(aiTags) && aiTags.length > 0) setTags(aiTags.join(", "));
+        if (aiCategory && CATEGORIES.includes(aiCategory as Category)) setCategory(aiCategory as Category);
       }
 
       setAiStatus("done");
     } catch {
-      // Silently fail — leave fields empty
       setAiStatus("failed");
     }
   }
