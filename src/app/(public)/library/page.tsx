@@ -24,6 +24,14 @@ export default function LibraryPage() {
   const [images, setImages]     = useState<ImageCardData[]>([]);
   const [loading, setLoading]   = useState(true);
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [liveStats, setLiveStats] = useState<{ images: number; photographers: number; orders: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then(setLiveStats)
+      .catch(() => {});
+  }, []);
 
   // Debounce search input
   useEffect(() => {
@@ -86,9 +94,17 @@ export default function LibraryPage() {
 
           {/* Stats */}
           <div className="flex justify-center gap-10 mt-8 text-xs font-bold uppercase tracking-widest text-outline">
-            {Object.values(l.stats).map((stat) => (
-              <span key={stat}>{stat}</span>
-            ))}
+            {liveStats ? (
+              <>
+                <span>{liveStats.images.toLocaleString("ko-KR")}+ {l.stats.assets.split("+").slice(-1)[0].trim()}</span>
+                <span>{liveStats.photographers.toLocaleString("ko-KR")}+ {l.stats.photographers.split("+").slice(-1)[0].trim()}</span>
+                <span>{l.stats.countries}</span>
+              </>
+            ) : (
+              Object.values(l.stats).map((stat) => (
+                <span key={stat}>{stat}</span>
+              ))
+            )}
           </div>
         </div>
       </section>

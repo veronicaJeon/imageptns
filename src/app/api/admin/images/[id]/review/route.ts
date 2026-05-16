@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendImageApproved, sendImageRejected } from "@/lib/email/resend";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -48,9 +49,29 @@ export async function PATCH(
     .from("images")
     .update(update)
     .eq("id", id)
-    .select("id, status, rejection_reason, approved_at")
+    .select("id, status, rejection_reason, approved_at, title, asset_id, photographer_id")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Fire-and-forget notification — never block the response
+  if (data.photographer_id) {
+    (async () => {
+      const [profileRes, authRes] = await Promise.all([
+        admin.from("profiles").select("full_name").eq("id", data.photographer_id).single(),
+        admin.auth.admin.getUserById(data.photographer_id),
+      ]);
+      const email = authRes.data.user?.email;
+      const name  = profileRes.data?.full_name ?? "사진작가";
+      if (!email) return;
+
+      if (action === "approve") {
+        await sendImageApproved({ photographerEmail: email, photographerName: name, imageTitle: data.title, assetId: data.asset_id });
+      } else {
+        await sendImageRejected({ photographerEmail: email, photographerName: name, imageTitle: data.title, assetId: data.asset_id, reason: rejection_reason! });
+      }
+    })().catch(console.error);
+  }
+
   return NextResponse.json({ image: data });
 }

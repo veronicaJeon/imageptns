@@ -64,3 +64,45 @@ export async function notifyOpsContact(opts: {
     `,
   });
 }
+
+export async function sendImageApproved(opts: {
+  photographerEmail: string;
+  photographerName:  string;
+  imageTitle:        string;
+  assetId:           string;
+}) {
+  await sendEmail({
+    to:      opts.photographerEmail,
+    subject: `[Image Partners] 이미지가 승인되었습니다 — ${opts.imageTitle}`,
+    html: `
+      <p>${opts.photographerName}님, 안녕하세요.</p>
+      <p>제출하신 이미지가 검토를 통과하여 라이브러리에 게시되었습니다.</p>
+      <p><strong>이미지:</strong> ${opts.imageTitle}</p>
+      <p><strong>에셋 ID:</strong> ${opts.assetId}</p>
+      <p>구매자들이 이미지를 검색하고 라이선스를 구매할 수 있습니다.</p>
+      <br><p>Image Partners 팀 드림</p>
+    `,
+  });
+}
+
+export async function sendImageRejected(opts: {
+  photographerEmail: string;
+  photographerName:  string;
+  imageTitle:        string;
+  assetId:           string;
+  reason:            string;
+}) {
+  await sendEmail({
+    to:      opts.photographerEmail,
+    subject: `[Image Partners] 이미지 검토 결과 안내 — ${opts.imageTitle}`,
+    html: `
+      <p>${opts.photographerName}님, 안녕하세요.</p>
+      <p>제출하신 이미지가 아래 사유로 승인되지 않았습니다.</p>
+      <p><strong>이미지:</strong> ${opts.imageTitle}</p>
+      <p><strong>에셋 ID:</strong> ${opts.assetId}</p>
+      <p><strong>반려 사유:</strong> ${opts.reason}</p>
+      <p>수정 후 다시 제출해 주시면 재검토 해드리겠습니다.</p>
+      <br><p>Image Partners 팀 드림</p>
+    `,
+  });
+}
