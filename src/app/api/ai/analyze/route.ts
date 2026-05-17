@@ -109,7 +109,41 @@ async function analyzeWithGemini(base64Data: string, mimeType: string): Promise<
   return parsed;
 }
 
-// ── Fallback: Groq text model with filename + EXIF ─────────────────────────
+// ── Vision: Groq llama-3.2-11b-vision ────────────────────────────────────────
+async function analyzeWithGroqVision(dataUrl: string): Promise<AnalyzeResponse> {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "llama-3.2-11b-vision-preview",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: dataUrl } },
+            { type: "text", text: VISION_PROMPT },
+          ],
+        },
+      ],
+      max_tokens: 256,
+      temperature: 0.1,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Groq vision ${res.status}: ${text.slice(0, 200)}`);
+  }
+  const json = await res.json();
+  const raw: string = json?.choices?.[0]?.message?.content ?? "";
+  const parsed = parseJsonResponse(raw);
+  if (!parsed || (!parsed.caption && parsed.tags.length === 0)) {
+    throw new Error(`Groq vision returned unusable result: ${raw.slice(0, 100)}`);
+  }
+  return parsed;
+}
+
+// ── Last resort: Groq text model with filename + EXIF ────────────────────────
 async function analyzeWithGroqText(body: {
   filename?: string;
   exifData?: { locationLabel?: string; camera?: string; takenAt?: string };
@@ -154,11 +188,11 @@ Respond with ONLY valid JSON:
     }),
   });
 
-  if (!res.ok) throw new Error(`Groq ${res.status}`);
+  if (!res.ok) throw new Error(`Groq text ${res.status}`);
   const json = await res.json();
   const raw: string = json?.choices?.[0]?.message?.content ?? "";
   const parsed = parseJsonResponse(raw);
-  if (!parsed || (!parsed.caption && parsed.tags.length === 0)) throw new Error("Groq returned unusable result");
+  if (!parsed || (!parsed.caption && parsed.tags.length === 0)) throw new Error("Groq text returned unusable result");
   return parsed;
 }
 
@@ -210,7 +244,19 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
     }
   }
 
-  // 2. Try Gemini vision (gemini-2.0-flash-lite)
+  // 2. Try Groq vision (llama-3.2-11b-vision-preview) — free tier
+  if (process.env.GROQ_API_KEY && dataUrl) {
+    try {
+      const result = await analyzeWithGroqVision(dataUrl);
+      return NextResponse.json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[ai/analyze] Groq vision failed:", msg);
+      errors.push(`Groq vision: ${msg}`);
+    }
+  }
+
+  // 3. Try Gemini vision (gemini-2.0-flash-lite)
   if (process.env.GEMINI_API_KEY && base64Data) {
     try {
       const result = await analyzeWithGemini(base64Data, mimeType);
@@ -222,15 +268,15 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
     }
   }
 
-  // 3. Fallback: Groq text + filename/EXIF (no vision)
+  // 4. Last resort: Groq text + filename/EXIF (no vision)
   if (process.env.GROQ_API_KEY && (filename || exifData)) {
     try {
       const result = await analyzeWithGroqText({ filename, exifData });
       return NextResponse.json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error("[ai/analyze] Groq fallback failed:", msg);
-      errors.push(`Groq: ${msg}`);
+      console.error("[ai/analyze] Groq text fallback failed:", msg);
+      errors.push(`Groq text: ${msg}`);
     }
   }
 
