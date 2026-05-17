@@ -46,13 +46,20 @@ if (!ACCESS_TOKEN) {
   process.exit(1);
 }
 
-// project ref 추출: https://jelspkusznubqcbjsucw.supabase.co → jelspkusznubqcbjsucw
-const match = SUPABASE_URL.match(/https:\/\/([a-z0-9]+)\.supabase\.co/);
-if (!match) {
-  console.error("❌ NEXT_PUBLIC_SUPABASE_URL에서 project ref를 추출할 수 없습니다:", SUPABASE_URL);
-  process.exit(1);
+// project ref: SUPABASE_PROJECT_REF 우선, 없으면 URL에서 추출
+let PROJECT_REF = process.env.SUPABASE_PROJECT_REF ?? "";
+if (!PROJECT_REF) {
+  const match = SUPABASE_URL.match(/https:\/\/([a-z0-9]+)\.supabase\.co/);
+  if (!match) {
+    console.error(
+      "❌ project ref를 찾을 수 없습니다.\n" +
+      "   .env.local에 SUPABASE_PROJECT_REF=jelspkusznubqcbjsucw 형식으로 추가하거나\n" +
+      "   NEXT_PUBLIC_SUPABASE_URL을 프로덕션 URL로 설정하세요."
+    );
+    process.exit(1);
+  }
+  PROJECT_REF = match[1];
 }
-const PROJECT_REF = match[1];
 const API_URL = `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`;
 
 console.log(`\n🚀 프로젝트: ${PROJECT_REF}`);
