@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { sendContactConfirmation, notifyOpsContact } from "@/lib/email/resend";
+import {
+  sendContactConfirmationViaNaverSmtp,
+  notifyOpsContactViaNaverSmtp,
+} from "@/lib/email/naver";
 
 export async function POST(req: NextRequest) {
   const { name, email, subject, message } = await req.json();
@@ -17,9 +20,9 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Fire-and-forget emails
-  sendContactConfirmation({ name, email, subject }).catch(console.error);
-  notifyOpsContact({ name, email, subject, message }).catch(console.error);
+  // Fire-and-forget emails via Naver SMTP
+  sendContactConfirmationViaNaverSmtp({ name, email, subject }).catch(console.error);
+  notifyOpsContactViaNaverSmtp({ name, email, subject, message }).catch(console.error);
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }
