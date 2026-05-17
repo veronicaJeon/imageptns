@@ -28,8 +28,8 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Increment views (fire-and-forget)
-  supabase
+  // Increment views via admin client — RLS blocks updates on approved images for non-owners
+  createAdminClient()
     .from("images")
     .update({ views_count: (img as any).views_count + 1 })
     .eq("id", id)

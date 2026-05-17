@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { previewUrl } from "@/lib/supabase/storage";
 import { applyWatermark } from "@/lib/utils/watermark";
+import { notifyOpsNewUpload } from "@/lib/email/resend";
 
 export const maxDuration = 60;
 
@@ -91,6 +92,14 @@ export async function POST(req: NextRequest) {
     console.error("[uploads] Watermark/preview generation failed:", err);
     // Image record is already saved — preview will be missing but upload succeeded
   }
+
+  // Notify admin of new upload (fire-and-forget, non-blocking)
+  notifyOpsNewUpload({
+    photographerEmail: user.email ?? "",
+    photographerName:  user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "Unknown",
+    imageTitle:        title,
+    imageId:           data.id,
+  }).catch((e) => console.error("[uploads] admin notify failed", e));
 
   return NextResponse.json({ image: data }, { status: 201 });
 }

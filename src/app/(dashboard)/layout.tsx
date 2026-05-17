@@ -27,12 +27,94 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname  = usePathname();
   const { user, loading, init, signOut } = useAuth();
 
-  useEffect(() => { init(); }, [init]);
-
   // Demo toggle only shown when truly not authenticated (not during loading)
   const [demoRole, setDemoRole] = useState<"buyer" | "photographer">("buyer");
+  // viewMode: photographers can switch to buyer nav without changing their DB role
+  const [viewMode, setViewMode] = useState<"buyer" | "photographer">("buyer");
+
+  useEffect(() => { init(); }, [init]);
+
+  // Sync viewMode default to actual role when user loads
+  useEffect(() => {
+    if (user?.role) setViewMode(user.role as "buyer" | "photographer");
+  }, [user?.role]);
+
   const role = user?.role ?? demoRole;
-  const navItems = role === "photographer" ? NAV_ITEMS_PHOTOGRAPHER : NAV_ITEMS_BUYER;
+  const effectiveMode = user ? viewMode : demoRole;
+  const navItems = effectiveMode === "photographer" ? NAV_ITEMS_PHOTOGRAPHER : NAV_ITEMS_BUYER;
+
+  function RoleSection() {
+    if (loading) {
+      return <div className="h-9 rounded-lg bg-surface-container-low animate-pulse" />;
+    }
+
+    if (!user) {
+      return (
+        <div className="flex rounded-lg overflow-hidden bg-surface-container-low p-1 gap-1">
+          {(["buyer", "photographer"] as const).map((r) => (
+            <button
+              key={r}
+              onClick={() => setDemoRole(r)}
+              className={cn(
+                "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
+                demoRole === r
+                  ? "bg-primary text-white"
+                  : "text-on-surface-variant hover:text-on-surface"
+              )}
+            >
+              {d.role[r]}
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    if (role === "photographer") {
+      // Photographer can toggle between their two views
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex rounded-lg overflow-hidden bg-surface-container-low p-1 gap-1">
+            <button
+              onClick={() => setViewMode("photographer")}
+              className={cn(
+                "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
+                viewMode === "photographer"
+                  ? "bg-primary text-white"
+                  : "text-on-surface-variant hover:text-on-surface"
+              )}
+            >
+              {d.role.photographer}
+            </button>
+            <button
+              onClick={() => setViewMode("buyer")}
+              className={cn(
+                "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
+                viewMode === "buyer"
+                  ? "bg-primary text-white"
+                  : "text-on-surface-variant hover:text-on-surface"
+              )}
+            >
+              {d.role.buyer}
+            </button>
+          </div>
+          {user.is_admin && (
+            <span className="text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded text-center">Admin</span>
+          )}
+        </div>
+      );
+    }
+
+    // Buyer: show simple role badge
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low">
+        <span className="material-symbols-outlined text-base text-primary">shopping_bag</span>
+        <span className="text-xs font-bold text-on-surface capitalize">{d.role.buyer}</span>
+        {user.is_admin && (
+          <span className="ml-auto text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded">Admin</span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-surface-container-low">
@@ -46,38 +128,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Link>
         </div>
 
-        {/* Role indicator (or demo toggle if not authenticated) */}
+        {/* Role indicator / toggle */}
         <div className="px-4 py-4 border-b border-outline-variant/20">
-          {loading ? (
-            <div className="h-9 rounded-lg bg-surface-container-low animate-pulse" />
-          ) : user ? (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low">
-              <span className="material-symbols-outlined text-base text-primary">
-                {user.role === "photographer" ? "photo_camera" : "shopping_bag"}
-              </span>
-              <span className="text-xs font-bold text-on-surface capitalize">{d.role[user.role]}</span>
-              {user.is_admin && (
-                <span className="ml-auto text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded">Admin</span>
-              )}
-            </div>
-          ) : (
-            <div className="flex rounded-lg overflow-hidden bg-surface-container-low p-1 gap-1">
-              {(["buyer", "photographer"] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setDemoRole(r)}
-                  className={cn(
-                    "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
-                    demoRole === r
-                      ? "bg-primary text-white"
-                      : "text-on-surface-variant hover:text-on-surface"
-                  )}
-                >
-                  {d.role[r]}
-                </button>
-              ))}
-            </div>
-          )}
+          <RoleSection />
         </div>
 
         {/* Nav */}
@@ -130,7 +183,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/" className="text-sm font-headline font-black uppercase tracking-tighter text-on-surface">
             IMAGE PARTNERS
           </Link>
-          {!user && (
+          {user?.role === "photographer" ? (
+            <div className="flex rounded-lg overflow-hidden bg-surface-container-low p-0.5 gap-0.5">
+              {(["photographer", "buyer"] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setViewMode(r)}
+                  className={cn(
+                    "px-3 py-1 text-xs font-bold rounded-md transition-all",
+                    viewMode === r ? "bg-primary text-white" : "text-on-surface-variant"
+                  )}
+                >
+                  {d.role[r]}
+                </button>
+              ))}
+            </div>
+          ) : !user ? (
             <div className="flex rounded-lg overflow-hidden bg-surface-container-low p-0.5 gap-0.5">
               {(["buyer", "photographer"] as const).map((r) => (
                 <button
@@ -145,7 +213,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </button>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Mobile bottom nav */}

@@ -8,9 +8,23 @@ interface Notice {
   body: string;
 }
 
+function isDismissedToday(noticeId: string): boolean {
+  try {
+    const val = localStorage.getItem(`notice_dismissed_${noticeId}`);
+    if (!val) return false;
+    const dismissedAt = new Date(val);
+    const now = new Date();
+    const diffMs = now.getTime() - dismissedAt.getTime();
+    return diffMs < 24 * 60 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+
 export function NoticePopup() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [visible, setVisible] = useState(false);
+  const [hideForDay, setHideForDay] = useState(false);
 
   useEffect(() => {
     fetch("/api/notices?popup=1")
@@ -18,9 +32,7 @@ export function NoticePopup() {
       .then(({ notices }) => {
         const n = notices?.[0];
         if (!n) return;
-        // Don't show if dismissed today
-        const dismissedKey = `notice_dismissed_${n.id}`;
-        if (sessionStorage.getItem(dismissedKey)) return;
+        if (isDismissedToday(n.id)) return;
         setNotice(n);
         setVisible(true);
       })
@@ -28,7 +40,11 @@ export function NoticePopup() {
   }, []);
 
   function dismiss() {
-    if (notice) sessionStorage.setItem(`notice_dismissed_${notice.id}`, "1");
+    if (notice && hideForDay) {
+      try {
+        localStorage.setItem(`notice_dismissed_${notice.id}`, new Date().toISOString());
+      } catch {}
+    }
     setVisible(false);
   }
 
@@ -58,7 +74,16 @@ export function NoticePopup() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end pt-2">
+        <div className="flex items-center justify-between pt-2">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hideForDay}
+              onChange={(e) => setHideForDay(e.target.checked)}
+              className="w-4 h-4 accent-primary rounded"
+            />
+            <span className="text-xs text-on-surface-variant">하루동안 안보기</span>
+          </label>
           <button
             type="button"
             onClick={dismiss}

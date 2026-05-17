@@ -1,6 +1,7 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL    = "Image Partners <noreply@imagepartners.com>";
-const OPS_EMAIL     = "contact@imagepartners.com";
+// Override via env vars in Vercel dashboard; defaults kept for local dev reference
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "Image Partners <onboarding@resend.dev>";
+const OPS_EMAIL  = process.env.OPS_EMAIL ?? "booknfoto461@gmail.com";
 
 interface EmailPayload {
   to:      string | string[];
@@ -65,6 +66,25 @@ export async function notifyOpsContact(opts: {
   });
 }
 
+export async function notifyOpsNewUpload(opts: {
+  photographerEmail: string;
+  photographerName:  string;
+  imageTitle:        string;
+  imageId:           string;
+}) {
+  await sendEmail({
+    to:      OPS_EMAIL,
+    subject: `[새 업로드] ${opts.imageTitle} — ${opts.photographerName}`,
+    html: `
+      <p>새 이미지가 심사 대기 중입니다.</p>
+      <p><strong>제목:</strong> ${opts.imageTitle}</p>
+      <p><strong>사진작가:</strong> ${opts.photographerName} (${opts.photographerEmail})</p>
+      <p><strong>이미지 ID:</strong> ${opts.imageId}</p>
+      <p><a href="https://imageptns.vercel.app/admin/images">관리자 페이지에서 검토하기 →</a></p>
+    `,
+  });
+}
+
 export async function sendImageApproved(opts: {
   photographerEmail: string;
   photographerName:  string;
@@ -119,7 +139,7 @@ export async function sendPayoutRejected(opts: {
       <p>${opts.period} 기간의 정산 요청이 아래 사유로 처리되지 않았습니다.</p>
       <p><strong>신청 금액:</strong> ₩${opts.netKrw.toLocaleString("ko-KR")}</p>
       ${opts.note ? `<p><strong>사유:</strong> ${opts.note}</p>` : ""}
-      <p>문의 사항은 support@imagepartners.com으로 연락해 주세요.</p>
+      <p>문의 사항은 ${OPS_EMAIL}으로 연락해 주세요.</p>
       <br><p>Image Partners 팀 드림</p>
     `,
   });
