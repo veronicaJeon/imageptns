@@ -16,6 +16,7 @@ export default function NewUploadPage() {
   const router = useRouter();
 
   const [file, setFile]         = useState<File | null>(null);
+  const [fileName, setFileName] = useState("");   // original filename — read-only display
   const [preview, setPreview]   = useState<string | null>(null);
   const [title, setTitle]       = useState("");
   const [description, setDesc]  = useState("");
@@ -110,9 +111,10 @@ export default function NewUploadPage() {
 
       if (!aiRes.ok) { setAiStatus("failed"); return; }
 
-      const { caption, tags: aiTags, category: aiCategory } = await aiRes.json();
-      const filled = !!(caption || (Array.isArray(aiTags) && aiTags.length > 0));
+      const { title: aiTitle, caption, tags: aiTags, category: aiCategory } = await aiRes.json();
+      const filled = !!(aiTitle || caption || (Array.isArray(aiTags) && aiTags.length > 0));
 
+      if (aiTitle) setTitle(aiTitle);
       if (caption) setDesc(caption);
       if (Array.isArray(aiTags) && aiTags.length > 0) setTags(aiTags.join(", "));
       if (aiCategory && CATEGORIES.includes(aiCategory as Category)) setCategory(aiCategory as Category);
@@ -135,6 +137,8 @@ export default function NewUploadPage() {
     }
     setErrorMsg("");
     setFile(f);
+    setFileName(f.name);
+    setTitle("");     // clear title — will be filled by AI
     setImgWidth(null); setImgHeight(null);
     const objectUrl = URL.createObjectURL(f);
     setPreview(objectUrl);
@@ -146,7 +150,6 @@ export default function NewUploadPage() {
     }
     setTakenAt(""); setTakenAtSource("manual");
     setLocation(""); setLocationSource("manual");
-    if (!title) setTitle(f.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
     setAiStatus("idle");
     setExifData(null);
     runAiAnalysis(f);
@@ -207,6 +210,7 @@ export default function NewUploadPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          original_filename: file!.name,
           title: title.trim(),
           description: description.trim(),
           category,
@@ -290,7 +294,14 @@ export default function NewUploadPage() {
             )}
           </div>
 
-          {file && <p className="text-xs text-outline">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</p>}
+          {file && (
+            <div className="flex items-center gap-2 text-xs text-outline">
+              <span className="material-symbols-outlined text-sm">insert_drive_file</span>
+              <span className="font-mono truncate max-w-xs">{file.name}</span>
+              <span>·</span>
+              <span>{(file.size / 1024 / 1024).toFixed(1)} MB</span>
+            </div>
+          )}
 
           {/* AI status */}
           {aiStatus === "analyzing" && (
@@ -330,12 +341,17 @@ export default function NewUploadPage() {
             </p>
           )}
 
-          {/* ── 제목 * ── */}
+          {/* ── 제목 * (AI 자동생성) ── */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-outline uppercase tracking-widest">제목 *</label>
+            <label className="text-xs font-bold text-outline uppercase tracking-widest flex items-center gap-2">
+              작품 제목 *
+              {aiStatus === "done" && title && (
+                <span className="normal-case font-normal text-primary text-[10px] bg-primary/10 px-2 py-0.5 rounded-full">AI 자동생성</span>
+              )}
+            </label>
             <input
               type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="이미지 제목을 입력하세요"
+              placeholder={aiStatus === "analyzing" ? "AI가 제목을 생성 중..." : "작품 제목을 입력하세요 (AI가 자동으로 채워줍니다)"}
               className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
             />
           </div>

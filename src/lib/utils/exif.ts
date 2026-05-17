@@ -13,15 +13,26 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
     const res = await fetch(url, {
-      headers: { 'Accept-Language': 'en' },
+      headers: {
+        'Accept-Language': 'en',
+        'User-Agent': 'ImagePartners/1.0 (imageptns.vercel.app)',
+      },
     })
     if (!res.ok) return null
     const data = await res.json()
+    // Use structured address for a clean "City, Country" label
+    const addr = data?.address
+    if (addr) {
+      const city = addr.city || addr.town || addr.village || addr.county || addr.state
+      const country = addr.country
+      if (city && country) return `${city}, ${country}`
+      if (country) return country
+    }
+    // Fallback: last 2 comma-separated parts of display_name
     const displayName: string | undefined = data?.display_name
     if (!displayName) return null
-    // Take the first 2 comma-separated parts for a short label (e.g. "Seoul, South Korea")
-    const parts = displayName.split(',').map((p: string) => p.trim())
-    return parts.slice(0, 2).join(', ')
+    const parts = displayName.split(',').map((p: string) => p.trim()).filter(Boolean)
+    return parts.slice(-2).join(', ')
   } catch {
     return null
   }
@@ -68,9 +79,12 @@ export async function extractExif(file: File): Promise<ExifData> {
     const camera = [make, model].filter(Boolean).join(' ')
     result.camera = camera || null
 
-    // Reverse geocode if GPS is present
+    // Reverse geocode if GPS is present; fall back to raw coordinates
     if (lat !== null && lng !== null) {
       result.locationLabel = await reverseGeocode(lat, lng)
+      if (!result.locationLabel) {
+        result.locationLabel = `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      }
     }
   } catch {
     // Return whatever partial data was collected; nulls are fine on failure

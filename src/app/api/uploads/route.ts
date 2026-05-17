@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { previewUrl } from "@/lib/supabase/storage";
 import { applyWatermark } from "@/lib/utils/watermark";
 
+export const maxDuration = 60;
+
 export async function GET(_req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     title, description, category, tags,
-    storage_path_original,
+    storage_path_original, original_filename,
     width, height, resolution_mp, file_format, file_size_mb,
     exif_taken_at, exif_lat, exif_lng, exif_location, exif_camera,
   } = body;
@@ -51,7 +53,8 @@ export async function POST(req: NextRequest) {
       category,
       tags:                 tags ?? [],
       storage_path_original,
-      // For MVP: preview = same file uploaded to images-preview bucket
+      original_filename:    original_filename ?? null,
+      // preview path same as original path, different bucket — filled by watermark step below
       storage_path_preview: storage_path_original,
       storage_path_full:    storage_path_original,
       width:                width ?? null,
@@ -71,25 +74,23 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const originalPath = storage_path_original;
-  const previewPath = storage_path_original;
-  (async () => {
+  // Apply watermark synchronously before returning so Vercel doesn't terminate it early
+  try {
     const admin = createAdminClient();
     const { data: downloaded, error: downloadErr } = await admin.storage
       .from("images-original")
-      .download(originalPath);
+      .download(storage_path_original);
     if (downloadErr || !downloaded) throw downloadErr ?? new Error("download returned null");
     const arrayBuffer = await downloaded.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const watermarked = await applyWatermark(buffer);
-    const { error: uploadErr } = await admin.storage
+    await admin.storage
       .from("images-preview")
-      .upload(previewPath, watermarked, {
-        contentType: "image/jpeg",
-        upsert: true,
-      });
-    if (uploadErr) throw uploadErr;
-  })().catch(console.error);
+      .upload(storage_path_original, watermarked, { contentType: "image/jpeg", upsert: true });
+  } catch (err) {
+    console.error("[uploads] Watermark/preview generation failed:", err);
+    // Image record is already saved — preview will be missing but upload succeeded
+  }
 
   return NextResponse.json({ image: data }, { status: 201 });
 }

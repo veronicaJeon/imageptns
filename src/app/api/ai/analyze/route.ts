@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 export const maxDuration = 60;
 
 interface AnalyzeResponse {
+  title: string;
   caption: string;
   tags: string[];
   category: string;
@@ -14,23 +15,25 @@ const VALID_CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", 
 const VISION_PROMPT = `Analyze this stock photo. Respond with ONLY valid JSON — no markdown fences, no explanation.
 
 {
+  "title": "<short evocative title for this photo, max 6 words, title case>",
   "caption": "<one factual English sentence describing the photo, max 20 words>",
   "tags": ["<up to 10 lowercase English keywords that describe the image content>"],
   "category": "<exactly one of: nature | people | editorial | urban | abstract | architecture>"
 }`;
 
-function parseJsonResponse(raw: string): { caption: string; tags: string[]; category: string } | null {
+function parseJsonResponse(raw: string): { title: string; caption: string; tags: string[]; category: string } | null {
   try {
     const cleaned = raw.trim().startsWith("```")
       ? raw.trim().replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "")
       : raw.trim();
     const parsed = JSON.parse(cleaned);
+    const title: string = typeof parsed.title === "string" ? parsed.title.trim() : "";
     const caption: string = typeof parsed.caption === "string" ? parsed.caption.trim() : "";
     const tags: string[] = Array.isArray(parsed.tags)
       ? parsed.tags.filter((t: unknown) => typeof t === "string").map((t: string) => t.toLowerCase().trim()).slice(0, 10)
       : [];
     const category: string = VALID_CATEGORIES.includes(parsed.category) ? parsed.category : "";
-    return { caption, tags, category };
+    return { title, caption, tags, category };
   } catch {
     return null;
   }
@@ -172,6 +175,7 @@ ${parts.join("\n")}
 
 Respond with ONLY valid JSON:
 {
+  "title": "<short evocative title, max 6 words, title case>",
   "caption": "<one factual English sentence, max 20 words>",
   "tags": ["<up to 10 lowercase English keywords>"],
   "category": "<one of: nature | people | editorial | urban | abstract | architecture>"
