@@ -64,7 +64,6 @@ export async function POST(req: NextRequest) {
       exif_lng:             exif_lng ?? null,
       exif_location:        exif_location ?? null,
       exif_camera:          exif_camera ?? null,
-      ai_analyzed:          false,
       status:               "pending",
     })
     .select()
