@@ -232,19 +232,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
 
   const errors: string[] = [];
 
-  // 1. Try Mistral vision (pixtral-12b)
-  if (process.env.MISTRAL_API_KEY && dataUrl) {
-    try {
-      const result = await analyzeWithMistral(dataUrl);
-      return NextResponse.json(result);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error("[ai/analyze] Mistral failed:", msg);
-      errors.push(`Mistral: ${msg}`);
-    }
-  }
-
-  // 2. Try Groq vision (llama-3.2-11b-vision-preview) — free tier
+  // 1. Try Groq vision (llama-3.2-11b-vision-preview) — free tier, primary
   if (process.env.GROQ_API_KEY && dataUrl) {
     try {
       const result = await analyzeWithGroqVision(dataUrl);
@@ -253,6 +241,18 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
       const msg = e instanceof Error ? e.message : String(e);
       console.error("[ai/analyze] Groq vision failed:", msg);
       errors.push(`Groq vision: ${msg}`);
+    }
+  }
+
+  // 2. Try Mistral vision (pixtral-12b) — backup
+  if (process.env.MISTRAL_API_KEY && dataUrl) {
+    try {
+      const result = await analyzeWithMistral(dataUrl);
+      return NextResponse.json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[ai/analyze] Mistral failed:", msg);
+      errors.push(`Mistral: ${msg}`);
     }
   }
 
