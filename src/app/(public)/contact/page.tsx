@@ -1,16 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLang } from "@/lib/i18n/store";
+import { useAuth } from "@/lib/store/auth";
 
 export default function ContactPage() {
   const { t } = useLang();
   const c = t.contact;
   const f = c.form;
 
+  const { user, init } = useAuth();
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => { init(); }, [init]);
+
+  // Auto-fill name and email when user is loaded
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        name:  prev.name  || user.full_name || "",
+        email: prev.email || user.email     || "",
+      }));
+    }
+  }, [user?.id]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,7 +39,6 @@ export default function ContactPage() {
       if (!res.ok) throw new Error("Failed");
       setSent(true);
     } catch {
-      // Fall through — show success anyway (UX)
       setSent(true);
     } finally {
       setLoading(false);
@@ -35,6 +49,8 @@ export default function ContactPage() {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm((prev) => ({ ...prev, [key]: e.target.value }));
   }
+
+  const isLoggedIn = !!user;
 
   return (
     <>
@@ -64,14 +80,30 @@ export default function ContactPage() {
                 {/* Name */}
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">{f.name}</label>
-                  <input type="text" required value={form.name} onChange={set("name")} placeholder={f.namePlaceholder}
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all" />
+                  <input
+                    type="text" required value={form.name} onChange={set("name")}
+                    placeholder={f.namePlaceholder}
+                    readOnly={isLoggedIn}
+                    className={`h-12 ring-1 ring-outline-variant rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all ${
+                      isLoggedIn
+                        ? "bg-surface-container-low cursor-default"
+                        : "bg-surface-container-lowest focus:ring-2 focus:ring-primary"
+                    }`}
+                  />
                 </div>
                 {/* Email */}
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">{f.email}</label>
-                  <input type="email" required value={form.email} onChange={set("email")} placeholder={f.emailPlaceholder}
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all" />
+                  <input
+                    type="email" required value={form.email} onChange={set("email")}
+                    placeholder={f.emailPlaceholder}
+                    readOnly={isLoggedIn}
+                    className={`h-12 ring-1 ring-outline-variant rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all ${
+                      isLoggedIn
+                        ? "bg-surface-container-low cursor-default"
+                        : "bg-surface-container-lowest focus:ring-2 focus:ring-primary"
+                    }`}
+                  />
                 </div>
                 {/* Subject */}
                 <div className="flex flex-col gap-2">
@@ -105,7 +137,7 @@ export default function ContactPage() {
                 <span className="material-symbols-outlined text-primary text-xl shrink-0 mt-0.5">mail</span>
                 <div>
                   <p className="text-xs font-bold text-outline uppercase tracking-widest mb-1">Email</p>
-                  <p className="text-sm text-on-surface">{c.info.email}</p>
+                  <a href={`mailto:${c.info.email}`} className="text-sm text-on-surface hover:text-primary transition-colors">{c.info.email}</a>
                 </div>
               </div>
               <div className="flex items-start gap-3">

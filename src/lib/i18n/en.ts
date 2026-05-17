@@ -291,7 +291,7 @@ export const en: Translations = {
   },
   dashboard: {
     nav: { overview: "Overview", favorites: "Favorites", orders: "Orders", uploads: "Uploads", earnings: "Earnings", settings: "Settings" },
-    role: { buyer: "Buyer", photographer: "Photographer" },
+    role: { buyer: "Image Buyer", photographer: "Photographer" },
     overview: {
       greeting: "Good to see you",
       statFavorites: "Favorites", statOrders: "Orders", statCart: "In Cart",
@@ -346,7 +346,7 @@ export const en: Translations = {
   contact: {
     hero: { headline: "Get in touch.", sub: "Our editorial team is ready to help you find the right imagery." },
     form: { name: "Full Name", namePlaceholder: "Jane Smith", email: "Email", emailPlaceholder: "you@example.com", subject: "Subject", subjectPlaceholder: "How can we help?", message: "Message", messagePlaceholder: "Tell us about your project…", submit: "Send Message" },
-    info: { title: "Contact Information", email: "contact@imagepartners.com", hours: "Business Hours", hoursVal: "Mon–Fri, 9AM–6PM (KST)", response: "Response Time", responseVal: "Within 1 business day" },
+    info: { title: "Contact Information", email: "imagepartners@naver.com", hours: "Business Hours", hoursVal: "Mon–Fri, 9AM–6PM (KST)", response: "Response Time", responseVal: "Within 1 business day" },
     success: "Message sent! We'll be in touch within one business day.",
   },
   imageDetail: {

@@ -246,10 +246,10 @@ export default function SettingsPage() {
             <div className="flex items-start gap-3">
               <span className="material-symbols-outlined text-xl text-outline mt-0.5">shopping_bag</span>
               <div>
-                <p className="text-sm font-bold text-on-surface">현재 역할: 구매자</p>
+                <p className="text-sm font-bold text-on-surface">현재 역할: 이미지 바이어</p>
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
                   사진가로 전환하면 이미지를 업로드하고 판매할 수 있습니다.<br />
-                  기존 구매자 기능(즐겨찾기, 주문 내역 등)은 그대로 유지됩니다.
+                  기존 이미지 바이어 기능(즐겨찾기, 주문 내역 등)은 그대로 유지됩니다.
                 </p>
               </div>
             </div>
