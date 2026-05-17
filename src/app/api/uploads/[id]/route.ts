@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const VALID_CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
-const EDITABLE_STATUSES = ["pending", "rejected", "draft"] as const;
 
 export async function PATCH(
   req: NextRequest,
@@ -22,16 +21,15 @@ export async function PATCH(
     .single();
 
   if (!img) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!EDITABLE_STATUSES.includes((img as any).status)) {
-    return NextResponse.json({ error: "Only pending or rejected images can be edited" }, { status: 403 });
-  }
 
   const body = await req.json();
-  const { title, description, category, tags, resubmit } = body as {
+  const { title, description, category, tags, exif_location, exif_taken_at, resubmit } = body as {
     title?: string;
     description?: string;
     category?: string;
     tags?: string[];
+    exif_location?: string;
+    exif_taken_at?: string | null;
     resubmit?: boolean;
   };
 
@@ -47,6 +45,9 @@ export async function PATCH(
   if (description !== undefined) update.description = description || null;
   if (category !== undefined) update.category = category;
   if (Array.isArray(tags)) update.tags = tags.map((t) => t.trim().toLowerCase()).filter(Boolean);
+  if (exif_location !== undefined) update.exif_location = exif_location || null;
+  if (exif_taken_at !== undefined) update.exif_taken_at = exif_taken_at || null;
+  // Resubmit: only for rejected/draft → pending (approved stays approved)
   if (resubmit && ["rejected", "draft"].includes((img as any).status)) {
     update.status = "pending";
     update.rejection_reason = null;
@@ -58,7 +59,7 @@ export async function PATCH(
     .update(update)
     .eq("id", id)
     .eq("photographer_id", user.id)
-    .select("id, title, description, category, tags, status, rejection_reason")
+    .select("id, title, description, category, tags, status, rejection_reason, exif_location, exif_taken_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -35,6 +35,8 @@ interface EditState {
   description: string;
   category: Category;
   tags: string;
+  exif_location: string;
+  exif_taken_at: string;
 }
 
 export default function UploadsPage() {
@@ -74,11 +76,13 @@ export default function UploadsPage() {
 
   function openEdit(img: any) {
     setEditing({
-      id:          img.id,
-      title:       img.title ?? "",
-      description: img.description ?? "",
-      category:    img.category ?? "nature",
-      tags:        Array.isArray(img.tags) ? img.tags.join(", ") : "",
+      id:           img.id,
+      title:        img.title ?? "",
+      description:  img.description ?? "",
+      category:     img.category ?? "nature",
+      tags:         Array.isArray(img.tags) ? img.tags.join(", ") : "",
+      exif_location: img.exif_location ?? "",
+      exif_taken_at: img.exif_taken_at ? img.exif_taken_at.slice(0, 10) : "",
     });
   }
 
@@ -90,10 +94,12 @@ export default function UploadsPage() {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title:       editing.title.trim(),
-          description: editing.description.trim() || null,
-          category:    editing.category,
-          tags:        editing.tags.split(",").map((t) => t.trim()).filter(Boolean),
+          title:        editing.title.trim(),
+          description:  editing.description.trim() || null,
+          category:     editing.category,
+          tags:         editing.tags.split(",").map((t) => t.trim()).filter(Boolean),
+          exif_location: editing.exif_location.trim() || null,
+          exif_taken_at: editing.exif_taken_at || null,
           resubmit,
         }),
       });
@@ -211,7 +217,7 @@ export default function UploadsPage() {
                 const uploaded = new Date(img.created_at).toLocaleDateString("en-US", {
                   month: "short", day: "numeric", year: "numeric",
                 });
-                const canEdit = ["pending", "rejected", "draft"].includes(img.status);
+                const canEdit = true; // 모든 상태에서 편집 가능
                 const isEditing = editing?.id === img.id;
 
                 return (
@@ -323,6 +329,47 @@ export default function UploadsPage() {
                                   placeholder="쉼표로 구분"
                                   className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                                 />
+                              </div>
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">촬영일시</label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="date"
+                                    value={editing.exif_taken_at === "unknown" ? "" : editing.exif_taken_at}
+                                    disabled={editing.exif_taken_at === "unknown"}
+                                    onChange={(e) => setEditing({ ...editing, exif_taken_at: e.target.value })}
+                                    className="flex-1 h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all disabled:opacity-50"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditing({ ...editing, exif_taken_at: editing.exif_taken_at === "unknown" ? "" : "unknown" })}
+                                    className={`h-10 px-3 text-xs rounded border transition-colors ${editing.exif_taken_at === "unknown" ? "border-primary text-primary bg-primary/5" : "border-outline-variant text-outline hover:text-on-surface"}`}
+                                  >
+                                    미상
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">촬영장소</label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={editing.exif_location === "unknown" ? "" : editing.exif_location}
+                                    disabled={editing.exif_location === "unknown"}
+                                    onChange={(e) => setEditing({ ...editing, exif_location: e.target.value })}
+                                    placeholder="예: Seoul, Korea"
+                                    className="flex-1 h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface placeholder:text-outline outline-none transition-all disabled:opacity-50"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditing({ ...editing, exif_location: editing.exif_location === "unknown" ? "" : "unknown" })}
+                                    className={`h-10 px-3 text-xs rounded border transition-colors ${editing.exif_location === "unknown" ? "border-primary text-primary bg-primary/5" : "border-outline-variant text-outline hover:text-on-surface"}`}
+                                  >
+                                    미상
+                                  </button>
+                                </div>
                               </div>
                             </div>
 

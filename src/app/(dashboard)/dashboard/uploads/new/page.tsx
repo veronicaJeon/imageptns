@@ -10,6 +10,7 @@ type Category = typeof CATEGORIES[number];
 
 const ACCEPTED_TYPES = ["image/tiff", "image/jpeg", "image/png", "image/webp"];
 const MAX_SIZE_MB = 500;
+const UNKNOWN = "unknown";
 
 export default function NewUploadPage() {
   const router = useRouter();
@@ -20,6 +21,13 @@ export default function NewUploadPage() {
   const [description, setDesc]  = useState("");
   const [category, setCategory] = useState<Category>("nature");
   const [tags, setTags]         = useState("");
+  // 촬영일시: ISO date string | "unknown" | ""
+  const [takenAt, setTakenAt]   = useState("");
+  const [takenAtSource, setTakenAtSource] = useState<"exif" | "manual">("manual");
+  // 촬영장소: text | "unknown" | ""
+  const [location, setLocation] = useState("");
+  const [locationSource, setLocationSource] = useState<"exif" | "manual">("manual");
+
   const [progress, setProgress] = useState(0);
   const [status, setStatus]     = useState<"idle" | "uploading" | "saving" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -27,7 +35,6 @@ export default function NewUploadPage() {
   const [exifData, setExifData] = useState<ExifData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Resize image to max 800px for AI analysis (canvas can't render TIFF — send as-is)
   async function resizeForAI(f: File): Promise<string> {
     if (f.type === "image/tiff") {
       return new Promise((resolve, reject) => {
@@ -52,7 +59,6 @@ export default function NewUploadPage() {
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);
-        // Fallback: send original
         const reader = new FileReader();
         reader.readAsDataURL(f);
         reader.onload = () => resolve(reader.result as string);
@@ -72,6 +78,16 @@ export default function NewUploadPage() {
 
       setExifData(exif);
 
+      // Pre-fill 촬영일시 / 촬영장소 from EXIF
+      if (exif?.takenAt) {
+        setTakenAt(exif.takenAt.toISOString().slice(0, 10));
+        setTakenAtSource("exif");
+      }
+      if (exif?.locationLabel) {
+        setLocation(exif.locationLabel);
+        setLocationSource("exif");
+      }
+
       const aiRes = await fetch("/api/ai/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -90,10 +106,7 @@ export default function NewUploadPage() {
         }),
       });
 
-      if (!aiRes.ok) {
-        setAiStatus("failed");
-        return;
-      }
+      if (!aiRes.ok) { setAiStatus("failed"); return; }
 
       const { caption, tags: aiTags, category: aiCategory } = await aiRes.json();
       const filled = !!(caption || (Array.isArray(aiTags) && aiTags.length > 0));
@@ -120,11 +133,10 @@ export default function NewUploadPage() {
     }
     setErrorMsg("");
     setFile(f);
-    const url = URL.createObjectURL(f);
-    setPreview(url);
-    // Auto-fill title from filename
+    setPreview(URL.createObjectURL(f));
+    setTakenAt(""); setTakenAtSource("manual");
+    setLocation(""); setLocationSource("manual");
     if (!title) setTitle(f.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
-    // Trigger AI analysis
     setAiStatus("idle");
     setExifData(null);
     runAiAnalysis(f);
@@ -136,28 +148,36 @@ export default function NewUploadPage() {
     if (f) handleFileChange(f);
   }
 
+  const canSubmit =
+    !!file &&
+    !!title.trim() &&
+    !!description.trim() &&
+    tags.split(",").map((t) => t.trim()).filter(Boolean).length > 0 &&
+    !!takenAt &&
+    !!location &&
+    status !== "uploading" &&
+    status !== "saving";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!file || !title || !category) return;
+    if (!canSubmit) return;
     setStatus("uploading");
     setProgress(0);
     setErrorMsg("");
 
     try {
-      // 1. Get presigned upload URL
       const presignRes = await fetch("/api/uploads/presign", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+        body: JSON.stringify({ filename: file!.name, contentType: file!.type }),
       });
       if (!presignRes.ok) throw new Error("Failed to get upload URL");
       const { uploadUrl, storagePath } = await presignRes.json();
 
-      // 2. Upload directly to Supabase Storage
       const xhr = new XMLHttpRequest();
       await new Promise<void>((resolve, reject) => {
         xhr.open("PUT", uploadUrl);
-        xhr.setRequestHeader("Content-Type", file.type);
+        xhr.setRequestHeader("Content-Type", file!.type);
         xhr.upload.addEventListener("progress", (ev) => {
           if (ev.lengthComputable) setProgress(Math.round((ev.loaded / ev.total) * 100));
         });
@@ -166,29 +186,31 @@ export default function NewUploadPage() {
           else reject(new Error(`Upload failed: ${xhr.status}`));
         });
         xhr.addEventListener("error", reject);
-        xhr.send(file);
+        xhr.send(file!);
       });
       setProgress(100);
 
-      // 3. Create image record in DB
       setStatus("saving");
       const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean);
 
       const saveRes = await fetch("/api/uploads", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title,
-          description: description || null,
+          title: title.trim(),
+          description: description.trim(),
           category,
           tags: tagList,
           storage_path_original: storagePath,
-          file_size_mb: parseFloat((file.size / 1024 / 1024).toFixed(2)),
-          file_format: file.type === "image/tiff" ? "TIFF" : file.type === "image/jpeg" ? "JPEG" : file.type.split("/")[1].toUpperCase(),
-          exif_taken_at: exifData?.takenAt?.toISOString() ?? null,
+          file_size_mb: parseFloat((file!.size / 1024 / 1024).toFixed(2)),
+          file_format: file!.type === "image/tiff" ? "TIFF" : file!.type === "image/jpeg" ? "JPEG" : file!.type.split("/")[1].toUpperCase(),
+          // 촬영일시: "unknown" → null (TIMESTAMPTZ 불가), 날짜 문자열 → ISO
+          exif_taken_at: takenAt === UNKNOWN ? null : takenAt || null,
+          exif_taken_at_unknown: takenAt === UNKNOWN,
+          // 촬영장소: "unknown" 그대로 저장 가능
+          exif_location: location || null,
           exif_lat: exifData?.lat ?? null,
           exif_lng: exifData?.lng ?? null,
-          exif_location: exifData?.locationLabel ?? null,
           exif_camera: exifData?.camera ?? null,
         }),
       });
@@ -212,12 +234,9 @@ export default function NewUploadPage() {
         <Link href="/dashboard/uploads" className="text-outline hover:text-on-surface transition-colors">
           <span className="material-symbols-outlined text-xl">arrow_back</span>
         </Link>
-        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">
-          이미지 업로드
-        </h1>
+        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">이미지 업로드</h1>
       </div>
 
-      {/* Success */}
       {status === "done" && (
         <div className="flex flex-col items-center py-16 gap-4 text-center">
           <span className="material-symbols-outlined text-6xl text-primary">check_circle</span>
@@ -229,7 +248,7 @@ export default function NewUploadPage() {
       {status !== "done" && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
 
-          {/* File drop zone */}
+          {/* Drop zone */}
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
@@ -258,27 +277,21 @@ export default function NewUploadPage() {
             )}
           </div>
 
-          {file && (
-            <p className="text-xs text-outline">
-              {file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB
-            </p>
-          )}
+          {file && <p className="text-xs text-outline">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</p>}
 
-          {/* AI analysis status */}
+          {/* AI status */}
           {aiStatus === "analyzing" && (
             <div className="flex items-center gap-2 text-sm text-on-surface-variant">
               <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin inline-block shrink-0" />
               AI가 이미지를 분석하고 있어요...
             </div>
           )}
-
           {aiStatus === "done" && (
             <div className="px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm flex items-center gap-2">
               <span className="material-symbols-outlined text-base">auto_awesome</span>
               AI가 내용을 자동으로 채웠어요. 수정하셔도 됩니다.
             </div>
           )}
-
           {aiStatus === "failed" && (
             <div className="px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-center gap-2">
               <span className="material-symbols-outlined text-base">info</span>
@@ -286,18 +299,14 @@ export default function NewUploadPage() {
             </div>
           )}
 
-          {/* Upload progress */}
+          {/* Progress */}
           {status === "uploading" && (
             <div>
               <div className="flex justify-between text-xs text-outline mb-1">
-                <span>업로드 중...</span>
-                <span>{progress}%</span>
+                <span>업로드 중...</span><span>{progress}%</span>
               </div>
               <div className="h-2 bg-surface-container-low rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-300 rounded-full"
-                  style={{ width: `${progress}%` }}
-                />
+                <div className="h-full bg-primary transition-all duration-300 rounded-full" style={{ width: `${progress}%` }} />
               </div>
             </div>
           )}
@@ -308,71 +317,144 @@ export default function NewUploadPage() {
             </p>
           )}
 
-          {/* Metadata */}
+          {/* ── 제목 * ── */}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-bold text-outline uppercase tracking-widest">제목 *</label>
             <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
               placeholder="이미지 제목을 입력하세요"
               className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
             />
           </div>
 
+          {/* ── 설명 * ── */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-outline uppercase tracking-widest">설명</label>
+            <label className="text-xs font-bold text-outline uppercase tracking-widest">설명 *</label>
             <textarea
-              value={description}
-              onChange={(e) => setDesc(e.target.value)}
-              rows={3}
-              placeholder="이미지에 대한 설명 (선택)"
+              required value={description} onChange={(e) => setDesc(e.target.value)}
+              rows={3} placeholder="이미지에 대한 설명을 입력하세요"
               className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-none transition-all"
             />
           </div>
 
+          {/* ── 카테고리 * ── */}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-bold text-outline uppercase tracking-widest">카테고리 *</label>
             <select
-              required
-              value={category}
-              onChange={(e) => setCategory(e.target.value as Category)}
+              required value={category} onChange={(e) => setCategory(e.target.value as Category)}
               className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface outline-none transition-all"
             >
               {CATEGORIES.map((c) => (
-                <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
               ))}
             </select>
           </div>
 
+          {/* ── 태그 * ── */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-outline uppercase tracking-widest">태그</label>
+            <label className="text-xs font-bold text-outline uppercase tracking-widest">태그 *</label>
             <input
-              type="text"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
+              type="text" value={tags} onChange={(e) => setTags(e.target.value)}
               placeholder="쉼표로 구분 (예: landscape, sunset, korea)"
               className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
             />
+            {tags && tags.split(",").map((t) => t.trim()).filter(Boolean).length === 0 && (
+              <p className="text-xs text-error">태그를 최소 1개 입력해 주세요.</p>
+            )}
           </div>
 
-          {/* EXIF info display */}
-          {exifData && (exifData.takenAt || exifData.camera || exifData.locationLabel) && (
-            <div className="rounded-lg bg-surface-container-low border border-outline-variant px-4 py-3 flex flex-col gap-1 text-xs text-on-surface-variant">
-              {exifData.camera && (
-                <span>📷 카메라: {exifData.camera}</span>
+          {/* ── 촬영일시 * ── */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-outline uppercase tracking-widest">
+              촬영일시 *
+              {takenAtSource === "exif" && (
+                <span className="ml-2 normal-case font-normal text-primary text-[10px] bg-primary/10 px-2 py-0.5 rounded-full">EXIF 자동입력</span>
               )}
-              {exifData.takenAt && (
-                <span>
-                  📅 촬영일시: {exifData.takenAt.toLocaleDateString("ko-KR", {
-                    year: "numeric", month: "2-digit", day: "2-digit",
-                  })}
-                </span>
+            </label>
+            {takenAt === UNKNOWN ? (
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-12 bg-surface-container-low ring-1 ring-outline-variant/50 rounded-lg px-4 flex items-center text-sm text-outline">
+                  미상 (Unknown)
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setTakenAt(""); setTakenAtSource("manual"); }}
+                  className="h-12 px-4 text-xs text-outline hover:text-on-surface border border-outline-variant rounded-lg transition-colors"
+                >
+                  직접입력
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={takenAt}
+                  onChange={(e) => { setTakenAt(e.target.value); setTakenAtSource("manual"); }}
+                  className="flex-1 h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface outline-none transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => { setTakenAt(UNKNOWN); setTakenAtSource("manual"); }}
+                  className="h-12 px-4 text-xs text-outline hover:text-on-surface border border-outline-variant rounded-lg transition-colors whitespace-nowrap"
+                >
+                  미상
+                </button>
+              </div>
+            )}
+            {!takenAt && file && aiStatus !== "analyzing" && (
+              <p className="text-xs text-error">촬영일시를 입력하거나 '미상'을 선택하세요.</p>
+            )}
+          </div>
+
+          {/* ── 촬영장소 * ── */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-outline uppercase tracking-widest">
+              촬영장소 *
+              {locationSource === "exif" && (
+                <span className="ml-2 normal-case font-normal text-primary text-[10px] bg-primary/10 px-2 py-0.5 rounded-full">EXIF 자동입력</span>
               )}
-              {exifData.locationLabel && (
-                <span>📍 위치: {exifData.locationLabel}</span>
-              )}
+            </label>
+            {location === UNKNOWN ? (
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-12 bg-surface-container-low ring-1 ring-outline-variant/50 rounded-lg px-4 flex items-center text-sm text-outline">
+                  미상 (Unknown)
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setLocation(""); setLocationSource("manual"); }}
+                  className="h-12 px-4 text-xs text-outline hover:text-on-surface border border-outline-variant rounded-lg transition-colors"
+                >
+                  직접입력
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => { setLocation(e.target.value); setLocationSource("manual"); }}
+                  placeholder="예: Seoul, Korea"
+                  className="flex-1 h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => { setLocation(UNKNOWN); setLocationSource("manual"); }}
+                  className="h-12 px-4 text-xs text-outline hover:text-on-surface border border-outline-variant rounded-lg transition-colors whitespace-nowrap"
+                >
+                  미상
+                </button>
+              </div>
+            )}
+            {!location && file && aiStatus !== "analyzing" && (
+              <p className="text-xs text-error">촬영장소를 입력하거나 '미상'을 선택하세요.</p>
+            )}
+          </div>
+
+          {/* EXIF 카메라 정보 */}
+          {exifData?.camera && (
+            <div className="rounded-lg bg-surface-container-low border border-outline-variant px-4 py-3 text-xs text-on-surface-variant flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">photo_camera</span>
+              카메라: {exifData.camera}
             </div>
           )}
 
@@ -385,7 +467,7 @@ export default function NewUploadPage() {
 
           <button
             type="submit"
-            disabled={!file || !title || status === "uploading" || status === "saving"}
+            disabled={!canSubmit}
             className="w-full py-4 bg-primary text-white font-bold text-xs uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-base">cloud_upload</span>

@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest) {
 
   const { data, error } = await supabase
     .from("images")
-    .select("id, asset_id, title, category, status, rejection_reason, views_count, sales_count, created_at, storage_path_preview")
+    .select("id, asset_id, title, description, category, tags, status, rejection_reason, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at")
     .eq("photographer_id", user.id)
     .order("created_at", { ascending: false });
 
