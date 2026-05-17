@@ -12,6 +12,95 @@ const ACCEPTED_TYPES = ["image/tiff", "image/jpeg", "image/png", "image/webp"];
 const MAX_SIZE_MB = 500;
 const UNKNOWN = "unknown";
 
+// ── Adaptive preview container based on aspect ratio ─────────────────────────
+function previewContainerClass(w: number | null, h: number | null): string {
+  if (!w || !h) return "w-full max-h-64 overflow-hidden rounded-lg";
+  const r = w / h;
+  if (r >= 1.35)  return "w-full overflow-hidden rounded-lg";              // landscape
+  if (r <= 0.74)  return "max-w-[280px] mx-auto overflow-hidden rounded-lg"; // portrait
+  return "max-w-[420px] mx-auto overflow-hidden rounded-lg";              // square-ish
+}
+
+// ── EXIF metadata display ─────────────────────────────────────────────────────
+function ExifPanel({ data }: { data: ExifData }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Build structured rows
+  const rows: { label: string; value: string }[] = [];
+
+  if (data.takenAt)        rows.push({ label: "촬영일시", value: data.takenAt.toLocaleString("ko-KR") });
+  if (data.locationLabel)  rows.push({ label: "위치", value: data.locationLabel });
+  if (data.lat != null && data.lng != null)
+    rows.push({ label: "GPS", value: `${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}` });
+  if (data.altitude != null) rows.push({ label: "고도", value: `${data.altitude.toFixed(0)}m` });
+  if (data.camera)         rows.push({ label: "카메라", value: data.camera });
+  if (data.lensModel)      rows.push({ label: "렌즈", value: data.lensModel });
+  if (data.focalLength != null) {
+    const fl = `${data.focalLength}mm${data.focalLength35mm ? ` (${data.focalLength35mm}mm 환산)` : ""}`;
+    rows.push({ label: "초점거리", value: fl });
+  }
+  if (data.iso != null)        rows.push({ label: "ISO", value: String(data.iso) });
+  if (data.aperture != null)   rows.push({ label: "조리개", value: `f/${data.aperture}` });
+  if (data.shutterSpeed)       rows.push({ label: "셔터속도", value: data.shutterSpeed });
+  if (data.flash)              rows.push({ label: "플래시", value: data.flash });
+  if (data.whiteBalance)       rows.push({ label: "화이트밸런스", value: data.whiteBalance });
+  if (data.exposureMode)       rows.push({ label: "노출모드", value: data.exposureMode });
+  if (data.meteringMode)       rows.push({ label: "측광모드", value: data.meteringMode });
+  if (data.colorSpace)         rows.push({ label: "색공간", value: data.colorSpace });
+  if (data.orientation != null) rows.push({ label: "방향", value: String(data.orientation) });
+  if (data.software)           rows.push({ label: "소프트웨어", value: data.software });
+
+  // Raw additional fields
+  for (const [k, v] of Object.entries(data.rawFields)) {
+    if (rows.length >= 40) break;
+    const val = v instanceof Date ? v.toLocaleString("ko-KR") : String(v);
+    if (val.length > 120) continue;
+    rows.push({ label: k, value: val });
+  }
+
+  if (rows.length === 0) return null;
+
+  // Summary line: key exposure info
+  const summaryParts: string[] = [];
+  if (data.camera) summaryParts.push(data.camera);
+  if (data.iso != null) summaryParts.push(`ISO ${data.iso}`);
+  if (data.aperture != null) summaryParts.push(`f/${data.aperture}`);
+  if (data.shutterSpeed) summaryParts.push(data.shutterSpeed);
+  if (data.focalLength != null) summaryParts.push(`${data.focalLength}mm`);
+  const summary = summaryParts.join(" · ") || rows[0].value;
+
+  return (
+    <div className="rounded-lg bg-surface-container-low border border-outline-variant/40 text-xs overflow-hidden">
+      {/* Summary row — always visible */}
+      <button
+        type="button"
+        onClick={() => setExpanded((x) => !x)}
+        className="w-full flex items-center justify-between px-4 py-2.5 gap-3 text-on-surface-variant hover:bg-surface-container transition-colors"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="material-symbols-outlined text-sm shrink-0">photo_camera</span>
+          <span className="truncate">{summary}</span>
+        </div>
+        <span className="material-symbols-outlined text-sm shrink-0 transition-transform duration-200" style={{ transform: expanded ? "rotate(180deg)" : "none" }}>
+          expand_more
+        </span>
+      </button>
+
+      {/* Expanded grid */}
+      {expanded && (
+        <div className="border-t border-outline-variant/30 px-4 py-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+          {rows.map(({ label, value }) => (
+            <div key={label} className="contents">
+              <span className="text-outline font-semibold truncate">{label}</span>
+              <span className="text-on-surface-variant truncate" title={value}>{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function NewUploadPage() {
   const router = useRouter();
 
@@ -265,7 +354,7 @@ export default function NewUploadPage() {
       {status !== "done" && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
 
-          {/* Drop zone */}
+          {/* ── Drop zone ── */}
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
@@ -280,8 +369,8 @@ export default function NewUploadPage() {
               onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
             />
             {preview ? (
-              <div className="w-full max-h-64 overflow-hidden rounded-lg">
-                <img src={preview} alt="Preview" className="w-full h-full object-contain" />
+              <div className={previewContainerClass(imgWidth, imgHeight)}>
+                <img src={preview} alt="Preview" className="w-full h-auto block" />
               </div>
             ) : (
               <>
@@ -294,12 +383,24 @@ export default function NewUploadPage() {
             )}
           </div>
 
+          {/* ── File info + EXIF ── */}
           {file && (
-            <div className="flex items-center gap-2 text-xs text-outline">
-              <span className="material-symbols-outlined text-sm">insert_drive_file</span>
-              <span className="font-mono truncate max-w-xs">{file.name}</span>
-              <span>·</span>
-              <span>{(file.size / 1024 / 1024).toFixed(1)} MB</span>
+            <div className="flex flex-col gap-2">
+              {/* Filename / size / dimensions */}
+              <div className="flex items-center gap-2 text-xs text-outline">
+                <span className="material-symbols-outlined text-sm">insert_drive_file</span>
+                <span className="font-mono truncate max-w-xs">{file.name}</span>
+                <span>·</span>
+                <span>{(file.size / 1024 / 1024).toFixed(1)} MB</span>
+                {imgWidth && imgHeight && (
+                  <>
+                    <span>·</span>
+                    <span>{imgWidth.toLocaleString()} × {imgHeight.toLocaleString()} px</span>
+                  </>
+                )}
+              </div>
+              {/* EXIF metadata panel */}
+              {exifData && <ExifPanel data={exifData} />}
             </div>
           )}
 
@@ -341,7 +442,7 @@ export default function NewUploadPage() {
             </p>
           )}
 
-          {/* ── 제목 * (AI 자동생성) ── */}
+          {/* ── 작품 제목 * (AI 자동생성) ── */}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-bold text-outline uppercase tracking-widest flex items-center gap-2">
               작품 제목 *
@@ -478,14 +579,6 @@ export default function NewUploadPage() {
               <p className="text-xs text-error">촬영장소를 입력하거나 '미상'을 선택하세요.</p>
             )}
           </div>
-
-          {/* EXIF 카메라 정보 */}
-          {exifData?.camera && (
-            <div className="rounded-lg bg-surface-container-low border border-outline-variant px-4 py-3 text-xs text-on-surface-variant flex items-center gap-2">
-              <span className="material-symbols-outlined text-sm">photo_camera</span>
-              카메라: {exifData.camera}
-            </div>
-          )}
 
           {errorMsg && (
             <div className="px-4 py-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm flex items-center gap-2">
