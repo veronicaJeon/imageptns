@@ -1,10 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+
+interface Subscription {
+  id: string;
+  plan: string;
+  status: string;
+  current_period_start: string;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+}
 
 export default function SettingsPage() {
   const { t } = useLang();
@@ -18,6 +28,35 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState({ sales: true, reviews: true, newsletter: false });
   const [notifSaving, setNotifSaving] = useState(false);
+  const [subscription, setSubscription] = useState<Subscription | null | undefined>(undefined);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelDone, setCancelDone] = useState(false);
+
+  // Load subscription
+  useEffect(() => {
+    fetch("/api/subscription")
+      .then((r) => r.json())
+      .then(({ subscription: sub }: { subscription: Subscription | null }) => {
+        setSubscription(sub ?? null);
+      })
+      .catch(() => setSubscription(null));
+  }, []);
+
+  async function handleCancelSubscription() {
+    if (!confirm("구독을 취소하시겠습니까? 현재 결제 기간이 종료될 때까지는 계속 이용하실 수 있습니다.")) return;
+    setCancelLoading(true);
+    try {
+      const res = await fetch("/api/subscription", { method: "DELETE" });
+      if (res.ok) {
+        setCancelDone(true);
+        setSubscription((s) =>
+          s ? { ...s, cancel_at_period_end: true } : s
+        );
+      }
+    } finally {
+      setCancelLoading(false);
+    }
+  }
 
   // Load real profile data
   useEffect(() => {
@@ -164,6 +203,77 @@ export default function SettingsPage() {
             );
           })}
         </div>
+      </section>
+
+      {/* Subscription */}
+      <section className="mb-10">
+        <h2 className="text-xs font-bold text-outline uppercase tracking-widest mb-6 pb-3 border-b border-outline-variant/20">
+          구독 관리
+        </h2>
+
+        {subscription === undefined && (
+          <div className="flex items-center gap-2 text-outline text-sm">
+            <span className="w-4 h-4 border-2 border-outline border-t-transparent rounded-full animate-spin" />
+            불러오는 중…
+          </div>
+        )}
+
+        {subscription === null && (
+          <div className="flex flex-col gap-4 p-5 bg-surface-container-low rounded-lg">
+            <p className="text-sm text-on-surface-variant">현재 활성 구독이 없습니다.</p>
+            <Link
+              href="/pricing"
+              className="self-start px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
+            >
+              요금제 보기
+            </Link>
+          </div>
+        )}
+
+        {subscription && (
+          <div className="p-5 bg-surface-container-low rounded-lg flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-xs text-outline uppercase tracking-widest mb-1">현재 플랜</p>
+                <p className="text-on-surface font-bold capitalize text-lg">{subscription.plan}</p>
+              </div>
+              {subscription.current_period_end && (
+                <div className="text-right">
+                  <p className="text-xs text-outline uppercase tracking-widest mb-1">
+                    {subscription.cancel_at_period_end ? "구독 종료일" : "다음 결제일"}
+                  </p>
+                  <p className="text-on-surface font-semibold text-sm">
+                    {new Date(subscription.current_period_end).toLocaleDateString("ko-KR", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {subscription.cancel_at_period_end ? (
+              <div className="flex items-center gap-2 text-sm text-on-surface-variant bg-surface-container-lowest rounded px-4 py-3">
+                <span className="material-symbols-outlined text-base text-outline">info</span>
+                기간 종료 후 자동으로 해지됩니다. 재구독을 원하시면 요금제 페이지를 방문하세요.
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleCancelSubscription}
+                disabled={cancelLoading || cancelDone}
+                className="self-start px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-error border border-error/30 rounded hover:bg-error hover:text-white transition-all disabled:opacity-50"
+              >
+                {cancelLoading
+                  ? "처리 중…"
+                  : cancelDone
+                  ? "취소 완료"
+                  : "구독 취소"}
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Danger zone */}

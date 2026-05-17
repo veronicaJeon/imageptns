@@ -242,6 +242,16 @@ export const ko: Translations = {
     },
   },
 
+  photographerProfile: {
+    memberSince: "가입일",
+    images: "이미지",
+    totalSales: "총 판매",
+    totalViews: "총 조회",
+    portfolio: "포트폴리오",
+    noImages: "아직 승인된 이미지가 없습니다.",
+    notFound: "작가를 찾을 수 없습니다.",
+    backToLibrary: "← 라이브러리로 돌아가기",
+  },
   footer: {
     tagline: "1994년부터 큐레이션된 시각적 탁월함으로 세계 출판 기준을 높여왔습니다.",
     copyright: "© 2026 이미지파트너스. All rights reserved.",

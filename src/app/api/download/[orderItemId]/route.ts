@@ -38,9 +38,9 @@ export async function GET(
     return NextResponse.json({ error: "File not available" }, { status: 404 });
   }
 
-  // Create signed URL (1 hour)
+  // Create signed URL (1 hour) — files live in images-original (MVP: no separate full-res bucket)
   const { data: signed, error: signError } = await supabase.storage
-    .from("images-full")
+    .from("images-original")
     .createSignedUrl(storagePath, 60 * 60);
 
   if (signError || !signed) {

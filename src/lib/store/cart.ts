@@ -1,5 +1,12 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+
+// SSR-safe no-op storage (server has no localStorage/sessionStorage)
+const noopStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
 
 export type LicenseType = "editorial" | "commercial" | "extended";
 
@@ -69,6 +76,11 @@ export const useCart = create<CartStore>()(
 
       clear: () => set({ items: [] }),
     }),
-    { name: "imageptns-cart" }
+    {
+      name: "imageptns-cart",
+      storage: createJSONStorage(() =>
+        typeof window !== "undefined" ? localStorage : noopStorage
+      ),
+    }
   )
 );

@@ -75,17 +75,34 @@ export default function NewUploadPage() {
       const aiRes = await fetch("/api/ai/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64 }),
+        body: JSON.stringify({
+          imageBase64,
+          filename: f.name,
+          exifData: exif
+            ? {
+                locationLabel: exif.locationLabel ?? undefined,
+                camera: exif.camera ?? undefined,
+                takenAt: exif.takenAt?.toISOString() ?? undefined,
+                lat: exif.lat ?? undefined,
+                lng: exif.lng ?? undefined,
+              }
+            : undefined,
+        }),
       });
 
-      if (aiRes.ok) {
-        const { caption, tags: aiTags, category: aiCategory } = await aiRes.json();
-        if (caption) setDesc(caption);
-        if (Array.isArray(aiTags) && aiTags.length > 0) setTags(aiTags.join(", "));
-        if (aiCategory && CATEGORIES.includes(aiCategory as Category)) setCategory(aiCategory as Category);
+      if (!aiRes.ok) {
+        setAiStatus("failed");
+        return;
       }
 
-      setAiStatus("done");
+      const { caption, tags: aiTags, category: aiCategory } = await aiRes.json();
+      const filled = !!(caption || (Array.isArray(aiTags) && aiTags.length > 0));
+
+      if (caption) setDesc(caption);
+      if (Array.isArray(aiTags) && aiTags.length > 0) setTags(aiTags.join(", "));
+      if (aiCategory && CATEGORIES.includes(aiCategory as Category)) setCategory(aiCategory as Category);
+
+      setAiStatus(filled ? "done" : "failed");
     } catch {
       setAiStatus("failed");
     }
@@ -256,8 +273,16 @@ export default function NewUploadPage() {
           )}
 
           {aiStatus === "done" && (
-            <div className="px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm">
+            <div className="px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">auto_awesome</span>
               AI가 내용을 자동으로 채웠어요. 수정하셔도 됩니다.
+            </div>
+          )}
+
+          {aiStatus === "failed" && (
+            <div className="px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">info</span>
+              AI 분석을 완료하지 못했어요. 직접 입력해 주세요.
             </div>
           )}
 

@@ -85,6 +85,46 @@ export async function sendImageApproved(opts: {
   });
 }
 
+export async function sendPayoutApproved(opts: {
+  photographerEmail: string;
+  photographerName:  string;
+  period:            string;
+  netKrw:            number;
+}) {
+  await sendEmail({
+    to:      opts.photographerEmail,
+    subject: `[Image Partners] 정산이 완료되었습니다 — ${opts.period}`,
+    html: `
+      <p>${opts.photographerName}님, 안녕하세요.</p>
+      <p>${opts.period} 기간의 정산이 처리되어 지급되었습니다.</p>
+      <p><strong>지급 금액:</strong> ₩${opts.netKrw.toLocaleString("ko-KR")}</p>
+      <p>수익 장부에서 상세 내역을 확인하실 수 있습니다.</p>
+      <br><p>Image Partners 팀 드림</p>
+    `,
+  });
+}
+
+export async function sendPayoutRejected(opts: {
+  photographerEmail: string;
+  photographerName:  string;
+  period:            string;
+  netKrw:            number;
+  note?:             string;
+}) {
+  await sendEmail({
+    to:      opts.photographerEmail,
+    subject: `[Image Partners] 정산 처리 안내 — ${opts.period}`,
+    html: `
+      <p>${opts.photographerName}님, 안녕하세요.</p>
+      <p>${opts.period} 기간의 정산 요청이 아래 사유로 처리되지 않았습니다.</p>
+      <p><strong>신청 금액:</strong> ₩${opts.netKrw.toLocaleString("ko-KR")}</p>
+      ${opts.note ? `<p><strong>사유:</strong> ${opts.note}</p>` : ""}
+      <p>문의 사항은 support@imagepartners.com으로 연락해 주세요.</p>
+      <br><p>Image Partners 팀 드림</p>
+    `,
+  });
+}
+
 export async function sendImageRejected(opts: {
   photographerEmail: string;
   photographerName:  string;

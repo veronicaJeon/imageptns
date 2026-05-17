@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+export const maxDuration = 60;
 
 interface AnalyzeResponse {
   caption: string;
@@ -6,190 +9,231 @@ interface AnalyzeResponse {
   category: string;
 }
 
-interface BlipResult {
-  generated_text: string;
-}
+const VALID_CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
 
-interface DetrResult {
-  score: number;
-  label: string;
-  box: { xmin: number; ymin: number; xmax: number; ymax: number };
-}
+const VISION_PROMPT = `Analyze this stock photo. Respond with ONLY valid JSON — no markdown fences, no explanation.
 
-const HF_BASE = "https://api-inference.huggingface.co/models";
-const BLIP_MODEL = "Salesforce/blip-image-captioning-base";
-const DETR_MODEL = "facebook/detr-resnet-50";
+{
+  "caption": "<one factual English sentence describing the photo, max 20 words>",
+  "tags": ["<up to 10 lowercase English keywords that describe the image content>"],
+  "category": "<exactly one of: nature | people | editorial | urban | abstract | architecture>"
+}`;
 
-const RETRY_DELAY_MS = 3000;
-const DETR_SCORE_THRESHOLD = 0.5;
-const MIN_TAG_LENGTH = 3;
-const MAX_TAGS = 10;
-const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
-
-// Ordered by priority — first match wins
-const CATEGORY_RULES: Array<{ keywords: string[]; category: string }> = [
-  {
-    keywords: ["person", "people", "man", "woman", "child", "face", "crowd", "boy", "girl", "human", "portrait"],
-    category: "people",
-  },
-  {
-    keywords: ["building", "church", "cathedral", "tower", "skyscraper", "bridge", "monument", "facade", "architecture"],
-    category: "architecture",
-  },
-  {
-    keywords: ["car", "bus", "truck", "traffic light", "road", "street", "taxi", "motorcycle", "vehicle", "urban"],
-    category: "urban",
-  },
-  {
-    keywords: ["tree", "forest", "mountain", "river", "ocean", "sea", "beach", "flower", "bird", "dog", "cat", "animal", "wildlife", "sunset", "lake", "sky", "grass", "plant", "field"],
-    category: "nature",
-  },
-  {
-    keywords: ["newspaper", "protest", "ceremony", "event", "rally", "demonstration", "speech", "conference"],
-    category: "editorial",
-  },
-];
-
-function inferCategory(labels: string[], caption: string): string {
-  const haystack = [
-    ...labels.map((l) => l.toLowerCase()),
-    ...caption.toLowerCase().split(/\W+/),
-  ];
-  for (const rule of CATEGORY_RULES) {
-    if (rule.keywords.some((kw) => haystack.some((t) => t.includes(kw)))) {
-      return rule.category;
-    }
-  }
-  return "";
-}
-
-// HuggingFace image models expect raw binary — NOT JSON with base64
-async function callHuggingFace(
-  model: string,
-  imageArrayBuffer: ArrayBuffer,
-  mimeType: string,
-  apiKey: string
-): Promise<Response> {
-  const url = `${HF_BASE}/${model}`;
-  const options: RequestInit = {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": mimeType,
-    },
-    body: imageArrayBuffer,
-  };
-
-  const res = await fetch(url, options);
-
-  if (res.status === 503) {
-    // Model is loading — retry once after delay
-    await new Promise<void>((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-    return fetch(url, options);
-  }
-
-  return res;
-}
-
-async function fetchCaption(
-  imageArrayBuffer: ArrayBuffer,
-  mimeType: string,
-  apiKey: string
-): Promise<string | null> {
+function parseJsonResponse(raw: string): { caption: string; tags: string[]; category: string } | null {
   try {
-    const res = await callHuggingFace(BLIP_MODEL, imageArrayBuffer, mimeType, apiKey);
-    if (!res.ok) return null;
-    const json: BlipResult[] = await res.json();
-    if (!Array.isArray(json)) return null;
-    return json[0]?.generated_text ?? null;
+    const cleaned = raw.trim().startsWith("```")
+      ? raw.trim().replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "")
+      : raw.trim();
+    const parsed = JSON.parse(cleaned);
+    const caption: string = typeof parsed.caption === "string" ? parsed.caption.trim() : "";
+    const tags: string[] = Array.isArray(parsed.tags)
+      ? parsed.tags.filter((t: unknown) => typeof t === "string").map((t: string) => t.toLowerCase().trim()).slice(0, 10)
+      : [];
+    const category: string = VALID_CATEGORIES.includes(parsed.category) ? parsed.category : "";
+    return { caption, tags, category };
   } catch {
     return null;
   }
 }
 
-async function fetchTags(
-  imageArrayBuffer: ArrayBuffer,
-  mimeType: string,
-  apiKey: string
-): Promise<string[]> {
-  try {
-    const res = await callHuggingFace(DETR_MODEL, imageArrayBuffer, mimeType, apiKey);
-    if (!res.ok) return [];
-    const json: DetrResult[] = await res.json();
-    if (!Array.isArray(json)) return [];
+// ── Vision: Mistral pixtral-12b ────────────────────────────────────────────
+async function analyzeWithMistral(dataUrl: string): Promise<AnalyzeResponse> {
+  const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "pixtral-12b-2409",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: dataUrl } },
+            { type: "text", text: VISION_PROMPT },
+          ],
+        },
+      ],
+      max_tokens: 256,
+      temperature: 0.1,
+    }),
+  });
 
-    const seen = new Set<string>();
-    const tags: string[] = [];
-
-    for (const detection of json) {
-      if (detection.score <= DETR_SCORE_THRESHOLD) continue;
-      const label = detection.label.toLowerCase().trim();
-      if (label.length < MIN_TAG_LENGTH) continue;
-      if (seen.has(label)) continue;
-      seen.add(label);
-      tags.push(label);
-      if (tags.length >= MAX_TAGS) break;
-    }
-
-    return tags;
-  } catch {
-    return [];
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Mistral ${res.status}: ${text.slice(0, 200)}`);
   }
+
+  const json = await res.json();
+  const raw: string = json?.choices?.[0]?.message?.content ?? "";
+  const parsed = parseJsonResponse(raw);
+  if (!parsed || (!parsed.caption && parsed.tags.length === 0)) {
+    throw new Error(`Mistral returned unusable result: ${raw.slice(0, 100)}`);
+  }
+  return parsed;
 }
 
-export async function POST(
-  req: NextRequest
-): Promise<NextResponse<AnalyzeResponse | { error: string }>> {
-  let imageBase64: string;
+// ── Vision: Google Gemini flash-lite ──────────────────────────────────────
+async function analyzeWithGemini(base64Data: string, mimeType: string): Promise<AnalyzeResponse> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { inline_data: { mime_type: mimeType, data: base64Data } },
+              { text: VISION_PROMPT },
+            ],
+          },
+        ],
+        generationConfig: { maxOutputTokens: 256, temperature: 0.1 },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Gemini ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  const json = await res.json();
+  const raw: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const parsed = parseJsonResponse(raw);
+  if (!parsed || (!parsed.caption && parsed.tags.length === 0)) {
+    throw new Error(`Gemini returned unusable result: ${raw.slice(0, 100)}`);
+  }
+  return parsed;
+}
+
+// ── Fallback: Groq text model with filename + EXIF ─────────────────────────
+async function analyzeWithGroqText(body: {
+  filename?: string;
+  exifData?: { locationLabel?: string; camera?: string; takenAt?: string };
+}): Promise<AnalyzeResponse> {
+  const fileBase = (body.filename ?? "")
+    .replace(/\.[^/.]+$/, "")
+    .replace(/[-_.]/g, " ")
+    .replace(/\d{4,}/g, "")
+    .trim();
+
+  const parts: string[] = [];
+  if (fileBase) parts.push(`Filename keywords: ${fileBase}`);
+  if (body.exifData?.locationLabel) parts.push(`Location: ${body.exifData.locationLabel}`);
+  if (body.exifData?.camera) parts.push(`Camera: ${body.exifData.camera}`);
+  if (body.exifData?.takenAt) {
+    const d = new Date(body.exifData.takenAt);
+    if (!isNaN(d.getTime())) parts.push(`Taken: ${d.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`);
+  }
+
+  if (parts.length === 0) throw new Error("No metadata to analyze");
+
+  const prompt = `You are a stock photo metadata specialist.
+
+Photo metadata:
+${parts.join("\n")}
+
+Respond with ONLY valid JSON:
+{
+  "caption": "<one factual English sentence, max 20 words>",
+  "tags": ["<up to 10 lowercase English keywords>"],
+  "category": "<one of: nature | people | editorial | urban | abstract | architecture>"
+}`;
+
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 256,
+      temperature: 0.2,
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Groq ${res.status}`);
+  const json = await res.json();
+  const raw: string = json?.choices?.[0]?.message?.content ?? "";
+  const parsed = parseJsonResponse(raw);
+  if (!parsed || (!parsed.caption && parsed.tags.length === 0)) throw new Error("Groq returned unusable result");
+  return parsed;
+}
+
+// ── Handler ────────────────────────────────────────────────────────────────
+export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeResponse | { error: string }>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  let body: {
+    imageBase64?: string;
+    filename?: string;
+    exifData?: { locationLabel?: string; camera?: string; takenAt?: string; lat?: number; lng?: number };
+  };
+
   try {
-    const body = await req.json();
-    imageBase64 = body?.imageBase64;
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (typeof imageBase64 !== "string" || !imageBase64) {
-    return NextResponse.json({ error: "imageBase64 is required" }, { status: 400 });
+  const { imageBase64, filename, exifData } = body;
+
+  // Parse data URL once (shared by vision providers)
+  let dataUrl = "";
+  let base64Data = "";
+  let mimeType = "image/jpeg";
+
+  if (imageBase64) {
+    const comma = imageBase64.indexOf(",");
+    if (comma !== -1) {
+      mimeType = imageBase64.slice(5, comma).split(";")[0] || "image/jpeg";
+      base64Data = imageBase64.slice(comma + 1);
+      dataUrl = `data:${mimeType};base64,${base64Data}`;
+    }
   }
 
-  const apiKey = process.env.HUGGINGFACE_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ caption: "", tags: [], category: "" });
+  const errors: string[] = [];
+
+  // 1. Try Mistral vision (pixtral-12b)
+  if (process.env.MISTRAL_API_KEY && dataUrl) {
+    try {
+      const result = await analyzeWithMistral(dataUrl);
+      return NextResponse.json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[ai/analyze] Mistral failed:", msg);
+      errors.push(`Mistral: ${msg}`);
+    }
   }
 
-  // Parse data URL: "data:<mime>;base64,<data>"
-  const commaIndex = imageBase64.indexOf(",");
-  if (commaIndex === -1) {
-    return NextResponse.json({ error: "Invalid data URL" }, { status: 400 });
-  }
-  const mimeType = imageBase64.slice(5, commaIndex).split(";")[0] || "image/jpeg";
-  const base64Data = imageBase64.slice(commaIndex + 1);
-
-  // Decode base64 → ArrayBuffer (ArrayBuffer is valid BodyInit, no SharedArrayBuffer issues)
-  const binary = atob(base64Data);
-  const imageArrayBuffer = new ArrayBuffer(binary.length);
-  const view = new Uint8Array(imageArrayBuffer);
-  for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
-
-  if (imageArrayBuffer.byteLength > MAX_BYTES) {
-    return NextResponse.json(
-      { error: "Image exceeds 8 MB limit for AI analysis" },
-      { status: 400 }
-    );
+  // 2. Try Gemini vision (gemini-2.0-flash-lite)
+  if (process.env.GEMINI_API_KEY && base64Data) {
+    try {
+      const result = await analyzeWithGemini(base64Data, mimeType);
+      return NextResponse.json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[ai/analyze] Gemini failed:", msg);
+      errors.push(`Gemini: ${msg}`);
+    }
   }
 
-  const [captionResult, tagsResult] = await Promise.allSettled([
-    fetchCaption(imageArrayBuffer, mimeType, apiKey),
-    fetchTags(imageArrayBuffer, mimeType, apiKey),
-  ]);
+  // 3. Fallback: Groq text + filename/EXIF (no vision)
+  if (process.env.GROQ_API_KEY && (filename || exifData)) {
+    try {
+      const result = await analyzeWithGroqText({ filename, exifData });
+      return NextResponse.json(result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[ai/analyze] Groq fallback failed:", msg);
+      errors.push(`Groq: ${msg}`);
+    }
+  }
 
-  const caption =
-    captionResult.status === "fulfilled" && captionResult.value
-      ? captionResult.value
-      : "";
-
-  const tags = tagsResult.status === "fulfilled" ? tagsResult.value : [];
-  const category = inferCategory(tags, caption);
-
-  return NextResponse.json({ caption, tags, category });
+  console.error("[ai/analyze] All providers failed:", errors);
+  return NextResponse.json({ error: "AI analysis failed" }, { status: 500 });
 }

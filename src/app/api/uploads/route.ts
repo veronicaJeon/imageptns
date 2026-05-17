@@ -72,12 +72,13 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const originalPath = storage_path_original;
   const previewPath = storage_path_original;
   (async () => {
     const admin = createAdminClient();
     const { data: downloaded, error: downloadErr } = await admin.storage
-      .from("images-preview")
-      .download(previewPath);
+      .from("images-original")
+      .download(originalPath);
     if (downloadErr || !downloaded) throw downloadErr ?? new Error("download returned null");
     const arrayBuffer = await downloaded.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);

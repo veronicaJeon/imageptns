@@ -155,6 +155,16 @@ export interface Translations {
       contact: string;
     };
   };
+  photographerProfile: {
+    memberSince: string;
+    images: string;
+    totalSales: string;
+    totalViews: string;
+    portfolio: string;
+    noImages: string;
+    notFound: string;
+    backToLibrary: string;
+  };
   footer: {
     tagline: string;
     copyright: string;
@@ -413,6 +423,16 @@ export const en: Translations = {
       browse: "Browse our library",
       contact: "Contact sales",
     },
+  },
+  photographerProfile: {
+    memberSince: "Member since",
+    images: "Images",
+    totalSales: "Total Sales",
+    totalViews: "Total Views",
+    portfolio: "Portfolio",
+    noImages: "No approved images yet.",
+    notFound: "Photographer not found.",
+    backToLibrary: "← Back to Library",
   },
   footer: {
     tagline:

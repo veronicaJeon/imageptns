@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -30,11 +30,11 @@ export async function GET(req: NextRequest) {
 
   const tossData = await tossRes.json();
 
-  const supabase = await createClient();
+  const admin = createAdminClient();
 
   if (!tossRes.ok) {
     // Mark order failed
-    await supabase
+    await admin
       .from("orders")
       .update({ status: "failed" })
       .eq("toss_order_id", orderId);
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Mark order completed — triggers earnings_ledger + downloads via DB trigger
-  const { data: order } = await supabase
+  const { data: order } = await admin
     .from("orders")
     .update({
       status:           "completed",

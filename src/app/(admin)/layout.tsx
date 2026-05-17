@@ -7,8 +7,9 @@ import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/lib/store/auth";
 
 const NAV_ITEMS = [
-  { href: "/admin",        icon: "pending_actions", label: "이미지 검토" },
-  { href: "/admin/stats",  icon: "bar_chart",       label: "통계"       },
+  { href: "/admin",          icon: "pending_actions", label: "이미지 검토" },
+  { href: "/admin/payouts",  icon: "payments",        label: "정산 관리"  },
+  { href: "/admin/stats",    icon: "bar_chart",       label: "통계"       },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

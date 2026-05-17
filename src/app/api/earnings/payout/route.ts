@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const MIN_PAYOUT_KRW = 50_000;
 
@@ -46,8 +47,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Create payout record
-  const { data: payout, error: payoutError } = await supabase
+  // Create payout record (admin client bypasses RLS — no insert policy exists for photographers)
+  const admin = createAdminClient();
+  const { data: payout, error: payoutError } = await admin
     .from("payouts")
     .insert({
       photographer_id:  user.id,
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest) {
   if (payoutError) return NextResponse.json({ error: payoutError.message }, { status: 500 });
 
   // Link earnings rows to payout
-  await supabase
+  await admin
     .from("earnings_ledger")
     .update({ payout_id: payout.id })
     .in("id", rows.map((r: any) => r.id));

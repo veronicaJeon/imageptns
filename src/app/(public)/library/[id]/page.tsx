@@ -168,7 +168,17 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                 {imageData.title}
               </h1>
               <p className="text-on-surface-variant text-sm">
-                {d.by} <span className="text-on-surface font-semibold">{photographer}</span>
+                {d.by}{" "}
+                {imageData.photographer?.id ? (
+                  <Link
+                    href={`/photographer/${imageData.photographer.id}`}
+                    className="text-on-surface font-semibold hover:text-primary transition-colors"
+                  >
+                    {photographer}
+                  </Link>
+                ) : (
+                  <span className="text-on-surface font-semibold">{photographer}</span>
+                )}
               </p>
               {imageData.description && (
                 <p className="text-on-surface-variant text-sm mt-3 leading-relaxed">{imageData.description}</p>
