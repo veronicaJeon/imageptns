@@ -121,7 +121,8 @@ export interface Translations {
     favorite: string;
     share: string;
     similarTitle: string;
-    details: { format: string; size: string; uploaded: string; id: string };
+    details: { format: string; size: string; uploaded: string; id: string; shotAt: string; shotLocation: string };
+    copied: string;
   };
   home: {
     hero: {
@@ -359,7 +360,8 @@ export const en: Translations = {
     favorite: "Save",
     share: "Share",
     similarTitle: "Similar Images",
-    details: { format: "Format", size: "File Size", uploaded: "Uploaded", id: "Asset ID" },
+    details: { format: "Format", size: "File Size", uploaded: "Uploaded", id: "Asset ID", shotAt: "Shot On", shotLocation: "Location" },
+    copied: "Link copied!",
   },
   home: {
     hero: {

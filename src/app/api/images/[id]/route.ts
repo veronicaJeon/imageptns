@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(
   _req: NextRequest,
@@ -14,7 +15,9 @@ export async function GET(
       `id, asset_id, title, description, category, tags,
        storage_path_preview, storage_path_full,
        width, height, resolution_mp, file_format, file_size_mb,
+       exif_taken_at, exif_location,
        views_count, sales_count, approved_at, created_at,
+       photographer_id,
        photographer:profiles!photographer_id(id, full_name, avatar_url, bio)`
     )
     .eq("id", id)
@@ -50,10 +53,21 @@ export async function GET(
 
   const imgAny = img as any;
 
+  // Photographer display name: full_name → email prefix fallback
+  let photographerName: string = imgAny.photographer?.full_name?.trim() ?? "";
+  if (!photographerName && imgAny.photographer_id) {
+    const admin = createAdminClient();
+    const { data: authUser } = await admin.auth.admin.getUserById(imgAny.photographer_id);
+    photographerName = authUser?.user?.email?.split("@")[0] ?? "Unknown";
+  }
+
   return NextResponse.json({
     image: {
       ...imgAny,
       storage_path_preview: previewUrl(imgAny.storage_path_preview),
+      photographer: imgAny.photographer
+        ? { ...imgAny.photographer, display_name: photographerName }
+        : null,
     },
     similar: (similar ?? []).map((s: any) => ({
       id: s.id,

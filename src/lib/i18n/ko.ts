@@ -174,7 +174,8 @@ export const ko: Translations = {
     favorite: "저장",
     share: "공유",
     similarTitle: "유사 이미지",
-    details: { format: "파일 형식", size: "파일 크기", uploaded: "업로드일", id: "에셋 ID" },
+    details: { format: "파일 형식", size: "파일 크기", uploaded: "업로드일", id: "에셋 ID", shotAt: "촬영일시", shotLocation: "촬영장소" },
+    copied: "링크가 복사됐어요!",
   },
   home: {
     hero: {

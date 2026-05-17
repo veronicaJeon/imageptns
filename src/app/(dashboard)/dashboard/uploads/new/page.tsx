@@ -28,6 +28,8 @@ export default function NewUploadPage() {
   const [location, setLocation] = useState("");
   const [locationSource, setLocationSource] = useState<"exif" | "manual">("manual");
 
+  const [imgWidth, setImgWidth]   = useState<number | null>(null);
+  const [imgHeight, setImgHeight] = useState<number | null>(null);
   const [progress, setProgress] = useState(0);
   const [status, setStatus]     = useState<"idle" | "uploading" | "saving" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -133,7 +135,15 @@ export default function NewUploadPage() {
     }
     setErrorMsg("");
     setFile(f);
-    setPreview(URL.createObjectURL(f));
+    setImgWidth(null); setImgHeight(null);
+    const objectUrl = URL.createObjectURL(f);
+    setPreview(objectUrl);
+    // Extract image dimensions (skip for TIFF — canvas can't decode it)
+    if (f.type !== "image/tiff") {
+      const img = new window.Image();
+      img.onload = () => { setImgWidth(img.naturalWidth); setImgHeight(img.naturalHeight); };
+      img.src = objectUrl;
+    }
     setTakenAt(""); setTakenAtSource("manual");
     setLocation(""); setLocationSource("manual");
     if (!title) setTitle(f.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
@@ -204,6 +214,9 @@ export default function NewUploadPage() {
           storage_path_original: storagePath,
           file_size_mb: parseFloat((file!.size / 1024 / 1024).toFixed(2)),
           file_format: file!.type === "image/tiff" ? "TIFF" : file!.type === "image/jpeg" ? "JPEG" : file!.type.split("/")[1].toUpperCase(),
+          width: imgWidth,
+          height: imgHeight,
+          resolution_mp: imgWidth && imgHeight ? parseFloat(((imgWidth * imgHeight) / 1_000_000).toFixed(1)) : null,
           // 촬영일시: "unknown" → null (TIMESTAMPTZ 불가), 날짜 문자열 → ISO
           exif_taken_at: takenAt === UNKNOWN ? null : takenAt || null,
           exif_taken_at_unknown: takenAt === UNKNOWN,

@@ -32,6 +32,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   const [isFavorited, setFavorited]   = useState(false);
   const [favLoading, setFavLoading]   = useState(false);
   const [cartFeedback, setCartFeedback] = useState<"idle" | "added">("idle");
+  const [shareFeedback, setShareFeedback] = useState<"idle" | "copied">("idle");
   const addItem = useCart((s) => s.addItem);
 
   useEffect(() => {
@@ -115,14 +116,38 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const photographer = imageData.photographer?.full_name ?? "";
-  const uploadedDate = imageData.approved_at
-    ? new Date(imageData.approved_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-    : new Date(imageData.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const photographer = imageData.photographer?.display_name || imageData.photographer?.full_name || "Unknown";
+  const photographerId = imageData.photographer?.id;
+
+  const uploadedDate = new Date(imageData.approved_at ?? imageData.created_at)
+    .toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
+
+  const shotAtDate = imageData.exif_taken_at
+    ? new Date(imageData.exif_taken_at).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })
+    : null;
+
+  const shotLocation = (imageData.exif_location && imageData.exif_location !== "unknown")
+    ? imageData.exif_location
+    : imageData.exif_location === "unknown" ? "미상" : null;
 
   const resolutionStr = imageData.width && imageData.height
-    ? `${imageData.width.toLocaleString()} × ${imageData.height.toLocaleString()} px`
-    : "—";
+    ? `${Number(imageData.width).toLocaleString()} × ${Number(imageData.height).toLocaleString()} px`
+    : null;
+
+  function handleShare() {
+    const url = window.location.href;
+    const tryClipboard = () =>
+      navigator.clipboard.writeText(url).then(() => {
+        setShareFeedback("copied");
+        setTimeout(() => setShareFeedback("idle"), 2000);
+      });
+
+    if (navigator.clipboard) {
+      tryClipboard().catch(() => prompt("링크를 복사하세요:", url));
+    } else {
+      prompt("링크를 복사하세요:", url);
+    }
+  }
 
   return (
     <>
@@ -169,10 +194,10 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
               </h1>
               <p className="text-on-surface-variant text-sm">
                 {d.by}{" "}
-                {imageData.photographer?.id ? (
+                {photographerId ? (
                   <Link
-                    href={`/photographer/${imageData.photographer.id}`}
-                    className="text-on-surface font-semibold hover:text-primary transition-colors"
+                    href={`/photographer/${photographerId}`}
+                    className="text-on-surface font-semibold hover:text-primary transition-colors underline-offset-2 hover:underline"
                   >
                     {photographer}
                   </Link>
@@ -260,24 +285,33 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                   {d.favorite}
                 </button>
                 <button
-                  onClick={() => navigator.clipboard?.writeText(window.location.href)}
-                  className="flex-1 py-3 rounded border border-outline-variant text-on-surface-variant text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:border-outline transition-colors"
+                  onClick={handleShare}
+                  className={cn(
+                    "flex-1 py-3 rounded border text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
+                    shareFeedback === "copied"
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-outline-variant text-on-surface-variant hover:border-outline"
+                  )}
                 >
-                  <span className="material-symbols-outlined text-base">share</span>
-                  {d.share}
+                  <span className="material-symbols-outlined text-base">
+                    {shareFeedback === "copied" ? "check" : "share"}
+                  </span>
+                  {shareFeedback === "copied" ? d.copied : d.share}
                 </button>
               </div>
             </div>
 
             {/* Asset details */}
             <div className="border-t border-outline-variant/20 pt-6 grid grid-cols-2 gap-4">
-              {[
-                { label: d.details.format,   value: imageData.file_format ?? "TIFF / JPEG" },
-                { label: d.resolution,        value: resolutionStr },
-                { label: d.details.size,      value: imageData.file_size_mb ? `${imageData.file_size_mb} MB` : "—" },
-                { label: d.details.uploaded,  value: uploadedDate },
-                { label: d.details.id,        value: imageData.asset_id ?? "—" },
-              ].map(({ label, value }) => (
+              {([
+                { label: d.details.format,       value: imageData.file_format ?? "—" },
+                { label: d.resolution,            value: resolutionStr ?? "—" },
+                { label: d.details.size,          value: imageData.file_size_mb ? `${imageData.file_size_mb} MB` : "—" },
+                { label: d.details.uploaded,      value: uploadedDate },
+                shotAtDate    ? { label: d.details.shotAt,       value: shotAtDate }    : null,
+                shotLocation  ? { label: d.details.shotLocation,  value: shotLocation }  : null,
+                { label: d.details.id,            value: imageData.asset_id ?? "—" },
+              ]).filter((x): x is { label: string; value: string } => x !== null).map(({ label, value }) => (
                 <div key={label}>
                   <p className="text-[10px] text-outline uppercase tracking-widest font-bold mb-1">{label}</p>
                   <p className="text-sm text-on-surface font-medium">{value}</p>
