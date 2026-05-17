@@ -160,7 +160,7 @@ export const ko: Translations = {
   contact: {
     hero: { headline: "문의하기.", sub: "에디토리얼 팀이 적합한 이미지를 찾는 데 도움을 드립니다." },
     form: { name: "이름", namePlaceholder: "홍길동", email: "이메일", emailPlaceholder: "you@example.com", subject: "제목", subjectPlaceholder: "어떻게 도와드릴까요?", message: "메시지", messagePlaceholder: "프로젝트에 대해 알려주세요…", submit: "메시지 보내기" },
-    info: { title: "연락처 정보", email: "imagepartners@naver.com", hours: "운영 시간", hoursVal: "월–금, 오전 9시–오후 6시 (KST)", response: "응답 시간", responseVal: "영업일 기준 1일 이내" },
+    info: { title: "연락처 정보", email: "contact@imagepartners.kr", hours: "운영 시간", hoursVal: "월–금, 오전 9시–오후 6시 (KST)", response: "응답 시간", responseVal: "영업일 기준 1일 이내" },
     success: "메시지가 전송되었습니다! 영업일 기준 하루 안에 연락드리겠습니다.",
   },
   imageDetail: {

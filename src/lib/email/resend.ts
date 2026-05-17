@@ -1,7 +1,7 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Override via env vars in Vercel dashboard; defaults kept for local dev reference
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "Image Partners <onboarding@resend.dev>";
-const OPS_EMAIL  = process.env.OPS_EMAIL ?? "imagepartners@naver.com";
+const OPS_EMAIL  = process.env.OPS_EMAIL ?? "contact@imagepartners.kr";
 
 interface EmailPayload {
   to:      string | string[];

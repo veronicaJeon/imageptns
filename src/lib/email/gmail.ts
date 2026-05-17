@@ -1,27 +1,27 @@
 import nodemailer from "nodemailer";
 
 // Set in Vercel env vars:
-//   NAVER_SMTP_USER = imagepartners@naver.com
-//   NAVER_SMTP_PASS = (Naver account password or app password)
-const SMTP_USER = process.env.NAVER_SMTP_USER ?? "";
-const SMTP_PASS = process.env.NAVER_SMTP_PASS ?? "";
+//   GMAIL_SMTP_USER = imgptns@gmail.com
+//   GMAIL_SMTP_PASS = Gmail App Password (Google 계정 → 보안 → 2단계 인증 → 앱 비밀번호)
+const SMTP_USER = process.env.GMAIL_SMTP_USER ?? "";
+const SMTP_PASS = process.env.GMAIL_SMTP_PASS ?? "";
 
 function createTransport() {
   return nodemailer.createTransport({
-    host: "smtp.naver.com",
+    host: "smtp.gmail.com",
     port: 465,
     secure: true,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
   });
 }
 
-export async function sendContactConfirmationViaNaverSmtp(opts: {
+export async function sendContactConfirmation(opts: {
   name:    string;
   email:   string;
   subject: string;
 }) {
   if (!SMTP_USER || !SMTP_PASS) {
-    console.warn("[naver-smtp] credentials not set — skipping confirmation email");
+    console.warn("[gmail-smtp] credentials not set — skipping confirmation email");
     return;
   }
   const transport = createTransport();
@@ -38,18 +38,18 @@ export async function sendContactConfirmationViaNaverSmtp(opts: {
   });
 }
 
-export async function notifyOpsContactViaNaverSmtp(opts: {
+export async function notifyOpsContact(opts: {
   name:    string;
   email:   string;
   subject: string;
   message: string;
 }) {
   if (!SMTP_USER || !SMTP_PASS) {
-    console.warn("[naver-smtp] credentials not set — skipping ops notification");
+    console.warn("[gmail-smtp] credentials not set — skipping ops notification");
     return;
   }
   const transport = createTransport();
-  // Reply-To is set to the enquirer's email so the business can reply directly
+  // Reply-To 설정으로 수신 후 바로 답장 가능
   await transport.sendMail({
     from:    `"Image Partners" <${SMTP_USER}>`,
     to:      SMTP_USER,
