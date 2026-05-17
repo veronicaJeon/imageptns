@@ -1,40 +1,17 @@
-version: "3.8"
-
-# ─────────────────────────────────────────────
-# Image Partners — 로컬 개발 환경
-# 사용법: docker compose up
-# Supabase Studio: http://localhost:54323
-# Next.js App:     http://localhost:3000
-# ─────────────────────────────────────────────
+version: "3.9"
 
 services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     volumes:
-      - ./src:/app/src
-      - ./public:/app/public
+      - .:/app
       - /app/node_modules
-    environment:
-      - NODE_ENV=development
     env_file:
-      - .env.local
-    depends_on:
-      - supabase-db
-
-  supabase-db:
-    image: postgres:15-alpine
-    ports:
-      - "54322:5432"
-    environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - supabase_data:/var/lib/postgresql/data
-
-volumes:
-  supabase_data:
+      - .env.docker.local
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: ["npm", "run", "dev", "--", "--hostname", "0.0.0.0"]

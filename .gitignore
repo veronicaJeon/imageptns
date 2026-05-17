@@ -56,3 +56,5 @@ nginx/ssl/
 
 # OS
 Thumbs.db
+
+.vercel

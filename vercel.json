@@ -1,0 +1,13 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "regions": ["icn1"],
+  "crons": [
+    {
+      "path": "/api/cron/auto-reject-stale",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

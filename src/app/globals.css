@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind v4 — 클래스 기반 다크모드 (.dark가 html에 붙으면 활성화) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ─────────────────────────────────────────────
    Lumina Editorial Design System
    "The Digital Curator" — Image Partners
@@ -43,9 +46,10 @@
   --color-on-surface-dark:            #dde4e0;
 
   /* ── Typography ── */
-  --font-display:  "Epilogue", sans-serif;
-  --font-body:     "Inter", sans-serif;
-  --font-sans:     "Inter", sans-serif;
+  --font-display:   "Epilogue", sans-serif;
+  --font-headline:  "Epilogue", sans-serif;  /* alias */
+  --font-body:      "Inter", sans-serif;
+  --font-sans:      "Inter", sans-serif;
 
   /* ── Shadows ── */
   --shadow-ghost:  0px 20px 40px rgba(26, 28, 28, 0.06);
@@ -70,7 +74,28 @@
    ───────────────────────────────────────────── */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+}
+
+/* ── 다크모드 색상 토큰 오버라이드 ── */
+.dark {
+  color-scheme: dark;
+
+  --color-surface:                   #111815;
+  --color-surface-container-lowest:  #0a0f0d;
+  --color-surface-container-low:     #181f1c;
+  --color-surface-container:         #1d2421;
+  --color-surface-container-high:    #252c29;
+  --color-surface-container-highest: #2d3431;
+
+  --color-on-surface:         #dde4e0;
+  --color-on-surface-variant: #8fa39a;
+  --color-outline:            #5a6e66;
+  --color-outline-variant:    #2e3c38;
+
+  /* primary / accent는 유지 */
+  --color-primary:           #00c957;
+  --color-primary-container: #00ff7b;
 }
 
 body {
@@ -79,6 +104,7 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 /* ─────────────────────────────────────────────

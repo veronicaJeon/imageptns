@@ -20,6 +20,39 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Local Development
+
+1. Copy the example env file and fill in your keys:
+
+```bash
+cp .env.example .env.local
+```
+
+2. Start Supabase locally:
+
+```bash
+supabase start --workdir .
+```
+
+3. In another terminal, start the app:
+
+```bash
+npm run dev
+```
+
+4. If using Docker, launch the app container with:
+
+```bash
+docker compose up --build
+```
+
+5. Local services:
+- App: `http://localhost:3000`
+- Supabase API: `http://127.0.0.1:55001`
+- Supabase DB: `postgresql://postgres:postgres@127.0.0.1:55002/postgres`
+
+Make sure `.env.local` is not committed. `.env.docker.local` is already ignored by `.dockerignore`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
