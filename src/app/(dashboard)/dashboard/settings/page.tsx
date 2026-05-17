@@ -24,6 +24,7 @@ export default function SettingsPage() {
   const [name, setName]   = useState("");
   const [email, setEmail] = useState("");
   const [bio, setBio]     = useState("");
+  const [role, setRole]   = useState<"buyer" | "photographer" | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState({ sales: true, reviews: true, newsletter: false });
@@ -31,6 +32,8 @@ export default function SettingsPage() {
   const [subscription, setSubscription] = useState<Subscription | null | undefined>(undefined);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelDone, setCancelDone] = useState(false);
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+  const [upgradeDone, setUpgradeDone] = useState(false);
 
   // Load subscription
   useEffect(() => {
@@ -67,6 +70,7 @@ export default function SettingsPage() {
         setName(profile.full_name ?? "");
         setEmail(profile.email ?? "");
         setBio(profile.bio ?? "");
+        setRole(profile.role ?? null);
         setNotifications({
           sales:      profile.notif_sales      ?? true,
           reviews:    profile.notif_reviews    ?? true,
@@ -99,6 +103,24 @@ export default function SettingsPage() {
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleUpgradeToPhotographer() {
+    if (!confirm("사진가 계정으로 전환하시겠습니까?\n이미지 업로드 및 판매 기능이 활성화됩니다.")) return;
+    setUpgradeLoading(true);
+    try {
+      const res = await fetch("/api/profile/upgrade-to-photographer", { method: "POST" });
+      if (res.ok) {
+        setRole("photographer");
+        setUpgradeDone(true);
+        await init();
+      } else {
+        const { error } = await res.json();
+        alert(error ?? "전환 중 오류가 발생했습니다.");
+      }
+    } finally {
+      setUpgradeLoading(false);
     }
   }
 
@@ -203,6 +225,57 @@ export default function SettingsPage() {
             );
           })}
         </div>
+      </section>
+
+      {/* Role Management */}
+      <section className="mb-10">
+        <h2 className="text-xs font-bold text-outline uppercase tracking-widest mb-6 pb-3 border-b border-outline-variant/20">
+          계정 역할
+        </h2>
+
+        {role === "photographer" || upgradeDone ? (
+          <div className="flex items-center gap-3 px-5 py-4 bg-primary/5 border border-primary/20 rounded-lg">
+            <span className="material-symbols-outlined text-xl text-primary">photo_camera</span>
+            <div>
+              <p className="text-sm font-bold text-on-surface">사진가 계정</p>
+              <p className="text-xs text-on-surface-variant mt-0.5">이미지 업로드 및 판매 기능이 활성화되어 있습니다.</p>
+            </div>
+          </div>
+        ) : role === "buyer" ? (
+          <div className="p-5 bg-surface-container-low rounded-lg flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-xl text-outline mt-0.5">shopping_bag</span>
+              <div>
+                <p className="text-sm font-bold text-on-surface">현재 역할: 구매자</p>
+                <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                  사진가로 전환하면 이미지를 업로드하고 판매할 수 있습니다.<br />
+                  기존 구매자 기능(즐겨찾기, 주문 내역 등)은 그대로 유지됩니다.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 text-xs text-on-surface-variant pl-8">
+              {["이미지 업로드 및 검토 신청", "승인된 이미지 라이브러리 노출", "판매 수익 정산 (판매가의 80%)"].map((item) => (
+                <div key={item} className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm text-primary">check</span>
+                  {item}
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleUpgradeToPhotographer}
+              disabled={upgradeLoading}
+              className="self-start flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-all disabled:opacity-50"
+            >
+              {upgradeLoading ? (
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <span className="material-symbols-outlined text-sm">photo_camera</span>
+              )}
+              {upgradeLoading ? "전환 중…" : "사진가로 전환"}
+            </button>
+          </div>
+        ) : null}
       </section>
 
       {/* Subscription */}

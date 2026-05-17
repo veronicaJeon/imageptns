@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Badge } from "@/components/ui/Badge";
+import { NoticePopup } from "@/components/ui/NoticePopup";
 import { useLang } from "@/lib/i18n/store";
 
 const IMAGES = {
@@ -25,6 +26,7 @@ export default function HomePage() {
 
   return (
     <>
+      <NoticePopup />
       {/* ── 1. Hero ─────────────────────────────── */}
       <section className="relative h-[870px] w-full overflow-hidden flex items-center px-8 md:px-24">
         <div className="absolute inset-0 z-0">
