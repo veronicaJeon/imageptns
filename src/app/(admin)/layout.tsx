@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/admin",                   icon: "pending_actions", label: "이미지 검토"   },
   { href: "/admin/onchain",           icon: "account_balance",  label: "온체인 운영"  },
   { href: "/admin/payouts",           icon: "payments",        label: "정산 관리"    },
+  { href: "/admin/pricing",           icon: "sell",            label: "상품 가격"    },
   { href: "/admin/commission",        icon: "percent",         label: "수수료 정책"  },
   { href: "/admin/support",           icon: "support_agent",   label: "고객 문의"    },
   { href: "/admin/activity",          icon: "timeline",        label: "방문 로그"    },

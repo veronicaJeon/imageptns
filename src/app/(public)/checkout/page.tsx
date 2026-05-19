@@ -10,7 +10,7 @@ import { createConfig, http, injected, WagmiProvider } from "wagmi";
 import { base, baseSepolia } from "wagmi/chains";
 import { getAddress, type Address, type Hex } from "viem";
 import { useLang } from "@/lib/i18n/store";
-import { useCart } from "@/lib/store/cart";
+import { useCart, type LicenseType, getLicensePrice } from "@/lib/store/cart";
 import { useAuth } from "@/lib/store/auth";
 import { ERC20_ABI, IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
 import { isQuoteExpired, type OnchainQuoteSnapshot } from "@/lib/onchain/quote";
@@ -87,6 +87,7 @@ function CheckoutContent() {
   const { items } = useCart();
   const { user, loading: authLoading, init } = useAuth();
   const router = useRouter();
+  const [licensePrices, setLicensePrices] = useState<Partial<Record<LicenseType, number>>>({});
 
   useEffect(() => { init(); }, [init]);
 
@@ -97,7 +98,21 @@ function CheckoutContent() {
     }
   }, [authLoading, user, router]);
 
-  const subtotal = items.reduce((s, i) => s + i.price, 0);
+  useEffect(() => {
+    fetch("/api/license-types")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { licenses?: { code: LicenseType; price_krw: number }[] } | null) => {
+        if (!data?.licenses) return;
+        setLicensePrices(Object.fromEntries(data.licenses.map((license) => [license.code, license.price_krw])));
+      })
+      .catch(() => {});
+  }, []);
+
+  function displayPrice(license: LicenseType) {
+    return licensePrices[license] ?? getLicensePrice(license);
+  }
+
+  const subtotal = items.reduce((s, i) => s + displayPrice(i.license), 0);
   const vat      = Math.round(subtotal * 0.1);
   const total    = subtotal + vat;
 
@@ -543,7 +558,7 @@ function CheckoutContent() {
                       <p className="text-xs font-semibold text-on-surface truncate">{item.title}</p>
                       <p className="text-[10px] text-outline capitalize">{item.license}</p>
                     </div>
-                    <p className="text-xs font-bold text-on-surface shrink-0">{formatKRW(item.price)}</p>
+                    <p className="text-xs font-bold text-on-surface shrink-0">{formatKRW(displayPrice(item.license))}</p>
                   </div>
                 ))}
               </div>

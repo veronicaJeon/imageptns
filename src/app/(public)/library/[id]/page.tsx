@@ -54,6 +54,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   const [similar, setSimilar]         = useState<ImageCardData[]>([]);
   const [loading, setLoading]         = useState(true);
   const [notFound, setNotFound]       = useState(false);
+  const [licensePrices, setLicensePrices] = useState<Partial<Record<LicenseKey, number>>>({});
 
   const [license, setLicense]         = useState<LicenseKey>("editorial");
   const [isFavorited, setFavorited]   = useState(false);
@@ -72,6 +73,16 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    fetch("/api/license-types")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { licenses?: { code: LicenseKey; price_krw: number }[] } | null) => {
+        if (!data?.licenses) return;
+        setLicensePrices(Object.fromEntries(data.licenses.map((license) => [license.code, license.price_krw])));
+      })
+      .catch(() => {});
+  }, []);
 
   // Check favorite status
   useEffect(() => {
@@ -124,6 +135,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   const licenseKeys: LicenseKey[] = ["editorial", "commercial", "extended"];
+  const displayPrice = (key: LicenseKey) => licensePrices[key] ?? LICENSE_PRICES[key];
 
   if (loading) {
     return (
@@ -320,7 +332,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                       <span className="text-sm font-semibold text-on-surface">{d.licenseTypes[key]}</span>
                     </div>
                     <span className="text-sm font-bold text-primary">
-                      ₩{LICENSE_PRICES[key].toLocaleString("ko-KR")}
+                      ₩{displayPrice(key).toLocaleString("ko-KR")}
                     </span>
                   </label>
                 ))}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n/store";
@@ -15,8 +16,23 @@ export default function CartPage() {
   const { t } = useLang();
   const c = t.cart;
   const { items, removeItem, updateLicense } = useCart();
+  const [licensePrices, setLicensePrices] = useState<Partial<Record<LicenseType, number>>>({});
 
-  const subtotal = items.reduce((s, i) => s + i.price, 0);
+  useEffect(() => {
+    fetch("/api/license-types")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { licenses?: { code: LicenseType; price_krw: number }[] } | null) => {
+        if (!data?.licenses) return;
+        setLicensePrices(Object.fromEntries(data.licenses.map((license) => [license.code, license.price_krw])));
+      })
+      .catch(() => {});
+  }, []);
+
+  function displayPrice(license: LicenseType) {
+    return licensePrices[license] ?? getLicensePrice(license);
+  }
+
+  const subtotal = items.reduce((s, i) => s + displayPrice(i.license), 0);
   const vat      = Math.round(subtotal * 0.1);
   const total    = subtotal + vat;
 
@@ -76,7 +92,7 @@ export default function CartPage() {
                               : "border-outline-variant text-on-surface-variant hover:border-outline",
                           ].join(" ")}
                         >
-                          {c.licenseTypes[key]} · {formatKRW(getLicensePrice(key))}
+                          {c.licenseTypes[key]} · {formatKRW(displayPrice(key))}
                         </button>
                       ))}
                     </div>
@@ -90,7 +106,7 @@ export default function CartPage() {
                     >
                       <span className="material-symbols-outlined text-xl">close</span>
                     </button>
-                    <p className="font-headline font-bold text-on-surface">{formatKRW(item.price)}</p>
+                    <p className="font-headline font-bold text-on-surface">{formatKRW(displayPrice(item.license))}</p>
                   </div>
                 </div>
               ))}
