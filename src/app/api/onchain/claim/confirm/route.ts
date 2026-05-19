@@ -14,6 +14,7 @@ interface ClaimConfirmBody {
 interface ClaimableLedgerRow {
   id: string;
   claimable_amount: number | string | null;
+  created_at: string;
 }
 
 interface UsedClaimTxRow {
@@ -161,7 +162,7 @@ export async function POST(req: NextRequest) {
 
   const { data: claimableRowsData, error: claimableRowsError } = await admin
     .from("earnings_ledger")
-    .select("id, claimable_amount")
+    .select("id, claimable_amount, created_at")
     .eq("photographer_id", user.id)
     .eq("settlement_provider", "onchain_escrow")
     .eq("claim_status", "claimable");
@@ -177,6 +178,21 @@ export async function POST(req: NextRequest) {
 
   if (txAlreadyConfirmedForUser) {
     return NextResponse.json({ error: "Claim transaction hash is already used" }, { status: 409 });
+  }
+
+  const latestClaimableCreatedAt = claimableRows.reduce((latest, row) => {
+    const rowTime = Date.parse(row.created_at);
+    if (!Number.isFinite(rowTime)) return Number.NaN;
+    return Math.max(latest, rowTime);
+  }, 0);
+  if (!Number.isFinite(latestClaimableCreatedAt)) {
+    return NextResponse.json({ error: "Claimable row timestamp is invalid" }, { status: 409 });
+  }
+
+  const claimBlock = await publicClient.getBlock({ blockHash: receipt.blockHash });
+  const claimBlockTimestampMs = Number(claimBlock.timestamp) * 1000;
+  if (claimBlockTimestampMs < latestClaimableCreatedAt) {
+    return badRequest("Claim transaction predates current claimable earnings");
   }
 
   let expectedClaimAmount: bigint;
