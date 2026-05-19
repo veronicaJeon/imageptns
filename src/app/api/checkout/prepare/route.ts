@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { randomUUID } from "crypto";
+import { calculateCommission, selectCommissionPolicy, type CommissionPolicy } from "@/lib/commerce/commission";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 interface CartItemInput {
   id: string;           // image id
   license: string;      // 'editorial' | 'commercial' | 'extended'
   price: number;        // KRW
+}
+
+interface CheckoutImageRow {
+  id: string;
+  photographer_id: string | null;
 }
 
 export async function POST(req: NextRequest) {
@@ -49,13 +56,28 @@ export async function POST(req: NextRequest) {
     .select("id, photographer_id")
     .in("id", imageIds);
 
-  const imageMap = Object.fromEntries((images ?? []).map((img: any) => [img.id, img]));
+  const imageRows = (images ?? []) as CheckoutImageRow[];
+  const imageMap = Object.fromEntries(imageRows.map((img) => [img.id, img]));
+  const admin = createAdminClient();
+  const { data: policyRows } = await admin
+    .from("commission_policies")
+    .select("id, scope, rate, active, starts_at, ends_at, license_code, photographer_id, image_id")
+    .eq("active", true);
+  const policies = ((policyRows ?? []) as CommissionPolicy[]).map((policy) => ({
+    ...policy,
+    rate: Number(policy.rate),
+  }));
 
-  const COMMISSION_RATE = 0.20;
   const orderItems = items.map((item) => {
     const img      = imageMap[item.id];
     const gross    = item.price;
-    const commission = Math.round(gross * COMMISSION_RATE);
+    const commissionPolicy = selectCommissionPolicy({
+      imageId: item.id,
+      photographerId: img?.photographer_id ?? null,
+      licenseCode: item.license,
+      policies,
+    });
+    const commission = calculateCommission(gross, commissionPolicy.rate);
     return {
       order_id:        order.id,
       image_id:        item.id,
@@ -63,9 +85,9 @@ export async function POST(req: NextRequest) {
       price_krw:       item.price,
       photographer_id: img?.photographer_id ?? null,
       gross_krw:       gross,
-      commission_rate: COMMISSION_RATE,
-      commission_krw:  commission,
-      net_krw:         gross - commission,
+      commission_rate: commission.commissionRate,
+      commission_krw:  commission.commissionKrw,
+      net_krw:         commission.netKrw,
     };
   });
 

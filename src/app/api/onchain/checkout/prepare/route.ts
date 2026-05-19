@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getAddress, type Address } from "viem";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { calculateCommission, selectCommissionPolicy, type CommissionPolicy } from "@/lib/commerce/commission";
 import { createClient } from "@/lib/supabase/server";
 import { bigintToDecimalString, krwToUsdcAmount } from "@/lib/onchain/amounts";
 import { createOnchainConfirmToken } from "@/lib/onchain/checkout-auth";
@@ -40,8 +41,6 @@ interface ImageRow {
   proof_status: string | null;
   photographer: { wallet_address: string | null } | { wallet_address: string | null }[] | null;
 }
-
-const COMMISSION_RATE = 0.2;
 
 function badRequest(error: string) {
   return NextResponse.json({ error }, { status: 400 });
@@ -100,7 +99,11 @@ export async function POST(req: NextRequest) {
   const licenseCodes = [...new Set(normalizedItems.map((item) => item.license))];
   const imageIds = [...new Set(normalizedItems.map((item) => item.id))];
 
-  const [{ data: licenses, error: licenseError }, { data: images, error: imageError }] = await Promise.all([
+  const [
+    { data: licenses, error: licenseError },
+    { data: images, error: imageError },
+    { data: policyRows, error: policyError },
+  ] = await Promise.all([
     admin
       .from("license_types")
       .select("code, price_krw")
@@ -110,13 +113,22 @@ export async function POST(req: NextRequest) {
       .select("id, asset_id, photographer_id, onchain_asset_id, proof_status, photographer:profiles!photographer_id(wallet_address)")
       .in("id", imageIds)
       .eq("status", "approved"),
+    admin
+      .from("commission_policies")
+      .select("id, scope, rate, active, starts_at, ends_at, license_code, photographer_id, image_id")
+      .eq("active", true),
   ]);
 
   if (licenseError) return NextResponse.json({ error: licenseError.message }, { status: 500 });
   if (imageError) return NextResponse.json({ error: imageError.message }, { status: 500 });
+  if (policyError) return NextResponse.json({ error: policyError.message }, { status: 500 });
 
   const licenseMap = new Map((licenses as LicenseRow[] | null ?? []).map((license) => [license.code, license]));
   const imageMap = new Map((images as ImageRow[] | null ?? []).map((image) => [image.id, image]));
+  const policies = ((policyRows ?? []) as CommissionPolicy[]).map((policy) => ({
+    ...policy,
+    rate: Number(policy.rate),
+  }));
   const quote = createStaticKrwUsdcQuote(config.usdcPerKrw);
   const orderItems = [];
   const assetIds: `0x${string}`[] = [];
@@ -142,8 +154,14 @@ export async function POST(req: NextRequest) {
     }
 
     const price = license.price_krw;
-    const commission = Math.round(price * COMMISSION_RATE);
-    const netKrw = price - commission;
+    const commissionPolicy = selectCommissionPolicy({
+      imageId: item.id,
+      photographerId: image.photographer_id,
+      licenseCode: item.license,
+      policies,
+    });
+    const commission = calculateCommission(price, commissionPolicy.rate);
+    const netKrw = commission.netKrw;
     const grossCryptoAmount = krwToUsdcAmount(price, quote.usdcPerKrw);
     const netCryptoAmount = krwToUsdcAmount(netKrw, quote.usdcPerKrw);
     subtotal += price;
@@ -156,8 +174,8 @@ export async function POST(req: NextRequest) {
       price_krw: price,
       photographer_id: image.photographer_id,
       gross_krw: price,
-      commission_rate: COMMISSION_RATE,
-      commission_krw: commission,
+      commission_rate: commission.commissionRate,
+      commission_krw: commission.commissionKrw,
       net_krw: netKrw,
       crypto_gross_amount: bigintToDecimalString(grossCryptoAmount),
       crypto_net_amount: bigintToDecimalString(netCryptoAmount),
