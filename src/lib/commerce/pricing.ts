@@ -15,7 +15,7 @@ export interface PricedCartItem {
   priceKrw: number;
 }
 
-const MIN_PRICE_KRW = 100;
+const MIN_PRICE_KRW = 0;
 const MAX_PRICE_KRW = 10_000_000;
 
 export function normalizeLicensePrice(value: unknown) {

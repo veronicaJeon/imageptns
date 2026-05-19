@@ -12,6 +12,7 @@ export type LicenseType = "editorial" | "commercial" | "extended";
 
 export interface CartItem {
   id: string;
+  assetId?: string;
   title: string;
   photographer: string;
   src: string;

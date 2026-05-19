@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import { normalizeLicensePrice, priceCartItemsFromLicenses } from "./pricing";
 
 describe("normalizeLicensePrice", () => {
-  it("accepts positive whole KRW prices", () => {
+  it("accepts free or positive whole KRW prices", () => {
+    expect(normalizeLicensePrice(0)).toBe(0);
     expect(normalizeLicensePrice(55000)).toBe(55000);
     expect(normalizeLicensePrice("180000")).toBe(180000);
   });
 
   it("rejects invalid prices", () => {
-    expect(() => normalizeLicensePrice(0)).toThrow("price_krw must be between");
+    expect(() => normalizeLicensePrice(-1)).toThrow("price_krw must be between");
     expect(() => normalizeLicensePrice(1000.5)).toThrow("price_krw must be a whole KRW amount");
   });
 });

@@ -110,6 +110,29 @@ export async function POST(req: NextRequest) {
   const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
   if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 });
 
+  if (total === 0) {
+    const { data: completedOrder, error: completeError } = await admin
+      .from("orders")
+      .update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", order.id)
+      .select("id, order_number")
+      .single();
+
+    if (completeError) return NextResponse.json({ error: completeError.message }, { status: 500 });
+
+    return NextResponse.json({
+      orderId: tossOrderId,
+      orderDbId: completedOrder.id,
+      orderNumber: completedOrder.order_number,
+      amount: total,
+      orderName: items.length === 1 ? `무료 이미지 라이선스 (${items[0].license})` : `무료 이미지 라이선스 외 ${items.length - 1}건`,
+      free: true,
+    });
+  }
+
   // Order name for Toss
   const firstName = items[0];
   const orderName =

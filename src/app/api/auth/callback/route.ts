@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -25,6 +26,12 @@ export async function GET(request: Request) {
             .update({ role })
             .eq("id", user.id);
         }
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const admin = createAdminClient();
+        await admin.rpc("record_profile_login", { target_user_id: user.id });
       }
 
       return NextResponse.redirect(`${origin}${next}`);

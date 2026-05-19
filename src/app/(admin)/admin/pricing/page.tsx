@@ -132,7 +132,7 @@ export default function AdminPricingPage() {
                   <div className="flex gap-2">
                     <input
                       type="number"
-                      min={100}
+                      min={0}
                       max={10000000}
                       step={100}
                       value={draft}
