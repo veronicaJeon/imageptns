@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 
 const VALID_CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
+type ValidCategory = typeof VALID_CATEGORIES[number];
+
+interface ImagePatchRow {
+  id: string;
+  status: string;
+  photographer_id?: string | null;
+}
+
+interface ImageDeleteRow {
+  id: string;
+  status: string;
+  storage_path_original: string | null;
+}
 
 export async function PATCH(
   req: NextRequest,
@@ -23,7 +37,7 @@ export async function PATCH(
   if (!img) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { title, description, category, tags, exif_location, exif_taken_at, resubmit } = body as {
+  const { title, description, category, tags, exif_location, exif_taken_at, resubmit, copyright_license, free_usage_policy, attribution_name, attribution_url } = body as {
     title?: string;
     description?: string;
     category?: string;
@@ -31,15 +45,20 @@ export async function PATCH(
     exif_location?: string;
     exif_taken_at?: string | null;
     resubmit?: boolean;
+    copyright_license?: string;
+    free_usage_policy?: string;
+    attribution_name?: string | null;
+    attribution_url?: string | null;
   };
 
   if (title !== undefined && !title.trim()) {
     return NextResponse.json({ error: "Title cannot be empty" }, { status: 400 });
   }
-  if (category !== undefined && !VALID_CATEGORIES.includes(category as any)) {
+  if (category !== undefined && !VALID_CATEGORIES.includes(category as ValidCategory)) {
     return NextResponse.json({ error: "Invalid category" }, { status: 400 });
   }
 
+  const image = img as ImagePatchRow;
   const update: Record<string, unknown> = {};
   if (title !== undefined) update.title = title.trim();
   if (description !== undefined) update.description = description || null;
@@ -47,8 +66,12 @@ export async function PATCH(
   if (Array.isArray(tags)) update.tags = tags.map((t) => t.trim().toLowerCase()).filter(Boolean);
   if (exif_location !== undefined) update.exif_location = exif_location || null;
   if (exif_taken_at !== undefined) update.exif_taken_at = exif_taken_at || null;
+  if (copyright_license !== undefined) update.copyright_license = normalizeCopyrightLicenseCode(copyright_license);
+  if (free_usage_policy !== undefined) update.free_usage_policy = normalizeFreeUsagePolicy(free_usage_policy);
+  if (attribution_name !== undefined) update.attribution_name = attribution_name?.trim() || null;
+  if (attribution_url !== undefined) update.attribution_url = attribution_url?.trim() || null;
   // Resubmit: only for rejected/draft → pending (approved stays approved)
-  if (resubmit && ["rejected", "draft"].includes((img as any).status)) {
+  if (resubmit && ["rejected", "draft"].includes(image.status)) {
     update.status = "pending";
     update.rejection_reason = null;
   }
@@ -59,7 +82,7 @@ export async function PATCH(
     .update(update)
     .eq("id", id)
     .eq("photographer_id", user.id)
-    .select("id, title, description, category, tags, status, rejection_reason, exif_location, exif_taken_at")
+    .select("id, title, description, category, tags, status, rejection_reason, exif_location, exif_taken_at, copyright_license, free_usage_policy, attribution_name, attribution_url")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -84,15 +107,16 @@ export async function DELETE(
     .single();
 
   if (!img) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!["pending", "rejected", "draft"].includes((img as any).status)) {
+  const image = img as ImageDeleteRow;
+  if (!["pending", "rejected", "draft"].includes(image.status)) {
     return NextResponse.json({ error: "Cannot delete approved images" }, { status: 403 });
   }
 
   // Remove from both original and preview storage if path exists.
-  if ((img as any).storage_path_original) {
+  if (image.storage_path_original) {
     const admin = createAdminClient();
-    await admin.storage.from("images-original").remove([(img as any).storage_path_original]);
-    await admin.storage.from("images-preview").remove([(img as any).storage_path_original]);
+    await admin.storage.from("images-original").remove([image.storage_path_original]);
+    await admin.storage.from("images-preview").remove([image.storage_path_original]);
   }
 
   const { error } = await createAdminClient().from("images").delete().eq("id", id).eq("photographer_id", user.id);

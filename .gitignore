@@ -58,3 +58,6 @@ nginx/ssl/
 Thumbs.db
 
 .vercel
+
+# local feature worktrees
+.worktrees/

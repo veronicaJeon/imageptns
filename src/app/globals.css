@@ -147,3 +147,21 @@ body {
   break-inside: avoid;
   margin-bottom: 1rem;
 }
+
+@media print {
+  body.printing-cart {
+    background: #ffffff !important;
+  }
+
+  body.printing-cart header,
+  body.printing-cart nav,
+  body.printing-cart footer,
+  body.printing-cart .cart-screen-content {
+    display: none !important;
+  }
+
+  body.printing-cart .cart-print-document {
+    display: block !important;
+    padding: 32px !important;
+  }
+}

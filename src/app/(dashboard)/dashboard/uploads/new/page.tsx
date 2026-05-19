@@ -2,8 +2,10 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { extractExif, type ExifData } from "@/lib/utils/exif";
+import { COPYRIGHT_LICENSES, FREE_USAGE_POLICIES, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
 
 const CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
 type Category = typeof CATEGORIES[number];
@@ -105,7 +107,6 @@ export default function NewUploadPage() {
   const router = useRouter();
 
   const [file, setFile]         = useState<File | null>(null);
-  const [fileName, setFileName] = useState("");   // original filename — read-only display
   const [preview, setPreview]   = useState<string | null>(null);
   const [title, setTitle]       = useState("");
   const [description, setDesc]  = useState("");
@@ -117,6 +118,10 @@ export default function NewUploadPage() {
   // 촬영장소: text | "unknown" | ""
   const [location, setLocation] = useState("");
   const [locationSource, setLocationSource] = useState<"exif" | "manual">("manual");
+  const [copyrightLicense, setCopyrightLicense] = useState<CopyrightLicenseCode>("standard");
+  const [freeUsagePolicy, setFreeUsagePolicy] = useState<FreeUsagePolicyCode>("none");
+  const [attributionName, setAttributionName] = useState("");
+  const [attributionUrl, setAttributionUrl] = useState("");
 
   const [imgWidth, setImgWidth]   = useState<number | null>(null);
   const [imgHeight, setImgHeight] = useState<number | null>(null);
@@ -138,7 +143,7 @@ export default function NewUploadPage() {
     }
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(f);
-      const img = new Image();
+      const img = new window.Image();
       img.onload = () => {
         const MAX = 800;
         const scale = Math.min(1, MAX / Math.max(img.width, img.height));
@@ -226,7 +231,6 @@ export default function NewUploadPage() {
     }
     setErrorMsg("");
     setFile(f);
-    setFileName(f.name);
     setTitle("");     // clear title — will be filled by AI
     setImgWidth(null); setImgHeight(null);
     const objectUrl = URL.createObjectURL(f);
@@ -318,6 +322,10 @@ export default function NewUploadPage() {
           exif_lat: exifData?.lat ?? null,
           exif_lng: exifData?.lng ?? null,
           exif_camera: exifData?.camera ?? null,
+          copyright_license: copyrightLicense,
+          free_usage_policy: freeUsagePolicy,
+          attribution_name: attributionName.trim() || null,
+          attribution_url: attributionUrl.trim() || null,
         }),
       });
 
@@ -328,8 +336,8 @@ export default function NewUploadPage() {
 
       setStatus("done");
       setTimeout(() => router.push("/dashboard/uploads"), 1500);
-    } catch (err: any) {
-      setErrorMsg(err.message ?? "업로드 중 오류가 발생했습니다.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "업로드 중 오류가 발생했습니다.");
       setStatus("error");
     }
   }
@@ -370,7 +378,7 @@ export default function NewUploadPage() {
             />
             {preview ? (
               <div className={previewContainerClass(imgWidth, imgHeight)}>
-                <img src={preview} alt="Preview" className="w-full h-auto block" />
+                <Image src={preview} alt="Preview" width={imgWidth ?? 800} height={imgHeight ?? 600} className="w-full h-auto block" unoptimized />
               </div>
             ) : (
               <>
@@ -532,7 +540,7 @@ export default function NewUploadPage() {
               </div>
             )}
             {!takenAt && file && aiStatus !== "analyzing" && (
-              <p className="text-xs text-error">촬영일시를 입력하거나 '미상'을 선택하세요.</p>
+              <p className="text-xs text-error">촬영일시를 입력하거나 &apos;미상&apos;을 선택하세요.</p>
             )}
           </div>
 
@@ -576,8 +584,93 @@ export default function NewUploadPage() {
               </div>
             )}
             {!location && file && aiStatus !== "analyzing" && (
-              <p className="text-xs text-error">촬영장소를 입력하거나 '미상'을 선택하세요.</p>
+              <p className="text-xs text-error">촬영장소를 입력하거나 &apos;미상&apos;을 선택하세요.</p>
             )}
+          </div>
+
+          {/* ── 저작권/무료 사용 정책 ── */}
+          <div className="flex flex-col gap-4 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5">
+            <div>
+              <p className="text-xs font-bold text-outline uppercase tracking-widest">저작권 및 공개 범위 *</p>
+              <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                사진별로 Creative Commons 등급과 무료 사용 조건을 지정합니다. 상업 라이선스 판매가 필요한 경우 기본 정책을 유지하세요.
+              </p>
+            </div>
+
+            <div className="grid gap-3">
+              {COPYRIGHT_LICENSES.map((license) => (
+                <label
+                  key={license.code}
+                  className={[
+                    "flex cursor-pointer gap-3 rounded-lg border px-4 py-3 transition-colors",
+                    copyrightLicense === license.code
+                      ? "border-primary bg-primary/5"
+                      : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
+                  ].join(" ")}
+                >
+                  <input
+                    type="radio"
+                    name="copyright_license"
+                    value={license.code}
+                    checked={copyrightLicense === license.code}
+                    onChange={() => setCopyrightLicense(license.code)}
+                    className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-on-surface">{license.label}</span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">{license.summary}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {FREE_USAGE_POLICIES.map((policy) => (
+                <label
+                  key={policy.code}
+                  className={[
+                    "cursor-pointer rounded-lg border px-4 py-3 transition-colors",
+                    freeUsagePolicy === policy.code
+                      ? "border-primary bg-primary/5"
+                      : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
+                  ].join(" ")}
+                >
+                  <input
+                    type="radio"
+                    name="free_usage_policy"
+                    value={policy.code}
+                    checked={freeUsagePolicy === policy.code}
+                    onChange={() => setFreeUsagePolicy(policy.code)}
+                    className="sr-only"
+                  />
+                  <span className="block text-sm font-bold text-on-surface">{policy.label}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{policy.summary}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-outline uppercase tracking-widest">출처 표기명</label>
+                <input
+                  type="text"
+                  value={attributionName}
+                  onChange={(e) => setAttributionName(e.target.value)}
+                  placeholder="예: 작가명 또는 스튜디오명"
+                  className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-outline uppercase tracking-widest">출처 URL</label>
+                <input
+                  type="url"
+                  value={attributionUrl}
+                  onChange={(e) => setAttributionUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                />
+              </div>
+            </div>
           </div>
 
           {errorMsg && (

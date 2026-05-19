@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n/store";
+import { buildOrderStatusSteps, type TimelineState } from "@/lib/ux/status";
 
 const STATUS_STYLES: Record<string, string> = {
   completed: "bg-primary/10 text-primary",
@@ -16,21 +17,129 @@ function formatKRW(n: number) {
   return "₩" + n.toLocaleString("ko-KR");
 }
 
+function explorerTxUrl(chainId: number | null, txHash: string | null) {
+  if (!chainId || !txHash) return null;
+  const baseUrl = chainId === 8453 ? "https://basescan.org" : "https://sepolia.basescan.org";
+  return `${baseUrl}/tx/${txHash}`;
+}
+
+interface OrderImage {
+  id: string;
+  title: string | null;
+  asset_id: string | null;
+  storage_path_preview: string | null;
+}
+
+interface OrderItem {
+  id: string;
+  license_code: string;
+  price_krw: number;
+  image: OrderImage | null;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  status: string;
+  created_at: string;
+  total_krw: number;
+  payment_provider: string | null;
+  chain_id: number | null;
+  payment_token: string | null;
+  payment_tx_hash: string | null;
+  contract_order_id: string | null;
+  crypto_amount: number | string | null;
+  crypto_status: string | null;
+  order_items: OrderItem[] | null;
+}
+
+interface OrderRow {
+  orderId: string;
+  orderNumber: string;
+  status: string;
+  date: string;
+  totalKrw: number;
+  itemId: string;
+  license: string;
+  priceKrw: number;
+  imageId: string | undefined;
+  title: string;
+  src: string;
+  assetId: string;
+  paymentProvider: string | null;
+  chainId: number | null;
+  paymentToken: string | null;
+  paymentTxHash: string | null;
+  contractOrderId: string | null;
+  cryptoAmount: number | string | null;
+  cryptoStatus: string | null;
+  isFirstItemInOrder: boolean;
+}
+
+const LICENSE_SUMMARY: Record<string, string> = {
+  editorial: "뉴스, 기사, 교육 목적 사용",
+  commercial: "광고, 마케팅, 상업 목적 사용",
+  extended: "확장 인쇄, 상품화, 전 매체 사용",
+};
+
+const TIMELINE_STYLES: Record<TimelineState, string> = {
+  done: "bg-primary text-on-primary",
+  current: "bg-amber-400 text-black",
+  pending: "bg-surface-container-high text-outline",
+  failed: "bg-error text-on-error",
+};
+
+function OrderTimeline({ row }: { row: OrderRow }) {
+  const steps = buildOrderStatusSteps({
+    status: row.status,
+    paymentProvider: row.paymentProvider,
+    cryptoStatus: row.cryptoStatus,
+    paymentTxHash: row.paymentTxHash,
+  });
+
+  return (
+    <div className="mt-4 grid gap-2 sm:grid-cols-4">
+      {steps.map((step, index) => (
+        <div key={step.key} className="flex gap-2 min-w-0">
+          <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${TIMELINE_STYLES[step.state]}`}>
+            {step.state === "done" ? "✓" : step.state === "failed" ? "!" : index + 1}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-on-surface">{step.label}</p>
+            <p className="text-[10px] leading-relaxed text-outline">{step.description}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function OrdersPage() {
   const { t } = useLang();
   const ord = t.dashboard.orders;
+  const recovery = ord.recovery;
   const c   = ord.cols;
 
-  const [orders, setOrders]       = useState<any[]>([]);
+  const [orders, setOrders]       = useState<Order[]>([]);
   const [loading, setLoading]     = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [recoveryTxHashes, setRecoveryTxHashes] = useState<Record<string, string>>({});
+  const [confirmingOrderIds, setConfirmingOrderIds] = useState<Record<string, boolean>>({});
+
+  const refreshOrders = useCallback(async () => {
+    const res = await fetch("/api/orders");
+    if (!res.ok) {
+      throw new Error("Failed to refresh orders");
+    }
+    const data = (await res.json()) as { orders?: Order[] };
+    setOrders(data.orders ?? []);
+  }, []);
 
   useEffect(() => {
-    fetch("/api/orders")
-      .then((r) => r.json())
-      .then(({ orders }) => setOrders(orders ?? []))
+    refreshOrders()
+      .catch(() => setOrders([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshOrders]);
 
   async function handleDownload(orderItemId: string) {
     setDownloading(orderItemId);
@@ -48,9 +157,59 @@ export default function OrdersPage() {
     }
   }
 
+  function handleRecoveryTxHashChange(orderDbId: string, txHash: string) {
+    setRecoveryTxHashes((prev) => ({ ...prev, [orderDbId]: txHash }));
+  }
+
+  async function handleConfirmOnchain(orderDbId: string) {
+    const txHash = recoveryTxHashes[orderDbId]?.trim() ?? "";
+    if (!txHash) {
+      alert(recovery.missingTx);
+      return;
+    }
+
+    setConfirmingOrderIds((prev) => ({ ...prev, [orderDbId]: true }));
+    try {
+      const res = await fetch("/api/onchain/checkout/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderDbId, txHash }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: unknown } | null;
+        const error = typeof data?.error === "string" && data.error.trim()
+          ? data.error
+          : recovery.confirmFailed;
+        alert(error);
+        return;
+      }
+
+      try {
+        await refreshOrders();
+      } catch {
+        alert(recovery.refreshFailed);
+      }
+
+      setRecoveryTxHashes((prev) => {
+        const next = { ...prev };
+        delete next[orderDbId];
+        return next;
+      });
+    } catch {
+      alert(recovery.networkFailed);
+    } finally {
+      setConfirmingOrderIds((prev) => {
+        const next = { ...prev };
+        delete next[orderDbId];
+        return next;
+      });
+    }
+  }
+
   // Flatten orders → rows per item
-  const rows = orders.flatMap((order: any) =>
-    (order.order_items ?? []).map((item: any) => ({
+  const rows: OrderRow[] = orders.flatMap((order) =>
+    (order.order_items ?? []).map((item, itemIndex) => ({
       orderId:     order.id,
       orderNumber: order.order_number,
       status:      order.status,
@@ -58,10 +217,19 @@ export default function OrdersPage() {
       totalKrw:    order.total_krw,
       itemId:      item.id,
       license:     item.license_code,
+      priceKrw:     item.price_krw,
       imageId:     item.image?.id,
       title:       item.image?.title ?? "",
       src:         item.image?.storage_path_preview ?? "",
       assetId:     item.image?.asset_id ?? "",
+      paymentProvider: order.payment_provider,
+      chainId: order.chain_id,
+      paymentToken: order.payment_token,
+      paymentTxHash: order.payment_tx_hash,
+      contractOrderId: order.contract_order_id,
+      cryptoAmount: order.crypto_amount,
+      cryptoStatus: order.crypto_status,
+      isFirstItemInOrder: itemIndex === 0,
     }))
   );
 
@@ -93,12 +261,16 @@ export default function OrdersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20">
-              {rows.map((row) => (
-                <tr key={row.itemId} className="hover:bg-surface-container-low transition-colors">
+              {rows.map((row) => {
+                const canRecoverBaseUsdc = row.isFirstItemInOrder && row.paymentProvider === "base_usdc" && row.cryptoStatus === "pending";
+                const isConfirming = Boolean(confirmingOrderIds[row.orderId]);
+
+                return (
+                <tr key={row.itemId} className="hover:bg-surface-container-low transition-colors align-top">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       {row.src ? (
-                        <img src={row.src} alt={row.title} width={56} height={40} className="object-cover rounded shrink-0 w-14 h-10" />
+                        <Image src={row.src} alt={row.title} width={56} height={40} className="object-cover rounded shrink-0 w-14 h-10" />
                       ) : (
                         <div className="w-14 h-10 bg-surface-container-low rounded shrink-0 flex items-center justify-center">
                           <span className="material-symbols-outlined text-outline text-sm">image</span>
@@ -111,16 +283,64 @@ export default function OrdersPage() {
                           <p className="text-on-surface font-medium truncate max-w-[180px]">{row.title}</p>
                         )}
                         <p className="text-xs text-outline">{row.orderNumber}</p>
+                        {row.paymentProvider === "base_usdc" && (
+                          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                            <span className="bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-200 px-2 py-0.5 rounded-full">
+                              Base USDC
+                            </span>
+                            {row.cryptoStatus && (
+                              <span className="bg-surface-container-low text-on-surface-variant px-2 py-0.5 rounded-full">
+                                {row.cryptoStatus}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-on-surface-variant capitalize">{row.license}</td>
+                  <td className="px-6 py-4 text-on-surface-variant capitalize">
+                    <p>{row.license}</p>
+                    <p className="mt-1 text-xs text-outline">{formatKRW(row.priceKrw)}</p>
+                  </td>
                   <td className="px-6 py-4 text-on-surface-variant">{row.date}</td>
-                  <td className="px-6 py-4 font-semibold text-on-surface">{formatKRW(row.totalKrw)}</td>
+                  <td className="px-6 py-4">
+                    <p className="font-semibold text-on-surface">{formatKRW(row.totalKrw)}</p>
+                    {row.paymentProvider === "base_usdc" && row.cryptoAmount && (
+                      <p className="text-xs text-outline mt-1">{row.cryptoAmount} USDC</p>
+                    )}
+                  </td>
                   <td className="px-6 py-4">
                     <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_STYLES[row.status] ?? ""}`}>
                       {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
                     </span>
+                    {row.paymentProvider === "base_usdc" && (
+                      <div className="mt-3 flex flex-col gap-1 text-[10px] text-outline font-mono max-w-[220px]">
+                        {row.paymentTxHash && (
+                          <a
+                            href={explorerTxUrl(row.chainId, row.paymentTxHash) ?? undefined}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary hover:opacity-70 transition-opacity truncate"
+                          >
+                            tx {row.paymentTxHash}
+                          </a>
+                        )}
+                        {row.contractOrderId && <span className="truncate">order {row.contractOrderId}</span>}
+                        {row.paymentToken && <span className="truncate">token {row.paymentToken}</span>}
+                      </div>
+                    )}
+                    {row.isFirstItemInOrder && <OrderTimeline row={row} />}
+                    {row.isFirstItemInOrder && row.paymentProvider === "base_usdc" && row.cryptoStatus === "pending" && (
+                      <div className="mt-3 max-w-md rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                        지갑 결제를 완료했는데 다운로드가 열리지 않으면, 지갑의 트랜잭션 해시를 오른쪽 복구 입력창에 붙여넣어 구매 확정을 다시 요청하세요.
+                      </div>
+                    )}
+                    {row.status === "completed" && (
+                      <div className="mt-3 max-w-md rounded-lg bg-surface-container-low px-3 py-2 text-[11px] leading-relaxed text-on-surface-variant">
+                        <span className="font-bold text-on-surface">라이선스:</span>{" "}
+                        {LICENSE_SUMMARY[row.license] ?? "구매한 라이선스 조건에 따라 사용 가능합니다."}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     {row.status === "completed" && (
@@ -136,9 +356,40 @@ export default function OrdersPage() {
                         {ord.download}
                       </button>
                     )}
+                    {canRecoverBaseUsdc && (
+                      <form
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void handleConfirmOnchain(row.orderId);
+                        }}
+                        className="flex w-56 max-w-full items-center gap-2"
+                      >
+                        <input
+                          type="text"
+                          value={recoveryTxHashes[row.orderId] ?? ""}
+                          onChange={(event) => handleRecoveryTxHashChange(row.orderId, event.target.value)}
+                          placeholder={recovery.txPlaceholder}
+                          aria-label={`${recovery.txLabel} ${row.orderNumber}`}
+                          disabled={isConfirming}
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="min-w-0 flex-1 rounded-md border border-outline-variant/50 bg-surface-container-lowest px-2 py-1.5 text-xs text-on-surface outline-none transition-colors placeholder:text-outline focus:border-primary disabled:opacity-60"
+                        />
+                        <button
+                          type="submit"
+                          disabled={isConfirming}
+                          className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition-opacity hover:opacity-80 disabled:opacity-50"
+                        >
+                          <span className="inline-flex min-w-14 justify-center">
+                            {isConfirming ? recovery.retrying : recovery.retry}
+                          </span>
+                        </button>
+                      </form>
+                    )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

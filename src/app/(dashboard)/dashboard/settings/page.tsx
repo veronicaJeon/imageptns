@@ -24,6 +24,7 @@ export default function SettingsPage() {
   const [name, setName]   = useState("");
   const [email, setEmail] = useState("");
   const [bio, setBio]     = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
   const [role, setRole]   = useState<"buyer" | "photographer" | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -70,6 +71,7 @@ export default function SettingsPage() {
         setName(profile.full_name ?? "");
         setEmail(profile.email ?? "");
         setBio(profile.bio ?? "");
+        setWalletAddress(profile.wallet_address ?? "");
         setRole(profile.role ?? null);
         setNotifications({
           sales:      profile.notif_sales      ?? true,
@@ -93,7 +95,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/profile", {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ full_name: name, bio }),
+        body: JSON.stringify({ full_name: name, bio, wallet_address: walletAddress }),
       });
       if (res.ok) {
         setSaved(true);
@@ -177,6 +179,17 @@ export default function SettingsPage() {
               placeholder="Tell us about yourself…"
             />
           </div>
+
+          {role === "photographer" && (
+            <Input
+              label="Base 지갑 주소"
+              type="text"
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value)}
+              icon="account_balance_wallet"
+              placeholder="0x..."
+            />
+          )}
 
           <div className="flex items-center gap-3">
             <Button type="submit" variant="primary" size="md" loading={loading}>{s.saveBtn}</Button>

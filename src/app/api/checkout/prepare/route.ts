@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { randomUUID } from "crypto";
+import { calculateCommission, selectCommissionPolicy, type CommissionPolicy } from "@/lib/commerce/commission";
+import { priceCartItemsFromLicenses, type LicensePriceRow } from "@/lib/commerce/pricing";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 interface CartItemInput {
   id: string;           // image id
   license: string;      // 'editorial' | 'commercial' | 'extended'
   price: number;        // KRW
+}
+
+interface CheckoutImageRow {
+  id: string;
+  photographer_id: string | null;
 }
 
 export async function POST(req: NextRequest) {
@@ -18,7 +26,23 @@ export async function POST(req: NextRequest) {
 
   if (!items?.length) return NextResponse.json({ error: "No items" }, { status: 400 });
 
-  const subtotal = items.reduce((s, i) => s + i.price, 0);
+  const admin = createAdminClient();
+  const licenseCodes = [...new Set(items.map((item) => item.license))];
+  const { data: licenses, error: licenseError } = await admin
+    .from("license_types")
+    .select("code, price_krw")
+    .in("code", licenseCodes);
+
+  if (licenseError) return NextResponse.json({ error: licenseError.message }, { status: 500 });
+
+  let pricedItems;
+  try {
+    pricedItems = priceCartItemsFromLicenses(items, (licenses ?? []) as LicensePriceRow[]);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid license" }, { status: 400 });
+  }
+
+  const subtotal = pricedItems.reduce((s, i) => s + i.priceKrw, 0);
   const vat      = Math.round(subtotal * 0.1);
   const total    = subtotal + vat;
   const tossOrderId = randomUUID();
@@ -49,23 +73,37 @@ export async function POST(req: NextRequest) {
     .select("id, photographer_id")
     .in("id", imageIds);
 
-  const imageMap = Object.fromEntries((images ?? []).map((img: any) => [img.id, img]));
+  const imageRows = (images ?? []) as CheckoutImageRow[];
+  const imageMap = Object.fromEntries(imageRows.map((img) => [img.id, img]));
+  const { data: policyRows } = await admin
+    .from("commission_policies")
+    .select("id, scope, rate, active, starts_at, ends_at, license_code, photographer_id, image_id")
+    .eq("active", true);
+  const policies = ((policyRows ?? []) as CommissionPolicy[]).map((policy) => ({
+    ...policy,
+    rate: Number(policy.rate),
+  }));
 
-  const COMMISSION_RATE = 0.20;
-  const orderItems = items.map((item) => {
+  const orderItems = pricedItems.map((item) => {
     const img      = imageMap[item.id];
-    const gross    = item.price;
-    const commission = Math.round(gross * COMMISSION_RATE);
+    const gross    = item.priceKrw;
+    const commissionPolicy = selectCommissionPolicy({
+      imageId: item.id,
+      photographerId: img?.photographer_id ?? null,
+      licenseCode: item.license,
+      policies,
+    });
+    const commission = calculateCommission(gross, commissionPolicy.rate);
     return {
       order_id:        order.id,
       image_id:        item.id,
       license_code:    item.license,
-      price_krw:       item.price,
+      price_krw:       item.priceKrw,
       photographer_id: img?.photographer_id ?? null,
       gross_krw:       gross,
-      commission_rate: COMMISSION_RATE,
-      commission_krw:  commission,
-      net_krw:         gross - commission,
+      commission_rate: commission.commissionRate,
+      commission_krw:  commission.commissionKrw,
+      net_krw:         commission.netKrw,
     };
   });
 

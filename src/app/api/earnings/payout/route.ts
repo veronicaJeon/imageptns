@@ -4,6 +4,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 const MIN_PAYOUT_KRW = 50_000;
 
+interface PayoutLedgerRow {
+  id: string;
+  gross_krw: number;
+  commission_krw: number;
+  net_krw: number;
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -25,20 +32,22 @@ export async function POST(req: NextRequest) {
   }
 
   // Aggregate unpaid earnings for the period
-  const { data: rows } = await supabase
+  const { data: rowsData } = await supabase
     .from("earnings_ledger")
     .select("id, gross_krw, commission_krw, net_krw")
     .eq("photographer_id", user.id)
     .eq("period", period)
+    .eq("settlement_provider", "offchain")
     .is("payout_id", null);
 
-  if (!rows?.length) {
+  const rows = (rowsData ?? []) as PayoutLedgerRow[];
+  if (!rows.length) {
     return NextResponse.json({ error: "No earnings for this period" }, { status: 404 });
   }
 
-  const totalGross      = rows.reduce((s, r: any) => s + r.gross_krw, 0);
-  const totalCommission = rows.reduce((s, r: any) => s + r.commission_krw, 0);
-  const totalNet        = rows.reduce((s, r: any) => s + r.net_krw, 0);
+  const totalGross      = rows.reduce((s, r) => s + r.gross_krw, 0);
+  const totalCommission = rows.reduce((s, r) => s + r.commission_krw, 0);
+  const totalNet        = rows.reduce((s, r) => s + r.net_krw, 0);
 
   if (totalNet < MIN_PAYOUT_KRW) {
     return NextResponse.json(
@@ -69,7 +78,8 @@ export async function POST(req: NextRequest) {
   await admin
     .from("earnings_ledger")
     .update({ payout_id: payout.id })
-    .in("id", rows.map((r: any) => r.id));
+    .eq("settlement_provider", "offchain")
+    .in("id", rows.map((r) => r.id));
 
   return NextResponse.json({ payout }, { status: 201 });
 }

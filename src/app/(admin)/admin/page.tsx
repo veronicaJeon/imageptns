@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 
 type Status = "pending" | "approved" | "rejected" | "all";
@@ -26,6 +27,18 @@ const STATUS_LABELS: Record<string, string> = {
   draft:    "임시저장",
 };
 
+const PROOF_STYLES: Record<string, string> = {
+  pending: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200",
+  registered: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200",
+  failed: "bg-error/10 text-error",
+};
+
+const PROOF_LABELS: Record<string, string> = {
+  pending: "Base proof: pending",
+  registered: "Base proof: registered",
+  failed: "Base proof: failed",
+};
+
 interface ImageRow {
   id: string;
   asset_id: string | null;
@@ -42,7 +55,13 @@ interface ImageRow {
   width: number | null;
   height: number | null;
   created_at: string;
-  photographer: { id: string; full_name: string; avatar_url: string | null } | null;
+  chain_id: number | null;
+  onchain_asset_id: string | null;
+  content_hash: string | null;
+  proof_tx_hash: string | null;
+  proof_status: string | null;
+  proof_registered_at: string | null;
+  photographer: { id: string; full_name: string; avatar_url: string | null; wallet_address?: string | null } | null;
 }
 
 export default function AdminPage() {
@@ -106,8 +125,6 @@ export default function AdminPage() {
     );
   }
 
-  const pendingCount = images.filter((i) => i.status === "pending").length;
-
   return (
     <div className="p-6 md:p-10">
 
@@ -159,9 +176,11 @@ export default function AdminPage() {
                 {/* Thumbnail */}
                 <div className="w-full sm:w-48 h-36 sm:h-auto shrink-0 bg-surface-container-low flex items-center justify-center overflow-hidden">
                   {img.storage_path_preview ? (
-                    <img
+                    <Image
                       src={img.storage_path_preview}
                       alt={img.title}
+                      width={192}
+                      height={144}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -184,12 +203,22 @@ export default function AdminPage() {
                         <p className="text-xs text-on-surface-variant mt-0.5 line-clamp-2">{img.description}</p>
                       )}
                     </div>
-                    <span className={cn(
-                      "text-[10px] font-bold px-3 py-1 rounded-full shrink-0",
-                      STATUS_STYLES[img.status] ?? "bg-surface-container text-outline"
-                    )}>
-                      {STATUS_LABELS[img.status] ?? img.status}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                      {img.proof_status && img.proof_status !== "not_registered" && (
+                        <span className={cn(
+                          "text-[10px] font-bold px-3 py-1 rounded-full",
+                          PROOF_STYLES[img.proof_status] ?? "bg-surface-container text-outline"
+                        )}>
+                          {PROOF_LABELS[img.proof_status] ?? `Base proof: ${img.proof_status}`}
+                        </span>
+                      )}
+                      <span className={cn(
+                        "text-[10px] font-bold px-3 py-1 rounded-full",
+                        STATUS_STYLES[img.status] ?? "bg-surface-container text-outline"
+                      )}>
+                        {STATUS_LABELS[img.status] ?? img.status}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Meta chips */}
@@ -226,7 +255,7 @@ export default function AdminPage() {
                     <div className="flex items-center gap-1.5">
                       <div className="w-5 h-5 rounded-full bg-primary-container flex items-center justify-center overflow-hidden shrink-0">
                         {img.photographer?.avatar_url ? (
-                          <img src={img.photographer.avatar_url} alt="" className="w-full h-full object-cover" />
+                          <Image src={img.photographer.avatar_url} alt="" width={20} height={20} className="w-full h-full object-cover" />
                         ) : (
                           <span className="material-symbols-outlined text-[10px] text-on-primary-container">person</span>
                         )}
@@ -242,6 +271,21 @@ export default function AdminPage() {
                     <div className="flex items-start gap-2 bg-error/8 border border-error/20 rounded-lg px-3 py-2">
                       <span className="material-symbols-outlined text-error text-sm mt-0.5">cancel</span>
                       <p className="text-xs text-error">{img.rejection_reason}</p>
+                    </div>
+                  )}
+
+                  {img.status === "pending" && img.proof_status === "failed" && (
+                    <div className="flex items-start gap-2 bg-error/8 border border-error/20 rounded-lg px-3 py-2">
+                      <span className="material-symbols-outlined text-error text-sm mt-0.5">sync_problem</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-error">Base 증명 등록이 실패했습니다.</p>
+                        <p className="text-xs text-on-surface-variant mt-1">
+                          operator 지갑, RPC, 사진가 지갑 주소를 확인한 뒤 재시도하세요.
+                        </p>
+                        {img.proof_tx_hash && (
+                          <p className="text-[10px] font-mono text-outline mt-1 truncate">tx {img.proof_tx_hash}</p>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -284,14 +328,18 @@ export default function AdminPage() {
                     <div className="flex gap-2 flex-wrap">
                       <button
                         onClick={() => handleAction(img.id, "approve")}
-                        disabled={actioning === img.id}
+                        disabled={actioning === img.id || img.proof_status === "pending" || img.status !== "pending"}
                         className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
                       >
                         {actioning === img.id
                           ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          : <span className="material-symbols-outlined text-sm">check_circle</span>
+                          : <span className="material-symbols-outlined text-sm">{img.proof_status === "failed" ? "sync" : "check_circle"}</span>
                         }
-                        승인
+                        {img.proof_status === "pending"
+                          ? "Base 증명 등록 중"
+                          : img.proof_status === "failed"
+                            ? "Base 증명 재시도"
+                            : "승인"}
                       </button>
                       {img.status !== "rejected" && (
                         <button

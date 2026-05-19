@@ -4,23 +4,24 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { previewUrl } from "@/lib/supabase/storage";
 import { applyWatermark } from "@/lib/utils/watermark";
 import { notifyOpsNewUpload } from "@/lib/email/resend";
+import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 
 export const maxDuration = 60;
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabase
     .from("images")
-    .select("id, asset_id, title, description, category, tags, status, rejection_reason, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at")
+    .select("id, asset_id, title, description, category, tags, status, rejection_reason, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at, chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at, copyright_license, free_usage_policy, attribution_name, attribution_url")
     .eq("photographer_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const uploads = (data ?? []).map((img: any) => ({
+  const uploads = (data ?? []).map((img) => ({
     ...img,
     storage_path_preview: previewUrl(img.storage_path_preview),
   }));
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
     storage_path_original, original_filename,
     width, height, resolution_mp, file_format, file_size_mb,
     exif_taken_at, exif_lat, exif_lng, exif_location, exif_camera,
+    copyright_license, free_usage_policy, attribution_name, attribution_url,
   } = body;
 
   if (!title || !category || !storage_path_original) {
@@ -68,6 +70,10 @@ export async function POST(req: NextRequest) {
       exif_lng:             exif_lng ?? null,
       exif_location:        exif_location ?? null,
       exif_camera:          exif_camera ?? null,
+      copyright_license:    normalizeCopyrightLicenseCode(copyright_license),
+      free_usage_policy:    normalizeFreeUsagePolicy(free_usage_policy),
+      attribution_name:     attribution_name?.trim() || null,
+      attribution_url:      attribution_url?.trim() || null,
       status:               "pending",
     })
     .select()
