@@ -1,51 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { previewUrl } from "@/lib/supabase/storage";
-
-async function requireAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const admin = createAdminClient();
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", user.id)
-    .single();
-
-  return profile?.is_admin ? user : null;
-}
 
 interface AdminImageListRow {
   storage_path_preview: string | null;
 }
 
+function clampPage(value: string | null) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return 1;
+  return parsed;
+}
+
+function clampPageSize(value: string | null) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return 50;
+  return Math.min(Math.max(parsed, 10), 100);
+}
+
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
+function normalizeTag(value: string) {
+  return value.trim().toLowerCase().replace(/[{}"\\,]/g, "");
+}
+
 export async function GET(req: NextRequest) {
-  const user = await requireAdmin();
-  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const adminUser = await requireAdminUser();
+  if (!adminUser) return forbidden();
 
   const status = req.nextUrl.searchParams.get("status") ?? "pending";
+  const queryText = req.nextUrl.searchParams.get("query")?.trim() ?? "";
+  const page = clampPage(req.nextUrl.searchParams.get("page"));
+  const pageSize = clampPageSize(req.nextUrl.searchParams.get("pageSize"));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
   const admin = createAdminClient();
 
   let query = admin
     .from("images")
     .select(`
-      id, asset_id, title, description, category, tags,
-      status, rejection_reason,
-      chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at,
-      storage_path_preview, storage_path_original,
-      width, height, resolution_mp, file_format, file_size_mb,
-      views_count, sales_count, created_at, approved_at,
-      photographer:profiles!photographer_id(id, full_name, avatar_url, wallet_address)
-    `)
+    id, asset_id, title, description, category, tags,
+    status, rejection_reason,
+    chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at,
+    storage_path_preview, storage_path_original,
+    width, height, resolution_mp, file_format, file_size_mb,
+    views_count, sales_count, created_at, approved_at,
+    photographer:profiles!photographer_id(id, full_name, avatar_url, wallet_address)
+  `, { count: "exact" })
     .order("created_at", { ascending: false })
-    .limit(100);
+    .range(from, to);
 
   if (status !== "all") query = query.eq("status", status);
+  if (queryText) {
+    const escaped = escapeLike(queryText);
+    const tag = normalizeTag(queryText);
+    query = query.or(`title.ilike.%${escaped}%,asset_id.ilike.%${escaped}%,tags.cs.{${tag}}`);
+  }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const images = (data ?? []).map((img: AdminImageListRow) => ({
@@ -53,5 +68,13 @@ export async function GET(req: NextRequest) {
     storage_path_preview: previewUrl(img.storage_path_preview),
   }));
 
-  return NextResponse.json({ images });
+  return NextResponse.json({
+    images,
+    pagination: {
+      page,
+      pageSize,
+      total: count ?? 0,
+      totalPages: Math.max(1, Math.ceil((count ?? 0) / pageSize)),
+    },
+  });
 }
