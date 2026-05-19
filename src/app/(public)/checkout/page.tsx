@@ -14,6 +14,7 @@ import { useCart, type LicenseType, getLicensePrice } from "@/lib/store/cart";
 import { useAuth } from "@/lib/store/auth";
 import { ERC20_ABI, IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
 import { isQuoteExpired, type OnchainQuoteSnapshot } from "@/lib/onchain/quote";
+import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 import { loadPaymentWidget, type PaymentWidgetInstance } from "@tosspayments/payment-widget-sdk";
 
 const wagmiConfig = createConfig({
@@ -620,7 +621,14 @@ function CheckoutContent() {
               <div className="flex flex-col gap-4 mb-6 max-h-64 overflow-y-auto pr-1">
                 {items.map((item) => (
                   <div key={item.id} className="flex gap-3">
-                    <Image src={item.src} alt={item.title} width={56} height={40} className="object-cover rounded shrink-0" unoptimized />
+                    <Image
+                      src={thumbnailUrlFromPreviewUrl(item.src, 160, 120)}
+                      alt={item.title}
+                      width={56}
+                      height={40}
+                      className="object-cover rounded shrink-0"
+                      unoptimized
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-on-surface truncate">{item.title}</p>
                       <p className="text-[10px] text-outline capitalize">{item.license}</p>

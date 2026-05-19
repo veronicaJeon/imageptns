@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { useEffect, Suspense, useMemo, useState } from "react";
 import { useCart } from "@/lib/store/cart";
+import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 
 interface SuccessOrderItem {
   id: string;
@@ -106,7 +107,7 @@ function SuccessContent() {
                     <div className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded bg-surface-container-low">
                       {item.image?.storage_path_preview ? (
                         <Image
-                          src={item.image.storage_path_preview}
+                          src={thumbnailUrlFromPreviewUrl(item.image.storage_path_preview, 160, 120)}
                           alt={item.image.title ?? ""}
                           width={80}
                           height={56}

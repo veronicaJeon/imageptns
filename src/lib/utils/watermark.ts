@@ -50,3 +50,12 @@ export async function applyWatermark(input: Buffer): Promise<Buffer> {
     .toBuffer();
   // No catch — let errors propagate so callers know the watermark failed
 }
+
+export async function createWatermarkedThumbnail(input: Buffer, width = 320, height = 240): Promise<Buffer> {
+  const resized = await sharp(input)
+    .resize(width, height, { fit: "cover", withoutEnlargement: true })
+    .jpeg({ quality: 74 })
+    .toBuffer();
+
+  return applyWatermark(resized);
+}

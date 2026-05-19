@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n/store";
 import { useCart, LicenseType, getLicensePrice } from "@/lib/store/cart";
+import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 
 const LICENSE_KEYS: LicenseType[] = ["editorial", "commercial", "extended"];
 
@@ -77,7 +78,14 @@ export default function CartPage() {
                 <td className="py-3 pr-3 text-zinc-500">{index + 1}</td>
                 <td className="py-3 pr-3">
                   {item.src ? (
-                    <Image src={item.src} alt="" width={64} height={48} className="h-12 w-16 rounded object-cover" unoptimized />
+                    <Image
+                      src={thumbnailUrlFromPreviewUrl(item.src, 160, 120)}
+                      alt=""
+                      width={64}
+                      height={48}
+                      className="h-12 w-16 rounded object-cover"
+                      unoptimized
+                    />
                   ) : (
                     <div className="h-12 w-16 rounded bg-zinc-100" />
                   )}
@@ -150,7 +158,7 @@ export default function CartPage() {
                 <div key={item.id} className="bg-surface-container-lowest shadow-ghost p-5 flex gap-5">
                   <Link href={`/library/${item.id}`} className="shrink-0">
                     <Image
-                      src={item.src}
+                      src={thumbnailUrlFromPreviewUrl(item.src, 240, 180)}
                       alt={item.title}
                       width={100}
                       height={70}
