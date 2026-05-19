@@ -150,7 +150,7 @@ export default function AdminStatsPage() {
       label: "Base 결제 확인 대기",
       value: payments.pending,
       detail: "구매자가 confirm 단계에서 이탈했거나 RPC 확인이 지연됐을 수 있습니다.",
-      href: "/admin/stats",
+      href: "/admin/onchain",
       tone: "text-amber-600 bg-amber-50 dark:bg-amber-900/20",
     },
     {
@@ -158,7 +158,7 @@ export default function AdminStatsPage() {
       label: "Base 결제 실패",
       value: payments.failed,
       detail: "실패 주문의 재시도/정리 여부를 확인해야 합니다.",
-      href: "/admin/stats",
+      href: "/admin/onchain",
       tone: "text-error bg-error/10",
     },
     {

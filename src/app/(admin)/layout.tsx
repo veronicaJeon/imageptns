@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils/cn";
@@ -8,6 +9,7 @@ import { useAuth } from "@/lib/store/auth";
 
 const NAV_ITEMS = [
   { href: "/admin",                   icon: "pending_actions", label: "이미지 검토"   },
+  { href: "/admin/onchain",           icon: "account_balance",  label: "온체인 운영"  },
   { href: "/admin/payouts",           icon: "payments",        label: "정산 관리"    },
   { href: "/admin/stats",             icon: "bar_chart",       label: "통계"         },
   { href: "/admin/image-insights",    icon: "insights",        label: "이미지 인사이트" },
@@ -60,7 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shrink-0 overflow-hidden">
               {user?.avatar_url ? (
-                <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                <Image src={user.avatar_url} alt="" width={32} height={32} className="w-full h-full object-cover" />
               ) : (
                 <span className="material-symbols-outlined text-base text-on-primary-container">person</span>
               )}
