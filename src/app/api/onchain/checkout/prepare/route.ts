@@ -49,19 +49,6 @@ function profileWallet(photographer: ImageRow["photographer"]) {
   return profile?.wallet_address ?? null;
 }
 
-function allocateCryptoGrossAmounts(total: bigint, weights: number[]) {
-  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
-  let allocated = BigInt(0);
-
-  return weights.map((weight, index) => {
-    if (index === weights.length - 1) return total - allocated;
-
-    const amount = (total * BigInt(weight)) / BigInt(totalWeight);
-    allocated += amount;
-    return amount;
-  });
-}
-
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -170,8 +157,8 @@ export async function POST(req: NextRequest) {
 
   const vat = Math.round(subtotal * 0.1);
   const total = subtotal + vat;
-  const cryptoAmount = krwToUsdcAmount(total, config.usdcPerKrw);
-  const grossAmounts = allocateCryptoGrossAmounts(cryptoAmount, grossKrwAmounts);
+  const grossAmounts = grossKrwAmounts.map((amount) => krwToUsdcAmount(amount, config.usdcPerKrw));
+  const cryptoAmount = grossAmounts.reduce((sum, amount) => sum + amount, BigInt(0));
   const tossOrderId = randomUUID();
   const contractOrderId = orderBytes32(tossOrderId);
 

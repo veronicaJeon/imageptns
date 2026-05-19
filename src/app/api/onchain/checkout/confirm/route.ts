@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeEventLog, getAddress, isHex, type Address, type Hex } from "viem";
-import { bigintToDecimalString } from "@/lib/onchain/amounts";
+import { bigintToDecimalString, krwToUsdcAmount } from "@/lib/onchain/amounts";
 import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
 import { getOnchainServerConfig } from "@/lib/onchain/env";
 import { getOnchainPublicClient } from "@/lib/onchain/server";
@@ -26,6 +26,8 @@ interface OrderRow {
 interface OrderItemRow {
   id: string;
   gross_krw: number;
+  commission_krw: number;
+  net_krw: number;
 }
 
 function badRequest(error: string) {
@@ -39,19 +41,6 @@ function decimalToUnits(value: number | string, decimals: number) {
   const [whole, fraction = ""] = normalized.split(".");
   const paddedFraction = fraction.padEnd(decimals, "0").slice(0, decimals);
   return BigInt(`${whole}${paddedFraction}`.replace(/^0+/, "") || "0");
-}
-
-function allocateCryptoGrossAmounts(total: bigint, weights: number[]) {
-  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
-  let allocated = BigInt(0);
-
-  return weights.map((weight, index) => {
-    if (index === weights.length - 1) return total - allocated;
-
-    const amount = (total * BigInt(weight)) / BigInt(totalWeight);
-    allocated += amount;
-    return amount;
-  });
 }
 
 export async function POST(req: NextRequest) {
@@ -189,29 +178,26 @@ export async function POST(req: NextRequest) {
 
   const { data: orderItems, error: orderItemsError } = await admin
     .from("order_items")
-    .select("id, gross_krw")
+    .select("id, gross_krw, commission_krw, net_krw")
     .eq("order_id", orderDbId);
 
   if (orderItemsError) return NextResponse.json({ error: orderItemsError.message }, { status: 500 });
 
   const typedOrderItems = orderItems as OrderItemRow[] | null;
   if (typedOrderItems?.length) {
-    const claimableAmounts = allocateCryptoGrossAmounts(
-      expectedAmount,
-      typedOrderItems.map((item) => item.gross_krw),
-    ).map((amount) => amount - (amount * BigInt(config.platformFeeBps)) / BigInt(10_000));
-
     const ledgerUpdates = await Promise.all(
-      typedOrderItems.map((item, index) =>
-        admin
+      typedOrderItems.map((item) => {
+        const claimableAmount = krwToUsdcAmount(item.net_krw, config.usdcPerKrw);
+
+        return admin
           .from("earnings_ledger")
           .update({
             settlement_provider: "onchain_escrow",
             claim_status: "claimable",
-            claimable_amount: bigintToDecimalString(claimableAmounts[index], cryptoDecimals),
+            claimable_amount: bigintToDecimalString(claimableAmount, cryptoDecimals),
           })
-          .eq("order_item_id", item.id),
-      ),
+          .eq("order_item_id", item.id);
+      }),
     );
 
     const ledgerError = ledgerUpdates.find((result) => result.error)?.error;
