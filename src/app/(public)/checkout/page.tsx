@@ -41,6 +41,12 @@ interface OnchainPrepareResponse {
   grossAmounts: string[];
 }
 
+interface BasePaymentRecovery {
+  orderDbId: string;
+  txHash: Hex;
+  confirmToken: string;
+}
+
 function formatKRW(n: number) {
   return "₩" + n.toLocaleString("ko-KR");
 }
@@ -97,6 +103,7 @@ function CheckoutContent() {
   const [loading, setLoading]   = useState(false);
   const [widgetReady, setWidgetReady] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("toss");
+  const [baseRecovery, setBaseRecovery] = useState<BasePaymentRecovery | null>(null);
   const widgetRef = useRef<PaymentWidgetInstance | null>(null);
   const displayVat = paymentMethod === "base_usdc" ? 0 : vat;
   const displayTotal = subtotal + displayVat;
@@ -186,6 +193,8 @@ function CheckoutContent() {
 
   async function handleBaseUsdcPayment() {
     setLoading(true);
+    let preparedForRecovery: OnchainPrepareResponse | null = null;
+    let purchaseTxHash: Hex | null = null;
 
     try {
       if (typeof window === "undefined" || !("ethereum" in window)) {
@@ -216,6 +225,7 @@ function CheckoutContent() {
       if (!prepRes.ok) throw new Error(await readApiError(prepRes, "Base USDC 주문 생성 실패"));
 
       const prepared = await prepRes.json() as OnchainPrepareResponse;
+      preparedForRecovery = prepared;
       const targetChainId = ensureBaseChainId(prepared.chainId);
 
       account = getAccount(wagmiConfig);
@@ -263,6 +273,12 @@ function CheckoutContent() {
       if (purchaseReceipt.status !== "success") {
         throw new Error("구매 트랜잭션이 실패했습니다. 지갑에서 상태를 확인한 뒤 다시 시도해주세요.");
       }
+      purchaseTxHash = purchaseReceipt.transactionHash;
+      setBaseRecovery({
+        orderDbId: prepared.orderDbId,
+        txHash: purchaseReceipt.transactionHash,
+        confirmToken: prepared.confirmToken,
+      });
 
       const confirmRes = await fetch("/api/onchain/checkout/confirm", {
         method:  "POST",
@@ -276,10 +292,40 @@ function CheckoutContent() {
       if (!confirmRes.ok) throw new Error(await readApiError(confirmRes, "Base USDC 결제 확인 실패"));
 
       const { orderNumber } = await confirmRes.json() as { orderNumber?: string };
+      setBaseRecovery(null);
       router.push(`/checkout/success?order=${encodeURIComponent(orderNumber ?? "")}`);
     } catch (err) {
       console.error(err);
+      if (preparedForRecovery && purchaseTxHash) {
+        setBaseRecovery({
+          orderDbId: preparedForRecovery.orderDbId,
+          txHash: purchaseTxHash,
+          confirmToken: preparedForRecovery.confirmToken,
+        });
+      }
       alert(checkoutErrorMessage(err, "Base USDC 결제를 완료하지 못했습니다."));
+      setLoading(false);
+    }
+  }
+
+  async function retryBaseConfirmation() {
+    if (!baseRecovery) return;
+    setLoading(true);
+    try {
+      const confirmRes = await fetch("/api/onchain/checkout/confirm", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(baseRecovery),
+      });
+      if (!confirmRes.ok) throw new Error(await readApiError(confirmRes, "Base USDC 결제 확인 실패"));
+
+      const { orderNumber } = await confirmRes.json() as { orderNumber?: string };
+      setBaseRecovery(null);
+      router.push(`/checkout/success?order=${encodeURIComponent(orderNumber ?? "")}`);
+    } catch (err) {
+      console.error(err);
+      alert(checkoutErrorMessage(err, "Base USDC 결제 확인을 다시 완료하지 못했습니다."));
+    } finally {
       setLoading(false);
     }
   }
@@ -401,9 +447,57 @@ function CheckoutContent() {
                       </p>
                     </div>
                   </div>
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-on-surface-variant">
+                    <div className="bg-surface-container-low px-3 py-2">
+                      <p className="font-bold text-on-surface">1. Approve</p>
+                      <p className="mt-1">USDC 사용 권한을 승인합니다.</p>
+                    </div>
+                    <div className="bg-surface-container-low px-3 py-2">
+                      <p className="font-bold text-on-surface">2. Purchase</p>
+                      <p className="mt-1">Base에서 구매 트랜잭션을 전송합니다.</p>
+                    </div>
+                    <div className="bg-surface-container-low px-3 py-2">
+                      <p className="font-bold text-on-surface">3. Confirm</p>
+                      <p className="mt-1">서버가 tx를 검증해 다운로드 권한을 엽니다.</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-start gap-2 text-[11px] leading-relaxed text-outline">
+                    <span className="material-symbols-outlined text-sm text-amber-500 mt-0.5">info</span>
+                    <p>
+                      purchase가 성공했는데 화면이 멈추면 아래 재확인 버튼이나 주문 내역의 tx 정보를 사용해 복구할 수 있습니다.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
+
+            {baseRecovery && (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300/40 p-4 flex flex-col gap-3">
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-amber-600 text-xl mt-0.5">sync</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-on-surface">Base 결제 확인 재시도가 필요합니다</p>
+                    <p className="text-xs text-on-surface-variant mt-1">
+                      구매 tx는 감지됐지만 서버 확인이 끝나지 않았습니다.
+                    </p>
+                    <p className="text-[10px] font-mono text-outline mt-2 truncate">tx {baseRecovery.txHash}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={retryBaseConfirmation}
+                    disabled={loading}
+                    className="px-4 py-2 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    결제 확인 다시 시도
+                  </button>
+                  <Link href="/dashboard/orders" className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:text-primary">
+                    주문 내역 보기
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* Submit */}
             <button
