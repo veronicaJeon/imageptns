@@ -2,17 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { randomUUID } from "crypto";
 
+const ALLOWED_IMAGE_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/tiff": "tif",
+};
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { filename, contentType } = await req.json();
+  const { filename, contentType } = await req.json() as { filename?: string; contentType?: string };
   if (!filename || !contentType) {
     return NextResponse.json({ error: "filename and contentType required" }, { status: 400 });
   }
+  if (!ALLOWED_IMAGE_TYPES[contentType]) {
+    return NextResponse.json({ error: "Unsupported image type" }, { status: 400 });
+  }
 
-  const ext = filename.split(".").pop() ?? "jpg";
+  const ext = ALLOWED_IMAGE_TYPES[contentType];
   const objectPath = `${user.id}/${randomUUID()}.${ext}`;
 
   // Upload the original file to images-original, then generate public previews separately.

@@ -3,13 +3,42 @@ import { createClient } from "@/lib/supabase/server";
 
 const PAGE_SIZE = 20;
 
+interface ImageListRow {
+  id: string;
+  asset_id: string | null;
+  title: string;
+  category: string;
+  tags: string[] | null;
+  storage_path_preview: string | null;
+  width: number | null;
+  height: number | null;
+  photographer?: { full_name: string | null } | { full_name: string | null }[] | null;
+}
+
+interface SearchImageRpcRow {
+  id: string;
+  asset_id: string | null;
+  title: string;
+  category: string;
+  storage_path_preview: string | null;
+  width: number | null;
+  height: number | null;
+  photographer_name: string | null;
+}
+
+function firstPhotographer(photographer: ImageListRow["photographer"]) {
+  return Array.isArray(photographer) ? photographer[0] : photographer;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const query    = searchParams.get("query") ?? "";
   const category = searchParams.get("category") ?? "";
   const sort     = searchParams.get("sort") ?? "newest";
-  const limit    = Math.min(Number(searchParams.get("limit") ?? String(PAGE_SIZE)), 100);
-  const offset   = Number(searchParams.get("offset") ?? "0");
+  const rawLimit = Number(searchParams.get("limit") ?? String(PAGE_SIZE));
+  const rawOffset = Number(searchParams.get("offset") ?? "0");
+  const limit = Number.isInteger(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : PAGE_SIZE;
+  const offset = Number.isInteger(rawOffset) ? Math.max(rawOffset, 0) : 0;
   const fetchCount = limit + 1; // fetch one extra to determine hasMore
 
   const supabase = await createClient();
@@ -44,7 +73,7 @@ export async function GET(req: NextRequest) {
       const rawRpc = rpcData ?? [];
       const hasMoreRpc = rawRpc.length > limit;
       const slicedRpc = hasMoreRpc ? rawRpc.slice(0, limit) : rawRpc;
-      const images = slicedRpc.map((img: any) => {
+      const images = (slicedRpc as SearchImageRpcRow[]).map((img) => {
         let src = "";
         if (img.storage_path_preview) {
           const { data: urlData } = supabase.storage
@@ -86,7 +115,7 @@ export async function GET(req: NextRequest) {
   const hasMore = raw.length > limit;
   const sliced = hasMore ? raw.slice(0, limit) : raw;
 
-  const images = sliced.map((img: any) => {
+  const images = (sliced as ImageListRow[]).map((img) => {
     let src = "";
     if (img.storage_path_preview) {
       const { data: urlData } = supabase.storage
@@ -99,7 +128,7 @@ export async function GET(req: NextRequest) {
       assetId:      img.asset_id,
       title:        img.title,
       category:     img.category,
-      photographer: img.photographer?.full_name ?? "",
+      photographer: firstPhotographer(img.photographer)?.full_name ?? "",
       src,
       alt:          img.title,
       width:        img.width ?? 800,

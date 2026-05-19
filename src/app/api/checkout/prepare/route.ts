@@ -8,12 +8,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 interface CartItemInput {
   id: string;           // image id
   license: string;      // 'editorial' | 'commercial' | 'extended'
-  price: number;        // KRW
 }
 
 interface CheckoutImageRow {
   id: string;
   photographer_id: string | null;
+  status: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -21,10 +21,13 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { items, billing }: { items: CartItemInput[]; billing: { name: string; email: string; company?: string } } =
+  const { items, billing }: { items?: CartItemInput[]; billing?: { name?: string; email?: string; company?: string } } =
     await req.json();
 
   if (!items?.length) return NextResponse.json({ error: "No items" }, { status: 400 });
+  if (!billing?.name?.trim() || !billing.email?.trim()) {
+    return NextResponse.json({ error: "Billing name and email are required" }, { status: 400 });
+  }
 
   const admin = createAdminClient();
   const licenseCodes = [...new Set(items.map((item) => item.license))];
@@ -68,13 +71,19 @@ export async function POST(req: NextRequest) {
 
   // Fetch image details for order items
   const imageIds = items.map((i) => i.id);
-  const { data: images } = await supabase
+  const { data: images, error: imageError } = await admin
     .from("images")
-    .select("id, photographer_id")
-    .in("id", imageIds);
+    .select("id, photographer_id, status")
+    .in("id", imageIds)
+    .eq("status", "approved");
+
+  if (imageError) return NextResponse.json({ error: imageError.message }, { status: 500 });
 
   const imageRows = (images ?? []) as CheckoutImageRow[];
   const imageMap = Object.fromEntries(imageRows.map((img) => [img.id, img]));
+  if (imageIds.some((id) => !imageMap[id])) {
+    return NextResponse.json({ error: "All items must be approved images" }, { status: 400 });
+  }
   const { data: policyRows } = await admin
     .from("commission_policies")
     .select("id, scope, rate, active, starts_at, ends_at, license_code, photographer_id, image_id")
@@ -107,7 +116,7 @@ export async function POST(req: NextRequest) {
     };
   });
 
-  const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
+  const { error: itemsError } = await admin.from("order_items").insert(orderItems);
   if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 });
 
   if (total === 0) {

@@ -50,6 +50,8 @@ interface BasePaymentRecovery {
   confirmToken: string;
 }
 
+const BASE_RECOVERY_STORAGE_KEY = "imagepartners.basePaymentRecovery";
+
 interface CheckoutPrepareResponse {
   orderId: string;
   orderName: string;
@@ -144,6 +146,25 @@ function CheckoutContent() {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(BASE_RECOVERY_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as BasePaymentRecovery;
+      if (parsed.orderDbId && parsed.txHash && parsed.confirmToken) setBaseRecovery(parsed);
+    } catch {
+      window.localStorage.removeItem(BASE_RECOVERY_STORAGE_KEY);
+    }
+  }, []);
+
+  function persistBaseRecovery(recovery: BasePaymentRecovery | null) {
+    setBaseRecovery(recovery);
+    if (typeof window === "undefined") return;
+    if (recovery) window.localStorage.setItem(BASE_RECOVERY_STORAGE_KEY, JSON.stringify(recovery));
+    else window.localStorage.removeItem(BASE_RECOVERY_STORAGE_KEY);
+  }
 
   function setB(k: keyof typeof billing) {
     return (v: string) => setBilling((p) => ({ ...p, [k]: v }));
@@ -334,7 +355,7 @@ function CheckoutContent() {
         throw new Error("구매 트랜잭션이 실패했습니다. 지갑에서 상태를 확인한 뒤 다시 시도해주세요.");
       }
       purchaseTxHash = purchaseReceipt.transactionHash;
-      setBaseRecovery({
+      persistBaseRecovery({
         orderDbId: prepared.orderDbId,
         txHash: purchaseReceipt.transactionHash,
         confirmToken: prepared.confirmToken,
@@ -352,12 +373,12 @@ function CheckoutContent() {
       if (!confirmRes.ok) throw new Error(await readApiError(confirmRes, "Base USDC 결제 확인 실패"));
 
       const { orderNumber } = await confirmRes.json() as { orderNumber?: string };
-      setBaseRecovery(null);
+      persistBaseRecovery(null);
       router.push(`/checkout/success?order=${encodeURIComponent(orderNumber ?? "")}`);
     } catch (err) {
       console.error(err);
       if (preparedForRecovery && purchaseTxHash) {
-        setBaseRecovery({
+        persistBaseRecovery({
           orderDbId: preparedForRecovery.orderDbId,
           txHash: purchaseTxHash,
           confirmToken: preparedForRecovery.confirmToken,
@@ -380,7 +401,7 @@ function CheckoutContent() {
       if (!confirmRes.ok) throw new Error(await readApiError(confirmRes, "Base USDC 결제 확인 실패"));
 
       const { orderNumber } = await confirmRes.json() as { orderNumber?: string };
-      setBaseRecovery(null);
+      persistBaseRecovery(null);
       router.push(`/checkout/success?order=${encodeURIComponent(orderNumber ?? "")}`);
     } catch (err) {
       console.error(err);

@@ -1,3 +1,5 @@
+import { escapeHtml } from "./html";
+
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Override via env vars in Vercel dashboard; defaults kept for local dev reference
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "Image Partners <onboarding@resend.dev>";
@@ -35,13 +37,15 @@ export async function sendContactConfirmation(opts: {
   email:   string;
   subject: string;
 }) {
+  const name = escapeHtml(opts.name);
+  const subject = escapeHtml(opts.subject);
   await sendEmail({
     to:      opts.email,
     subject: `[Image Partners] 문의가 접수되었습니다 — ${opts.subject}`,
     html: `
-      <p>${opts.name}님, 안녕하세요.</p>
+      <p>${name}님, 안녕하세요.</p>
       <p>문의해 주셔서 감사합니다. 빠른 시일 내에 답변 드리겠습니다.</p>
-      <p>문의 제목: <strong>${opts.subject}</strong></p>
+      <p>문의 제목: <strong>${subject}</strong></p>
       <br><p>Image Partners 팀 드림</p>
     `,
   });
@@ -53,15 +57,19 @@ export async function notifyOpsContact(opts: {
   subject: string;
   message: string;
 }) {
+  const name = escapeHtml(opts.name);
+  const email = escapeHtml(opts.email);
+  const subject = escapeHtml(opts.subject);
+  const message = escapeHtml(opts.message);
   await sendEmail({
     to:      OPS_EMAIL,
     subject: `[문의] ${opts.subject} — ${opts.name}`,
     html: `
-      <p><strong>이름:</strong> ${opts.name}</p>
-      <p><strong>이메일:</strong> ${opts.email}</p>
-      <p><strong>제목:</strong> ${opts.subject}</p>
+      <p><strong>이름:</strong> ${name}</p>
+      <p><strong>이메일:</strong> ${email}</p>
+      <p><strong>제목:</strong> ${subject}</p>
       <p><strong>내용:</strong></p>
-      <pre>${opts.message}</pre>
+      <pre>${message}</pre>
     `,
   });
 }

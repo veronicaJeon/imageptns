@@ -2,8 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendContactEmails } from "@/lib/email/contact";
 import { sendContactConfirmation, notifyOpsContact } from "@/lib/email/gmail";
+import { checkRateLimit, requestIp } from "@/lib/security/rate-limit";
 
 export async function POST(req: NextRequest) {
+  const rate = checkRateLimit({
+    key: `contact:${requestIp(req.headers)}`,
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many contact requests" },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+    );
+  }
+
   let body: { name?: string; email?: string; subject?: string; message?: string };
   try {
     body = await req.json();
@@ -18,6 +31,9 @@ export async function POST(req: NextRequest) {
 
   if (!name || !email || !subject || !message) {
     return NextResponse.json({ error: "All fields required" }, { status: 400 });
+  }
+  if (name.length > 80 || email.length > 254 || subject.length > 160 || message.length > 5000) {
+    return NextResponse.json({ error: "Input is too long" }, { status: 400 });
   }
 
   const supabase = await createClient();
