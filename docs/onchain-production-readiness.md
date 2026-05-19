@@ -8,7 +8,7 @@ This checklist tracks the remaining work to take Base USDC payments from testnet
 - [ ] Add an admin retry tool for failed proof registration after operator/RPC issues are fixed.
 - [ ] Add an admin reconciliation view that compares pending Base orders against transaction hashes submitted by buyers.
 - [ ] Add a cron reconciliation endpoint for stale `base_usdc` pending orders.
-- [ ] Add order detail UI that exposes Base tx hash, chain id, token address, and contract order id.
+- [x] Add buyer order history UI that exposes Base tx hash, token address, and contract order id.
 - [ ] Add photographer-facing claim history filters for `claimable` and `claimed` USDC rows.
 - [ ] Add buyer-facing copy for Base USDC checkout risks: wallet network, gas, approval, and retry behavior.
 - [ ] Add analytics events for Base checkout prepare, approval, purchase tx, confirm success, and confirm failure.
@@ -41,4 +41,3 @@ This checklist tracks the remaining work to take Base USDC payments from testnet
 - Create a buyer test wallet with Base Sepolia ETH and Base Sepolia USDC.
 - Fill the worktree environment file at `/Users/simini/Documents/Imgptns/imageptns/.worktrees/base-usdc-onchain-payments/.env.local`.
 - After the escrow deployment prints the contract address, add it as `NEXT_PUBLIC_IMAGEPARTNERS_ESCROW_ADDRESS`.
-
