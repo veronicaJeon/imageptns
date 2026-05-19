@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { bigintToDecimalString, krwToUsdcAmount } from "@/lib/onchain/amounts";
 import { createOnchainConfirmToken } from "@/lib/onchain/checkout-auth";
 import { getOnchainServerConfig } from "@/lib/onchain/env";
+import { recordOnchainEvent } from "@/lib/onchain/events";
 import { orderBytes32 } from "@/lib/onchain/ids";
 
 interface CartItemInput {
@@ -209,6 +210,19 @@ export async function POST(req: NextRequest) {
       .eq("status", "pending");
     return NextResponse.json({ error: itemsError.message }, { status: 500 });
   }
+
+  await recordOnchainEvent(admin, {
+    eventType: "checkout_prepare_created",
+    actorId: user.id,
+    orderId: order.id,
+    chainId: config.chainId,
+    metadata: {
+      itemCount: orderItems.length,
+      cryptoAmount: cryptoAmount.toString(),
+      contractOrderId,
+      buyerWalletAddress,
+    },
+  });
 
   return NextResponse.json({
     orderDbId: order.id,

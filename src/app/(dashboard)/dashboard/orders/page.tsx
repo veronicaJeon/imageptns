@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n/store";
@@ -70,23 +70,35 @@ interface OrderRow {
   contractOrderId: string | null;
   cryptoAmount: number | string | null;
   cryptoStatus: string | null;
+  isFirstItemInOrder: boolean;
 }
 
 export default function OrdersPage() {
   const { t } = useLang();
   const ord = t.dashboard.orders;
+  const recovery = ord.recovery;
   const c   = ord.cols;
 
   const [orders, setOrders]       = useState<Order[]>([]);
   const [loading, setLoading]     = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [recoveryTxHashes, setRecoveryTxHashes] = useState<Record<string, string>>({});
+  const [confirmingOrderIds, setConfirmingOrderIds] = useState<Record<string, boolean>>({});
+
+  const refreshOrders = useCallback(async () => {
+    const res = await fetch("/api/orders");
+    if (!res.ok) {
+      throw new Error("Failed to refresh orders");
+    }
+    const data = (await res.json()) as { orders?: Order[] };
+    setOrders(data.orders ?? []);
+  }, []);
 
   useEffect(() => {
-    fetch("/api/orders")
-      .then((r) => r.json())
-      .then(({ orders }) => setOrders(orders ?? []))
+    refreshOrders()
+      .catch(() => setOrders([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshOrders]);
 
   async function handleDownload(orderItemId: string) {
     setDownloading(orderItemId);
@@ -104,9 +116,59 @@ export default function OrdersPage() {
     }
   }
 
+  function handleRecoveryTxHashChange(orderDbId: string, txHash: string) {
+    setRecoveryTxHashes((prev) => ({ ...prev, [orderDbId]: txHash }));
+  }
+
+  async function handleConfirmOnchain(orderDbId: string) {
+    const txHash = recoveryTxHashes[orderDbId]?.trim() ?? "";
+    if (!txHash) {
+      alert(recovery.missingTx);
+      return;
+    }
+
+    setConfirmingOrderIds((prev) => ({ ...prev, [orderDbId]: true }));
+    try {
+      const res = await fetch("/api/onchain/checkout/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderDbId, txHash }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: unknown } | null;
+        const error = typeof data?.error === "string" && data.error.trim()
+          ? data.error
+          : recovery.confirmFailed;
+        alert(error);
+        return;
+      }
+
+      try {
+        await refreshOrders();
+      } catch {
+        alert(recovery.refreshFailed);
+      }
+
+      setRecoveryTxHashes((prev) => {
+        const next = { ...prev };
+        delete next[orderDbId];
+        return next;
+      });
+    } catch {
+      alert(recovery.networkFailed);
+    } finally {
+      setConfirmingOrderIds((prev) => {
+        const next = { ...prev };
+        delete next[orderDbId];
+        return next;
+      });
+    }
+  }
+
   // Flatten orders → rows per item
   const rows: OrderRow[] = orders.flatMap((order) =>
-    (order.order_items ?? []).map((item) => ({
+    (order.order_items ?? []).map((item, itemIndex) => ({
       orderId:     order.id,
       orderNumber: order.order_number,
       status:      order.status,
@@ -125,6 +187,7 @@ export default function OrdersPage() {
       contractOrderId: order.contract_order_id,
       cryptoAmount: order.crypto_amount,
       cryptoStatus: order.crypto_status,
+      isFirstItemInOrder: itemIndex === 0,
     }))
   );
 
@@ -156,7 +219,11 @@ export default function OrdersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20">
-              {rows.map((row) => (
+              {rows.map((row) => {
+                const canRecoverBaseUsdc = row.isFirstItemInOrder && row.paymentProvider === "base_usdc" && row.cryptoStatus === "pending";
+                const isConfirming = Boolean(confirmingOrderIds[row.orderId]);
+
+                return (
                 <tr key={row.itemId} className="hover:bg-surface-container-low transition-colors align-top">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -232,9 +299,40 @@ export default function OrdersPage() {
                         {ord.download}
                       </button>
                     )}
+                    {canRecoverBaseUsdc && (
+                      <form
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void handleConfirmOnchain(row.orderId);
+                        }}
+                        className="flex w-56 max-w-full items-center gap-2"
+                      >
+                        <input
+                          type="text"
+                          value={recoveryTxHashes[row.orderId] ?? ""}
+                          onChange={(event) => handleRecoveryTxHashChange(row.orderId, event.target.value)}
+                          placeholder={recovery.txPlaceholder}
+                          aria-label={`${recovery.txLabel} ${row.orderNumber}`}
+                          disabled={isConfirming}
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="min-w-0 flex-1 rounded-md border border-outline-variant/50 bg-surface-container-lowest px-2 py-1.5 text-xs text-on-surface outline-none transition-colors placeholder:text-outline focus:border-primary disabled:opacity-60"
+                        />
+                        <button
+                          type="submit"
+                          disabled={isConfirming}
+                          className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition-opacity hover:opacity-80 disabled:opacity-50"
+                        >
+                          <span className="inline-flex min-w-14 justify-center">
+                            {isConfirming ? recovery.retrying : recovery.retry}
+                          </span>
+                        </button>
+                      </form>
+                    )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

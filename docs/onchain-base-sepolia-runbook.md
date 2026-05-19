@@ -15,6 +15,7 @@ ONCHAIN_TREASURY_ADDRESS=
 ONCHAIN_PLATFORM_FEE_BPS=2000
 ONCHAIN_USDC_PER_KRW=0.00075
 NEXT_PUBLIC_IMAGEPARTNERS_ESCROW_ADDRESS=
+CRON_SECRET=
 ```
 
 ## Where To Get Them
@@ -24,6 +25,7 @@ NEXT_PUBLIC_IMAGEPARTNERS_ESCROW_ADDRESS=
 - `ONCHAIN_TREASURY_ADDRESS`: the platform fee recipient wallet address.
 - `NEXT_PUBLIC_USDC_ADDRESS`: Circle Base Sepolia USDC, `0x036CbD53842c5426634e7929541eC2318f3dCF7e`.
 - `NEXT_PUBLIC_IMAGEPARTNERS_ESCROW_ADDRESS`: produced by the deployment command below.
+- `CRON_SECRET`: create a long random secret and store the same value in Vercel/Supabase scheduler headers as `Authorization: Bearer <value>` for cron endpoints.
 
 ## Test Funds
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { decodeEventLog, decodeFunctionData, getAddress, isHex, type Address, type Hex } from "viem";
 import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
 import { getOnchainServerConfig } from "@/lib/onchain/env";
+import { recordOnchainEvent } from "@/lib/onchain/events";
 import { getOnchainPublicClient } from "@/lib/onchain/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -237,6 +238,18 @@ export async function POST(req: NextRequest) {
   if (!updatedRows || updatedRows.length !== claimableRows.length) {
     return NextResponse.json({ error: "Claimable earnings changed during confirmation" }, { status: 409 });
   }
+
+  await recordOnchainEvent(admin, {
+    eventType: "claim_confirmed",
+    actorId: user.id,
+    txHash: normalizedTxHash,
+    chainId: config.chainId,
+    metadata: {
+      walletAddress,
+      rowCount: updatedRows.length,
+      amount: expectedClaimAmount.toString(),
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }

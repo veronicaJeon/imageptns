@@ -69,7 +69,22 @@ export interface Translations {
       browseBtn: string; uploadBtn: string;
     };
     favorites: { title: string; empty: string; emptyBtn: string; removeBtn: string };
-    orders: { title: string; empty: string; cols: { image: string; license: string; date: string; amount: string; status: string }; download: string };
+    orders: {
+      title: string;
+      empty: string;
+      cols: { image: string; license: string; date: string; amount: string; status: string };
+      download: string;
+      recovery: {
+        txPlaceholder: string;
+        txLabel: string;
+        retry: string;
+        retrying: string;
+        missingTx: string;
+        confirmFailed: string;
+        refreshFailed: string;
+        networkFailed: string;
+      };
+    };
     uploads: { title: string; uploadBtn: string; empty: string; cols: { image: string; status: string; views: string; sales: string; uploaded: string }; statuses: { approved: string; pending: string; rejected: string } };
     earnings: { title: string; statTotal: string; statMonth: string; statPending: string; payoutBtn: string; historyTitle: string };
     settings: { title: string; sections: { profile: string; account: string; notifications: string; danger: string }; saveBtn: string; nameLabel: string; emailLabel: string; bioLabel: string; deleteAccount: string; deleteBtn: string };
@@ -302,7 +317,22 @@ export const en: Translations = {
       uploadBtn: "Upload Images",
     },
     favorites: { title: "My Favorites", empty: "You haven't saved any images yet.", emptyBtn: "Browse Library", removeBtn: "Remove" },
-    orders: { title: "Order History", empty: "No orders yet.", cols: { image: "Image", license: "License", date: "Date", amount: "Amount", status: "Status" }, download: "Download" },
+    orders: {
+      title: "Order History",
+      empty: "No orders yet.",
+      cols: { image: "Image", license: "License", date: "Date", amount: "Amount", status: "Status" },
+      download: "Download",
+      recovery: {
+        txPlaceholder: "Tx hash",
+        txLabel: "Transaction hash for order",
+        retry: "Retry",
+        retrying: "Retrying",
+        missingTx: "Enter the Base USDC transaction hash from your wallet or order history.",
+        confirmFailed: "Could not confirm this Base USDC payment. Check the transaction hash and try again.",
+        refreshFailed: "Payment was confirmed, but the order list could not refresh. Reload this page to see the latest status.",
+        networkFailed: "Could not confirm this Base USDC payment. Check your connection and try again.",
+      },
+    },
     uploads: { title: "My Uploads", uploadBtn: "New Upload", empty: "No uploads yet. Start sharing your work.", cols: { image: "Image", status: "Status", views: "Views", sales: "Sales", uploaded: "Uploaded" }, statuses: { approved: "Approved", pending: "Pending", rejected: "Rejected" } },
     earnings: { title: "Earnings", statTotal: "Total Earned", statMonth: "This Month", statPending: "Pending Payout", payoutBtn: "Request Payout", historyTitle: "Payout History" },
     settings: { title: "Settings", sections: { profile: "Profile", account: "Account", notifications: "Notifications", danger: "Danger Zone" }, saveBtn: "Save Changes", nameLabel: "Full Name", emailLabel: "Email", bioLabel: "Bio", deleteAccount: "Permanently delete your account and all associated data.", deleteBtn: "Delete Account" },

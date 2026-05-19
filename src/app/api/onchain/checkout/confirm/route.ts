@@ -4,6 +4,7 @@ import { bigintToDecimalString } from "@/lib/onchain/amounts";
 import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
 import { authorizeOnchainCheckoutConfirmation } from "@/lib/onchain/checkout-auth";
 import { getOnchainServerConfig } from "@/lib/onchain/env";
+import { recordOnchainEvent } from "@/lib/onchain/events";
 import { imageAssetBytes32 } from "@/lib/onchain/ids";
 import { getOnchainPublicClient } from "@/lib/onchain/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -338,6 +339,20 @@ export async function POST(req: NextRequest) {
     const ledgerError = await updateLedgerClaimable(admin, expectedItems, cryptoDecimals);
     if (ledgerError) return NextResponse.json({ error: ledgerError.message }, { status: 500 });
 
+    await recordOnchainEvent(admin, {
+      eventType: "checkout_confirmed",
+      actorId: user?.id ?? null,
+      orderId: orderDbId,
+      txHash,
+      chainId: config.chainId,
+      metadata: {
+        orderNumber: order.order_number,
+        alreadyCompleted: true,
+        itemCount: expectedItems.length,
+        grossAmount: expectedAmount.toString(),
+      },
+    });
+
     return NextResponse.json({ orderNumber: order.order_number, alreadyCompleted: true });
   }
 
@@ -372,6 +387,20 @@ export async function POST(req: NextRequest) {
       const ledgerError = await updateLedgerClaimable(admin, expectedItems, cryptoDecimals);
       if (ledgerError) return NextResponse.json({ error: ledgerError.message }, { status: 500 });
 
+      await recordOnchainEvent(admin, {
+        eventType: "checkout_confirmed",
+        actorId: user?.id ?? null,
+        orderId: orderDbId,
+        txHash,
+        chainId: config.chainId,
+        metadata: {
+          orderNumber: completedOrder.order_number,
+          alreadyCompleted: true,
+          itemCount: expectedItems.length,
+          grossAmount: expectedAmount.toString(),
+        },
+      });
+
       return NextResponse.json({ orderNumber: completedOrder.order_number, alreadyCompleted: true });
     }
 
@@ -380,6 +409,20 @@ export async function POST(req: NextRequest) {
 
   const ledgerError = await updateLedgerClaimable(admin, expectedItems, cryptoDecimals);
   if (ledgerError) return NextResponse.json({ error: ledgerError.message }, { status: 500 });
+
+  await recordOnchainEvent(admin, {
+    eventType: "checkout_confirmed",
+    actorId: user?.id ?? null,
+    orderId: orderDbId,
+    txHash,
+    chainId: config.chainId,
+    metadata: {
+      orderNumber: updated.order_number,
+      alreadyCompleted: false,
+      itemCount: expectedItems.length,
+      grossAmount: expectedAmount.toString(),
+    },
+  });
 
   return NextResponse.json({ orderNumber: updated.order_number });
 }
