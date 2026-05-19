@@ -8,6 +8,7 @@ import { createOnchainConfirmToken } from "@/lib/onchain/checkout-auth";
 import { getOnchainServerConfig } from "@/lib/onchain/env";
 import { recordOnchainEvent } from "@/lib/onchain/events";
 import { orderBytes32 } from "@/lib/onchain/ids";
+import { createStaticKrwUsdcQuote } from "@/lib/onchain/quote";
 
 interface CartItemInput {
   id: string;
@@ -116,6 +117,7 @@ export async function POST(req: NextRequest) {
 
   const licenseMap = new Map((licenses as LicenseRow[] | null ?? []).map((license) => [license.code, license]));
   const imageMap = new Map((images as ImageRow[] | null ?? []).map((image) => [image.id, image]));
+  const quote = createStaticKrwUsdcQuote(config.usdcPerKrw);
   const orderItems = [];
   const assetIds: `0x${string}`[] = [];
   const photographers: Address[] = [];
@@ -142,8 +144,8 @@ export async function POST(req: NextRequest) {
     const price = license.price_krw;
     const commission = Math.round(price * COMMISSION_RATE);
     const netKrw = price - commission;
-    const grossCryptoAmount = krwToUsdcAmount(price, config.usdcPerKrw);
-    const netCryptoAmount = krwToUsdcAmount(netKrw, config.usdcPerKrw);
+    const grossCryptoAmount = krwToUsdcAmount(price, quote.usdcPerKrw);
+    const netCryptoAmount = krwToUsdcAmount(netKrw, quote.usdcPerKrw);
     subtotal += price;
     grossAmounts.push(grossCryptoAmount);
     assetIds.push(image.onchain_asset_id);
@@ -192,6 +194,10 @@ export async function POST(req: NextRequest) {
       crypto_status: "pending",
       buyer_wallet_address: buyerWalletAddress,
       onchain_confirm_token: confirmToken,
+      onchain_quote_usdc_per_krw: quote.usdcPerKrw,
+      onchain_quote_source: quote.source,
+      onchain_quote_created_at: quote.createdAt,
+      onchain_quote_expires_at: quote.expiresAt,
     })
     .select("id")
     .single();
@@ -221,6 +227,7 @@ export async function POST(req: NextRequest) {
       cryptoAmount: cryptoAmount.toString(),
       contractOrderId,
       buyerWalletAddress,
+      quote,
     },
   });
 
@@ -232,6 +239,7 @@ export async function POST(req: NextRequest) {
     escrowAddress: config.escrowAddress,
     confirmToken,
     cryptoAmount: cryptoAmount.toString(),
+    quote,
     assetIds,
     photographers,
     grossAmounts: grossAmounts.map((amount) => amount.toString()),

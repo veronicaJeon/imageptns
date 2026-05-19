@@ -22,14 +22,20 @@
 - 목표: checkout prepare, checkout confirm, claim confirm, proof review 흐름에 best-effort 이벤트 로그를 남긴다.
 - 완료 기준: 이벤트 기록 실패가 사용자 흐름을 막지 않고, 이후 관리자 분석/알림/감사 로그의 기반 데이터가 쌓인다.
 
+## 완료된 추가 배치
+
+- `checkout/confirm` rate limit과 반복 실패 backoff를 주문 단위로 추가했다.
+- 주문별 static USDC/KRW quote snapshot과 15분 quote expiry를 추가했다.
+- 관리자 온체인 화면에서 pending 주문 purchase tx hash를 직접 재확인할 수 있게 했다.
+- 관리자 온체인 화면에서 DB `earnings_ledger`와 contract `claimable(address)`를 사진가별로 대조한다.
+
 ## 다음 개발 배치
 
 ### Batch 1 - 결제 신뢰성
 
-- `checkout/confirm` rate limit과 반복 실패 backoff를 추가한다.
 - pending 주문 만료 정책을 확정하고, 자동 리포트에서 action-needed 상태를 분리한다.
-- 주문별 quote snapshot과 quote expiry를 추가해 정적 환율 리스크를 줄인다.
 - 동일 이미지/라이선스 중복 구매를 카트와 checkout 양쪽에서 막거나 명시적으로 경고한다.
+- static `ONCHAIN_USDC_PER_KRW`를 live quote provider로 교체하고 provider 장애 시 fallback 정책을 적용한다.
 
 ### Batch 2 - 운영 대시보드 고도화
 
@@ -39,7 +45,6 @@
 
 ### Batch 3 - 회계/정산 무결성
 
-- DB `earnings_ledger`와 contract `claimable(address)`를 비교하는 photographer별 reconciliation job을 추가한다.
 - 주문 완료, 다운로드 권한, onchain ledger 업데이트가 갈라졌을 때 복구하는 repair job을 만든다.
 - claim 전 preflight check를 넣어 contract와 DB 상태 불일치를 사용자에게 명확히 안내한다.
 
@@ -58,7 +63,7 @@
 ## 테스트넷 의존 배치
 
 - `ImagePartnersEscrow`를 Base Sepolia에 배포한다.
-- Supabase migrations `010`, `011`, `012`, `013` 이후 신규 migration을 대상 프로젝트에 적용한다.
+- Supabase migrations `010`, `011`, `012`, `013`, `014` 이후 신규 migration을 대상 프로젝트에 적용한다.
 - photographer wallet, buyer wallet, treasury wallet로 실제 Base Sepolia 구매와 claim을 한 번씩 끝까지 실행한다.
 - approval 중 proof registration 실패, checkout confirm 실패, pending 재확인, claim confirm 실패를 의도적으로 재현한다.
 - 테스트 결과를 runbook에 기록하고 운영 전 차단 이슈를 P0/P1로 재분류한다.

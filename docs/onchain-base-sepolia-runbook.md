@@ -56,6 +56,9 @@ If the Supabase CLI is unavailable locally, apply these files through your norma
 
 - `supabase/migrations/010_onchain_payments.sql`
 - `supabase/migrations/011_onchain_order_item_amounts.sql`
+- `supabase/migrations/012_onchain_confirm_token.sql`
+- `supabase/migrations/013_onchain_events.sql`
+- `supabase/migrations/014_onchain_checkout_ops.sql`
 
 ## End-To-End Smoke Test
 

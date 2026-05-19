@@ -25,6 +25,13 @@ export const IMAGE_PARTNERS_ESCROW_ABI = [
   },
   {
     type: "function",
+    name: "claimable",
+    stateMutability: "view",
+    inputs: [{ name: "photographer", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "claim",
     stateMutability: "nonpayable",
     inputs: [],

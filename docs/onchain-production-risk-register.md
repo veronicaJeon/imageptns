@@ -6,8 +6,9 @@
 
 1. **정적 USDC/KRW 환율**
    - 현재 `ONCHAIN_USDC_PER_KRW` 환경값으로 KRW 가격을 USDC로 고정 환산한다.
+   - 주문별 quote snapshot과 15분 quote expiry는 추가되어, 주문 생성 후 금액 근거는 추적 가능하다.
    - 가격 변동이 큰 구간에서는 구매자 과소/과대 결제와 정산 불일치가 발생할 수 있다.
-   - 추가 개발: 실시간 quote provider, quote 만료 시간, 주문별 quote snapshot, 관리자 quote 상태 모니터링.
+   - 추가 개발: 실시간 quote provider, 관리자 quote 상태 모니터링.
 
 2. **VAT/세금 처리 미완성**
    - Base USDC 결제는 현재 `vat = 0`으로 두고 license proceeds만 escrow에 넣는다.
@@ -21,12 +22,13 @@
 
 4. **결제 확인 endpoint 남용 방지**
    - `/api/onchain/checkout/confirm`은 구매자 세션 또는 주문별 confirmation token을 요구하도록 보강했다.
-   - 아직 대량 호출에 따른 RPC/DB 비용 증가 가능성은 남아 있다.
-   - 추가 개발: rate limit, request logging, repeated failure backoff.
+   - 주문 단위 confirmation attempt/backoff가 추가되어 반복 실패 호출은 429로 지연된다.
+   - 추가 개발: IP/user 단위 rate limit, request logging.
 
 5. **stale pending order 재처리**
    - 구매자가 order prepare 후 지갑 승인/구매/confirm 중 이탈하면 `base_usdc` pending order가 남는다.
-   - 추가 개발: pending order 만료 cron, tx hash 재입력/재확인 UI, admin reconciliation 화면.
+   - 구매자 주문 내역과 관리자 온체인 화면에서 tx hash 재확인을 지원한다.
+   - 추가 개발: pending order 만료 cron/action-needed 상태 전환.
 
 6. **proof 등록 실패 복구**
    - admin approval 중 operator/RPC 문제가 생기면 `proof_status = failed`가 된다.
@@ -37,7 +39,8 @@
 
 1. **onchain/offchain 회계 대조**
    - DB의 `earnings_ledger.claimable_amount`와 contract `claimable(address)`가 다를 수 있다.
-   - 추가 개발: admin reconciliation job, photographer별 DB/contract 차이 표시, claim 전 preflight check.
+   - 관리자 온체인 화면에서 photographer별 DB/contract 차이를 표시한다.
+   - 추가 개발: claim 전 preflight check, scheduled reconciliation alert.
 
 2. **refund/cancel 정책**
    - contract purchase는 완료되면 photographer claimable과 treasury fee가 즉시 할당된다.

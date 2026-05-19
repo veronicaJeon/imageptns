@@ -3,6 +3,7 @@ import { decodeEventLog, decodeFunctionData, getAddress, isHex, type Address, ty
 import { bigintToDecimalString } from "@/lib/onchain/amounts";
 import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
 import { authorizeOnchainCheckoutConfirmation } from "@/lib/onchain/checkout-auth";
+import { getConfirmAttemptDecision, getNextConfirmBackoffUntil } from "@/lib/onchain/confirm-attempts";
 import { getOnchainServerConfig } from "@/lib/onchain/env";
 import { recordOnchainEvent } from "@/lib/onchain/events";
 import { imageAssetBytes32 } from "@/lib/onchain/ids";
@@ -28,6 +29,8 @@ interface OrderRow {
   crypto_amount: number | string | null;
   crypto_decimals: number | null;
   crypto_status: string;
+  onchain_confirm_attempts: number | null;
+  onchain_confirm_backoff_until: string | null;
 }
 
 interface ImageJoinRow {
@@ -56,6 +59,37 @@ interface OrderItemRow {
 
 function badRequest(error: string) {
   return NextResponse.json({ error }, { status: 400 });
+}
+
+function retryAfterResponse(retryAfterSeconds: number) {
+  return NextResponse.json(
+    {
+      error: "Too many confirmation attempts. Try again later.",
+      retryAfterSeconds,
+    },
+    {
+      status: 429,
+      headers: { "Retry-After": String(retryAfterSeconds) },
+    },
+  );
+}
+
+function confirmAttemptReset() {
+  return {
+    onchain_confirm_attempts: 0,
+    onchain_confirm_backoff_until: null,
+  };
+}
+
+async function isAdminUser(admin: ReturnType<typeof createAdminClient>, userId: string) {
+  const { data, error } = await admin
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", userId)
+    .single();
+
+  if (error) return false;
+  return Boolean(data?.is_admin);
 }
 
 function decimalToUnits(value: number | string, decimals: number) {
@@ -195,7 +229,12 @@ export async function POST(req: NextRequest) {
 
   const { data: orderData, error } = await admin
     .from("orders")
-    .select("id, order_number, buyer_id, contract_order_id, buyer_wallet_address, onchain_confirm_token, status, payment_tx_hash, crypto_amount, crypto_decimals, crypto_status")
+    .select(`
+      id, order_number, buyer_id, contract_order_id, buyer_wallet_address,
+      onchain_confirm_token, status, payment_tx_hash, crypto_amount,
+      crypto_decimals, crypto_status, onchain_confirm_attempts,
+      onchain_confirm_backoff_until
+    `)
     .eq("id", orderDbId)
     .eq("payment_provider", "base_usdc")
     .single();
@@ -205,12 +244,14 @@ export async function POST(req: NextRequest) {
   }
 
   const order = orderData as OrderRow;
-  const authorized = authorizeOnchainCheckoutConfirmation({
+  const buyerOrTokenAuthorized = authorizeOnchainCheckoutConfirmation({
     orderBuyerId: order.buyer_id,
     authenticatedUserId: user?.id ?? null,
     storedConfirmToken: order.onchain_confirm_token,
     providedConfirmToken: body.confirmToken ?? null,
   });
+  const adminAuthorized = !buyerOrTokenAuthorized && user ? await isAdminUser(admin, user.id) : false;
+  const authorized = buyerOrTokenAuthorized || adminAuthorized;
   if (!authorized) {
     return NextResponse.json(
       { error: user ? "Forbidden" : "Unauthorized" },
@@ -227,6 +268,27 @@ export async function POST(req: NextRequest) {
   }
   if (!order.contract_order_id || !order.buyer_wallet_address || order.crypto_amount === null) {
     return NextResponse.json({ error: "Order is missing onchain payment fields" }, { status: 409 });
+  }
+
+  if (order.status === "pending" && order.crypto_status === "pending") {
+    const now = new Date();
+    const attemptDecision = getConfirmAttemptDecision(
+      { backoffUntil: order.onchain_confirm_backoff_until },
+      now,
+    );
+    if (!attemptDecision.allowed) return retryAfterResponse(attemptDecision.retryAfterSeconds);
+
+    const attemptsAfterThisRequest = (order.onchain_confirm_attempts ?? 0) + 1;
+    const { error: attemptError } = await admin
+      .from("orders")
+      .update({
+        onchain_confirm_attempts: attemptsAfterThisRequest,
+        onchain_confirm_last_attempt_at: now.toISOString(),
+        onchain_confirm_backoff_until: getNextConfirmBackoffUntil(attemptsAfterThisRequest, now).toISOString(),
+      })
+      .eq("id", orderDbId);
+
+    if (attemptError) return NextResponse.json({ error: attemptError.message }, { status: 500 });
   }
 
   const { data: reusedTxOrder, error: reusedTxError } = await admin
@@ -338,6 +400,7 @@ export async function POST(req: NextRequest) {
   if (order.status === "completed" && order.crypto_status === "confirmed") {
     const ledgerError = await updateLedgerClaimable(admin, expectedItems, cryptoDecimals);
     if (ledgerError) return NextResponse.json({ error: ledgerError.message }, { status: 500 });
+    await admin.from("orders").update(confirmAttemptReset()).eq("id", orderDbId);
 
     await recordOnchainEvent(admin, {
       eventType: "checkout_confirmed",
@@ -348,6 +411,7 @@ export async function POST(req: NextRequest) {
       metadata: {
         orderNumber: order.order_number,
         alreadyCompleted: true,
+        confirmedByAdmin: adminAuthorized,
         itemCount: expectedItems.length,
         grossAmount: expectedAmount.toString(),
       },
@@ -363,6 +427,7 @@ export async function POST(req: NextRequest) {
       payment_tx_hash: txHash,
       crypto_status: "confirmed",
       completed_at: new Date().toISOString(),
+      ...confirmAttemptReset(),
     })
     .eq("id", orderDbId)
     .eq("status", "pending")
@@ -386,6 +451,7 @@ export async function POST(req: NextRequest) {
     ) {
       const ledgerError = await updateLedgerClaimable(admin, expectedItems, cryptoDecimals);
       if (ledgerError) return NextResponse.json({ error: ledgerError.message }, { status: 500 });
+      await admin.from("orders").update(confirmAttemptReset()).eq("id", orderDbId);
 
       await recordOnchainEvent(admin, {
         eventType: "checkout_confirmed",
@@ -396,6 +462,7 @@ export async function POST(req: NextRequest) {
         metadata: {
           orderNumber: completedOrder.order_number,
           alreadyCompleted: true,
+          confirmedByAdmin: adminAuthorized,
           itemCount: expectedItems.length,
           grossAmount: expectedAmount.toString(),
         },
@@ -419,6 +486,7 @@ export async function POST(req: NextRequest) {
     metadata: {
       orderNumber: updated.order_number,
       alreadyCompleted: false,
+      confirmedByAdmin: adminAuthorized,
       itemCount: expectedItems.length,
       grossAmount: expectedAmount.toString(),
     },

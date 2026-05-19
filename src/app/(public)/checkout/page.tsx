@@ -13,6 +13,7 @@ import { useLang } from "@/lib/i18n/store";
 import { useCart } from "@/lib/store/cart";
 import { useAuth } from "@/lib/store/auth";
 import { ERC20_ABI, IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
+import { isQuoteExpired, type OnchainQuoteSnapshot } from "@/lib/onchain/quote";
 import { loadPaymentWidget, type PaymentWidgetInstance } from "@tosspayments/payment-widget-sdk";
 
 const wagmiConfig = createConfig({
@@ -36,6 +37,7 @@ interface OnchainPrepareResponse {
   escrowAddress: Address;
   confirmToken: string;
   cryptoAmount: string;
+  quote: OnchainQuoteSnapshot;
   assetIds: Hex[];
   photographers: Address[];
   grossAmounts: string[];
@@ -226,6 +228,9 @@ function CheckoutContent() {
 
       const prepared = await prepRes.json() as OnchainPrepareResponse;
       preparedForRecovery = prepared;
+      if (isQuoteExpired(prepared.quote.expiresAt)) {
+        throw new Error("USDC 견적이 만료되었습니다. 결제를 다시 시작해주세요.");
+      }
       const targetChainId = ensureBaseChainId(prepared.chainId);
 
       account = getAccount(wagmiConfig);
@@ -258,6 +263,10 @@ function CheckoutContent() {
         if (approvalReceipt.status !== "success") {
           throw new Error("USDC 승인 트랜잭션이 실패했습니다. 지갑에서 상태를 확인한 뒤 다시 시도해주세요.");
         }
+      }
+
+      if (isQuoteExpired(prepared.quote.expiresAt)) {
+        throw new Error("USDC 견적이 만료되었습니다. 주문 금액 보호를 위해 결제를 다시 시작해주세요.");
       }
 
       const purchaseAccount = ensureCurrentBuyerWallet(buyerWalletAddress);
@@ -443,7 +452,7 @@ function CheckoutContent() {
                         지갑 연결 후 Base 네트워크에서 USDC 승인과 구매 트랜잭션을 순서대로 진행합니다.
                       </p>
                       <p className="text-[11px] text-outline mt-3">
-                        최종 USDC 금액은 주문 생성 시점의 온체인 결제 설정으로 계산됩니다.
+                        최종 USDC 금액은 주문 생성 시점에 15분 유효한 견적으로 고정됩니다.
                       </p>
                     </div>
                   </div>

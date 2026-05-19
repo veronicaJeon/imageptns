@@ -13,8 +13,11 @@ See `docs/onchain-production-risk-register.md` for the operating risk register a
 - [x] Gate Base checkout confirmation with buyer session or per-order confirmation token.
 - [x] Add an admin onchain reconciliation view for pending, stale, and failed Base orders.
 - [x] Add an admin retry tool for failed proof registration after operator/RPC issues are fixed.
-- [ ] Add an admin reconciliation view that compares pending Base orders against transaction hashes submitted by buyers.
+- [x] Add an admin reconciliation view that compares pending Base orders against transaction hashes submitted by operators.
 - [x] Add a cron reconciliation endpoint for stale `base_usdc` pending orders.
+- [x] Add `checkout/confirm` rate limiting and backoff for repeated Base confirmation attempts.
+- [x] Add order-level static USDC/KRW quote snapshot and quote expiry handling.
+- [x] Add admin DB/contract claimable reconciliation for photographer escrow balances.
 - [x] Add buyer order history UI that exposes Base tx hash, token address, and contract order id.
 - [x] Add buyer order history recovery UI for retrying pending Base USDC confirmation with a tx hash.
 - [x] Add photographer-facing claim history filters for `claimable` and `claimed` USDC rows.
@@ -26,7 +29,7 @@ See `docs/onchain-production-risk-register.md` for the operating risk register a
 - [ ] Deploy `ImagePartnersEscrow` to Base Sepolia.
 - [ ] Store `NEXT_PUBLIC_IMAGEPARTNERS_ESCROW_ADDRESS` in the app environment.
 - [ ] Store `CRON_SECRET` in production and scheduler configuration before enabling cron endpoints.
-- [ ] Apply Supabase migrations `010_onchain_payments.sql` and `011_onchain_order_item_amounts.sql`.
+- [ ] Apply Supabase migrations `010` through `014` to the target project.
 - [ ] Run an end-to-end Base Sepolia purchase with a photographer wallet and buyer wallet.
 - [ ] Run an end-to-end Base Sepolia photographer claim.
 - [ ] Confirm admin image approval fails safely when proof registration fails.
