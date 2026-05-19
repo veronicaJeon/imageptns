@@ -8,6 +8,7 @@ import { base, baseSepolia } from "wagmi/chains";
 import { getAddress, type Address } from "viem";
 import { useLang } from "@/lib/i18n/store";
 import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
+import { filterOnchainEarnings, sumClaimableUsdc, type OnchainClaimFilter } from "@/lib/onchain/earnings";
 
 const earningsWagmiConfig = createConfig({
   chains: [base, baseSepolia],
@@ -32,9 +33,19 @@ interface PeriodEarnings {
 }
 
 interface LedgerEarning {
+  id?: string;
   settlement_provider?: string | null;
   claim_status?: string | null;
   claimable_amount?: number | string | null;
+  claim_tx_hash?: string | null;
+  created_at?: string | null;
+  order_item?: {
+    license_code?: string | null;
+    image?: { title?: string | null; asset_id?: string | null } | { title?: string | null; asset_id?: string | null }[] | null;
+  } | {
+    license_code?: string | null;
+    image?: { title?: string | null; asset_id?: string | null } | { title?: string | null; asset_id?: string | null }[] | null;
+  }[] | null;
 }
 
 interface EarningsResponse {
@@ -52,6 +63,24 @@ function configuredBaseChainId(): BaseChainId {
 
 function formatKRW(n: number) {
   return "₩" + n.toLocaleString("ko-KR");
+}
+
+function formatUSDC(n: number) {
+  return `${n.toLocaleString("en-US", { maximumFractionDigits: 6 })} USDC`;
+}
+
+function formatDate(iso?: string | null) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("ko-KR", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function ledgerOrderItem(row: LedgerEarning) {
+  return Array.isArray(row.order_item) ? row.order_item[0] : row.order_item;
+}
+
+function ledgerImage(row: LedgerEarning) {
+  const image = ledgerOrderItem(row)?.image;
+  return Array.isArray(image) ? image[0] : image;
 }
 
 function StatCard({ icon, label, value, sub }: { icon: string; label: string; value: string; sub?: string }) {
@@ -84,6 +113,7 @@ function EarningsInner() {
   const [payoutPeriod, setPayoutPeriod] = useState<string | null>(null);
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [claimingOnchain, setClaimingOnchain] = useState(false);
+  const [claimFilter, setClaimFilter] = useState<OnchainClaimFilter>("claimable");
 
   useEffect(() => {
     fetch("/api/earnings")
@@ -206,9 +236,10 @@ function EarningsInner() {
   const pendingNet      = data?.pendingNet ?? 0;
   const currentPeriod   = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
   const currentPeriodData = periods[0];
-  const onchainClaimable = (data?.ledger ?? [])
-    .filter((row: LedgerEarning) => row.settlement_provider === "onchain_escrow" && row.claim_status === "claimable")
-    .reduce((sum: number, row: LedgerEarning) => sum + (Number(row.claimable_amount) || 0), 0);
+  const ledger = data?.ledger ?? [];
+  const onchainRows = filterOnchainEarnings(ledger, "all");
+  const filteredOnchainRows = filterOnchainEarnings(ledger, claimFilter);
+  const onchainClaimable = sumClaimableUsdc(filterOnchainEarnings(ledger, "claimable"));
 
   if (loading) {
     return (
@@ -274,7 +305,7 @@ function EarningsInner() {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-primary">Base USDC Claim</p>
             <p className="text-sm text-on-surface-variant mt-1">
-              {onchainClaimable.toLocaleString("en-US", { maximumFractionDigits: 6 })} USDC is ready to claim on Base.
+              {formatUSDC(onchainClaimable)} is ready to claim on Base.
             </p>
           </div>
           <button
@@ -286,6 +317,81 @@ function EarningsInner() {
             <span className="material-symbols-outlined text-base">account_balance_wallet</span>
             {claimingOnchain ? "Claiming..." : "Claim USDC"}
           </button>
+        </div>
+      )}
+
+      {onchainRows.length > 0 && (
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div>
+              <p className="text-xs font-bold text-outline uppercase tracking-widest">Base USDC Settlement</p>
+              <p className="text-sm text-on-surface-variant mt-1">온체인 escrow로 정산되는 판매 항목입니다.</p>
+            </div>
+            <div className="flex gap-1 bg-surface-container-lowest p-1 shadow-ghost w-fit">
+              {(["claimable", "claimed", "all"] as const).map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setClaimFilter(filter)}
+                  className={`px-3 py-2 text-xs font-bold uppercase tracking-widest rounded transition-colors ${
+                    claimFilter === filter ? "bg-primary text-white" : "text-on-surface-variant hover:text-on-surface"
+                  }`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-outline-variant/20">
+                  {["Status", "Image", "Amount", "Claim Tx", "Created"].map((h) => (
+                    <th key={h} className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/20">
+                {filteredOnchainRows.map((row, index) => {
+                  const image = ledgerImage(row);
+                  return (
+                    <tr key={row.id ?? index} className="hover:bg-surface-container-low transition-colors">
+                      <td className="px-6 py-4">
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                          row.claim_status === "claimed" ? "bg-primary/10 text-primary" : "bg-amber-50 text-amber-600 dark:bg-amber-900/20"
+                        }`}>
+                          {row.claim_status ?? "unknown"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-on-surface">{image?.title ?? "Untitled"}</p>
+                        <p className="text-xs text-outline mt-1">
+                          {image?.asset_id ?? "No asset"} · {ledgerOrderItem(row)?.license_code ?? "license"}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-on-surface">
+                        {formatUSDC(Number(row.claimable_amount) || 0)}
+                      </td>
+                      <td className="px-6 py-4">
+                        {row.claim_tx_hash ? (
+                          <span className="block max-w-[220px] truncate font-mono text-[10px] text-primary">{row.claim_tx_hash}</span>
+                        ) : (
+                          <span className="text-xs text-outline">Not claimed</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-on-surface-variant">{formatDate(row.created_at)}</td>
+                    </tr>
+                  );
+                })}
+                {filteredOnchainRows.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-10 text-center text-outline">No Base USDC rows for this filter.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

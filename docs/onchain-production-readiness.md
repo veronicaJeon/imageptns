@@ -15,7 +15,7 @@ See `docs/onchain-production-risk-register.md` for the operating risk register a
 - [ ] Add an admin reconciliation view that compares pending Base orders against transaction hashes submitted by buyers.
 - [ ] Add a cron reconciliation endpoint for stale `base_usdc` pending orders.
 - [x] Add buyer order history UI that exposes Base tx hash, token address, and contract order id.
-- [ ] Add photographer-facing claim history filters for `claimable` and `claimed` USDC rows.
+- [x] Add photographer-facing claim history filters for `claimable` and `claimed` USDC rows.
 - [x] Add buyer-facing copy for Base USDC checkout risks: wallet network, approval, purchase, confirmation, and retry behavior.
 - [ ] Add analytics events for Base checkout prepare, approval, purchase tx, confirm success, and confirm failure.
 
