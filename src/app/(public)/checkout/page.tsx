@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { getAccount, connect, readContract, switchChain, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { createConfig, http, injected, WagmiProvider } from "wagmi";
 import { base, baseSepolia } from "wagmi/chains";
-import type { Address, Hex } from "viem";
+import { getAddress, type Address, type Hex } from "viem";
 import { useLang } from "@/lib/i18n/store";
 import { useCart } from "@/lib/store/cart";
 import { useAuth } from "@/lib/store/auth";
@@ -52,6 +52,15 @@ function checkoutErrorMessage(error: unknown, fallback: string) {
 function ensureBaseChainId(chainId: number): OnchainPrepareResponse["chainId"] {
   if (chainId === base.id || chainId === baseSepolia.id) return chainId;
   throw new Error("지원하지 않는 Base 네트워크입니다.");
+}
+
+function ensureCurrentBuyerWallet(buyerWalletAddress: Address) {
+  const currentAddress = getAccount(wagmiConfig).address;
+  if (!currentAddress) throw new Error("지갑 연결이 해제되었습니다. 다시 연결해주세요.");
+  if (getAddress(currentAddress) !== getAddress(buyerWalletAddress)) {
+    throw new Error("결제 중 지갑 계정이 변경되었습니다. 주문을 생성한 지갑으로 다시 시도해주세요.");
+  }
+  return getAddress(currentAddress);
 }
 
 async function readApiError(response: Response, fallback: string) {
@@ -210,6 +219,7 @@ function CheckoutContent() {
       if (account.chainId !== targetChainId) {
         await switchChain(wagmiConfig, { chainId: targetChainId });
       }
+      ensureCurrentBuyerWallet(buyerWalletAddress);
 
       const cryptoAmount = BigInt(prepared.cryptoAmount);
       const grossAmounts = prepared.grossAmounts.map((amount) => BigInt(amount));
@@ -222,31 +232,41 @@ function CheckoutContent() {
       });
 
       if (currentAllowance < cryptoAmount) {
+        const approvalAccount = ensureCurrentBuyerWallet(buyerWalletAddress);
         const approveHash = await writeContract(wagmiConfig, {
           address: prepared.usdcAddress,
           abi: ERC20_ABI,
           functionName: "approve",
           args: [prepared.escrowAddress, cryptoAmount],
+          account: approvalAccount,
           chainId: targetChainId,
         });
-        await waitForTransactionReceipt(wagmiConfig, { hash: approveHash, chainId: targetChainId });
+        const approvalReceipt = await waitForTransactionReceipt(wagmiConfig, { hash: approveHash, chainId: targetChainId });
+        if (approvalReceipt.status !== "success") {
+          throw new Error("USDC 승인 트랜잭션이 실패했습니다. 지갑에서 상태를 확인한 뒤 다시 시도해주세요.");
+        }
       }
 
+      const purchaseAccount = ensureCurrentBuyerWallet(buyerWalletAddress);
       const purchaseHash = await writeContract(wagmiConfig, {
         address: prepared.escrowAddress,
         abi: IMAGE_PARTNERS_ESCROW_ABI,
         functionName: "purchase",
         args: [prepared.contractOrderId, prepared.assetIds, prepared.photographers, grossAmounts],
+        account: purchaseAccount,
         chainId: targetChainId,
       });
-      await waitForTransactionReceipt(wagmiConfig, { hash: purchaseHash, chainId: targetChainId });
+      const purchaseReceipt = await waitForTransactionReceipt(wagmiConfig, { hash: purchaseHash, chainId: targetChainId });
+      if (purchaseReceipt.status !== "success") {
+        throw new Error("구매 트랜잭션이 실패했습니다. 지갑에서 상태를 확인한 뒤 다시 시도해주세요.");
+      }
 
       const confirmRes = await fetch("/api/onchain/checkout/confirm", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderDbId: prepared.orderDbId,
-          txHash: purchaseHash,
+          txHash: purchaseReceipt.transactionHash,
         }),
       });
       if (!confirmRes.ok) throw new Error(await readApiError(confirmRes, "Base USDC 결제 확인 실패"));
