@@ -49,6 +49,13 @@ interface BasePaymentRecovery {
   confirmToken: string;
 }
 
+interface CheckoutPrepareResponse {
+  orderId: string;
+  orderName: string;
+  orderNumber?: string;
+  free?: boolean;
+}
+
 function formatKRW(n: number) {
   return "₩" + n.toLocaleString("ko-KR");
 }
@@ -124,6 +131,7 @@ function CheckoutContent() {
   const widgetRef = useRef<PaymentWidgetInstance | null>(null);
   const displayVat = paymentMethod === "base_usdc" ? 0 : vat;
   const displayTotal = subtotal + displayVat;
+  const isFreeCheckout = total === 0;
 
   // Pre-fill billing from user profile
   useEffect(() => {
@@ -164,6 +172,11 @@ function CheckoutContent() {
     e.preventDefault();
     if (!billing.name || !billing.email) return;
 
+    if (isFreeCheckout) {
+      await handleFreeCheckout();
+      return;
+    }
+
     if (paymentMethod === "toss") {
       if (!widgetRef.current) return;
       await handleTossPayment();
@@ -190,7 +203,7 @@ function CheckoutContent() {
         }),
       });
       if (!prepRes.ok) throw new Error("주문 생성 실패");
-      const { orderId, orderName } = await prepRes.json();
+      const { orderId, orderName } = await prepRes.json() as CheckoutPrepareResponse;
 
       // 2. Launch Toss payment (widget handles payment UI)
       await widget.requestPayment({
@@ -204,6 +217,28 @@ function CheckoutContent() {
     } catch (err) {
       console.error(err);
       alert(checkoutErrorMessage(err, "결제를 시작하지 못했습니다."));
+      setLoading(false);
+    }
+  }
+
+  async function handleFreeCheckout() {
+    setLoading(true);
+    try {
+      const prepRes = await fetch("/api/checkout/prepare", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((i) => ({ id: i.id, license: i.license, price: i.price })),
+          billing,
+        }),
+      });
+      if (!prepRes.ok) throw new Error(await readApiError(prepRes, "무료 주문 생성 실패"));
+
+      const { orderNumber } = await prepRes.json() as CheckoutPrepareResponse;
+      router.push(`/checkout/success?order=${encodeURIComponent(orderNumber ?? "")}`);
+    } catch (err) {
+      console.error(err);
+      alert(checkoutErrorMessage(err, "무료 구매를 완료하지 못했습니다."));
       setLoading(false);
     }
   }
@@ -428,6 +463,14 @@ function CheckoutContent() {
             {/* Payment method */}
             <div>
               <h2 className="text-xs font-bold text-outline uppercase tracking-widest mb-5">{ch.paymentMethod}</h2>
+              {isFreeCheckout ? (
+                <div className="mb-5 rounded-lg bg-green-50 p-4 text-sm text-green-800 ring-1 ring-green-200 dark:bg-green-900/20 dark:text-green-200 dark:ring-green-900/50">
+                  <p className="font-bold">무료 라이선스 주문</p>
+                  <p className="mt-1 text-xs leading-relaxed">
+                    결제 수단 입력 없이 구매가 확정되고 원본 다운로드 권한이 즉시 생성됩니다.
+                  </p>
+                </div>
+              ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                 <button
                   type="button"
@@ -464,8 +507,9 @@ function CheckoutContent() {
                   </span>
                 </button>
               </div>
+              )}
 
-              <div className={paymentMethod === "toss" ? "block" : "hidden"}>
+              <div className={!isFreeCheckout && paymentMethod === "toss" ? "block" : "hidden"}>
                 <div id="toss-payment-widget" className="min-h-[100px]" />
                 <div id="toss-agreement-widget" className="mt-4" />
                 {!widgetReady && (
@@ -476,7 +520,7 @@ function CheckoutContent() {
                 )}
               </div>
 
-              {paymentMethod === "base_usdc" && (
+              {!isFreeCheckout && paymentMethod === "base_usdc" && (
                 <div className="bg-surface-container-lowest ring-1 ring-outline-variant rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <span className="material-symbols-outlined text-primary text-xl mt-0.5">currency_exchange</span>
@@ -545,7 +589,7 @@ function CheckoutContent() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading || (paymentMethod === "toss" && !widgetReady)}
+              disabled={loading || (!isFreeCheckout && paymentMethod === "toss" && !widgetReady)}
               className="w-full py-4 bg-primary text-white font-bold text-sm uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading
@@ -553,9 +597,9 @@ function CheckoutContent() {
                 : (
                   <>
                     <span className="material-symbols-outlined text-base">
-                      {paymentMethod === "base_usdc" ? "account_balance_wallet" : "lock"}
+                      {isFreeCheckout ? "redeem" : paymentMethod === "base_usdc" ? "account_balance_wallet" : "lock"}
                     </span>
-                    {paymentMethod === "base_usdc" ? "Pay with USDC" : ch.submitBtn} · {formatKRW(displayTotal)}
+                    {isFreeCheckout ? "무료 구매 확정" : paymentMethod === "base_usdc" ? "Pay with USDC" : ch.submitBtn} · {formatKRW(displayTotal)}
                   </>
                 )
               }

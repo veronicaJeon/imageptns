@@ -124,6 +124,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
     const photographer = imageData.photographer?.full_name ?? "";
     addItem({
       id,
+      assetId:      imageData.asset_id ?? undefined,
       title:        imageData.title,
       photographer,
       src:          imageData.storage_path_preview ?? "",
@@ -139,6 +140,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
     const photographer = imageData.photographer?.full_name ?? "";
     addItem({
       id,
+      assetId:      imageData.asset_id ?? undefined,
       title:        imageData.title,
       photographer,
       src:          imageData.storage_path_preview ?? "",

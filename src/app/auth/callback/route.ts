@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -30,6 +31,12 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const admin = createAdminClient()
+        await admin.rpc('record_profile_login', { target_user_id: user.id })
+      }
+
       // Ensure `next` only redirects to relative paths (security)
       const redirectTo = next.startsWith('/') ? next : '/'
       return NextResponse.redirect(`${origin}${redirectTo}`)

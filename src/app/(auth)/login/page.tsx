@@ -46,6 +46,7 @@ function LoginForm() {
       setError(a.errorCredentials);
       setLoading(false);
     } else {
+      await fetch("/api/auth/login-event", { method: "POST" }).catch(() => {});
       const next = searchParams.get("next") ?? "/library";
       window.location.href = next;
     }

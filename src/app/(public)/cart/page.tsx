@@ -64,7 +64,7 @@ export default function CartPage() {
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b-2 border-zinc-900">
-              {["No.", "이미지", "작가", "라이선스", "단가"].map((header) => (
+              {["No.", "썸네일", "이미지 / 에셋 ID", "작가", "라이선스", "단가"].map((header) => (
                 <th key={header} className="py-3 text-left text-xs font-bold uppercase tracking-widest text-zinc-600">
                   {header}
                 </th>
@@ -76,8 +76,16 @@ export default function CartPage() {
               <tr key={item.id} className="border-b border-zinc-200">
                 <td className="py-3 pr-3 text-zinc-500">{index + 1}</td>
                 <td className="py-3 pr-3">
+                  {item.src ? (
+                    <Image src={item.src} alt="" width={64} height={48} className="h-12 w-16 rounded object-cover" unoptimized />
+                  ) : (
+                    <div className="h-12 w-16 rounded bg-zinc-100" />
+                  )}
+                </td>
+                <td className="py-3 pr-3">
                   <p className="font-semibold text-zinc-950">{item.title}</p>
                   <p className="text-xs text-zinc-500">{item.category}</p>
+                  <p className="text-xs font-mono text-zinc-500">{item.assetId ?? item.id}</p>
                 </td>
                 <td className="py-3 pr-3 text-zinc-700">{item.photographer || "-"}</td>
                 <td className="py-3 pr-3 text-zinc-700">{c.licenseTypes[item.license]}</td>

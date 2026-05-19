@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 
 export interface ImageCardData {
   id: string;
+  assetId?: string;
   title: string;
   category: string;
   src: string;
@@ -67,6 +68,7 @@ export function ImageCard({
   function handleAddToCart() {
     addItem({
       id: image.id,
+      assetId: image.assetId,
       title: image.title,
       photographer: image.photographer ?? "",
       src: image.src,
