@@ -22,6 +22,10 @@ interface ImageDetailRow {
   sales_count: number;
   approved_at: string | null;
   created_at: string;
+  copyright_license: string | null;
+  free_usage_policy: string | null;
+  attribution_name: string | null;
+  attribution_url: string | null;
   photographer_id: string | null;
   photographer:
     | { id: string; full_name: string | null; avatar_url: string | null; bio: string | null }
@@ -63,6 +67,7 @@ export async function GET(
        width, height, resolution_mp, file_format, file_size_mb,
        exif_taken_at, exif_location,
        views_count, sales_count, approved_at, created_at,
+       copyright_license, free_usage_policy, attribution_name, attribution_url,
        photographer_id,
        photographer:profiles!photographer_id(id, full_name, avatar_url, bio)`
     )

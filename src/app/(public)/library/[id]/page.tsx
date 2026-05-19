@@ -8,6 +8,7 @@ import { useLang } from "@/lib/i18n/store";
 import { useCart } from "@/lib/store/cart";
 import { cn } from "@/lib/utils/cn";
 import { ImageCard, ImageCardData } from "@/components/gallery/ImageCard";
+import { getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 
 const LICENSE_PRICES: Record<string, number> = {
   editorial:  15000,
@@ -17,13 +18,39 @@ const LICENSE_PRICES: Record<string, number> = {
 
 type LicenseKey = "editorial" | "commercial" | "extended";
 
+interface ImageDetailData {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string;
+  storage_path_preview: string | null;
+  file_format: string | null;
+  file_size_mb: number | null;
+  width: number | null;
+  height: number | null;
+  approved_at: string | null;
+  created_at: string;
+  exif_taken_at: string | null;
+  exif_location: string | null;
+  asset_id: string | null;
+  copyright_license: string | null;
+  free_usage_policy: string | null;
+  attribution_name: string | null;
+  attribution_url: string | null;
+  photographer: {
+    id?: string | null;
+    full_name?: string | null;
+    display_name?: string | null;
+  } | null;
+}
+
 export default function ImageDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { t } = useLang();
   const d = t.imageDetail;
   const router = useRouter();
 
-  const [imageData, setImageData]     = useState<any>(null);
+  const [imageData, setImageData]     = useState<ImageDetailData | null>(null);
   const [similar, setSimilar]         = useState<ImageCardData[]>([]);
   const [loading, setLoading]         = useState(true);
   const [notFound, setNotFound]       = useState(false);
@@ -118,6 +145,9 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
 
   const photographer = imageData.photographer?.display_name || imageData.photographer?.full_name || "Unknown";
   const photographerId = imageData.photographer?.id;
+  const copyrightLicense = getCopyrightLicense(imageData.copyright_license);
+  const freeUsagePolicy = getFreeUsagePolicy(imageData.free_usage_policy);
+  const attributionName = imageData.attribution_name || photographer;
 
   const uploadedDate = new Date(imageData.approved_at ?? imageData.created_at)
     .toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
@@ -168,9 +198,11 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
           <div className="lg:col-span-7">
             <div className="relative overflow-hidden shadow-ghost bg-surface-container-low">
               {imageData.storage_path_preview ? (
-                <img
+                <Image
                   src={imageData.storage_path_preview}
                   alt={imageData.title}
+                  width={imageData.width ?? 1200}
+                  height={imageData.height ?? 800}
                   className="w-full h-auto object-cover"
                 />
               ) : (
@@ -213,6 +245,52 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
             {/* License selector */}
             <div>
               <p className="text-xs font-bold text-outline uppercase tracking-widest mb-4">{d.license}</p>
+              <div className="mb-4 rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                    {copyrightLicense.label}
+                  </span>
+                  {freeUsagePolicy.code !== "none" && (
+                    <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700 dark:bg-green-900/20 dark:text-green-200">
+                      {freeUsagePolicy.label}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-on-surface-variant">{copyrightLicense.summary}</p>
+                {freeUsagePolicy.code !== "none" && (
+                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{freeUsagePolicy.summary}</p>
+                )}
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <span>{copyrightLicense.requiresAttribution ? "출처 표기 필요" : "출처 표기 선택"}</span>
+                  <span>{copyrightLicense.allowsCommercialUse ? "상업 이용 가능" : "상업 이용 제한"}</span>
+                  <span>{copyrightLicense.allowsDerivatives ? "변경 가능" : "변경본 배포 제한"}</span>
+                  <span>{copyrightLicense.requiresShareAlike ? "동일조건 적용" : "동일조건 없음"}</span>
+                </div>
+                {copyrightLicense.requiresAttribution && (
+                  <p className="mt-3 text-xs text-on-surface-variant">
+                    권장 출처: <span className="font-semibold text-on-surface">{attributionName}</span>
+                    {imageData.attribution_url && (
+                      <>
+                        {" · "}
+                        <a href={imageData.attribution_url} target="_blank" rel="noreferrer" className="text-primary hover:opacity-70">
+                          출처 링크
+                        </a>
+                      </>
+                    )}
+                  </p>
+                )}
+                {copyrightLicense.url && (
+                  <a
+                    href={copyrightLicense.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-primary hover:opacity-70"
+                  >
+                    Creative Commons 원문 보기
+                    <span className="material-symbols-outlined text-sm">open_in_new</span>
+                  </a>
+                )}
+              </div>
               <div className="flex flex-col gap-3">
                 {licenseKeys.map((key) => (
                   <label

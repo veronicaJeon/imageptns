@@ -4,6 +4,7 @@ import { Fragment, useState, useEffect } from "react";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n/store";
 import { buildUploadProofSteps, type TimelineState } from "@/lib/ux/status";
+import { COPYRIGHT_LICENSES, FREE_USAGE_POLICIES, getCopyrightLicense, getFreeUsagePolicy, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
 
 const CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
 type Category = typeof CATEGORIES[number];
@@ -39,6 +40,10 @@ interface EditState {
   tags: string;
   exif_location: string;
   exif_taken_at: string;
+  copyright_license: CopyrightLicenseCode;
+  free_usage_policy: FreeUsagePolicyCode;
+  attribution_name: string;
+  attribution_url: string;
 }
 
 interface UploadRow {
@@ -62,6 +67,10 @@ interface UploadRow {
   proof_tx_hash: string | null;
   proof_status: string | null;
   proof_registered_at: string | null;
+  copyright_license: string | null;
+  free_usage_policy: string | null;
+  attribution_name: string | null;
+  attribution_url: string | null;
 }
 
 const PROOF_STATUS_LABELS: Record<string, string> = {
@@ -148,6 +157,10 @@ export default function UploadsPage() {
       tags:         Array.isArray(img.tags) ? img.tags.join(", ") : "",
       exif_location: img.exif_location ?? "",
       exif_taken_at: img.exif_taken_at ? img.exif_taken_at.slice(0, 10) : "",
+      copyright_license: getCopyrightLicense(img.copyright_license).code,
+      free_usage_policy: getFreeUsagePolicy(img.free_usage_policy).code,
+      attribution_name: img.attribution_name ?? "",
+      attribution_url: img.attribution_url ?? "",
     });
   }
 
@@ -165,6 +178,10 @@ export default function UploadsPage() {
           tags:         editing.tags.split(",").map((t) => t.trim()).filter(Boolean),
           exif_location: editing.exif_location.trim() || null,
           exif_taken_at: editing.exif_taken_at || null,
+          copyright_license: editing.copyright_license,
+          free_usage_policy: editing.free_usage_policy,
+          attribution_name: editing.attribution_name.trim() || null,
+          attribution_url: editing.attribution_url.trim() || null,
           resubmit,
         }),
       });
@@ -311,6 +328,14 @@ export default function UploadsPage() {
                           <p className="text-[10px] text-error mt-1 max-w-[180px] line-clamp-2 leading-relaxed">{img.rejection_reason}</p>
                         )}
                         <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                            {getCopyrightLicense(img.copyright_license).label}
+                          </span>
+                          {getFreeUsagePolicy(img.free_usage_policy).code !== "none" && (
+                            <span className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-200 px-2 py-0.5 rounded-full">
+                              {getFreeUsagePolicy(img.free_usage_policy).label}
+                            </span>
+                          )}
                           <span className="bg-surface-container-low text-on-surface-variant px-2 py-0.5 rounded-full">
                             {PROOF_STATUS_LABELS[img.proof_status ?? "not_registered"] ?? img.proof_status}
                           </span>
@@ -385,6 +410,54 @@ export default function UploadsPage() {
                                   onChange={(e) => setEditing({ ...editing, description: e.target.value })}
                                   rows={2}
                                   className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 py-2 text-sm text-on-surface outline-none resize-none transition-all"
+                                />
+                              </div>
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">저작권 등급</label>
+                                <select
+                                  value={editing.copyright_license}
+                                  onChange={(e) => setEditing({ ...editing, copyright_license: e.target.value as CopyrightLicenseCode })}
+                                  className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all"
+                                >
+                                  {COPYRIGHT_LICENSES.map((license) => (
+                                    <option key={license.code} value={license.code}>{license.label}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">무료 사용</label>
+                                <select
+                                  value={editing.free_usage_policy}
+                                  onChange={(e) => setEditing({ ...editing, free_usage_policy: e.target.value as FreeUsagePolicyCode })}
+                                  className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all"
+                                >
+                                  {FREE_USAGE_POLICIES.map((policy) => (
+                                    <option key={policy.code} value={policy.code}>{policy.label}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">출처 표기명</label>
+                                <input
+                                  type="text"
+                                  value={editing.attribution_name}
+                                  onChange={(e) => setEditing({ ...editing, attribution_name: e.target.value })}
+                                  placeholder="작가명 또는 스튜디오명"
+                                  className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
+                                />
+                              </div>
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">출처 URL</label>
+                                <input
+                                  type="url"
+                                  value={editing.attribution_url}
+                                  onChange={(e) => setEditing({ ...editing, attribution_url: e.target.value })}
+                                  placeholder="https://..."
+                                  className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                                 />
                               </div>
 
