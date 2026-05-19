@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n/store";
+import { buildOrderStatusSteps, type TimelineState } from "@/lib/ux/status";
 
 const STATUS_STYLES: Record<string, string> = {
   completed: "bg-primary/10 text-primary",
@@ -32,6 +33,7 @@ interface OrderImage {
 interface OrderItem {
   id: string;
   license_code: string;
+  price_krw: number;
   image: OrderImage | null;
 }
 
@@ -59,6 +61,7 @@ interface OrderRow {
   totalKrw: number;
   itemId: string;
   license: string;
+  priceKrw: number;
   imageId: string | undefined;
   title: string;
   src: string;
@@ -71,6 +74,44 @@ interface OrderRow {
   cryptoAmount: number | string | null;
   cryptoStatus: string | null;
   isFirstItemInOrder: boolean;
+}
+
+const LICENSE_SUMMARY: Record<string, string> = {
+  editorial: "뉴스, 기사, 교육 목적 사용",
+  commercial: "광고, 마케팅, 상업 목적 사용",
+  extended: "확장 인쇄, 상품화, 전 매체 사용",
+};
+
+const TIMELINE_STYLES: Record<TimelineState, string> = {
+  done: "bg-primary text-on-primary",
+  current: "bg-amber-400 text-black",
+  pending: "bg-surface-container-high text-outline",
+  failed: "bg-error text-on-error",
+};
+
+function OrderTimeline({ row }: { row: OrderRow }) {
+  const steps = buildOrderStatusSteps({
+    status: row.status,
+    paymentProvider: row.paymentProvider,
+    cryptoStatus: row.cryptoStatus,
+    paymentTxHash: row.paymentTxHash,
+  });
+
+  return (
+    <div className="mt-4 grid gap-2 sm:grid-cols-4">
+      {steps.map((step, index) => (
+        <div key={step.key} className="flex gap-2 min-w-0">
+          <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${TIMELINE_STYLES[step.state]}`}>
+            {step.state === "done" ? "✓" : step.state === "failed" ? "!" : index + 1}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-on-surface">{step.label}</p>
+            <p className="text-[10px] leading-relaxed text-outline">{step.description}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function OrdersPage() {
@@ -176,6 +217,7 @@ export default function OrdersPage() {
       totalKrw:    order.total_krw,
       itemId:      item.id,
       license:     item.license_code,
+      priceKrw:     item.price_krw,
       imageId:     item.image?.id,
       title:       item.image?.title ?? "",
       src:         item.image?.storage_path_preview ?? "",
@@ -256,7 +298,10 @@ export default function OrdersPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-on-surface-variant capitalize">{row.license}</td>
+                  <td className="px-6 py-4 text-on-surface-variant capitalize">
+                    <p>{row.license}</p>
+                    <p className="mt-1 text-xs text-outline">{formatKRW(row.priceKrw)}</p>
+                  </td>
                   <td className="px-6 py-4 text-on-surface-variant">{row.date}</td>
                   <td className="px-6 py-4">
                     <p className="font-semibold text-on-surface">{formatKRW(row.totalKrw)}</p>
@@ -282,6 +327,18 @@ export default function OrdersPage() {
                         )}
                         {row.contractOrderId && <span className="truncate">order {row.contractOrderId}</span>}
                         {row.paymentToken && <span className="truncate">token {row.paymentToken}</span>}
+                      </div>
+                    )}
+                    {row.isFirstItemInOrder && <OrderTimeline row={row} />}
+                    {row.isFirstItemInOrder && row.paymentProvider === "base_usdc" && row.cryptoStatus === "pending" && (
+                      <div className="mt-3 max-w-md rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                        지갑 결제를 완료했는데 다운로드가 열리지 않으면, 지갑의 트랜잭션 해시를 오른쪽 복구 입력창에 붙여넣어 구매 확정을 다시 요청하세요.
+                      </div>
+                    )}
+                    {row.status === "completed" && (
+                      <div className="mt-3 max-w-md rounded-lg bg-surface-container-low px-3 py-2 text-[11px] leading-relaxed text-on-surface-variant">
+                        <span className="font-bold text-on-surface">라이선스:</span>{" "}
+                        {LICENSE_SUMMARY[row.license] ?? "구매한 라이선스 조건에 따라 사용 가능합니다."}
                       </div>
                     )}
                   </td>

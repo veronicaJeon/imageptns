@@ -1,7 +1,9 @@
 "use client";
 
 import { Fragment, useState, useEffect } from "react";
+import Image from "next/image";
 import { useLang } from "@/lib/i18n/store";
+import { buildUploadProofSteps, type TimelineState } from "@/lib/ux/status";
 
 const CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
 type Category = typeof CATEGORIES[number];
@@ -39,12 +41,75 @@ interface EditState {
   exif_taken_at: string;
 }
 
+interface UploadRow {
+  id: string;
+  asset_id: string | null;
+  title: string;
+  description: string | null;
+  category: Category;
+  tags: string[] | null;
+  status: string;
+  rejection_reason: string | null;
+  views_count: number | null;
+  sales_count: number | null;
+  created_at: string;
+  storage_path_preview: string | null;
+  exif_location: string | null;
+  exif_taken_at: string | null;
+  chain_id: number | null;
+  onchain_asset_id: string | null;
+  content_hash: string | null;
+  proof_tx_hash: string | null;
+  proof_status: string | null;
+  proof_registered_at: string | null;
+}
+
+const PROOF_STATUS_LABELS: Record<string, string> = {
+  not_registered: "증명 전",
+  pending: "등록 중",
+  registered: "증명 완료",
+  failed: "증명 실패",
+};
+
+const TIMELINE_STYLES: Record<TimelineState, string> = {
+  done: "bg-primary text-on-primary",
+  current: "bg-amber-400 text-black",
+  pending: "bg-surface-container-high text-outline",
+  failed: "bg-error text-on-error",
+};
+
+function explorerTxUrl(chainId: number | null, txHash: string | null) {
+  if (!chainId || !txHash) return null;
+  const baseUrl = chainId === 8453 ? "https://basescan.org" : "https://sepolia.basescan.org";
+  return `${baseUrl}/tx/${txHash}`;
+}
+
+function UploadTimeline({ img }: { img: UploadRow }) {
+  const steps = buildUploadProofSteps({ status: img.status, proofStatus: img.proof_status });
+
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+      {steps.map((step, index) => (
+        <div key={step.key} className="flex gap-2 min-w-0">
+          <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${TIMELINE_STYLES[step.state]}`}>
+            {step.state === "done" ? "✓" : step.state === "failed" ? "!" : index + 1}
+          </span>
+          <div>
+            <p className="text-[11px] font-bold text-on-surface">{step.label}</p>
+            <p className="text-[10px] leading-relaxed text-outline">{step.description}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function UploadsPage() {
   const { t } = useLang();
   const up = t.dashboard.uploads;
   const c  = up.cols;
 
-  const [uploads, setUploads] = useState<any[]>([]);
+  const [uploads, setUploads] = useState<UploadRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [editing, setEditing] = useState<EditState | null>(null);
@@ -74,7 +139,7 @@ export default function UploadsPage() {
     }
   }
 
-  function openEdit(img: any) {
+  function openEdit(img: UploadRow) {
     setEditing({
       id:           img.id,
       title:        img.title ?? "",
@@ -213,7 +278,7 @@ export default function UploadsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/20">
-                  {filteredUploads.map((img: any) => {
+                  {filteredUploads.map((img) => {
                 const uploaded = new Date(img.created_at).toLocaleDateString("en-US", {
                   month: "short", day: "numeric", year: "numeric",
                 });
@@ -227,7 +292,7 @@ export default function UploadsPage() {
                         <div className="flex items-center gap-3">
                           <div className="w-14 h-10 bg-surface-container-low rounded shrink-0 overflow-hidden flex items-center justify-center">
                             {img.storage_path_preview ? (
-                              <img src={img.storage_path_preview} alt={img.title} className="w-full h-full object-cover" />
+                              <Image src={img.storage_path_preview} alt={img.title} width={56} height={40} className="w-full h-full object-cover" />
                             ) : (
                               <span className="material-symbols-outlined text-outline text-sm">image</span>
                             )}
@@ -245,6 +310,22 @@ export default function UploadsPage() {
                         {img.status === "rejected" && img.rejection_reason && (
                           <p className="text-[10px] text-error mt-1 max-w-[180px] line-clamp-2 leading-relaxed">{img.rejection_reason}</p>
                         )}
+                        <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                          <span className="bg-surface-container-low text-on-surface-variant px-2 py-0.5 rounded-full">
+                            {PROOF_STATUS_LABELS[img.proof_status ?? "not_registered"] ?? img.proof_status}
+                          </span>
+                          {img.proof_tx_hash && (
+                            <a
+                              href={explorerTxUrl(img.chain_id, img.proof_tx_hash) ?? undefined}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:opacity-70"
+                            >
+                              proof tx
+                            </a>
+                          )}
+                        </div>
+                        <UploadTimeline img={img} />
                       </td>
                       <td className="px-6 py-4 text-on-surface-variant">{(img.views_count ?? 0).toLocaleString()}</td>
                       <td className="px-6 py-4 text-on-surface-variant">{img.sales_count ?? 0}</td>

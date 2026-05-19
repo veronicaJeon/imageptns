@@ -34,6 +34,9 @@ interface PeriodEarnings {
 
 interface LedgerEarning {
   id?: string;
+  gross_krw?: number | null;
+  commission_krw?: number | null;
+  net_krw?: number | null;
   settlement_provider?: string | null;
   claim_status?: string | null;
   claimable_amount?: number | string | null;
@@ -67,6 +70,11 @@ function formatKRW(n: number) {
 
 function formatUSDC(n: number) {
   return `${n.toLocaleString("en-US", { maximumFractionDigits: 6 })} USDC`;
+}
+
+function formatRate(gross?: number | null, commission?: number | null) {
+  if (!gross || gross <= 0 || commission == null) return "정책 적용";
+  return `${((commission / gross) * 100).toLocaleString("ko-KR", { maximumFractionDigits: 2 })}%`;
 }
 
 function formatDate(iso?: string | null) {
@@ -240,6 +248,8 @@ function EarningsInner() {
   const onchainRows = filterOnchainEarnings(ledger, "all");
   const filteredOnchainRows = filterOnchainEarnings(ledger, claimFilter);
   const onchainClaimable = sumClaimableUsdc(filterOnchainEarnings(ledger, "claimable"));
+  const totalGross = ledger.reduce((sum, row) => sum + (row.gross_krw ?? 0), 0);
+  const totalCommission = ledger.reduce((sum, row) => sum + (row.commission_krw ?? 0), 0);
 
   if (loading) {
     return (
@@ -272,7 +282,24 @@ function EarningsInner() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
         <StatCard icon="account_balance_wallet" label={e.statTotal}   value={formatKRW(totalNet)}   sub="All time" />
         <StatCard icon="trending_up"            label={e.statMonth}   value={formatKRW(currentPeriodData?.net ?? 0)} sub={currentPeriod} />
-        <StatCard icon="pending"                label={e.statPending} value={formatKRW(pendingNet)} sub="Awaiting payout" />
+        <StatCard icon="pending"                label={e.statPending} value={formatKRW(pendingNet)} sub={`평균 수수료 ${formatRate(totalGross, totalCommission)}`} />
+      </div>
+
+      <div className="mb-8 grid gap-4 md:grid-cols-3">
+        <div className="bg-surface-container-lowest shadow-ghost p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-outline">Gross Sales</p>
+          <p className="mt-2 text-xl font-headline font-extrabold text-on-surface">{formatKRW(totalGross)}</p>
+        </div>
+        <div className="bg-surface-container-lowest shadow-ghost p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-outline">Platform Commission</p>
+          <p className="mt-2 text-xl font-headline font-extrabold text-on-surface">{formatKRW(totalCommission)}</p>
+          <p className="mt-1 text-xs text-on-surface-variant">판매 시점에 적용된 정책 기준</p>
+        </div>
+        <div className="bg-surface-container-lowest shadow-ghost p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-outline">Onchain Claimable</p>
+          <p className="mt-2 text-xl font-headline font-extrabold text-on-surface">{formatUSDC(onchainClaimable)}</p>
+          <p className="mt-1 text-xs text-on-surface-variant">Base USDC escrow 기준</p>
+        </div>
       </div>
 
       {/* Bar chart */}
@@ -347,7 +374,7 @@ function EarningsInner() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-outline-variant/20">
-                  {["Status", "Image", "Amount", "Claim Tx", "Created"].map((h) => (
+                  {["Status", "Image", "Gross / Commission / Net", "Claimable", "Claim Tx", "Created"].map((h) => (
                     <th key={h} className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">{h}</th>
                   ))}
                 </tr>
@@ -370,6 +397,11 @@ function EarningsInner() {
                           {image?.asset_id ?? "No asset"} · {ledgerOrderItem(row)?.license_code ?? "license"}
                         </p>
                       </td>
+                      <td className="px-6 py-4 text-on-surface-variant">
+                        <p>Gross {formatKRW(row.gross_krw ?? 0)}</p>
+                        <p className="text-xs text-outline">Commission {formatKRW(row.commission_krw ?? 0)} · {formatRate(row.gross_krw, row.commission_krw)}</p>
+                        <p className="text-xs text-primary">Net {formatKRW(row.net_krw ?? 0)}</p>
+                      </td>
                       <td className="px-6 py-4 font-semibold text-on-surface">
                         {formatUSDC(Number(row.claimable_amount) || 0)}
                       </td>
@@ -386,7 +418,7 @@ function EarningsInner() {
                 })}
                 {filteredOnchainRows.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-10 text-center text-outline">No Base USDC rows for this filter.</td>
+                    <td colSpan={6} className="px-6 py-10 text-center text-outline">No Base USDC rows for this filter.</td>
                   </tr>
                 )}
               </tbody>
@@ -407,7 +439,7 @@ function EarningsInner() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
-                {["Period", "Sales", "Gross", "Commission (20%)", "Net Payout", "Status"].map((h) => (
+                {["Period", "Sales", "Gross", "Commission", "Net Payout", "Status"].map((h) => (
                   <th key={h} className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">{h}</th>
                 ))}
               </tr>
