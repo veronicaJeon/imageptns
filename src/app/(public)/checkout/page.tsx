@@ -34,6 +34,7 @@ interface OnchainPrepareResponse {
   chainId: typeof base.id | typeof baseSepolia.id;
   usdcAddress: Address;
   escrowAddress: Address;
+  confirmToken: string;
   cryptoAmount: string;
   assetIds: Hex[];
   photographers: Address[];
@@ -269,6 +270,7 @@ function CheckoutContent() {
         body: JSON.stringify({
           orderDbId: prepared.orderDbId,
           txHash: purchaseReceipt.transactionHash,
+          confirmToken: prepared.confirmToken,
         }),
       });
       if (!confirmRes.ok) throw new Error(await readApiError(confirmRes, "Base USDC 결제 확인 실패"));

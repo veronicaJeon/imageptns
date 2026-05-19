@@ -4,6 +4,7 @@ import { getAddress, type Address } from "viem";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { bigintToDecimalString, krwToUsdcAmount } from "@/lib/onchain/amounts";
+import { createOnchainConfirmToken } from "@/lib/onchain/checkout-auth";
 import { getOnchainServerConfig } from "@/lib/onchain/env";
 import { orderBytes32 } from "@/lib/onchain/ids";
 
@@ -167,6 +168,7 @@ export async function POST(req: NextRequest) {
   const cryptoAmount = grossAmounts.reduce((sum, amount) => sum + amount, BigInt(0));
   const tossOrderId = randomUUID();
   const contractOrderId = orderBytes32(tossOrderId);
+  const confirmToken = createOnchainConfirmToken();
 
   const { data: order, error: orderError } = await admin
     .from("orders")
@@ -188,6 +190,7 @@ export async function POST(req: NextRequest) {
       crypto_decimals: 6,
       crypto_status: "pending",
       buyer_wallet_address: buyerWalletAddress,
+      onchain_confirm_token: confirmToken,
     })
     .select("id")
     .single();
@@ -213,6 +216,7 @@ export async function POST(req: NextRequest) {
     chainId: config.chainId,
     usdcAddress: config.usdcAddress,
     escrowAddress: config.escrowAddress,
+    confirmToken,
     cryptoAmount: cryptoAmount.toString(),
     assetIds,
     photographers,

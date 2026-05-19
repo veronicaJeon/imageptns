@@ -20,9 +20,9 @@
    - 추가 개발: audit, owner/operator multisig, key rotation, 배포 주소 검증, contract verification.
 
 4. **결제 확인 endpoint 남용 방지**
-   - `/api/onchain/checkout/confirm`은 유효한 tx만 완료 처리하지만, 현재 인증 없이 호출 가능하다.
-   - 대량 호출로 RPC/DB 비용이 증가하거나 주문번호가 노출될 수 있다.
-   - 추가 개발: 구매자 인증 또는 signed confirmation token, rate limit, request logging.
+   - `/api/onchain/checkout/confirm`은 구매자 세션 또는 주문별 confirmation token을 요구하도록 보강했다.
+   - 아직 대량 호출에 따른 RPC/DB 비용 증가 가능성은 남아 있다.
+   - 추가 개발: rate limit, request logging, repeated failure backoff.
 
 5. **stale pending order 재처리**
    - 구매자가 order prepare 후 지갑 승인/구매/confirm 중 이탈하면 `base_usdc` pending order가 남는다.
@@ -85,4 +85,3 @@
 - Buyer dashboard: Base USDC 주문 상태와 최근 온체인 주문을 확인한다.
 - Photographer dashboard: proof 등록 상태, wallet 준비 상태, claimable USDC를 확인한다.
 - Admin dashboard: proof/payment/claim 운영 지표와 즉시 확인해야 할 주의 항목을 확인한다.
-

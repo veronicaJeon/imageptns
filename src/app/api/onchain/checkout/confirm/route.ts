@@ -2,21 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { decodeEventLog, decodeFunctionData, getAddress, isHex, type Address, type Hex } from "viem";
 import { bigintToDecimalString } from "@/lib/onchain/amounts";
 import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
+import { authorizeOnchainCheckoutConfirmation } from "@/lib/onchain/checkout-auth";
 import { getOnchainServerConfig } from "@/lib/onchain/env";
 import { imageAssetBytes32 } from "@/lib/onchain/ids";
 import { getOnchainPublicClient } from "@/lib/onchain/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 interface CheckoutConfirmBody {
   orderDbId?: string;
   txHash?: string;
+  confirmToken?: string;
 }
 
 interface OrderRow {
   id: string;
   order_number: string;
+  buyer_id: string;
   contract_order_id: Hex;
   buyer_wallet_address: string;
+  onchain_confirm_token: string | null;
   status: string;
   payment_tx_hash: string | null;
   crypto_amount: number | string | null;
@@ -162,6 +167,9 @@ async function updateLedgerClaimable(
 }
 
 export async function POST(req: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   let body: CheckoutConfirmBody;
   try {
     body = await req.json();
@@ -186,7 +194,7 @@ export async function POST(req: NextRequest) {
 
   const { data: orderData, error } = await admin
     .from("orders")
-    .select("id, order_number, contract_order_id, buyer_wallet_address, status, payment_tx_hash, crypto_amount, crypto_decimals, crypto_status")
+    .select("id, order_number, buyer_id, contract_order_id, buyer_wallet_address, onchain_confirm_token, status, payment_tx_hash, crypto_amount, crypto_decimals, crypto_status")
     .eq("id", orderDbId)
     .eq("payment_provider", "base_usdc")
     .single();
@@ -196,6 +204,19 @@ export async function POST(req: NextRequest) {
   }
 
   const order = orderData as OrderRow;
+  const authorized = authorizeOnchainCheckoutConfirmation({
+    orderBuyerId: order.buyer_id,
+    authenticatedUserId: user?.id ?? null,
+    storedConfirmToken: order.onchain_confirm_token,
+    providedConfirmToken: body.confirmToken ?? null,
+  });
+  if (!authorized) {
+    return NextResponse.json(
+      { error: user ? "Forbidden" : "Unauthorized" },
+      { status: user ? 403 : 401 },
+    );
+  }
+
   if (order.status === "completed" && order.crypto_status === "confirmed") {
     if (order.payment_tx_hash && order.payment_tx_hash.toLowerCase() !== txHash.toLowerCase()) {
       return NextResponse.json({ error: "Order already completed with a different transaction" }, { status: 409 });

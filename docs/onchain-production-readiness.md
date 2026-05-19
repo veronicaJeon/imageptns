@@ -9,6 +9,7 @@ See `docs/onchain-production-risk-register.md` for the operating risk register a
 - [x] Add admin onchain operations stats for proof registration, Base payment state, and claimable USDC.
 - [x] Add buyer, photographer, and admin dashboard surfaces for onchain payment/proof/claim state.
 - [x] Document production operating risks and follow-up development targets.
+- [x] Gate Base checkout confirmation with buyer session or per-order confirmation token.
 - [ ] Add an admin retry tool for failed proof registration after operator/RPC issues are fixed.
 - [ ] Add an admin reconciliation view that compares pending Base orders against transaction hashes submitted by buyers.
 - [ ] Add a cron reconciliation endpoint for stale `base_usdc` pending orders.
