@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
   const orderItems = [];
   const assetIds: `0x${string}`[] = [];
   const photographers: Address[] = [];
-  const grossKrwAmounts: number[] = [];
+  const grossAmounts: bigint[] = [];
   let subtotal = 0;
 
   for (const item of normalizedItems) {
@@ -139,8 +139,11 @@ export async function POST(req: NextRequest) {
 
     const price = license.price_krw;
     const commission = Math.round(price * COMMISSION_RATE);
+    const netKrw = price - commission;
+    const grossCryptoAmount = krwToUsdcAmount(price, config.usdcPerKrw);
+    const netCryptoAmount = krwToUsdcAmount(netKrw, config.usdcPerKrw);
     subtotal += price;
-    grossKrwAmounts.push(price);
+    grossAmounts.push(grossCryptoAmount);
     assetIds.push(image.onchain_asset_id);
     photographers.push(photographerAddress);
     orderItems.push({
@@ -151,13 +154,16 @@ export async function POST(req: NextRequest) {
       gross_krw: price,
       commission_rate: COMMISSION_RATE,
       commission_krw: commission,
-      net_krw: price - commission,
+      net_krw: netKrw,
+      crypto_gross_amount: bigintToDecimalString(grossCryptoAmount),
+      crypto_net_amount: bigintToDecimalString(netCryptoAmount),
     });
   }
 
-  const vat = Math.round(subtotal * 0.1);
+  // Base USDC MVP settles only license proceeds onchain. VAT is not collected
+  // through escrow until a dedicated tax/treasury leg is added.
+  const vat = 0;
   const total = subtotal + vat;
-  const grossAmounts = grossKrwAmounts.map((amount) => krwToUsdcAmount(amount, config.usdcPerKrw));
   const cryptoAmount = grossAmounts.reduce((sum, amount) => sum + amount, BigInt(0));
   const tossOrderId = randomUUID();
   const contractOrderId = orderBytes32(tossOrderId);

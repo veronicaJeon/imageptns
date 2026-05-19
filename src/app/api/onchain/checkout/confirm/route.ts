@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeEventLog, decodeFunctionData, getAddress, isHex, type Address, type Hex } from "viem";
-import { bigintToDecimalString, krwToUsdcAmount } from "@/lib/onchain/amounts";
+import { bigintToDecimalString } from "@/lib/onchain/amounts";
 import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
 import { getOnchainServerConfig } from "@/lib/onchain/env";
 import { imageAssetBytes32 } from "@/lib/onchain/ids";
@@ -43,6 +43,8 @@ interface OrderItemRow {
   gross_krw: number;
   commission_krw: number;
   net_krw: number;
+  crypto_gross_amount: number | string | null;
+  crypto_net_amount: number | string | null;
   image: ImageJoinRow | ImageJoinRow[] | null;
 }
 
@@ -89,7 +91,6 @@ function equalCountMaps(left: Map<string, number>, right: Map<string, number>) {
 async function loadExpectedPurchaseItems(
   admin: ReturnType<typeof createAdminClient>,
   orderDbId: string,
-  usdcPerKrw: number,
 ) {
   const { data: orderItems, error } = await admin
     .from("order_items")
@@ -98,6 +99,8 @@ async function loadExpectedPurchaseItems(
       gross_krw,
       commission_krw,
       net_krw,
+      crypto_gross_amount,
+      crypto_net_amount,
       image:images!image_id(
         asset_id,
         onchain_asset_id,
@@ -125,8 +128,8 @@ async function loadExpectedPurchaseItems(
       orderItemId: item.id,
       assetId,
       photographer,
-      grossAmount: krwToUsdcAmount(item.gross_krw, usdcPerKrw),
-      claimableAmount: krwToUsdcAmount(item.net_krw, usdcPerKrw),
+      grossAmount: decimalToUnits(item.crypto_gross_amount ?? "", 6),
+      claimableAmount: decimalToUnits(item.crypto_net_amount ?? "", 6),
     });
   }
 
@@ -225,7 +228,7 @@ export async function POST(req: NextRequest) {
   const escrowAddress = getAddress(config.escrowAddress);
   const cryptoDecimals = order.crypto_decimals ?? 6;
   const expectedAmount = decimalToUnits(order.crypto_amount, cryptoDecimals);
-  const expectedPurchase = await loadExpectedPurchaseItems(admin, orderDbId, config.usdcPerKrw);
+  const expectedPurchase = await loadExpectedPurchaseItems(admin, orderDbId);
   if (expectedPurchase.error) return NextResponse.json({ error: expectedPurchase.error.message }, { status: 500 });
   if (expectedPurchase.response) return expectedPurchase.response;
   const expectedItems = expectedPurchase.expectedItems;

@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAddress } from "viem";
 import { createClient } from "@/lib/supabase/server";
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, bio, avatar_url, role, notif_sales, notif_reviews, notif_newsletter, created_at")
+    .select("id, full_name, bio, avatar_url, role, wallet_address, notif_sales, notif_reviews, notif_newsletter, created_at")
     .eq("id", user.id)
     .single();
 
@@ -25,6 +26,18 @@ export async function PATCH(req: NextRequest) {
   const allowed: Record<string, unknown> = {};
   if ("full_name" in body) allowed.full_name = body.full_name;
   if ("bio"       in body) allowed.bio       = body.bio;
+  if ("wallet_address" in body) {
+    const rawWallet = typeof body.wallet_address === "string" ? body.wallet_address.trim() : "";
+    if (rawWallet) {
+      try {
+        allowed.wallet_address = getAddress(rawWallet);
+      } catch {
+        return NextResponse.json({ error: "wallet_address must be a valid EVM address" }, { status: 400 });
+      }
+    } else {
+      allowed.wallet_address = null;
+    }
+  }
   allowed.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase

@@ -97,6 +97,8 @@ function CheckoutContent() {
   const [widgetReady, setWidgetReady] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("toss");
   const widgetRef = useRef<PaymentWidgetInstance | null>(null);
+  const displayVat = paymentMethod === "base_usdc" ? 0 : vat;
+  const displayTotal = subtotal + displayVat;
 
   // Pre-fill billing from user profile
   useEffect(() => {
@@ -414,7 +416,7 @@ function CheckoutContent() {
                     <span className="material-symbols-outlined text-base">
                       {paymentMethod === "base_usdc" ? "account_balance_wallet" : "lock"}
                     </span>
-                    {paymentMethod === "base_usdc" ? "Pay with USDC" : ch.submitBtn} · {formatKRW(total)}
+                    {paymentMethod === "base_usdc" ? "Pay with USDC" : ch.submitBtn} · {formatKRW(displayTotal)}
                   </>
                 )
               }
@@ -446,11 +448,16 @@ function CheckoutContent() {
                   <span>{t.cart.subtotal}</span><span>{formatKRW(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-on-surface-variant">
-                  <span>{t.cart.vat}</span><span>{formatKRW(vat)}</span>
+                  <span>{t.cart.vat}</span><span>{formatKRW(displayVat)}</span>
                 </div>
+                {paymentMethod === "base_usdc" && (
+                  <p className="text-[11px] leading-relaxed text-outline">
+                    Base USDC MVP는 라이선스 금액만 온체인 escrow로 결제합니다.
+                  </p>
+                )}
                 <div className="flex justify-between font-bold text-base pt-2 border-t border-outline-variant/20">
                   <span className="text-on-surface">{t.cart.total}</span>
-                  <span className="text-primary">{formatKRW(total)}</span>
+                  <span className="text-primary">{formatKRW(displayTotal)}</span>
                 </div>
               </div>
             </div>
