@@ -21,8 +21,78 @@ function formatKRW(n: number) {
   return "₩" + n.toLocaleString("ko-KR");
 }
 
+function formatUSDC(n: number) {
+  return `${n.toLocaleString("en-US", { maximumFractionDigits: 6 })} USDC`;
+}
+
+interface AdminStats {
+  images: {
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+  };
+  users: {
+    total: number;
+  };
+  orders: {
+    total: number;
+    revenue: number;
+  };
+  onchain: {
+    proof: {
+      notRegistered: number;
+      pending: number;
+      registered: number;
+      failed: number;
+    };
+    payments: {
+      pending: number;
+      confirmed: number;
+      failed: number;
+    };
+    claims: {
+      claimableRows: number;
+      claimableUsdc: number;
+    };
+  };
+  recentUsers: RecentUser[];
+}
+
+interface RecentUser {
+  id: string;
+  full_name: string | null;
+  role: string | null;
+  created_at: string;
+}
+
+const EMPTY_IMAGES: AdminStats["images"] = {
+  total: 0,
+  pending: 0,
+  approved: 0,
+  rejected: 0,
+};
+
+const EMPTY_PROOF: AdminStats["onchain"]["proof"] = {
+  notRegistered: 0,
+  pending: 0,
+  registered: 0,
+  failed: 0,
+};
+
+const EMPTY_PAYMENTS: AdminStats["onchain"]["payments"] = {
+  pending: 0,
+  confirmed: 0,
+  failed: 0,
+};
+
+const EMPTY_CLAIMS: AdminStats["onchain"]["claims"] = {
+  claimableRows: 0,
+  claimableUsdc: 0,
+};
+
 export default function AdminStatsPage() {
-  const [data, setData]       = useState<any>(null);
+  const [data, setData]       = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
 
@@ -52,7 +122,10 @@ export default function AdminStatsPage() {
     );
   }
 
-  const img = data?.images ?? {};
+  const img = data?.images ?? EMPTY_IMAGES;
+  const proof = data?.onchain?.proof ?? EMPTY_PROOF;
+  const payments = data?.onchain?.payments ?? EMPTY_PAYMENTS;
+  const claims = data?.onchain?.claims ?? EMPTY_CLAIMS;
   const reviewRate = img.total > 0 ? Math.round((img.approved / img.total) * 100) : 0;
 
   return (
@@ -74,6 +147,39 @@ export default function AdminStatsPage() {
         <StatCard icon="group"        label="전체 회원"    value={data?.users?.total ?? 0}          color="bg-blue-50 text-blue-500 dark:bg-blue-900/20" />
         <StatCard icon="receipt_long" label="완료된 주문"  value={data?.orders?.total ?? 0}         color="bg-green-50 text-green-500 dark:bg-green-900/20" />
         <StatCard icon="payments"     label="누적 매출"    value={formatKRW(data?.orders?.revenue ?? 0)} color="bg-green-50 text-green-600 dark:bg-green-900/20" />
+      </div>
+
+      {/* Onchain ops stats */}
+      <p className="text-xs font-bold text-outline uppercase tracking-widest mb-4">온체인 운영</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        <StatCard
+          icon="verified"
+          label="증명 등록 완료"
+          value={proof.registered ?? 0}
+          sub={`대기 ${proof.pending ?? 0} / 실패 ${proof.failed ?? 0}`}
+          color="bg-primary/10 text-primary"
+        />
+        <StatCard
+          icon="cloud_off"
+          label="증명 미등록"
+          value={proof.notRegistered ?? 0}
+          sub="승인 전 또는 이전 데이터"
+          color="bg-surface-container-high text-on-surface-variant"
+        />
+        <StatCard
+          icon="currency_exchange"
+          label="Base 결제"
+          value={payments.confirmed ?? 0}
+          sub={`대기 ${payments.pending ?? 0} / 실패 ${payments.failed ?? 0}`}
+          color="bg-green-50 text-green-600 dark:bg-green-900/20"
+        />
+        <StatCard
+          icon="account_balance_wallet"
+          label="Claim 대기"
+          value={formatUSDC(claims.claimableUsdc ?? 0)}
+          sub={`${claims.claimableRows ?? 0}개 정산 항목`}
+          color="bg-blue-50 text-blue-500 dark:bg-blue-900/20"
+        />
       </div>
 
       {/* Image approval bar */}
@@ -119,7 +225,7 @@ export default function AdminStatsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20">
-              {(data?.recentUsers ?? []).map((u: any) => (
+              {(data?.recentUsers ?? []).map((u) => (
                 <tr key={u.id} className="hover:bg-surface-container-low transition-colors">
                   <td className="px-6 py-4 font-medium text-on-surface">{u.full_name || "—"}</td>
                   <td className="px-6 py-4">
