@@ -10,16 +10,11 @@ export function previewUrl(path: string | null | undefined): string {
 
 export function previewThumbnailUrl(path: string | null | undefined, width = 320, height = 240): string {
   if (!path) return "";
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  void width;
-  void height;
-  return `${base}/storage/v1/object/public/images-preview/thumbs/${path}`;
+  return thumbnailUrlFromPreviewUrl(previewUrl(path), width, height);
 }
 
 export function thumbnailUrlFromPreviewUrl(src: string, width = 320, height = 240): string {
   if (!src) return "";
-  void width;
-  void height;
 
   try {
     const url = new URL(src);
@@ -27,12 +22,12 @@ export function thumbnailUrlFromPreviewUrl(src: string, width = 320, height = 24
     const markerIndex = url.pathname.indexOf(marker);
     if (markerIndex === -1) return src;
 
-    const objectPath = url.pathname.slice(markerIndex + marker.length);
-    if (objectPath.startsWith("thumbs/")) return src;
-
-    url.pathname = `${url.pathname.slice(0, markerIndex)}/storage/v1/object/public/images-preview/thumbs/${objectPath}`;
-    url.search = "";
-    return url.toString();
+    const params = new URLSearchParams({
+      src: url.toString(),
+      w: String(width),
+      h: String(height),
+    });
+    return `/api/images/thumbnail?${params.toString()}`;
   } catch {
     return src;
   }
