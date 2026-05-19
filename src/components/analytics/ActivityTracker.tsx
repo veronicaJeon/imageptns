@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 const SESSION_KEY = "imageptns.activitySessionId";
+const PRESENCE_INTERVAL_MS = 30_000;
 
 function sessionId() {
   const existing = window.localStorage.getItem(SESSION_KEY);
@@ -45,6 +46,28 @@ export function ActivityTracker() {
         keepalive: true,
       }).catch(() => {});
     }
+  }, [pathname, searchParams]);
+
+  useEffect(() => {
+    if (!pathname || pathname.startsWith("/admin")) return;
+
+    const sendPresence = () => {
+      const search = searchParams.toString();
+      const path = search ? `${pathname}?${search}` : pathname;
+      fetch("/api/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sessionId(),
+          path,
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    };
+
+    sendPresence();
+    const interval = window.setInterval(sendPresence, PRESENCE_INTERVAL_MS);
+    return () => window.clearInterval(interval);
   }, [pathname, searchParams]);
 
   return null;

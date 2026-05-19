@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: "/admin/pricing",           icon: "sell",            label: "상품 가격"    },
   { href: "/admin/commission",        icon: "percent",         label: "수수료 정책"  },
   { href: "/admin/support",           icon: "support_agent",   label: "고객 문의"    },
+  { href: "/admin/presence",          icon: "groups",          label: "동시접속자"   },
   { href: "/admin/activity",          icon: "timeline",        label: "방문 로그"    },
   { href: "/admin/audit",             icon: "policy",          label: "감사 로그"    },
   { href: "/admin/stats",             icon: "bar_chart",       label: "통계"         },
