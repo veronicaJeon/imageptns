@@ -14,6 +14,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
+    "@tanstack/react-query": "^5.100.11",
     "@tosspayments/payment-widget-sdk": "^0.12.1",
     "@types/nodemailer": "^8.0.0",
     "clsx": "^2.1.1",
@@ -26,6 +27,8 @@
     "react-hook-form": "^7.72.1",
     "resend": "^6.10.0",
     "sharp": "^0.34.5",
+    "viem": "^2.50.3",
+    "wagmi": "^3.6.15",
     "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },
