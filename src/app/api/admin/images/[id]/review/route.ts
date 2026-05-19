@@ -46,6 +46,8 @@ interface ReviewResponseImage {
   proof_tx_hash?: string | null;
 }
 
+const REVIEW_SELECT = "id, status, rejection_reason, approved_at, title, asset_id, photographer_id, proof_status, proof_registered_at, proof_tx_hash";
+
 function photographerWalletAddress(photographer: ReviewImage["photographer"]) {
   const profile = Array.isArray(photographer) ? photographer[0] : photographer;
   return profile?.wallet_address ?? null;
@@ -122,7 +124,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Onchain proof registration is not configured" }, { status: 500 });
     }
 
-    const pending = await admin
+    const { data: claimedImage, error: claimError } = await admin
       .from("images")
       .update({
         proof_status: "pending",
@@ -130,9 +132,19 @@ export async function PATCH(
         onchain_asset_id: onchainAssetId,
         chain_id: config.chainId,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("status", "pending")
+      .in("proof_status", ["not_registered", "failed"])
+      .select("id")
+      .maybeSingle();
 
-    if (pending.error) return NextResponse.json({ error: pending.error.message }, { status: 500 });
+    if (claimError) return NextResponse.json({ error: claimError.message }, { status: 500 });
+    if (!claimedImage) {
+      return NextResponse.json(
+        { error: "Image is no longer pending or proof registration is already in progress" },
+        { status: 409 }
+      );
+    }
 
     let txHash: `0x${string}` | null = null;
     try {
@@ -151,7 +163,8 @@ export async function PATCH(
         await admin
           .from("images")
           .update({ proof_status: "failed", proof_tx_hash: txHash })
-          .eq("id", id);
+          .eq("id", id)
+          .eq("proof_status", "pending");
         return NextResponse.json({ error: "Onchain proof registration failed" }, { status: 502 });
       }
     } catch (error) {
@@ -159,39 +172,81 @@ export async function PATCH(
       await admin
         .from("images")
         .update({ proof_status: "failed", proof_tx_hash: txHash })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("proof_status", "pending");
       return NextResponse.json(
         { error: "Onchain proof registration failed" },
         { status: 502 }
       );
     }
 
-    const approvedAt = new Date().toISOString();
+    const proofRegisteredAt = new Date().toISOString();
+    const { data: registeredProof, error: proofPersistError } = await admin
+      .from("images")
+      .update({
+        proof_status: "registered",
+        proof_registered_at: proofRegisteredAt,
+        proof_tx_hash: txHash,
+      })
+      .eq("id", id)
+      .eq("status", "pending")
+      .eq("proof_status", "pending")
+      .select("id")
+      .maybeSingle();
+
+    if (proofPersistError) return NextResponse.json({ error: proofPersistError.message }, { status: 500 });
+    if (!registeredProof) {
+      return NextResponse.json(
+        { error: "Onchain proof registered, but image review state changed before proof persistence" },
+        { status: 409 }
+      );
+    }
+
     const { data: approved, error: approveError } = await admin
       .from("images")
       .update({
         status: "approved",
-        approved_at: approvedAt,
+        approved_at: proofRegisteredAt,
         rejection_reason: null,
-        proof_status: "registered",
-        proof_registered_at: approvedAt,
-        proof_tx_hash: txHash,
       })
       .eq("id", id)
-      .select("id, status, rejection_reason, approved_at, title, asset_id, photographer_id, proof_status, proof_registered_at, proof_tx_hash")
-      .single();
+      .eq("status", "pending")
+      .eq("proof_status", "registered")
+      .eq("proof_tx_hash", txHash)
+      .select(REVIEW_SELECT)
+      .maybeSingle();
 
-    if (approveError) return NextResponse.json({ error: approveError.message }, { status: 500 });
+    if (approveError) {
+      return NextResponse.json(
+        { error: "Onchain proof registered, but approval finalization failed" },
+        { status: 500 }
+      );
+    }
+    if (!approved) {
+      return NextResponse.json(
+        { error: "Onchain proof registered, but approval finalization needs review" },
+        { status: 409 }
+      );
+    }
+
     data = approved;
   } else {
     const { data: rejected, error } = await admin
       .from("images")
       .update({ status: "rejected", rejection_reason: rejection_reason!.trim(), approved_at: null })
       .eq("id", id)
-      .select("id, status, rejection_reason, approved_at, title, asset_id, photographer_id")
-      .single();
+      .eq("status", "pending")
+      .in("proof_status", ["not_registered", "failed"])
+      .select(REVIEW_SELECT)
+      .maybeSingle();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!rejected) {
+      return NextResponse.json(
+        { error: "Image is no longer pending or proof registration is already in progress" },
+        { status: 409 }
+      );
+    }
     data = rejected;
   }
 
