@@ -4,16 +4,66 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { getAccount, connect, readContract, switchChain, waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { createConfig, http, injected, WagmiProvider } from "wagmi";
+import { base, baseSepolia } from "wagmi/chains";
+import type { Address, Hex } from "viem";
 import { useLang } from "@/lib/i18n/store";
 import { useCart } from "@/lib/store/cart";
 import { useAuth } from "@/lib/store/auth";
+import { ERC20_ABI, IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
 import { loadPaymentWidget, type PaymentWidgetInstance } from "@tosspayments/payment-widget-sdk";
+
+const wagmiConfig = createConfig({
+  chains: [base, baseSepolia],
+  connectors: [injected()],
+  transports: {
+    [base.id]: http(),
+    [baseSepolia.id]: http(),
+  },
+});
+
+const queryClient = new QueryClient();
+
+type PaymentMethod = "toss" | "base_usdc";
+
+interface OnchainPrepareResponse {
+  orderDbId: string;
+  contractOrderId: Hex;
+  chainId: typeof base.id | typeof baseSepolia.id;
+  usdcAddress: Address;
+  escrowAddress: Address;
+  cryptoAmount: string;
+  assetIds: Hex[];
+  photographers: Address[];
+  grossAmounts: string[];
+}
 
 function formatKRW(n: number) {
   return "₩" + n.toLocaleString("ko-KR");
 }
 
-export default function CheckoutPage() {
+function checkoutErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
+function ensureBaseChainId(chainId: number): OnchainPrepareResponse["chainId"] {
+  if (chainId === base.id || chainId === baseSepolia.id) return chainId;
+  throw new Error("지원하지 않는 Base 네트워크입니다.");
+}
+
+async function readApiError(response: Response, fallback: string) {
+  try {
+    const body = await response.json();
+    return typeof body?.error === "string" ? body.error : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function CheckoutContent() {
   const { t } = useLang();
   const ch = t.checkout;
   const { items } = useCart();
@@ -36,6 +86,7 @@ export default function CheckoutPage() {
   const [billing, setBilling]   = useState({ name: "", email: "", company: "" });
   const [loading, setLoading]   = useState(false);
   const [widgetReady, setWidgetReady] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("toss");
   const widgetRef = useRef<PaymentWidgetInstance | null>(null);
 
   // Pre-fill billing from user profile
@@ -76,7 +127,20 @@ export default function CheckoutPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!billing.name || !billing.email) return;
-    if (!widgetRef.current) return;
+
+    if (paymentMethod === "toss") {
+      if (!widgetRef.current) return;
+      await handleTossPayment();
+      return;
+    }
+
+    await handleBaseUsdcPayment();
+  }
+
+  async function handleTossPayment() {
+    const widget = widgetRef.current;
+    if (!widget) return;
+
     setLoading(true);
 
     try {
@@ -93,7 +157,7 @@ export default function CheckoutPage() {
       const { orderId, orderName } = await prepRes.json();
 
       // 2. Launch Toss payment (widget handles payment UI)
-      await widgetRef.current.requestPayment({
+      await widget.requestPayment({
         orderId,
         orderName,
         customerName:  billing.name,
@@ -101,8 +165,97 @@ export default function CheckoutPage() {
         successUrl: `${window.location.origin}/api/checkout/confirm`,
         failUrl:    `${window.location.origin}/checkout/fail`,
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
+      alert(checkoutErrorMessage(err, "결제를 시작하지 못했습니다."));
+      setLoading(false);
+    }
+  }
+
+  async function handleBaseUsdcPayment() {
+    setLoading(true);
+
+    try {
+      if (typeof window === "undefined" || !("ethereum" in window)) {
+        throw new Error("브라우저 지갑을 찾을 수 없습니다. MetaMask 또는 Base 호환 지갑을 설치해주세요.");
+      }
+
+      const connector = wagmiConfig.connectors[0];
+      if (!connector) throw new Error("사용 가능한 지갑 커넥터가 없습니다.");
+
+      let account = getAccount(wagmiConfig);
+      if (!account.address) {
+        await connect(wagmiConfig, { connector });
+        account = getAccount(wagmiConfig);
+      }
+
+      if (!account.address) throw new Error("지갑 연결을 완료해주세요.");
+      const buyerWalletAddress = account.address;
+
+      const prepRes = await fetch("/api/onchain/checkout/prepare", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((i) => ({ id: i.id, license: i.license })),
+          billing,
+          buyerWalletAddress,
+        }),
+      });
+      if (!prepRes.ok) throw new Error(await readApiError(prepRes, "Base USDC 주문 생성 실패"));
+
+      const prepared = await prepRes.json() as OnchainPrepareResponse;
+      const targetChainId = ensureBaseChainId(prepared.chainId);
+
+      account = getAccount(wagmiConfig);
+      if (account.chainId !== targetChainId) {
+        await switchChain(wagmiConfig, { chainId: targetChainId });
+      }
+
+      const cryptoAmount = BigInt(prepared.cryptoAmount);
+      const grossAmounts = prepared.grossAmounts.map((amount) => BigInt(amount));
+      const currentAllowance = await readContract(wagmiConfig, {
+        address: prepared.usdcAddress,
+        abi: ERC20_ABI,
+        functionName: "allowance",
+        args: [buyerWalletAddress, prepared.escrowAddress],
+        chainId: targetChainId,
+      });
+
+      if (currentAllowance < cryptoAmount) {
+        const approveHash = await writeContract(wagmiConfig, {
+          address: prepared.usdcAddress,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [prepared.escrowAddress, cryptoAmount],
+          chainId: targetChainId,
+        });
+        await waitForTransactionReceipt(wagmiConfig, { hash: approveHash, chainId: targetChainId });
+      }
+
+      const purchaseHash = await writeContract(wagmiConfig, {
+        address: prepared.escrowAddress,
+        abi: IMAGE_PARTNERS_ESCROW_ABI,
+        functionName: "purchase",
+        args: [prepared.contractOrderId, prepared.assetIds, prepared.photographers, grossAmounts],
+        chainId: targetChainId,
+      });
+      await waitForTransactionReceipt(wagmiConfig, { hash: purchaseHash, chainId: targetChainId });
+
+      const confirmRes = await fetch("/api/onchain/checkout/confirm", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderDbId: prepared.orderDbId,
+          txHash: purchaseHash,
+        }),
+      });
+      if (!confirmRes.ok) throw new Error(await readApiError(confirmRes, "Base USDC 결제 확인 실패"));
+
+      const { orderNumber } = await confirmRes.json() as { orderNumber?: string };
+      router.push(`/checkout/success?order=${encodeURIComponent(orderNumber ?? "")}`);
+    } catch (err) {
+      console.error(err);
+      alert(checkoutErrorMessage(err, "Base USDC 결제를 완료하지 못했습니다."));
       setLoading(false);
     }
   }
@@ -159,15 +312,71 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Toss Payments Widget */}
+            {/* Payment method */}
             <div>
               <h2 className="text-xs font-bold text-outline uppercase tracking-widest mb-5">{ch.paymentMethod}</h2>
-              <div id="toss-payment-widget" className="min-h-[100px]" />
-              <div id="toss-agreement-widget" className="mt-4" />
-              {!widgetReady && (
-                <div className="flex items-center justify-center py-8 text-outline gap-2">
-                  <span className="w-5 h-5 border-2 border-outline border-t-transparent rounded-full animate-spin" />
-                  <span className="text-xs">결제 위젯 로딩 중...</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("toss")}
+                  className={`p-4 ring-1 rounded-lg text-left transition-all ${
+                    paymentMethod === "toss"
+                      ? "bg-primary/5 ring-primary"
+                      : "bg-surface-container-lowest ring-outline-variant hover:ring-outline"
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-sm font-bold text-on-surface">
+                    <span className="material-symbols-outlined text-base">credit_card</span>
+                    Toss Payments
+                  </span>
+                  <span className="block mt-2 text-[11px] leading-relaxed text-outline">
+                    카드 및 국내 간편결제
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("base_usdc")}
+                  className={`p-4 ring-1 rounded-lg text-left transition-all ${
+                    paymentMethod === "base_usdc"
+                      ? "bg-primary/5 ring-primary"
+                      : "bg-surface-container-lowest ring-outline-variant hover:ring-outline"
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-sm font-bold text-on-surface">
+                    <span className="material-symbols-outlined text-base">account_balance_wallet</span>
+                    USDC on Base
+                  </span>
+                  <span className="block mt-2 text-[11px] leading-relaxed text-outline">
+                    Base 지갑으로 온체인 결제
+                  </span>
+                </button>
+              </div>
+
+              <div className={paymentMethod === "toss" ? "block" : "hidden"}>
+                <div id="toss-payment-widget" className="min-h-[100px]" />
+                <div id="toss-agreement-widget" className="mt-4" />
+                {!widgetReady && (
+                  <div className="flex items-center justify-center py-8 text-outline gap-2">
+                    <span className="w-5 h-5 border-2 border-outline border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs">결제 위젯 로딩 중...</span>
+                  </div>
+                )}
+              </div>
+
+              {paymentMethod === "base_usdc" && (
+                <div className="bg-surface-container-lowest ring-1 ring-outline-variant rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="material-symbols-outlined text-primary text-xl mt-0.5">currency_exchange</span>
+                    <div>
+                      <p className="text-sm font-bold text-on-surface">Base USDC 결제</p>
+                      <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                        지갑 연결 후 Base 네트워크에서 USDC 승인과 구매 트랜잭션을 순서대로 진행합니다.
+                      </p>
+                      <p className="text-[11px] text-outline mt-3">
+                        최종 USDC 금액은 주문 생성 시점의 온체인 결제 설정으로 계산됩니다.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -175,12 +384,19 @@ export default function CheckoutPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading || !widgetReady}
+              disabled={loading || (paymentMethod === "toss" && !widgetReady)}
               className="w-full py-4 bg-primary text-white font-bold text-sm uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading
                 ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                : <><span className="material-symbols-outlined text-base">lock</span>{ch.submitBtn} · {formatKRW(total)}</>
+                : (
+                  <>
+                    <span className="material-symbols-outlined text-base">
+                      {paymentMethod === "base_usdc" ? "account_balance_wallet" : "lock"}
+                    </span>
+                    {paymentMethod === "base_usdc" ? "Pay with USDC" : ch.submitBtn} · {formatKRW(total)}
+                  </>
+                )
               }
             </button>
 
@@ -222,5 +438,15 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <CheckoutContent />
+      </QueryClientProvider>
+    </WagmiProvider>
   );
 }
