@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { previewUrl } from "@/lib/supabase/storage";
-import { applyWatermark } from "@/lib/utils/watermark";
+import { applyWatermark, createWatermarkedThumbnail } from "@/lib/utils/watermark";
 import { notifyOpsNewUpload } from "@/lib/email/resend";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 
@@ -91,9 +91,13 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await downloaded.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const watermarked = await applyWatermark(buffer);
+    const thumbnail = await createWatermarkedThumbnail(buffer);
     await admin.storage
       .from("images-preview")
       .upload(storage_path_original, watermarked, { contentType: "image/jpeg", upsert: true });
+    await admin.storage
+      .from("images-preview")
+      .upload(`thumbs/${storage_path_original}`, thumbnail, { contentType: "image/jpeg", upsert: true });
   } catch (err) {
     console.error("[uploads] Watermark/preview generation failed:", err);
     // Image record is already saved — preview will be missing but upload succeeded

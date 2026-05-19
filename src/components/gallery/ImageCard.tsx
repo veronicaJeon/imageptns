@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils/cn";
 import { useState } from "react";
 import { useCart } from "@/lib/store/cart";
 import { useRouter } from "next/navigation";
+import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 
 export interface ImageCardData {
   id: string;
@@ -89,11 +90,12 @@ export function ImageCard({
     >
       {/* 이미지 */}
       <Image
-        src={image.src}
+        src={thumbnailUrlFromPreviewUrl(image.src, 640, 480)}
         alt={image.alt}
         width={image.width}
         height={image.height}
         className="w-full h-auto object-cover group-hover:scale-[1.02] transition-transform duration-700"
+        unoptimized
       />
 
       {/* 호버 오버레이 */}

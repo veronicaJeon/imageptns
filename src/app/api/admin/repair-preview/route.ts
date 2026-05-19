@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { applyWatermark } from "@/lib/utils/watermark";
+import { applyWatermark, createWatermarkedThumbnail } from "@/lib/utils/watermark";
 
 export const maxDuration = 60;
+
+interface RepairPreviewImageRow {
+  id: string;
+  storage_path_original: string | null;
+  storage_path_preview: string | null;
+}
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-admin-secret");
@@ -25,7 +31,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Image not found" }, { status: 404 });
   }
 
-  const originalPath = (img as any).storage_path_original as string;
+  const image = img as RepairPreviewImageRow;
+  const originalPath = image.storage_path_original;
   if (!originalPath) {
     return NextResponse.json({ error: "No original path on record" }, { status: 400 });
   }
@@ -40,6 +47,7 @@ export async function POST(req: NextRequest) {
 
   const buffer = Buffer.from(await downloaded.arrayBuffer());
   const watermarked = await applyWatermark(buffer);
+  const thumbnail = await createWatermarkedThumbnail(buffer);
 
   const { error: uploadErr } = await admin.storage
     .from("images-preview")
@@ -47,6 +55,14 @@ export async function POST(req: NextRequest) {
 
   if (uploadErr) {
     return NextResponse.json({ error: `Preview upload failed: ${uploadErr.message}` }, { status: 500 });
+  }
+
+  const { error: thumbUploadErr } = await admin.storage
+    .from("images-preview")
+    .upload(`thumbs/${originalPath}`, thumbnail, { contentType: "image/jpeg", upsert: true });
+
+  if (thumbUploadErr) {
+    return NextResponse.json({ error: `Thumbnail upload failed: ${thumbUploadErr.message}` }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, repaired: image_id });
