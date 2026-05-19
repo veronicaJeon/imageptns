@@ -16,6 +16,12 @@ interface ClaimableLedgerRow {
   claimable_amount: number | string | null;
 }
 
+interface UsedClaimTxRow {
+  photographer_id: string;
+  settlement_provider: string;
+  claim_status: string;
+}
+
 function badRequest(error: string) {
   return NextResponse.json({ error }, { status: 400 });
 }
@@ -25,6 +31,9 @@ function decimalToUnits(value: number | string, decimals: number) {
   if (!/^\d+(\.\d+)?$/.test(normalized)) throw new Error("Invalid decimal amount");
 
   const [whole, fraction = ""] = normalized.split(".");
+  if (fraction.length > decimals && /[1-9]/.test(fraction.slice(decimals))) {
+    throw new Error("Invalid decimal amount");
+  }
   const paddedFraction = fraction.padEnd(decimals, "0").slice(0, decimals);
   return BigInt(`${whole}${paddedFraction}`.replace(/^0+/, "") || "0");
 }
@@ -46,6 +55,7 @@ export async function POST(req: NextRequest) {
   }
 
   const txHash = body.txHash as Hex;
+  const normalizedTxHash = txHash.toLowerCase();
   let walletAddress: Address;
   try {
     walletAddress = getAddress(body.walletAddress);
@@ -59,6 +69,47 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Onchain claims are not configured" }, { status: 500 });
+  }
+
+  const admin = createAdminClient();
+  const { data: profile, error: profileLoadError } = await admin
+    .from("profiles")
+    .select("wallet_address")
+    .eq("id", user.id)
+    .single();
+
+  if (profileLoadError) return NextResponse.json({ error: profileLoadError.message }, { status: 500 });
+
+  let existingProfileWallet: Address | null = null;
+  if (profile?.wallet_address) {
+    try {
+      existingProfileWallet = getAddress(profile.wallet_address);
+    } catch {
+      return NextResponse.json({ error: "Stored profile wallet is invalid" }, { status: 409 });
+    }
+  }
+  if (existingProfileWallet && existingProfileWallet !== walletAddress) {
+    return badRequest("Profile wallet mismatch");
+  }
+
+  const { data: usedTxRowsData, error: usedTxRowsError } = await admin
+    .from("earnings_ledger")
+    .select("photographer_id, settlement_provider, claim_status")
+    .eq("claim_tx_hash", normalizedTxHash);
+
+  if (usedTxRowsError) return NextResponse.json({ error: usedTxRowsError.message }, { status: 500 });
+
+  const usedTxRows = (usedTxRowsData ?? []) as unknown as UsedClaimTxRow[];
+  const txAlreadyConfirmedForUser =
+    usedTxRows.length > 0 &&
+    usedTxRows.every((row) =>
+      row.photographer_id === user.id &&
+      row.settlement_provider === "onchain_escrow" &&
+      row.claim_status === "claimed",
+    );
+
+  if (usedTxRows.length > 0 && !txAlreadyConfirmedForUser) {
+    return NextResponse.json({ error: "Claim transaction hash is already used" }, { status: 409 });
   }
 
   const publicClient = getOnchainPublicClient();
@@ -108,7 +159,6 @@ export async function POST(req: NextRequest) {
   const claimEvent = claimEvents.find((event) => getAddress(event.args.photographer) === walletAddress);
   if (!claimEvent) return badRequest("Claimed event missing");
 
-  const admin = createAdminClient();
   const { data: claimableRowsData, error: claimableRowsError } = await admin
     .from("earnings_ledger")
     .select("id, claimable_amount")
@@ -120,19 +170,13 @@ export async function POST(req: NextRequest) {
 
   const claimableRows = (claimableRowsData ?? []) as unknown as ClaimableLedgerRow[];
   if (claimableRows.length === 0) {
-    const { data: alreadyClaimed, error: alreadyClaimedError } = await admin
-      .from("earnings_ledger")
-      .select("id")
-      .eq("photographer_id", user.id)
-      .eq("settlement_provider", "onchain_escrow")
-      .eq("claim_status", "claimed")
-      .eq("claim_tx_hash", receipt.transactionHash)
-      .limit(1);
-
-    if (alreadyClaimedError) return NextResponse.json({ error: alreadyClaimedError.message }, { status: 500 });
-    if (alreadyClaimed && alreadyClaimed.length > 0) return NextResponse.json({ ok: true });
+    if (txAlreadyConfirmedForUser) return NextResponse.json({ ok: true, alreadyConfirmed: true });
 
     return NextResponse.json({ error: "No claimable onchain earnings found" }, { status: 409 });
+  }
+
+  if (txAlreadyConfirmedForUser) {
+    return NextResponse.json({ error: "Claim transaction hash is already used" }, { status: 409 });
   }
 
   let expectedClaimAmount: bigint;
@@ -149,16 +193,24 @@ export async function POST(req: NextRequest) {
     return badRequest("Claim amount mismatch");
   }
 
-  const { error: profileError } = await admin
-    .from("profiles")
-    .update({ wallet_address: walletAddress })
-    .eq("id", user.id);
+  if (!existingProfileWallet) {
+    const { data: updatedProfile, error: profileError } = await admin
+      .from("profiles")
+      .update({ wallet_address: walletAddress })
+      .eq("id", user.id)
+      .is("wallet_address", null)
+      .select("id")
+      .maybeSingle();
 
-  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
+    if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
+    if (!updatedProfile) {
+      return NextResponse.json({ error: "Profile wallet changed during confirmation" }, { status: 409 });
+    }
+  }
 
   const { data: updatedRows, error: ledgerError } = await admin
     .from("earnings_ledger")
-    .update({ claim_status: "claimed", claim_tx_hash: receipt.transactionHash })
+    .update({ claim_status: "claimed", claim_tx_hash: normalizedTxHash })
     .eq("photographer_id", user.id)
     .eq("settlement_provider", "onchain_escrow")
     .eq("claim_status", "claimable")

@@ -6,6 +6,7 @@ interface EarningsLedgerRow {
   commission_krw: number;
   net_krw: number;
   period: string;
+  settlement_provider: string;
   payout?: { status: string | null } | null;
 }
 
@@ -44,7 +45,8 @@ export async function GET() {
   // Aggregate by period
   const byPeriod: Record<string, { period: string; sales: number; gross: number; commission: number; net: number; paid: boolean }> = {};
   const ledgerRows = (ledger ?? []) as unknown as EarningsLedgerRow[];
-  for (const r of ledgerRows) {
+  const bankLedgerRows = ledgerRows.filter((row) => row.settlement_provider !== "onchain_escrow");
+  for (const r of bankLedgerRows) {
     if (!byPeriod[r.period]) {
       byPeriod[r.period] = { period: r.period, sales: 0, gross: 0, commission: 0, net: 0, paid: false };
     }
@@ -56,7 +58,7 @@ export async function GET() {
   }
 
   const totalNet = ledgerRows.reduce((s, r) => s + r.net_krw, 0);
-  const pendingNet = ledgerRows
+  const pendingNet = bankLedgerRows
     .filter((r) => !r.payout || r.payout.status !== "paid")
     .reduce((s, r) => s + r.net_krw, 0);
 
