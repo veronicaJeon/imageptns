@@ -210,13 +210,30 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
           <div className="lg:col-span-7">
             <div className="relative overflow-hidden shadow-ghost bg-surface-container-low">
               {imageData.storage_path_preview ? (
-                <Image
-                  src={imageData.storage_path_preview}
-                  alt={imageData.title}
-                  width={imageData.width ?? 1200}
-                  height={imageData.height ?? 800}
-                  className="w-full h-auto object-cover"
-                />
+                <>
+                  <Image
+                    src={imageData.storage_path_preview}
+                    alt={imageData.title}
+                    width={imageData.width ?? 1200}
+                    height={imageData.height ?? 800}
+                    className="w-full h-auto object-cover"
+                  />
+                  <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                    <div className="absolute inset-[-20%] grid grid-cols-3 gap-8 rotate-[-24deg] opacity-25">
+                      {Array.from({ length: 18 }).map((_, index) => (
+                        <span
+                          key={index}
+                          className="select-none whitespace-nowrap text-center font-headline text-xl font-black uppercase tracking-[0.35em] text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]"
+                        >
+                          IMAGE PARTNERS
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="pointer-events-none absolute bottom-4 right-4 rounded bg-black/55 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white">
+                    Watermarked Preview
+                  </div>
+                </>
               ) : (
                 <div className="aspect-[4/3] flex items-center justify-center text-outline">
                   <span className="material-symbols-outlined text-6xl">image</span>
