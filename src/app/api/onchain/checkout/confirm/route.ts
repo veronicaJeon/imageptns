@@ -31,6 +31,7 @@ interface OrderRow {
   crypto_status: string;
   onchain_confirm_attempts: number | null;
   onchain_confirm_backoff_until: string | null;
+  onchain_quote_expires_at: string | null;
 }
 
 interface ImageJoinRow {
@@ -233,7 +234,7 @@ export async function POST(req: NextRequest) {
       id, order_number, buyer_id, contract_order_id, buyer_wallet_address,
       onchain_confirm_token, status, payment_tx_hash, crypto_amount,
       crypto_decimals, crypto_status, onchain_confirm_attempts,
-      onchain_confirm_backoff_until
+      onchain_confirm_backoff_until, onchain_quote_expires_at
     `)
     .eq("id", orderDbId)
     .eq("payment_provider", "base_usdc")

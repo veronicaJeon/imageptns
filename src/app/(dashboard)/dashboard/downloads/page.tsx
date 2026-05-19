@@ -2,24 +2,40 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useLang } from "@/lib/i18n/store";
+import Image from "next/image";
+import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 
-function formatKRW(n: number) {
-  return "₩" + n.toLocaleString("ko-KR");
+interface DownloadOrderImage {
+  id: string | null;
+  title: string | null;
+  storage_path_preview: string | null;
+  asset_id: string | null;
+}
+
+interface DownloadOrderItem {
+  id: string;
+  license_code: string;
+  image: DownloadOrderImage | null;
+}
+
+interface DownloadOrder {
+  id: string;
+  order_number: string;
+  completed_at: string | null;
+  status: string;
+  order_items: DownloadOrderItem[] | null;
 }
 
 export default function DownloadsPage() {
-  const { t } = useLang();
-
-  const [orders, setOrders]   = useState<any[]>([]);
+  const [orders, setOrders]   = useState<DownloadOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/orders")
       .then((r) => r.json())
-      .then(({ orders }) =>
-        setOrders((orders ?? []).filter((o: any) => o.status === "completed"))
+      .then(({ orders }: { orders?: DownloadOrder[] }) =>
+        setOrders((orders ?? []).filter((order) => order.status === "completed"))
       )
       .finally(() => setLoading(false));
   }, []);
@@ -40,8 +56,8 @@ export default function DownloadsPage() {
     }
   }
 
-  const items = orders.flatMap((order: any) =>
-    (order.order_items ?? []).map((item: any) => ({
+  const items = orders.flatMap((order) =>
+    (order.order_items ?? []).map((item) => ({
       orderId:     order.id,
       orderNumber: order.order_number,
       completedAt: order.completed_at,
@@ -97,7 +113,14 @@ export default function DownloadsPage() {
                       <div className="flex items-center gap-3">
                         <div className="w-14 h-10 bg-surface-container-low rounded shrink-0 overflow-hidden flex items-center justify-center">
                           {row.src ? (
-                            <img src={row.src} alt={row.title} className="w-full h-full object-cover" />
+                            <Image
+                              src={thumbnailUrlFromPreviewUrl(row.src, 160, 120)}
+                              alt={row.title}
+                              width={160}
+                              height={120}
+                              className="w-full h-full object-cover"
+                              unoptimized
+                            />
                           ) : (
                             <span className="material-symbols-outlined text-outline text-sm">image</span>
                           )}

@@ -13,6 +13,7 @@ interface ProfileRow {
   updated_at: string | null;
   last_login_at: string | null;
   login_count: number | null;
+  deleted_at?: string | null;
 }
 
 interface OrderSummaryRow {
@@ -63,7 +64,8 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient();
   let profileQuery = admin
     .from("profiles")
-    .select("id, full_name, role, avatar_url, is_admin, wallet_address, created_at, updated_at, last_login_at, login_count")
+    .select("id, full_name, role, avatar_url, is_admin, wallet_address, created_at, updated_at, last_login_at, login_count, deleted_at")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(300);
 
@@ -113,4 +115,3 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ users });
 }
-

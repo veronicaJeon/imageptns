@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { randomUUID } from "crypto";
+import { PLAN_PRICES, nextPeriodEnd, subscriptionAmount } from "@/lib/subscription/plans";
 
 const TOSS_BASE = "https://api.tosspayments.com/v1";
 
@@ -10,18 +11,6 @@ function tossAuthHeader() {
   // Basic base64(secretKey:)
   return "Basic " + Buffer.from(secret + ":").toString("base64");
 }
-
-const PLAN_PRICES: Record<string, number> = {
-  basic:      29000,
-  pro:        79000,
-  enterprise: 199000,
-};
-
-const PLAN_PRICES_ANNUAL: Record<string, number> = {
-  basic:      23200,
-  pro:        63200,
-  enterprise: 159200,
-};
 
 /**
  * POST /api/subscription/billing-auth
@@ -41,6 +30,9 @@ export async function POST(req: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!process.env.TOSS_SECRET_KEY) {
+    return NextResponse.json({ error: "Toss secret key is not configured" }, { status: 503 });
   }
 
   const body = await req.json() as {
@@ -86,7 +78,7 @@ export async function POST(req: NextRequest) {
   };
 
   // ── 2. 즉시 첫 결제 실행 ──────────────────────────────────────
-  const amount = annual ? PLAN_PRICES_ANNUAL[plan] : PLAN_PRICES[plan];
+  const amount = subscriptionAmount(plan, annual);
   const orderId = randomUUID();
   const orderName = `이미지파트너스 ${plan.charAt(0).toUpperCase() + plan.slice(1)} 플랜 (${annual ? "연간" : "월간"})`;
 
@@ -117,12 +109,7 @@ export async function POST(req: NextRequest) {
 
   // ── 3. subscriptions 저장 ────────────────────────────────────
   const now = new Date();
-  const periodEnd = new Date(now);
-  if (annual) {
-    periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-  } else {
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
-  }
+  const periodEnd = nextPeriodEnd(now, annual);
 
   // 기존 활성 구독이 있으면 만료 처리
   const adminSb = createAdminClient();
@@ -142,6 +129,7 @@ export async function POST(req: NextRequest) {
     current_period_end:    periodEnd.toISOString(),
     cancel_at_period_end:  false,
     toss_order_id:         orderId,
+    billing_cycle:         annual ? "annual" : "monthly",
   });
 
   if (insertError) {

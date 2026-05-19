@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const [{ data: profile, error: profileError }, authResult, { data: orders, error: ordersError }] = await Promise.all([
     admin
       .from("profiles")
-      .select("id, full_name, bio, role, avatar_url, wallet_address, is_admin, created_at, updated_at, last_login_at, login_count")
+      .select("id, full_name, bio, role, avatar_url, wallet_address, is_admin, created_at, updated_at, last_login_at, login_count, deleted_at")
       .eq("id", id)
       .single(),
     admin.auth.admin.getUserById(id),
@@ -88,9 +88,27 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     before: target,
   });
 
-  const { error } = await admin.auth.admin.deleteUser(id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const deletedAt = new Date().toISOString();
+  const { error: profileError } = await admin
+    .from("profiles")
+    .update({
+      full_name: "탈퇴 회원",
+      bio: null,
+      avatar_url: null,
+      wallet_address: null,
+      is_admin: false,
+      deleted_at: deletedAt,
+      updated_at: deletedAt,
+    })
+    .eq("id", id);
+
+  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
+
+  const { error: authError } = await admin.auth.admin.updateUserById(id, {
+    ban_duration: "876000h",
+    user_metadata: { deleted_at: deletedAt },
+  });
+  if (authError) return NextResponse.json({ error: authError.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }
-
