@@ -1,13 +1,18 @@
-import "@nomicfoundation/hardhat-toolbox";
-import type { HardhatUserConfig } from "hardhat/config";
+import hardhatEthers from "@nomicfoundation/hardhat-ethers";
+import hardhatEthersChaiMatchers from "@nomicfoundation/hardhat-ethers-chai-matchers";
+import hardhatMocha from "@nomicfoundation/hardhat-mocha";
+import { defineConfig } from "hardhat/config";
 
-const config: HardhatUserConfig = {
+export default defineConfig({
+  plugins: [hardhatEthers, hardhatEthersChaiMatchers, hardhatMocha],
   solidity: {
-    version: "0.8.24",
-    settings: {
-      optimizer: { enabled: true, runs: 200 },
+    profiles: {
+      default: {
+        version: "0.8.24",
+        settings: {
+          optimizer: { enabled: true, runs: 200 },
+        },
+      },
     },
   },
-};
-
-export default config;
+});
