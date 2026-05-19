@@ -1,7 +1,54 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { getAccount, connect, switchChain, waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { createConfig, http, injected, WagmiProvider } from "wagmi";
+import { base, baseSepolia } from "wagmi/chains";
+import { getAddress, type Address } from "viem";
 import { useLang } from "@/lib/i18n/store";
+import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
+
+const earningsWagmiConfig = createConfig({
+  chains: [base, baseSepolia],
+  connectors: [injected()],
+  transports: {
+    [base.id]: http(),
+    [baseSepolia.id]: http(),
+  },
+});
+
+const earningsQueryClient = new QueryClient();
+
+type BaseChainId = typeof base.id | typeof baseSepolia.id;
+
+interface PeriodEarnings {
+  period: string;
+  sales: number;
+  gross: number;
+  commission: number;
+  net: number;
+  paid: boolean;
+}
+
+interface LedgerEarning {
+  settlement_provider?: string | null;
+  claim_status?: string | null;
+  claimable_amount?: number | string | null;
+}
+
+interface EarningsResponse {
+  periods: PeriodEarnings[];
+  totalNet: number;
+  pendingNet: number;
+  ledger: LedgerEarning[];
+}
+
+function configuredBaseChainId(): BaseChainId {
+  const chainId = Number(process.env.NEXT_PUBLIC_BASE_CHAIN_ID ?? baseSepolia.id);
+  if (chainId === base.id || chainId === baseSepolia.id) return chainId;
+  throw new Error("Unsupported Base network configuration.");
+}
 
 function formatKRW(n: number) {
   return "₩" + n.toLocaleString("ko-KR");
@@ -19,13 +66,24 @@ function StatCard({ icon, label, value, sub }: { icon: string; label: string; va
 }
 
 export default function EarningsPage() {
+  return (
+    <WagmiProvider config={earningsWagmiConfig}>
+      <QueryClientProvider client={earningsQueryClient}>
+        <EarningsInner />
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
+}
+
+function EarningsInner() {
   const { t } = useLang();
   const e = t.dashboard.earnings;
 
-  const [data, setData]       = useState<any>(null);
+  const [data, setData]       = useState<EarningsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [payoutPeriod, setPayoutPeriod] = useState<string | null>(null);
   const [payoutLoading, setPayoutLoading] = useState(false);
+  const [claimingOnchain, setClaimingOnchain] = useState(false);
 
   useEffect(() => {
     fetch("/api/earnings")
@@ -54,11 +112,103 @@ export default function EarningsPage() {
     }
   }
 
-  const periods: any[]  = data?.periods ?? [];
+  async function refreshEarnings() {
+    const fresh = await fetch("/api/earnings").then((r) => r.json());
+    setData(fresh);
+  }
+
+  async function readApiError(response: Response, fallback: string) {
+    try {
+      const body = await response.json();
+      return typeof body?.error === "string" ? body.error : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function currentWalletOrThrow(expectedWalletAddress: Address) {
+    const currentAddress = getAccount(earningsWagmiConfig).address;
+    if (!currentAddress) throw new Error("Wallet connection was interrupted. Please connect again.");
+    if (getAddress(currentAddress) !== expectedWalletAddress) {
+      throw new Error("Wallet account changed during claim. Please retry with the same wallet.");
+    }
+    return getAddress(currentAddress);
+  }
+
+  async function claimOnchainUsdc() {
+    setClaimingOnchain(true);
+    try {
+      if (typeof window === "undefined" || !("ethereum" in window)) {
+        throw new Error("No browser wallet found. Please install MetaMask or a Base-compatible wallet.");
+      }
+
+      const connector = earningsWagmiConfig.connectors[0];
+      if (!connector) throw new Error("No wallet connector is available.");
+
+      let account = getAccount(earningsWagmiConfig);
+      if (!account.address) {
+        await connect(earningsWagmiConfig, { connector });
+        account = getAccount(earningsWagmiConfig);
+      }
+
+      if (!account.address) throw new Error("Please finish connecting your wallet.");
+      const walletAddress = getAddress(account.address);
+      const targetChainId = configuredBaseChainId();
+
+      if (account.chainId !== targetChainId) {
+        await switchChain(earningsWagmiConfig, { chainId: targetChainId });
+      }
+
+      const escrowAddress = process.env.NEXT_PUBLIC_IMAGEPARTNERS_ESCROW_ADDRESS;
+      if (!escrowAddress) throw new Error("Escrow contract is not configured.");
+
+      const claimAccount = currentWalletOrThrow(walletAddress);
+      const claimHash = await writeContract(earningsWagmiConfig, {
+        address: getAddress(escrowAddress),
+        abi: IMAGE_PARTNERS_ESCROW_ABI,
+        functionName: "claim",
+        args: [],
+        account: claimAccount,
+        chainId: targetChainId,
+      });
+
+      const claimReceipt = await waitForTransactionReceipt(earningsWagmiConfig, {
+        hash: claimHash,
+        chainId: targetChainId,
+      });
+      if (claimReceipt.status !== "success") {
+        throw new Error("USDC claim transaction failed. Please check your wallet and try again.");
+      }
+
+      currentWalletOrThrow(walletAddress);
+
+      const res = await fetch("/api/onchain/claim/confirm", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          txHash: claimReceipt.transactionHash,
+          walletAddress,
+        }),
+      });
+      if (!res.ok) throw new Error(await readApiError(res, "USDC claim confirmation failed"));
+
+      await refreshEarnings();
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "USDC claim failed.");
+    } finally {
+      setClaimingOnchain(false);
+    }
+  }
+
+  const periods         = data?.periods ?? [];
   const totalNet        = data?.totalNet   ?? 0;
   const pendingNet      = data?.pendingNet ?? 0;
   const currentPeriod   = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
   const currentPeriodData = periods[0];
+  const onchainClaimable = (data?.ledger ?? [])
+    .filter((row: LedgerEarning) => row.settlement_provider === "onchain_escrow" && row.claim_status === "claimable")
+    .reduce((sum: number, row: LedgerEarning) => sum + (Number(row.claimable_amount) || 0), 0);
 
   if (loading) {
     return (
@@ -116,6 +266,26 @@ export default function EarningsPage() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {onchainClaimable > 0 && (
+        <div className="mb-8 p-5 bg-surface-container-lowest border border-primary/20 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-primary">Base USDC Claim</p>
+            <p className="text-sm text-on-surface-variant mt-1">
+              {onchainClaimable.toLocaleString("en-US", { maximumFractionDigits: 6 })} USDC is ready to claim on Base.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={claimingOnchain}
+            onClick={claimOnchainUsdc}
+            className="flex items-center justify-center gap-2 px-5 py-3 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-base">account_balance_wallet</span>
+            {claimingOnchain ? "Claiming..." : "Claim USDC"}
+          </button>
         </div>
       )}
 
