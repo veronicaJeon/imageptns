@@ -377,6 +377,25 @@ function CheckoutContent() {
       <div className="max-w-5xl mx-auto">
         <h1 className="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-10">{ch.title}</h1>
 
+        <div className="mb-10 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[
+            { icon: "receipt_long", title: "주문 확인", body: "라이선스와 결제 금액을 확정합니다." },
+            { icon: "payments", title: "결제 진행", body: "카드 또는 Base USDC로 구매를 완료합니다." },
+            { icon: "download", title: "원본 다운로드", body: "결제 완료 즉시 다운로드 권한이 열립니다." },
+          ].map((step, index) => (
+            <div key={step.title} className="bg-surface-container-lowest px-4 py-4 shadow-ghost">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-black text-on-primary">
+                  {index + 1}
+                </span>
+                <span className="material-symbols-outlined text-base text-primary">{step.icon}</span>
+                <p className="text-sm font-bold text-on-surface">{step.title}</p>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-outline">{step.body}</p>
+            </div>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
 
           {/* Payment form */}
@@ -543,6 +562,10 @@ function CheckoutContent() {
             </button>
 
             <p className="text-[10px] text-outline text-center">{ch.secureNote}</p>
+            <p className="text-center text-[11px] leading-relaxed text-on-surface-variant">
+              결제가 승인되면 구매한 이미지의 원본 파일 다운로드 권한이 자동으로 생성됩니다.
+              완료 화면 또는 대시보드의 주문 내역에서 다시 다운로드할 수 있습니다.
+            </p>
           </form>
 
           {/* Order summary */}

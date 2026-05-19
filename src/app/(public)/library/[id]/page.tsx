@@ -134,6 +134,20 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
     setTimeout(() => setCartFeedback("idle"), 2000);
   }
 
+  function handleBuyNow() {
+    if (!imageData) return;
+    const photographer = imageData.photographer?.full_name ?? "";
+    addItem({
+      id,
+      title:        imageData.title,
+      photographer,
+      src:          imageData.storage_path_preview ?? "",
+      category:     imageData.category,
+      license,
+    });
+    router.push("/checkout");
+  }
+
   const licenseKeys: LicenseKey[] = ["editorial", "commercial", "extended"];
   const displayPrice = (key: LicenseKey) => licensePrices[key] ?? LICENSE_PRICES[key];
 
@@ -358,6 +372,13 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
 
             {/* Actions */}
             <div className="flex flex-col gap-3">
+              <button
+                onClick={handleBuyNow}
+                className="w-full py-4 bg-on-surface text-surface font-bold text-xs uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 hover:opacity-90"
+              >
+                <span className="material-symbols-outlined text-base">shopping_bag</span>
+                바로 구매하고 원본 다운로드
+              </button>
               <button
                 onClick={handleAddToCart}
                 className={cn(
