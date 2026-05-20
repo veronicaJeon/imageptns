@@ -73,6 +73,7 @@ export async function GET(
     )
     .eq("id", id)
     .eq("status", "approved")
+    .eq("lifecycle_status", "active")
     .single();
 
   if (error || !img) {
@@ -107,6 +108,7 @@ export async function GET(
     .from("images")
     .select("id, title, category, storage_path_preview, width, height, photographer:profiles!photographer_id(full_name)")
     .eq("status", "approved")
+    .eq("lifecycle_status", "active")
     .eq("category", image.category)
     .neq("id", id)
     .limit(4);

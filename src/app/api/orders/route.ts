@@ -8,6 +8,8 @@ interface OrderImage {
   category: string | null;
   asset_id: string | null;
   storage_path_preview: string | null;
+  lifecycle_status: string | null;
+  deleted_at: string | null;
   width: number | null;
   height: number | null;
   photographer: { full_name: string | null } | { full_name: string | null }[] | null;
@@ -17,6 +19,12 @@ interface OrderItem {
   id: string;
   license_code: string;
   price_krw: number;
+  image_title_snapshot: string | null;
+  image_asset_id_snapshot: string | null;
+  image_preview_path_snapshot: string | null;
+  image_lifecycle_status: string | null;
+  image_deleted_at: string | null;
+  image_deletion_notice: string | null;
   image: OrderImage | OrderImage[] | null;
 }
 
@@ -27,6 +35,35 @@ interface OrderRow {
 function normalizeImage(image: OrderItem["image"]) {
   const row = Array.isArray(image) ? image[0] : image;
   return row ? { ...row, storage_path_preview: previewUrl(row.storage_path_preview) } : null;
+}
+
+function normalizeOrderItem(item: OrderItem) {
+  const image = normalizeImage(item.image);
+  const snapshotPreview = previewUrl(item.image_preview_path_snapshot);
+  return {
+    ...item,
+    image: image
+      ? {
+        ...image,
+        title: image.title ?? item.image_title_snapshot,
+        asset_id: image.asset_id ?? item.image_asset_id_snapshot,
+        storage_path_preview: image.storage_path_preview || snapshotPreview,
+        lifecycle_status: item.image_lifecycle_status ?? image.lifecycle_status ?? "active",
+        deleted_at: item.image_deleted_at ?? image.deleted_at,
+      }
+      : {
+        id: "",
+        title: item.image_title_snapshot,
+        category: null,
+        asset_id: item.image_asset_id_snapshot,
+        storage_path_preview: snapshotPreview,
+        lifecycle_status: item.image_lifecycle_status ?? "active",
+        deleted_at: item.image_deleted_at,
+        width: null,
+        height: null,
+        photographer: null,
+      },
+  };
 }
 
 export async function GET() {
@@ -44,7 +81,9 @@ export async function GET() {
       buyer_wallet_address,
       order_items(
         id, license_code, price_krw,
-        image:images!image_id(id, title, category, asset_id, storage_path_preview, width, height,
+        image_title_snapshot, image_asset_id_snapshot, image_preview_path_snapshot,
+        image_lifecycle_status, image_deleted_at, image_deletion_notice,
+        image:images!image_id(id, title, category, asset_id, storage_path_preview, lifecycle_status, deleted_at, width, height,
           photographer:profiles!photographer_id(full_name))
       )
     `)
@@ -55,10 +94,7 @@ export async function GET() {
 
   const orders = ((data ?? []) as OrderRow[]).map((order) => ({
     ...order,
-    order_items: (order.order_items ?? []).map((item) => ({
-      ...item,
-      image: normalizeImage(item.image),
-    })),
+    order_items: (order.order_items ?? []).map((item) => normalizeOrderItem(item)),
   }));
 
   return NextResponse.json({ orders });

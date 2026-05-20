@@ -15,6 +15,14 @@ type DownloadImage = {
   asset_id: string | null;
 };
 
+type DownloadOrderItem = {
+  image_original_path_snapshot: string | null;
+  image_original_filename_snapshot: string | null;
+  image_lifecycle_status: string | null;
+  image_deletion_notice: string | null;
+  image: DownloadImage | DownloadImage[] | null;
+};
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ orderItemId: string }> }
@@ -45,7 +53,7 @@ export async function GET(
   // Get the image storage path after buyer authorization above.
   const { data: item, error: itemError } = await supabase
     .from("order_items")
-    .select("image:images!image_id(storage_path_full, storage_path_original, original_filename, asset_id)")
+    .select("image_original_path_snapshot, image_original_filename_snapshot, image_lifecycle_status, image_deletion_notice, image:images!image_id(storage_path_full, storage_path_original, original_filename, asset_id)")
     .eq("id", orderItemId)
     .single();
 
@@ -53,11 +61,15 @@ export async function GET(
     return NextResponse.json({ error: "Download not found" }, { status: 404 });
   }
 
-  const imageData = Array.isArray(item.image) ? item.image[0] : item.image;
+  const orderItem = item as DownloadOrderItem;
+  const imageData = Array.isArray(orderItem.image) ? orderItem.image[0] : orderItem.image;
   const image = imageData as unknown as DownloadImage | null;
-  const storagePath = image?.storage_path_full ?? image?.storage_path_original;
+  const storagePath = image?.storage_path_full ?? image?.storage_path_original ?? orderItem.image_original_path_snapshot;
   if (!storagePath) {
-    return NextResponse.json({ error: "File not available" }, { status: 404 });
+    return NextResponse.json({
+      error: orderItem.image_deletion_notice ?? "File not available",
+      lifecycleStatus: orderItem.image_lifecycle_status,
+    }, { status: 404 });
   }
 
   // App-level checks above authorize the buyer. Service role bypasses storage RLS
@@ -66,7 +78,7 @@ export async function GET(
   const { data: signed, error: signError } = await admin.storage
     .from("images-original")
     .createSignedUrl(storagePath, 60 * 60, {
-      download: image?.original_filename ?? image?.asset_id ?? true,
+      download: image?.original_filename ?? orderItem.image_original_filename_snapshot ?? image?.asset_id ?? true,
     });
 
   if (signError || !signed) {

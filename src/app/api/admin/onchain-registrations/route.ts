@@ -174,6 +174,7 @@ export async function GET(req: NextRequest) {
       photographer:profiles!photographer_id(id, full_name, wallet_address)
     `)
     .eq("status", "approved")
+    .eq("lifecycle_status", "active")
     .order("proof_requested_at", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(200);
@@ -231,7 +232,8 @@ export async function POST(req: NextRequest) {
       photographer:profiles!photographer_id(id, full_name, wallet_address)
     `)
     .in("id", imageIds)
-    .eq("status", "approved");
+    .eq("status", "approved")
+    .eq("lifecycle_status", "active");
 
   if (loadError) return NextResponse.json({ error: loadError.message }, { status: 500 });
 

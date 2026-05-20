@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
       "id, asset_id, title, category, tags, storage_path_preview, width, height, photographer:profiles!photographer_id(full_name)"
     )
     .eq("status", "approved")
+    .eq("lifecycle_status", "active")
     .range(offset, offset + fetchCount - 1);
 
   if (category && category !== "all") {

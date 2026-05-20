@@ -56,6 +56,10 @@ interface UploadRow {
   category: Category;
   tags: string[] | null;
   status: string;
+  lifecycle_status: string | null;
+  deletion_requested_at: string | null;
+  deletion_fee_krw: number | null;
+  deletion_fee_status: string | null;
   rejection_reason: string | null;
   views_count: number | null;
   sales_count: number | null;
@@ -142,17 +146,56 @@ export default function UploadsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function handleDelete(id: string) {
-    if (!confirm("이미지를 삭제하시겠습니까?")) return;
-    setDeleting(id);
+  function requiresAdminDeletionRequest(img: UploadRow) {
+    return (
+      img.status === "approved" ||
+      (img.sales_count ?? 0) > 0 ||
+      ["requested", "pending", "registered"].includes(img.proof_status ?? "") ||
+      Boolean(img.proof_tx_hash || img.proof_arweave_original_tx_id || img.proof_arweave_manifest_tx_id)
+    );
+  }
+
+  async function handleDelete(img: UploadRow) {
+    if (img.lifecycle_status && img.lifecycle_status !== "active") {
+      alert("이미 삭제 절차가 진행 중이거나 완료된 이미지입니다.");
+      return;
+    }
+
+    setDeleting(img.id);
     try {
-      const res = await fetch(`/api/uploads/${id}`, { method: "DELETE" });
+      if (requiresAdminDeletionRequest(img)) {
+        const reason = prompt("관리자에게 전달할 삭제 요청 사유를 입력하세요.", "포트폴리오 정리");
+        if (reason === null) return;
+        const res = await fetch(`/api/images/${img.id}/deletion-request`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason, reasonCategory: "portfolio_cleanup" }),
+        });
+        const data = await res.json().catch(() => null) as {
+          request?: { estimated_fee_krw?: number };
+          impact?: { estimatedFeeKrw?: number };
+          error?: string;
+        } | null;
+        if (!res.ok) {
+          alert(data?.error ?? "삭제 요청을 생성하지 못했습니다.");
+          return;
+        }
+        const fee = data?.impact?.estimatedFeeKrw ?? data?.request?.estimated_fee_krw ?? 0;
+        alert(`삭제 요청이 접수되었습니다. 예상 삭제 수수료: ₩${fee.toLocaleString("ko-KR")}`);
+        setUploads((prev) => prev.map((u) => u.id === img.id
+          ? { ...u, lifecycle_status: "deletion_requested", deletion_fee_krw: fee, deletion_fee_status: fee > 0 ? "quoted" : "waived" }
+          : u));
+        return;
+      }
+
+      if (!confirm("미공개 이미지를 완전삭제하시겠습니까?")) return;
+      const res = await fetch(`/api/uploads/${img.id}`, { method: "DELETE" });
       if (!res.ok) {
         const { error } = await res.json();
         alert(error);
         return;
       }
-      setUploads((prev) => prev.filter((u) => u.id !== id));
+      setUploads((prev) => prev.filter((u) => u.id !== img.id));
     } finally {
       setDeleting(null);
     }
@@ -313,6 +356,7 @@ export default function UploadsPage() {
                 });
                 const canEdit = true; // 모든 상태에서 편집 가능
                 const isEditing = editing?.id === img.id;
+                const deletionPending = img.lifecycle_status === "deletion_requested";
 
                 return (
                   <Fragment key={img.id}>
@@ -351,6 +395,13 @@ export default function UploadsPage() {
                           <span className="bg-surface-container-low text-on-surface-variant px-2 py-0.5 rounded-full">
                             {PROOF_STATUS_LABELS[img.proof_status ?? "not_registered"] ?? img.proof_status}
                           </span>
+                          {img.lifecycle_status && img.lifecycle_status !== "active" && (
+                            <span className="bg-error/10 text-error px-2 py-0.5 rounded-full">
+                              {deletionPending
+                                ? `삭제 요청됨 · 수수료 ₩${(img.deletion_fee_krw ?? 0).toLocaleString("ko-KR")}`
+                                : img.lifecycle_status}
+                            </span>
+                          )}
                           <span className="bg-surface-container-low text-on-surface-variant px-2 py-0.5 rounded-full">
                             {img.authorship_declaration === "ai_generated" ? "AI 이미지" : "오리지널 보증"}
                           </span>
@@ -405,14 +456,14 @@ export default function UploadsPage() {
                           )}
                           {canEdit && (
                             <button
-                              onClick={() => handleDelete(img.id)}
+                              onClick={() => handleDelete(img)}
                               disabled={deleting === img.id}
                               className="text-outline hover:text-error transition-colors disabled:opacity-50"
-                              title="삭제"
+                              title={requiresAdminDeletionRequest(img) ? "삭제 요청" : "삭제"}
                             >
                               {deleting === img.id
                                 ? <span className="w-4 h-4 border-2 border-error border-t-transparent rounded-full animate-spin inline-block" />
-                                : <span className="material-symbols-outlined text-base">delete</span>
+                                : <span className="material-symbols-outlined text-base">{requiresAdminDeletionRequest(img) ? "assignment_late" : "delete"}</span>
                               }
                             </button>
                           )}

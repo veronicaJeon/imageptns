@@ -36,6 +36,11 @@ interface LicenseRow {
 interface ImageRow {
   id: string;
   asset_id: string | null;
+  title: string;
+  storage_path_preview: string | null;
+  storage_path_original: string | null;
+  storage_path_full: string | null;
+  original_filename: string | null;
   photographer_id: string | null;
   onchain_asset_id: `0x${string}` | null;
   proof_status: string | null;
@@ -110,9 +115,10 @@ export async function POST(req: NextRequest) {
       .in("code", licenseCodes),
     admin
       .from("images")
-      .select("id, asset_id, photographer_id, onchain_asset_id, proof_status, photographer:profiles!photographer_id(wallet_address)")
+      .select("id, asset_id, title, storage_path_preview, storage_path_original, storage_path_full, original_filename, photographer_id, onchain_asset_id, proof_status, photographer:profiles!photographer_id(wallet_address)")
       .in("id", imageIds)
-      .eq("status", "approved"),
+      .eq("status", "approved")
+      .eq("lifecycle_status", "active"),
     admin
       .from("commission_policies")
       .select("id, scope, rate, active, starts_at, ends_at, license_code, photographer_id, image_id")
@@ -173,6 +179,11 @@ export async function POST(req: NextRequest) {
       license_code: item.license,
       price_krw: price,
       photographer_id: image.photographer_id,
+      image_title_snapshot: image.title,
+      image_asset_id_snapshot: image.asset_id,
+      image_preview_path_snapshot: image.storage_path_preview,
+      image_original_path_snapshot: image.storage_path_original ?? image.storage_path_full,
+      image_original_filename_snapshot: image.original_filename,
       gross_krw: price,
       commission_rate: commission.commissionRate,
       commission_krw: commission.commissionKrw,
