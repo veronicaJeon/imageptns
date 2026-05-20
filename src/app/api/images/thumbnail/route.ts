@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
+import { createWatermarkedThumbnail } from "@/lib/utils/watermark";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
 
   const width = clampSize(req.nextUrl.searchParams.get("w"), DEFAULT_WIDTH);
   const height = clampSize(req.nextUrl.searchParams.get("h"), DEFAULT_HEIGHT);
+  const shouldWatermark = req.nextUrl.searchParams.get("wm") !== "0";
 
   const response = await fetch(src, { next: { revalidate: 60 * 60 * 24 * 30 } });
   if (!response.ok) {
@@ -45,14 +47,16 @@ export async function GET(req: NextRequest) {
   }
 
   const input = Buffer.from(await response.arrayBuffer());
-  const output = await sharp(input)
-    .resize(width, height, {
-      fit: "cover",
-      position: "center",
-      withoutEnlargement: true,
-    })
-    .jpeg({ quality: 76, mozjpeg: true })
-    .toBuffer();
+  const output = shouldWatermark
+    ? await createWatermarkedThumbnail(input, width, height)
+    : await sharp(input)
+      .resize(width, height, {
+        fit: "cover",
+        position: "center",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 76, mozjpeg: true })
+      .toBuffer();
 
   return new NextResponse(new Uint8Array(output), {
     headers: {

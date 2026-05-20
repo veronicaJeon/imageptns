@@ -1,4 +1,7 @@
-import { LegalPlaceholder } from "@/components/ui/LegalPlaceholder";
+import { LegalDocumentPage } from "@/components/legal/LegalDocumentPage";
+
+export const dynamic = "force-dynamic";
+
 export default function CookiePage() {
-  return <LegalPlaceholder titleKey="Cookie Policy" />;
+  return <LegalDocumentPage slug="cookie" />;
 }

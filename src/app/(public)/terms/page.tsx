@@ -1,4 +1,7 @@
-import { LegalPlaceholder } from "@/components/ui/LegalPlaceholder";
+import { LegalDocumentPage } from "@/components/legal/LegalDocumentPage";
+
+export const dynamic = "force-dynamic";
+
 export default function TermsPage() {
-  return <LegalPlaceholder titleKey="Terms of Service" />;
+  return <LegalDocumentPage slug="terms" />;
 }
