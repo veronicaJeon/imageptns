@@ -1,12 +1,7 @@
 import sharp from "sharp";
+import { normalizeRotationDegrees } from "@/lib/images/orientation";
 
-export async function applyWatermark(input: Buffer): Promise<Buffer> {
-  const image = sharp(input);
-  const { width = 800, height = 600 } = await image.metadata();
-
-  const w = width ?? 800;
-  const h = height ?? 600;
-
+function watermarkSvg(w: number, h: number) {
   // Font size scales with image: ~3.5% of the shorter dimension, clamped
   const fontSize = Math.max(18, Math.min(72, Math.round(Math.min(w, h) * 0.035)));
   const letterSpacing = Math.round(fontSize * 0.18);
@@ -40,22 +35,41 @@ export async function applyWatermark(input: Buffer): Promise<Buffer> {
     }
   }
 
-  const svg = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
   ${texts.join("\n  ")}
 </svg>`;
+}
 
-  return image
-    .composite([{ input: Buffer.from(svg), blend: "over" }])
+export async function applyWatermark(input: Buffer, rotationDegrees: unknown = 0): Promise<Buffer> {
+  const base = await sharp(input)
+    .rotate()
+    .rotate(normalizeRotationDegrees(rotationDegrees))
+    .jpeg({ quality: 95 })
+    .toBuffer({ resolveWithObject: true });
+
+  const w = base.info.width || 800;
+  const h = base.info.height || 600;
+
+  return sharp(base.data)
+    .composite([{ input: Buffer.from(watermarkSvg(w, h)), blend: "over" }])
     .jpeg({ quality: 88 })
     .toBuffer();
   // No catch — let errors propagate so callers know the watermark failed
 }
 
-export async function createWatermarkedThumbnail(input: Buffer, width = 320, height = 240): Promise<Buffer> {
+export async function createWatermarkedThumbnail(input: Buffer, width = 320, height = 240, rotationDegrees: unknown = 0): Promise<Buffer> {
   const resized = await sharp(input)
+    .rotate()
+    .rotate(normalizeRotationDegrees(rotationDegrees))
     .resize(width, height, { fit: "cover", withoutEnlargement: true })
     .jpeg({ quality: 74 })
-    .toBuffer();
+    .toBuffer({ resolveWithObject: true });
 
-  return applyWatermark(resized);
+  const w = resized.info.width || width;
+  const h = resized.info.height || height;
+
+  return sharp(resized.data)
+    .composite([{ input: Buffer.from(watermarkSvg(w, h)), blend: "over" }])
+    .jpeg({ quality: 74 })
+    .toBuffer();
 }

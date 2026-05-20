@@ -71,4 +71,32 @@ describe("image deletion policy", () => {
     expect(defaultDeletionFeeKrw(complex)).toBe(30000);
     expect(complex.estimatedFeeKrw).toBe(30000);
   });
+
+  it("uses administrator-configured photographer deletion fees", () => {
+    const simple = assessImageDeletion({
+      sales_count: 0,
+      proof_status: "not_registered",
+      proof_tx_hash: null,
+      proof_arweave_original_tx_id: null,
+      proof_arweave_manifest_tx_id: null,
+    }, {
+      requesterRole: "photographer",
+      feeConfig: { simpleFeeKrw: 7000, complexFeeKrw: 45000 },
+    });
+
+    const complex = assessImageDeletion({
+      sales_count: 2,
+      proof_status: "registered",
+      proof_tx_hash: "0xabc",
+      proof_arweave_original_tx_id: null,
+      proof_arweave_manifest_tx_id: null,
+    }, {
+      requesterRole: "photographer",
+      feeConfig: { simpleFeeKrw: 7000, complexFeeKrw: 45000 },
+    });
+
+    expect(simple.estimatedFeeKrw).toBe(7000);
+    expect(complex.estimatedFeeKrw).toBe(45000);
+    expect(defaultDeletionFeeKrw(complex, { simpleFeeKrw: 7000, complexFeeKrw: 45000 })).toBe(45000);
+  });
 });

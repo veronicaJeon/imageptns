@@ -5,6 +5,7 @@ import { previewUrl } from "@/lib/supabase/storage";
 import { applyWatermark, createWatermarkedThumbnail } from "@/lib/utils/watermark";
 import { notifyOpsNewUpload } from "@/lib/email/resend";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
+import { normalizeRotationDegrees } from "@/lib/images/orientation";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
 export const maxDuration = 60;
@@ -40,9 +41,10 @@ export async function POST(req: NextRequest) {
     title, description, category, tags,
     storage_path_original, original_filename,
     width, height, resolution_mp, file_format, file_size_mb,
+    upload_rotation_degrees, upload_original_width, upload_original_height,
     exif_taken_at, exif_lat, exif_lng, exif_location, exif_camera,
     copyright_license, free_usage_policy, attribution_name, attribution_url,
-    authorship_declaration,
+    authorship_declaration, factuality_attested,
   } = body;
 
   if (!title || !category || !storage_path_original) {
@@ -51,6 +53,11 @@ export async function POST(req: NextRequest) {
   if (authorship_declaration !== "ai_generated" && authorship_declaration !== "human_original") {
     return NextResponse.json({ error: "authorship_declaration must be ai_generated or human_original" }, { status: 400 });
   }
+  if (factuality_attested !== true) {
+    return NextResponse.json({ error: "factuality_attested must be true" }, { status: 400 });
+  }
+
+  const uploadRotationDegrees = normalizeRotationDegrees(upload_rotation_degrees);
 
   const { data, error } = await supabase
     .from("images")
@@ -70,6 +77,9 @@ export async function POST(req: NextRequest) {
       resolution_mp:        resolution_mp ?? null,
       file_format:          file_format ?? null,
       file_size_mb:         file_size_mb ?? null,
+      upload_rotation_degrees: uploadRotationDegrees,
+      upload_original_width: upload_original_width ?? width ?? null,
+      upload_original_height: upload_original_height ?? height ?? null,
       exif_taken_at:        exif_taken_at ?? null,
       exif_lat:             exif_lat ?? null,
       exif_lng:             exif_lng ?? null,
@@ -81,6 +91,9 @@ export async function POST(req: NextRequest) {
       attribution_url:      attribution_url?.trim() || null,
       authorship_declaration: authorship_declaration as AuthorshipDeclaration,
       authorship_declared_at: new Date().toISOString(),
+      factuality_attested: true,
+      factuality_attested_at: new Date().toISOString(),
+      factuality_attestation_version: "2026-05-20",
       status:               "pending",
     })
     .select()
@@ -97,8 +110,8 @@ export async function POST(req: NextRequest) {
     if (downloadErr || !downloaded) throw downloadErr ?? new Error("download returned null");
     const arrayBuffer = await downloaded.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const watermarked = await applyWatermark(buffer);
-    const thumbnail = await createWatermarkedThumbnail(buffer);
+    const watermarked = await applyWatermark(buffer, uploadRotationDegrees);
+    const thumbnail = await createWatermarkedThumbnail(buffer, 320, 240, uploadRotationDegrees);
     await admin.storage
       .from("images-preview")
       .upload(storage_path_original, watermarked, { contentType: "image/jpeg", upsert: true });

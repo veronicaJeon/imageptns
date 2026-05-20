@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { normalizeCopyrightLicenseCode } from "@/lib/licenses/creative-commons";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const PAGE_SIZE = 20;
 
@@ -13,6 +14,8 @@ interface ImageListRow {
   width: number | null;
   height: number | null;
   photographer?: { full_name: string | null } | { full_name: string | null }[] | null;
+  copyright_license: string | null;
+  free_usage_policy: string | null;
 }
 
 interface SearchImageRpcRow {
@@ -24,6 +27,8 @@ interface SearchImageRpcRow {
   width: number | null;
   height: number | null;
   photographer_name: string | null;
+  copyright_license: string | null;
+  free_usage_policy: string | null;
 }
 
 function firstPhotographer(photographer: ImageListRow["photographer"]) {
@@ -40,13 +45,18 @@ export async function GET(req: NextRequest) {
   const limit = Number.isInteger(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : PAGE_SIZE;
   const offset = Number.isInteger(rawOffset) ? Math.max(rawOffset, 0) : 0;
   const fetchCount = limit + 1; // fetch one extra to determine hasMore
+  const licenseFilters = Array.from(new Set(searchParams.getAll("license")
+    .flatMap((value) => value.split(","))
+    .map((value) => normalizeCopyrightLicenseCode(value))
+    .filter((value) => value !== "standard" || searchParams.getAll("license").some((raw) => raw.includes("standard")))));
+  const freeOnly = searchParams.get("free") === "true";
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   let q = supabase
     .from("images")
     .select(
-      "id, asset_id, title, category, tags, storage_path_preview, width, height, photographer:profiles!photographer_id(full_name)"
+      "id, asset_id, title, category, tags, storage_path_preview, width, height, copyright_license, free_usage_policy, photographer:profiles!photographer_id(full_name)"
     )
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
@@ -60,12 +70,22 @@ export async function GET(req: NextRequest) {
     q = q.textSearch("fts", query, { type: "plain" });
   }
 
+  if (licenseFilters.length > 0) {
+    q = q.in("copyright_license", licenseFilters);
+  }
+
+  if (freeOnly) {
+    q = q.or("free_usage_policy.neq.none,copyright_license.neq.standard");
+  }
+
   if (sort === "relevant" && query) {
     const { data: rpcData, error: rpcError } = await supabase.rpc("search_images", {
       search_query:    query,
       category_filter: category === "all" ? "" : category,
       lim:             limit,
       off:             offset,
+      license_filters: licenseFilters.length > 0 ? licenseFilters : null,
+      free_only:       freeOnly,
     });
 
     if (rpcError) {
@@ -92,6 +112,8 @@ export async function GET(req: NextRequest) {
           alt:          img.title,
           width:        img.width ?? 800,
           height:       img.height ?? 600,
+          copyrightLicense: img.copyright_license,
+          freeUsagePolicy:  img.free_usage_policy,
         };
       });
       return NextResponse.json({ images, hasMore: hasMoreRpc });
@@ -134,6 +156,8 @@ export async function GET(req: NextRequest) {
       alt:          img.title,
       width:        img.width ?? 800,
       height:       img.height ?? 600,
+      copyrightLicense: img.copyright_license,
+      freeUsagePolicy:  img.free_usage_policy,
     };
   });
 
