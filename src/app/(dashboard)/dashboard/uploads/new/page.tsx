@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { extractExif, type ExifData } from "@/lib/utils/exif";
 import { COPYRIGHT_LICENSES, FREE_USAGE_POLICIES, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
+import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
 const CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
 type Category = typeof CATEGORIES[number];
@@ -122,6 +123,7 @@ export default function NewUploadPage() {
   const [freeUsagePolicy, setFreeUsagePolicy] = useState<FreeUsagePolicyCode>("none");
   const [attributionName, setAttributionName] = useState("");
   const [attributionUrl, setAttributionUrl] = useState("");
+  const [authorshipDeclaration, setAuthorshipDeclaration] = useState<AuthorshipDeclaration | "">("");
 
   const [imgWidth, setImgWidth]   = useState<number | null>(null);
   const [imgHeight, setImgHeight] = useState<number | null>(null);
@@ -261,6 +263,7 @@ export default function NewUploadPage() {
     tags.split(",").map((t) => t.trim()).filter(Boolean).length > 0 &&
     !!takenAt &&
     !!location &&
+    !!authorshipDeclaration &&
     status !== "uploading" &&
     status !== "saving";
 
@@ -326,6 +329,7 @@ export default function NewUploadPage() {
           free_usage_policy: freeUsagePolicy,
           attribution_name: attributionName.trim() || null,
           attribution_url: attributionUrl.trim() || null,
+          authorship_declaration: authorshipDeclaration,
         }),
       });
 
@@ -671,6 +675,70 @@ export default function NewUploadPage() {
                 />
               </div>
             </div>
+          </div>
+
+          {/* ── AI / 오리지널리티 선언 ── */}
+          <div className="flex flex-col gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5">
+            <div>
+              <p className="text-xs font-bold text-outline uppercase tracking-widest">AI 및 오리지널리티 보증 *</p>
+              <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                플랫폼 운영 리스크 관리를 위해 업로드하는 이미지의 생성 방식을 반드시 선언해주세요.
+              </p>
+            </div>
+
+            <label
+              className={[
+                "flex cursor-pointer gap-3 rounded-lg border px-4 py-3 transition-colors",
+                authorshipDeclaration === "human_original"
+                  ? "border-primary bg-primary/5"
+                  : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
+              ].join(" ")}
+            >
+              <input
+                type="radio"
+                name="authorship_declaration"
+                value="human_original"
+                checked={authorshipDeclaration === "human_original"}
+                onChange={() => setAuthorshipDeclaration("human_original")}
+                className="mt-1 h-4 w-4 shrink-0 accent-primary"
+              />
+              <span>
+                <span className="block text-sm font-bold text-on-surface">
+                  AI 이미지가 아니며, 본인의 오리지널리티가 있음을 보증합니다.
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">
+                  직접 촬영했거나 권리자로서 라이선스 판매 및 증명을 요청할 수 있는 이미지입니다.
+                </span>
+              </span>
+            </label>
+
+            <label
+              className={[
+                "flex cursor-pointer gap-3 rounded-lg border px-4 py-3 transition-colors",
+                authorshipDeclaration === "ai_generated"
+                  ? "border-primary bg-primary/5"
+                  : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
+              ].join(" ")}
+            >
+              <input
+                type="radio"
+                name="authorship_declaration"
+                value="ai_generated"
+                checked={authorshipDeclaration === "ai_generated"}
+                onChange={() => setAuthorshipDeclaration("ai_generated")}
+                className="mt-1 h-4 w-4 shrink-0 accent-primary"
+              />
+              <span>
+                <span className="block text-sm font-bold text-on-surface">이 이미지는 AI 생성 이미지입니다.</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">
+                  AI 생성 또는 AI 보정 사실을 명시하며, 판매/배포 권한을 보유하고 있음을 확인합니다.
+                </span>
+              </span>
+            </label>
+
+            {!authorshipDeclaration && file && (
+              <p className="text-xs text-error">AI 여부 또는 오리지널리티 보증을 선택해주세요.</p>
+            )}
           </div>
 
           {errorMsg && (

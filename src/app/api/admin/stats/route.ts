@@ -28,7 +28,7 @@ export async function GET() {
   const [
     totalImages, pendingImages, approvedImages, rejectedImages,
     totalUsers, totalOrders, revenueRes, recentUsers,
-    proofNotRegistered, proofPending, proofRegistered, proofFailed,
+    proofNotRegistered, proofAvailable, proofRequested, proofPending, proofRegistered, proofFailed,
     basePendingOrders, baseConfirmedOrders, baseFailedOrders, onchainClaimableLedger,
   ] = await Promise.all([
     admin.from("images").select("id", { count: "exact", head: true }),
@@ -40,6 +40,8 @@ export async function GET() {
     admin.from("orders").select("total_krw").eq("status", "completed"),
     admin.from("profiles").select("id, full_name, role, created_at").order("created_at", { ascending: false }).limit(5),
     admin.from("images").select("id", { count: "exact", head: true }).eq("proof_status", "not_registered"),
+    admin.from("images").select("id", { count: "exact", head: true }).eq("proof_status", "available"),
+    admin.from("images").select("id", { count: "exact", head: true }).eq("proof_status", "requested"),
     admin.from("images").select("id", { count: "exact", head: true }).eq("proof_status", "pending"),
     admin.from("images").select("id", { count: "exact", head: true }).eq("proof_status", "registered"),
     admin.from("images").select("id", { count: "exact", head: true }).eq("proof_status", "failed"),
@@ -72,6 +74,8 @@ export async function GET() {
     onchain: {
       proof: {
         notRegistered: proofNotRegistered.count ?? 0,
+        available: proofAvailable.count ?? 0,
+        requested: proofRequested.count ?? 0,
         pending: proofPending.count ?? 0,
         registered: proofRegistered.count ?? 0,
         failed: proofFailed.count ?? 0,

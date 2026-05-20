@@ -28,15 +28,19 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const PROOF_STYLES: Record<string, string> = {
+  available: "bg-primary/10 text-primary",
+  requested: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200",
   pending: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200",
   registered: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200",
   failed: "bg-error/10 text-error",
 };
 
 const PROOF_LABELS: Record<string, string> = {
-  pending: "Base proof: pending",
-  registered: "Base proof: registered",
-  failed: "Base proof: failed",
+  available: "자격증명 등록가능",
+  requested: "자격증명 요청됨",
+  pending: "Arweave 등록 중",
+  registered: "자격증명 완료",
+  failed: "자격증명 실패",
 };
 
 interface ImageRow {
@@ -209,7 +213,7 @@ export default function AdminPage() {
                           "text-[10px] font-bold px-3 py-1 rounded-full",
                           PROOF_STYLES[img.proof_status] ?? "bg-surface-container text-outline"
                         )}>
-                          {PROOF_LABELS[img.proof_status] ?? `Base proof: ${img.proof_status}`}
+                          {PROOF_LABELS[img.proof_status] ?? `증명: ${img.proof_status}`}
                         </span>
                       )}
                       <span className={cn(
@@ -278,9 +282,9 @@ export default function AdminPage() {
                     <div className="flex items-start gap-2 bg-error/8 border border-error/20 rounded-lg px-3 py-2">
                       <span className="material-symbols-outlined text-error text-sm mt-0.5">sync_problem</span>
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-error">Base 증명 등록이 실패했습니다.</p>
+                        <p className="text-xs font-bold text-error">이전 자격증명 등록이 실패했습니다.</p>
                         <p className="text-xs text-on-surface-variant mt-1">
-                          operator 지갑, RPC, 사진가 지갑 주소를 확인한 뒤 재시도하세요.
+                          승인 후 첫 판매가 완료되면 사진가가 블록체인 사진 화면에서 재등록을 요청할 수 있습니다.
                         </p>
                         {img.proof_tx_hash && (
                           <p className="text-[10px] font-mono text-outline mt-1 truncate">tx {img.proof_tx_hash}</p>
@@ -328,18 +332,14 @@ export default function AdminPage() {
                     <div className="flex gap-2 flex-wrap">
                       <button
                         onClick={() => handleAction(img.id, "approve")}
-                        disabled={actioning === img.id || img.proof_status === "pending" || img.status !== "pending"}
+                        disabled={actioning === img.id || img.status !== "pending"}
                         className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
                       >
                         {actioning === img.id
                           ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          : <span className="material-symbols-outlined text-sm">{img.proof_status === "failed" ? "sync" : "check_circle"}</span>
+                          : <span className="material-symbols-outlined text-sm">check_circle</span>
                         }
-                        {img.proof_status === "pending"
-                          ? "Base 증명 등록 중"
-                          : img.proof_status === "failed"
-                            ? "Base 증명 재시도"
-                            : "승인"}
+                        승인
                       </button>
                       {img.status !== "rejected" && (
                         <button

@@ -161,12 +161,14 @@ export async function GET() {
   // Photographer
   const [
     uploadRes, pendingRes,
-    proofNotRegisteredRes, proofPendingRes, proofRegisteredRes, proofFailedRes,
+    proofNotRegisteredRes, proofAvailableRes, proofRequestedRes, proofPendingRes, proofRegisteredRes, proofFailedRes,
     earningsRes,
   ] = await Promise.all([
     supabase.from("images").select("id", { count: "exact", head: true }).eq("photographer_id", user.id),
     supabase.from("images").select("id", { count: "exact", head: true }).eq("photographer_id", user.id).eq("status", "pending"),
     supabase.from("images").select("id", { count: "exact", head: true }).eq("photographer_id", user.id).eq("proof_status", "not_registered"),
+    supabase.from("images").select("id", { count: "exact", head: true }).eq("photographer_id", user.id).eq("proof_status", "available"),
+    supabase.from("images").select("id", { count: "exact", head: true }).eq("photographer_id", user.id).eq("proof_status", "requested"),
     supabase.from("images").select("id", { count: "exact", head: true }).eq("photographer_id", user.id).eq("proof_status", "pending"),
     supabase.from("images").select("id", { count: "exact", head: true }).eq("photographer_id", user.id).eq("proof_status", "registered"),
     supabase.from("images").select("id", { count: "exact", head: true }).eq("photographer_id", user.id).eq("proof_status", "failed"),
@@ -207,6 +209,8 @@ export async function GET() {
     onchain: {
       proof: {
         notRegistered: proofNotRegisteredRes.count ?? 0,
+        available: proofAvailableRes.count ?? 0,
+        requested: proofRequestedRes.count ?? 0,
         pending: proofPendingRes.count ?? 0,
         registered: proofRegisteredRes.count ?? 0,
         failed: proofFailedRes.count ?? 0,

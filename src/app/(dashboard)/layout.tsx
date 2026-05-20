@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
+import type { AuthUser } from "@/lib/store/auth";
 
 const NAV_ITEMS_BUYER = [
   { href: "/dashboard",           icon: "grid_view",        key: "overview"   },
@@ -17,9 +19,102 @@ const NAV_ITEMS_BUYER = [
 const NAV_ITEMS_PHOTOGRAPHER = [
   { href: "/dashboard",           icon: "grid_view",        key: "overview"   },
   { href: "/dashboard/uploads",   icon: "cloud_upload",     key: "uploads"    },
+  { href: "/dashboard/blockchain", icon: "verified",         key: "blockchain" },
   { href: "/dashboard/earnings",  icon: "payments",         key: "earnings"   },
   { href: "/dashboard/settings",  icon: "settings",         key: "settings"   },
 ];
+
+type DashboardUser = AuthUser | null;
+type DashboardMode = "buyer" | "photographer";
+
+function RoleSection({
+  loading,
+  user,
+  role,
+  demoRole,
+  viewMode,
+  roleLabels,
+  onDemoRoleChange,
+  onViewModeChange,
+}: {
+  loading: boolean;
+  user: DashboardUser;
+  role: string;
+  demoRole: DashboardMode;
+  viewMode: DashboardMode;
+  roleLabels: Record<DashboardMode, string>;
+  onDemoRoleChange: (role: DashboardMode) => void;
+  onViewModeChange: (mode: DashboardMode) => void;
+}) {
+  if (loading) {
+    return <div className="h-9 rounded-lg bg-surface-container-low animate-pulse" />;
+  }
+
+  if (!user) {
+    return (
+      <div className="flex rounded-lg overflow-hidden bg-surface-container-low p-1 gap-1">
+        {(["buyer", "photographer"] as const).map((r) => (
+          <button
+            key={r}
+            onClick={() => onDemoRoleChange(r)}
+            className={cn(
+              "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
+              demoRole === r
+                ? "bg-primary text-white"
+                : "text-on-surface-variant hover:text-on-surface"
+            )}
+          >
+            {roleLabels[r]}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  if (role === "photographer") {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex rounded-lg overflow-hidden bg-surface-container-low p-1 gap-1">
+          <button
+            onClick={() => onViewModeChange("photographer")}
+            className={cn(
+              "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
+              viewMode === "photographer"
+                ? "bg-primary text-white"
+                : "text-on-surface-variant hover:text-on-surface"
+            )}
+          >
+            {roleLabels.photographer}
+          </button>
+          <button
+            onClick={() => onViewModeChange("buyer")}
+            className={cn(
+              "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
+              viewMode === "buyer"
+                ? "bg-primary text-white"
+                : "text-on-surface-variant hover:text-on-surface"
+            )}
+          >
+            {roleLabels.buyer}
+          </button>
+        </div>
+        {user.is_admin && (
+          <span className="text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded text-center">Admin</span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low">
+      <span className="material-symbols-outlined text-base text-primary">shopping_bag</span>
+      <span className="text-xs font-bold text-on-surface capitalize">{roleLabels.buyer}</span>
+      {user.is_admin && (
+        <span className="ml-auto text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded">Admin</span>
+      )}
+    </div>
+  );
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLang();
@@ -28,93 +123,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, loading, init, signOut } = useAuth();
 
   // Demo toggle only shown when truly not authenticated (not during loading)
-  const [demoRole, setDemoRole] = useState<"buyer" | "photographer">("buyer");
+  const [demoRole, setDemoRole] = useState<DashboardMode>("buyer");
   // viewMode: photographers can switch to buyer nav without changing their DB role
-  const [viewMode, setViewMode] = useState<"buyer" | "photographer">("buyer");
+  const [viewModeOverride, setViewModeOverride] = useState<DashboardMode | null>(null);
 
   useEffect(() => { init(); }, [init]);
 
-  // Sync viewMode default to actual role when user loads
-  useEffect(() => {
-    if (user?.role) setViewMode(user.role as "buyer" | "photographer");
-  }, [user?.role]);
-
   const role = user?.role ?? demoRole;
+  const viewMode: DashboardMode = user
+    ? role === "photographer"
+      ? viewModeOverride ?? "photographer"
+      : "buyer"
+    : demoRole;
   const effectiveMode = user ? viewMode : demoRole;
   const navItems = effectiveMode === "photographer" ? NAV_ITEMS_PHOTOGRAPHER : NAV_ITEMS_BUYER;
-
-  function RoleSection() {
-    if (loading) {
-      return <div className="h-9 rounded-lg bg-surface-container-low animate-pulse" />;
-    }
-
-    if (!user) {
-      return (
-        <div className="flex rounded-lg overflow-hidden bg-surface-container-low p-1 gap-1">
-          {(["buyer", "photographer"] as const).map((r) => (
-            <button
-              key={r}
-              onClick={() => setDemoRole(r)}
-              className={cn(
-                "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
-                demoRole === r
-                  ? "bg-primary text-white"
-                  : "text-on-surface-variant hover:text-on-surface"
-              )}
-            >
-              {d.role[r]}
-            </button>
-          ))}
-        </div>
-      );
-    }
-
-    if (role === "photographer") {
-      // Photographer can toggle between their two views
-      return (
-        <div className="flex flex-col gap-2">
-          <div className="flex rounded-lg overflow-hidden bg-surface-container-low p-1 gap-1">
-            <button
-              onClick={() => setViewMode("photographer")}
-              className={cn(
-                "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
-                viewMode === "photographer"
-                  ? "bg-primary text-white"
-                  : "text-on-surface-variant hover:text-on-surface"
-              )}
-            >
-              {d.role.photographer}
-            </button>
-            <button
-              onClick={() => setViewMode("buyer")}
-              className={cn(
-                "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
-                viewMode === "buyer"
-                  ? "bg-primary text-white"
-                  : "text-on-surface-variant hover:text-on-surface"
-              )}
-            >
-              {d.role.buyer}
-            </button>
-          </div>
-          {user.is_admin && (
-            <span className="text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded text-center">Admin</span>
-          )}
-        </div>
-      );
-    }
-
-    // Buyer: show simple role badge
-    return (
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low">
-        <span className="material-symbols-outlined text-base text-primary">shopping_bag</span>
-        <span className="text-xs font-bold text-on-surface capitalize">{d.role.buyer}</span>
-        {user.is_admin && (
-          <span className="ml-auto text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded">Admin</span>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex bg-surface-container-low">
@@ -130,7 +152,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Role indicator / toggle */}
         <div className="px-4 py-4 border-b border-outline-variant/20">
-          <RoleSection />
+          <RoleSection
+            loading={loading}
+            user={user}
+            role={role}
+            demoRole={demoRole}
+            viewMode={viewMode}
+            roleLabels={d.role}
+            onDemoRoleChange={setDemoRole}
+            onViewModeChange={setViewModeOverride}
+          />
         </div>
 
         {/* Nav */}
@@ -160,7 +191,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shrink-0 overflow-hidden">
               {user?.avatar_url ? (
-                <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                <Image src={user.avatar_url} alt="" width={32} height={32} className="w-full h-full object-cover" />
               ) : (
                 <span className="material-symbols-outlined text-base text-on-primary-container">person</span>
               )}
@@ -188,7 +219,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {(["photographer", "buyer"] as const).map((r) => (
                 <button
                   key={r}
-                  onClick={() => setViewMode(r)}
+                  onClick={() => setViewModeOverride(r)}
                   className={cn(
                     "px-3 py-1 text-xs font-bold rounded-md transition-all",
                     viewMode === r ? "bg-primary text-white" : "text-on-surface-variant"

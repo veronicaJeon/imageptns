@@ -58,7 +58,10 @@ export function buildUploadProofSteps(upload: UploadProofInput): TimelineStep[] 
   const rejected = upload.status === "rejected";
   const proofRegistered = upload.proofStatus === "registered";
   const proofFailed = upload.proofStatus === "failed";
-  const proofPending = upload.proofStatus === "pending";
+  const proofActive =
+    upload.proofStatus === "available" ||
+    upload.proofStatus === "requested" ||
+    upload.proofStatus === "pending";
 
   return [
     {
@@ -75,9 +78,9 @@ export function buildUploadProofSteps(upload: UploadProofInput): TimelineStep[] 
     },
     {
       key: "proof",
-      label: "온체인 증명",
-      description: "승인된 사진의 해시와 자산 ID를 블록체인에 기록합니다.",
-      state: proofRegistered ? "done" : proofFailed ? "failed" : proofPending ? "current" : approved ? "current" : "pending",
+      label: "Arweave 자격증명",
+      description: "첫 판매 이후 사진가 요청과 관리자 일괄 등록을 거쳐 원본과 해시를 Arweave에 기록합니다.",
+      state: proofRegistered ? "done" : proofFailed ? "failed" : proofActive ? "current" : approved ? "pending" : "pending",
     },
   ];
 }

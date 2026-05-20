@@ -5,6 +5,7 @@ import { previewUrl } from "@/lib/supabase/storage";
 import { applyWatermark, createWatermarkedThumbnail } from "@/lib/utils/watermark";
 import { notifyOpsNewUpload } from "@/lib/email/resend";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
+import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
 export const maxDuration = 60;
 
@@ -15,7 +16,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("images")
-    .select("id, asset_id, title, description, category, tags, status, rejection_reason, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at, chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at, copyright_license, free_usage_policy, attribution_name, attribution_url")
+    .select("id, asset_id, title, description, category, tags, status, rejection_reason, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at, chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at, proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
     .eq("photographer_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -41,10 +42,14 @@ export async function POST(req: NextRequest) {
     width, height, resolution_mp, file_format, file_size_mb,
     exif_taken_at, exif_lat, exif_lng, exif_location, exif_camera,
     copyright_license, free_usage_policy, attribution_name, attribution_url,
+    authorship_declaration,
   } = body;
 
   if (!title || !category || !storage_path_original) {
     return NextResponse.json({ error: "title, category, and storage_path_original required" }, { status: 400 });
+  }
+  if (authorship_declaration !== "ai_generated" && authorship_declaration !== "human_original") {
+    return NextResponse.json({ error: "authorship_declaration must be ai_generated or human_original" }, { status: 400 });
   }
 
   const { data, error } = await supabase
@@ -74,6 +79,8 @@ export async function POST(req: NextRequest) {
       free_usage_policy:    normalizeFreeUsagePolicy(free_usage_policy),
       attribution_name:     attribution_name?.trim() || null,
       attribution_url:      attribution_url?.trim() || null,
+      authorship_declaration: authorship_declaration as AuthorshipDeclaration,
+      authorship_declared_at: new Date().toISOString(),
       status:               "pending",
     })
     .select()
