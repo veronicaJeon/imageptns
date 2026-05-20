@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeContactSubmissionInput } from "@/lib/contact/request-fields";
 import { sendContactEmails } from "@/lib/email/contact";
 import { sendContactConfirmation, notifyOpsContact } from "@/lib/email/gmail";
 import { checkRateLimit, requestIp } from "@/lib/security/rate-limit";
@@ -17,36 +18,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { name?: string; email?: string; subject?: string; message?: string };
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const name = body.name?.trim();
-  const email = body.email?.trim();
-  const subject = body.subject?.trim();
-  const message = body.message?.trim();
-
-  if (!name || !email || !subject || !message) {
-    return NextResponse.json({ error: "All fields required" }, { status: 400 });
-  }
-  if (name.length > 80 || email.length > 254 || subject.length > 160 || message.length > 5000) {
-    return NextResponse.json({ error: "Input is too long" }, { status: 400 });
+  let submission;
+  try {
+    submission = normalizeContactSubmissionInput(body);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid contact request" },
+      { status: 400 },
+    );
   }
 
   const supabase = await createClient();
 
   const { error } = await supabase
     .from("contact_submissions")
-    .insert({ name, email, subject, message });
+    .insert(submission);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   try {
     await sendContactEmails(
-      { name, email, subject, message },
+      {
+        name: submission.name,
+        email: submission.email,
+        subject: submission.subject,
+        message: submission.message,
+      },
       {
         sendConfirmation: sendContactConfirmation,
         notifyOps: notifyOpsContact,

@@ -9,16 +9,19 @@ import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
 import type { AuthUser } from "@/lib/store/auth";
 
-const NAV_ITEMS_BUYER = [
+type NavItem = { href: string; icon: string; key: string; label?: string };
+
+const NAV_ITEMS_BUYER: NavItem[] = [
   { href: "/dashboard",           icon: "grid_view",        key: "overview"   },
   { href: "/dashboard/favorites", icon: "favorite",         key: "favorites"  },
   { href: "/dashboard/orders",    icon: "receipt_long",     key: "orders"     },
   { href: "/dashboard/settings",  icon: "settings",         key: "settings"   },
 ];
 
-const NAV_ITEMS_PHOTOGRAPHER = [
+const NAV_ITEMS_PHOTOGRAPHER: NavItem[] = [
   { href: "/dashboard",           icon: "grid_view",        key: "overview"   },
   { href: "/dashboard/uploads",   icon: "cloud_upload",     key: "uploads"    },
+  { href: "/dashboard/requests",  icon: "assignment",       key: "requests", label: "사진 의뢰" },
   { href: "/dashboard/blockchain", icon: "verified",         key: "blockchain" },
   { href: "/dashboard/earnings",  icon: "payments",         key: "earnings"   },
   { href: "/dashboard/settings",  icon: "settings",         key: "settings"   },
@@ -166,7 +169,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Nav */}
         <nav className="flex-1 py-4 px-3 flex flex-col gap-1">
-          {navItems.map(({ href, icon, key }) => {
+          {navItems.map(({ href, icon, key, label }) => {
             const isActive = pathname === href;
             return (
               <Link
@@ -180,7 +183,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
               >
                 <span className="material-symbols-outlined text-xl">{icon}</span>
-                {d.nav[key as keyof typeof d.nav]}
+                {label ?? d.nav[key as keyof typeof d.nav]}
               </Link>
             );
           })}
@@ -249,7 +252,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Mobile bottom nav */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex bg-surface-container-lowest border-t border-outline-variant/20">
-          {navItems.map(({ href, icon, key }) => {
+          {navItems.map(({ href, icon, key, label }) => {
             const isActive = pathname === href;
             return (
               <Link
@@ -261,7 +264,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
               >
                 <span className="material-symbols-outlined text-xl">{icon}</span>
-                {d.nav[key as keyof typeof d.nav]}
+                {label ?? d.nav[key as keyof typeof d.nav]}
               </Link>
             );
           })}

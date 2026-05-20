@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import type { ProfileWithdrawalAssessment } from "@/lib/profiles/withdrawal";
 
 interface UserSummary {
   id: string;
@@ -63,6 +64,40 @@ interface UserOrder {
   order_items: UserOrderItem[] | null;
 }
 
+interface WithdrawalRequestSummary {
+  id: string;
+  status: string;
+  created_at: string;
+}
+
+const WITHDRAWAL_METRIC_LABELS: Record<keyof ProfileWithdrawalAssessment["impactSnapshot"], string> = {
+  activeImages: "활성 이미지",
+  soldImages: "판매 이미지",
+  onchainImages: "온체인/Arweave",
+  pendingOrders: "대기 주문",
+  pendingPayouts: "대기 정산",
+  claimableEarnings: "클레임 수익",
+  claimableAmount: "클레임 금액",
+};
+
+const WITHDRAWAL_REASON_LABELS: Record<string, string> = {
+  active_images: "활성 이미지",
+  sold_images: "판매된 이미지",
+  onchain_images: "온체인/Arweave 증명 이미지",
+  pending_orders: "처리 중인 주문",
+  pending_payouts: "처리 중인 정산",
+  claimable_earnings: "클레임 가능한 수익",
+};
+
+const WITHDRAWAL_ACTION_LABELS: Record<string, string> = {
+  retire_active_images: "활성 이미지 정리",
+  preserve_sold_image_access: "구매자 접근 보존",
+  review_onchain_records: "온체인 기록 검토",
+  resolve_pending_orders: "대기 주문 처리",
+  settle_pending_payouts: "대기 정산 완료",
+  settle_claimable_earnings: "클레임 수익 정산",
+};
+
 function formatKRW(amount: number) {
   return `₩${amount.toLocaleString("ko-KR")}`;
 }
@@ -70,6 +105,16 @@ function formatKRW(amount: number) {
 function formatDate(value: string | null | undefined) {
   if (!value) return "-";
   return new Date(value).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function formatWithdrawalMetric(
+  key: keyof ProfileWithdrawalAssessment["impactSnapshot"],
+  value: number,
+) {
+  if (key === "claimableAmount") {
+    return value.toLocaleString("ko-KR", { maximumFractionDigits: 6 });
+  }
+  return `${value.toLocaleString("ko-KR")}건`;
 }
 
 export default function AdminUsersPage() {
@@ -82,6 +127,8 @@ export default function AdminUsersPage() {
   const [orders, setOrders] = useState<UserOrder[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [withdrawalAssessment, setWithdrawalAssessment] = useState<ProfileWithdrawalAssessment | null>(null);
+  const [withdrawalRequest, setWithdrawalRequest] = useState<WithdrawalRequestSummary | null>(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -103,6 +150,8 @@ export default function AdminUsersPage() {
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
     setSelectedId(id);
+    setWithdrawalAssessment(null);
+    setWithdrawalRequest(null);
     try {
       const res = await fetch(`/api/admin/users/${id}`);
       if (!res.ok) throw new Error("회원 상세를 불러오지 못했습니다.");
@@ -123,6 +172,12 @@ export default function AdminUsersPage() {
     [selectedId, users],
   );
 
+  const deleteActionLabel = useMemo(() => {
+    if (deleting) return "처리 중...";
+    if (withdrawalAssessment && !withdrawalAssessment.canDeleteImmediately) return "탈퇴 검토 요청 생성됨";
+    return "회원 탈퇴 처리";
+  }, [deleting, withdrawalAssessment]);
+
   async function deleteUser() {
     if (!detail) return;
     const label = detail.email || detail.full_name || detail.id;
@@ -130,13 +185,24 @@ export default function AdminUsersPage() {
     setDeleting(true);
     try {
       const res = await fetch(`/api/admin/users/${detail.id}`, { method: "DELETE" });
+      const body = await res.json().catch(() => null) as {
+        error?: string;
+        assessment?: ProfileWithdrawalAssessment;
+        withdrawalRequest?: WithdrawalRequestSummary;
+      } | null;
       if (!res.ok) {
-        const body = await res.json().catch(() => null) as { error?: string } | null;
+        if (res.status === 409 && body?.assessment) {
+          setWithdrawalAssessment(body.assessment);
+          setWithdrawalRequest(body.withdrawalRequest ?? null);
+          return;
+        }
         throw new Error(body?.error ?? "회원 탈퇴 처리에 실패했습니다.");
       }
       setDetail(null);
       setOrders([]);
       setSelectedId(null);
+      setWithdrawalAssessment(null);
+      setWithdrawalRequest(null);
       await loadUsers();
     } catch (error) {
       alert(error instanceof Error ? error.message : "회원 탈퇴 처리에 실패했습니다.");
@@ -252,8 +318,56 @@ export default function AdminUsersPage() {
                   disabled={deleting}
                   className="mt-5 w-full rounded-lg border border-error/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-error transition-colors hover:bg-error/10 disabled:opacity-50"
                 >
-                  {deleting ? "처리 중..." : "회원 탈퇴 처리"}
+                  {deleteActionLabel}
                 </button>
+                {withdrawalAssessment && !withdrawalAssessment.canDeleteImmediately && (
+                  <div className="mt-4 rounded-lg border border-error/30 bg-error/5 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-error">탈퇴 검토 요청</p>
+                        <p className="mt-1 text-sm font-semibold text-on-surface">
+                          즉시 탈퇴 대신 관리자 검토가 필요합니다.
+                        </p>
+                      </div>
+                      {withdrawalRequest && (
+                        <span className="shrink-0 rounded-full bg-surface-container-lowest px-2 py-1 text-[10px] font-bold text-error">
+                          {withdrawalRequest.status}
+                        </span>
+                      )}
+                    </div>
+                    {withdrawalRequest && (
+                      <p className="mt-2 text-xs text-outline">
+                        요청 {withdrawalRequest.id.slice(0, 8)} · {formatDate(withdrawalRequest.created_at)}
+                      </p>
+                    )}
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {(Object.entries(withdrawalAssessment.impactSnapshot) as Array<[
+                        keyof ProfileWithdrawalAssessment["impactSnapshot"],
+                        number,
+                      ]>).map(([key, value]) => (
+                        <div key={key} className="rounded-lg bg-surface-container-lowest p-2">
+                          <p className="text-[10px] font-bold text-outline">{WITHDRAWAL_METRIC_LABELS[key]}</p>
+                          <p className="mt-1 text-xs font-semibold text-on-surface">{formatWithdrawalMetric(key, value)}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {withdrawalAssessment.blockingReasons.map((reason) => (
+                        <div key={reason.code} className="text-xs text-on-surface-variant">
+                          <span className="font-semibold text-error">{WITHDRAWAL_REASON_LABELS[reason.code] ?? reason.label}</span>
+                          <span className="text-outline"> · {reason.count.toLocaleString("ko-KR")}건</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {withdrawalAssessment.requiredActions.map((action) => (
+                        <span key={action.code} className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
+                          {WITHDRAWAL_ACTION_LABELS[action.code] ?? action.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="mt-5">
