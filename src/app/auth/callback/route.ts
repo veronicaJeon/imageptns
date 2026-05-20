@@ -2,11 +2,16 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  getCanonicalRedirectOrigin,
+  getSafeRelativePath,
+} from '@/lib/routing/canonical'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  const next = getSafeRelativePath(searchParams.get('next'), '/')
+  const redirectOrigin = getCanonicalRedirectOrigin(origin)
 
   if (code) {
     const cookieStore = await cookies()
@@ -37,12 +42,10 @@ export async function GET(request: NextRequest) {
         await admin.rpc('record_profile_login', { target_user_id: user.id })
       }
 
-      // Ensure `next` only redirects to relative paths (security)
-      const redirectTo = next.startsWith('/') ? next : '/'
-      return NextResponse.redirect(`${origin}${redirectTo}`)
+      return NextResponse.redirect(`${redirectOrigin}${next}`)
     }
   }
 
   // Something went wrong — redirect to login with an error indicator
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
+  return NextResponse.redirect(`${redirectOrigin}/login?error=auth_callback_failed`)
 }

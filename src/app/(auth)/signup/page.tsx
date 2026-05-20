@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useLang } from "@/lib/i18n/store";
+import { buildSiteUrl } from "@/lib/routing/canonical";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -31,7 +32,7 @@ export default function SignupPage() {
       provider: "google",
       options: {
         // Pass role via callback URL; server route will attach it to user metadata
-        redirectTo: `${window.location.origin}/api/auth/callback?role=${role}`,
+        redirectTo: buildSiteUrl(`/api/auth/callback?role=${role}`),
       },
     });
     if (error) { setError(t.auth.login.errorOAuth); setLoading(false); }
@@ -47,7 +48,7 @@ export default function SignupPage() {
       password,
       options: {
         data: { full_name: name, role },
-        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+        emailRedirectTo: buildSiteUrl("/api/auth/callback"),
       },
     });
     if (error) {

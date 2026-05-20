@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/i18n/store";
+import { buildSiteUrl } from "@/lib/routing/canonical";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -17,18 +18,21 @@ function LoginForm() {
   const [email, setEmail]         = useState("");
   const [password, setPassword]   = useState("");
   const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState<string | null>(
-    searchParams.get("error") === "oauth" ? a.errorOAuth : null,
-  );
+  const [error, setError]         = useState<string | null>(null);
+  const [hideQueryError, setHideQueryError] = useState(false);
+  const queryError =
+    !hideQueryError && searchParams.get("error") === "oauth" ? a.errorOAuth : null;
+  const displayedError = error ?? queryError;
 
   async function handleGoogleLogin() {
     setLoading(true);
+    setHideQueryError(true);
     setError(null);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/api/auth/callback`,
+        redirectTo: buildSiteUrl("/api/auth/callback"),
       },
     });
     if (error) { setError(a.errorOAuth); setLoading(false); }
@@ -37,6 +41,7 @@ function LoginForm() {
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setHideQueryError(true);
     setError(null);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -58,10 +63,10 @@ function LoginForm() {
       <p className="text-on-surface-variant text-sm mb-10">{a.subtitle}</p>
 
       {/* Error */}
-      {error && (
+      {displayedError && (
         <div className="mb-6 px-4 py-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm flex items-center gap-2">
           <span className="material-symbols-outlined text-base">error</span>
-          {error}
+          {displayedError}
         </div>
       )}
 
