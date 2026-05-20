@@ -20,6 +20,16 @@ interface PhotographerData {
   };
 }
 
+interface PhotographerImageRow {
+  id: string;
+  title: string;
+  category: string;
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+}
+
 export default function PhotographerProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { t } = useLang();
@@ -37,7 +47,7 @@ export default function PhotographerProfilePage({ params }: { params: Promise<{ 
         const data = await res.json();
         setPhotographer(data.photographer);
         setImages(
-          (data.images ?? []).map((img: any) => ({
+          ((data.images ?? []) as PhotographerImageRow[]).map((img) => ({
             id: img.id,
             title: img.title,
             category: img.category,

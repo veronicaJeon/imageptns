@@ -18,16 +18,15 @@ function SuccessContent() {
   const authKey     = searchParams.get("authKey")     ?? "";
   const plan        = searchParams.get("plan")        ?? "";
   const annual      = searchParams.get("annual") === "true";
+  const missingParams = !customerKey || !authKey || !plan;
 
-  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [status, setStatus] = useState<"loading" | "ok" | "error">(
+    missingParams ? "error" : "loading",
+  );
+  const [errorMsg, setErrorMsg] = useState(missingParams ? "잘못된 접근입니다." : "");
 
   useEffect(() => {
-    if (!customerKey || !authKey || !plan) {
-      setErrorMsg("잘못된 접근입니다.");
-      setStatus("error");
-      return;
-    }
+    if (missingParams) return;
 
     fetch("/api/subscription/billing-auth", {
       method:  "POST",
@@ -45,7 +44,7 @@ function SuccessContent() {
         setErrorMsg(err.message);
         setStatus("error");
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [annual, authKey, customerKey, missingParams, plan]);
 
   if (status === "loading") {
     return (

@@ -3,6 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
+interface PhotographerCountRow {
+  photographer_id: string | null;
+}
+
 export async function GET() {
   const admin = createAdminClient();
 
@@ -22,7 +26,7 @@ export async function GET() {
   ]);
 
   const photographerCount = new Set(
-    (photographersRes.data ?? []).map((r: any) => r.photographer_id)
+    ((photographersRes.data ?? []) as PhotographerCountRow[]).map((r) => r.photographer_id)
   ).size;
 
   return NextResponse.json({

@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { previewUrl } from "@/lib/supabase/storage";
 
+interface CollectionImage {
+  storage_path_preview: string | null;
+}
+
+interface CollectionItemRow {
+  image: CollectionImage | CollectionImage[] | null;
+}
+
+function firstImage(image: CollectionItemRow["image"]) {
+  return Array.isArray(image) ? image[0] : image;
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -32,12 +44,15 @@ export async function GET(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const items = (data ?? []).map((item: any) => ({
-    ...item,
-    image: item.image
-      ? { ...item.image, storage_path_preview: previewUrl(item.image.storage_path_preview) }
-      : null,
-  }));
+  const items = ((data ?? []) as CollectionItemRow[]).map((item) => {
+    const image = firstImage(item.image);
+    return {
+      ...item,
+      image: image
+        ? { ...image, storage_path_preview: previewUrl(image.storage_path_preview) }
+        : null,
+    };
+  });
 
   return NextResponse.json({ items });
 }

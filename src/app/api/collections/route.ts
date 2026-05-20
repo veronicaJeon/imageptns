@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { previewUrl } from "@/lib/supabase/storage";
 
+interface CollectionThumbnailImage {
+  storage_path_preview: string | null;
+}
+
+interface CollectionItemSummary {
+  image: CollectionThumbnailImage | CollectionThumbnailImage[] | null;
+}
+
+interface CollectionRow {
+  id: string;
+  name: string;
+  created_at: string;
+  collection_items: CollectionItemSummary[] | null;
+}
+
+function firstJoinedImage(image: CollectionItemSummary["image"]) {
+  return Array.isArray(image) ? image[0] : image;
+}
+
 export async function GET(_req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -21,9 +40,9 @@ export async function GET(_req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const collections = (data ?? []).map((col: any) => {
-    const items: any[] = col.collection_items ?? [];
-    const firstImage = items[0]?.image ?? null;
+  const collections = ((data ?? []) as CollectionRow[]).map((col) => {
+    const items = col.collection_items ?? [];
+    const firstImage = firstJoinedImage(items[0]?.image ?? null);
     return {
       id: col.id,
       name: col.name,

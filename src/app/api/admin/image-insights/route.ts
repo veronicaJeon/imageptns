@@ -12,6 +12,25 @@ async function requireAdmin() {
   return profile?.is_admin ? user : null;
 }
 
+interface InsightImageRow {
+  id: string;
+  title: string | null;
+  category: string | null;
+  views_count?: number | null;
+  sales_count?: number | null;
+  storage_path_preview: string | null;
+  photographer: { full_name: string | null } | { full_name: string | null }[] | null;
+}
+
+interface FavoriteCountRow {
+  image_id: string;
+}
+
+function photographerName(row: InsightImageRow) {
+  const photographer = Array.isArray(row.photographer) ? row.photographer[0] : row.photographer;
+  return photographer?.full_name ?? "Unknown";
+}
+
 export async function GET(req: NextRequest) {
   const user = await requireAdmin();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -36,13 +55,13 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       sort,
-      images: (data ?? []).map((img: any) => ({
+      images: ((data ?? []) as InsightImageRow[]).map((img) => ({
         id: img.id,
         title: img.title,
         category: img.category,
-        photographer: img.photographer?.full_name ?? "Unknown",
+        photographer: photographerName(img),
         src: previewUrl(img.storage_path_preview),
-        value: img[col] ?? 0,
+        value: sort === "views" ? img.views_count ?? 0 : img.sales_count ?? 0,
       })),
     });
   }
@@ -57,7 +76,7 @@ export async function GET(req: NextRequest) {
 
   // Count favorites per image
   const countMap: Record<string, number> = {};
-  for (const row of (favCounts ?? [])) {
+  for (const row of ((favCounts ?? []) as FavoriteCountRow[])) {
     countMap[row.image_id] = (countMap[row.image_id] ?? 0) + 1;
   }
 
@@ -78,13 +97,13 @@ export async function GET(req: NextRequest) {
 
   const sorted = topIds
     .map((id) => {
-      const img = (imgs ?? []).find((i: any) => i.id === id);
+      const img = ((imgs ?? []) as InsightImageRow[]).find((i) => i.id === id);
       if (!img) return null;
       return {
         id: img.id,
         title: img.title,
         category: img.category,
-        photographer: (img as any).photographer?.full_name ?? "Unknown",
+        photographer: photographerName(img),
         src: previewUrl(img.storage_path_preview),
         value: countMap[id] ?? 0,
       };
