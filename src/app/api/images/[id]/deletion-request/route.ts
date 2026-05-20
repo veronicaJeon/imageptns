@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assessImageDeletion, deletionImpactMessage } from "@/lib/images/deletion";
+import { normalizeDeletionFeeConfig, type DeletionFeeSettingRow } from "@/lib/images/deletion-fees";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -73,7 +74,15 @@ export async function POST(
     return NextResponse.json({ request: existing, duplicated: true });
   }
 
-  const impact = assessImageDeletion(row, { requesterRole: "photographer" });
+  const { data: feeRows } = await admin
+    .from("platform_fee_settings")
+    .select("code, amount_krw, active")
+    .in("code", ["image_delete_simple", "image_delete_complex"]);
+
+  const impact = assessImageDeletion(row, {
+    requesterRole: "photographer",
+    feeConfig: normalizeDeletionFeeConfig(feeRows as DeletionFeeSettingRow[] | null),
+  });
   const now = new Date().toISOString();
   const { data: request, error: insertError } = await admin
     .from("image_deletion_requests")

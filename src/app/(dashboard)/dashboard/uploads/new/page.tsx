@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { extractExif, type ExifData } from "@/lib/utils/exif";
+import { normalizeRotationDegrees, rotatedDimensions } from "@/lib/images/orientation";
 import { COPYRIGHT_LICENSES, FREE_USAGE_POLICIES, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
@@ -124,6 +125,8 @@ export default function NewUploadPage() {
   const [attributionName, setAttributionName] = useState("");
   const [attributionUrl, setAttributionUrl] = useState("");
   const [authorshipDeclaration, setAuthorshipDeclaration] = useState<AuthorshipDeclaration | "">("");
+  const [factualityAgreed, setFactualityAgreed] = useState(false);
+  const [rotationDegrees, setRotationDegrees] = useState(0);
 
   const [imgWidth, setImgWidth]   = useState<number | null>(null);
   const [imgHeight, setImgHeight] = useState<number | null>(null);
@@ -235,6 +238,8 @@ export default function NewUploadPage() {
     setFile(f);
     setTitle("");     // clear title — will be filled by AI
     setImgWidth(null); setImgHeight(null);
+    setRotationDegrees(0);
+    setFactualityAgreed(false);
     const objectUrl = URL.createObjectURL(f);
     setPreview(objectUrl);
     // Extract image dimensions (skip for TIFF — canvas can't decode it)
@@ -256,6 +261,10 @@ export default function NewUploadPage() {
     if (f) handleFileChange(f);
   }
 
+  const orientedDimensions = rotatedDimensions(imgWidth, imgHeight, rotationDegrees);
+  const displayWidth = orientedDimensions.width;
+  const displayHeight = orientedDimensions.height;
+
   const canSubmit =
     !!file &&
     !!title.trim() &&
@@ -264,6 +273,7 @@ export default function NewUploadPage() {
     !!takenAt &&
     !!location &&
     !!authorshipDeclaration &&
+    factualityAgreed &&
     status !== "uploading" &&
     status !== "saving";
 
@@ -314,9 +324,12 @@ export default function NewUploadPage() {
           storage_path_original: storagePath,
           file_size_mb: parseFloat((file!.size / 1024 / 1024).toFixed(2)),
           file_format: file!.type === "image/tiff" ? "TIFF" : file!.type === "image/jpeg" ? "JPEG" : file!.type.split("/")[1].toUpperCase(),
-          width: imgWidth,
-          height: imgHeight,
-          resolution_mp: imgWidth && imgHeight ? parseFloat(((imgWidth * imgHeight) / 1_000_000).toFixed(1)) : null,
+          width: displayWidth,
+          height: displayHeight,
+          resolution_mp: displayWidth && displayHeight ? parseFloat(((displayWidth * displayHeight) / 1_000_000).toFixed(1)) : null,
+          upload_rotation_degrees: rotationDegrees,
+          upload_original_width: imgWidth,
+          upload_original_height: imgHeight,
           // 촬영일시: "unknown" → null (TIMESTAMPTZ 불가), 날짜 문자열 → ISO
           exif_taken_at: takenAt === UNKNOWN ? null : takenAt || null,
           exif_taken_at_unknown: takenAt === UNKNOWN,
@@ -330,6 +343,7 @@ export default function NewUploadPage() {
           attribution_name: attributionName.trim() || null,
           attribution_url: attributionUrl.trim() || null,
           authorship_declaration: authorshipDeclaration,
+          factuality_attested: factualityAgreed,
         }),
       });
 
@@ -381,8 +395,18 @@ export default function NewUploadPage() {
               onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
             />
             {preview ? (
-              <div className={previewContainerClass(imgWidth, imgHeight)}>
-                <Image src={preview} alt="Preview" width={imgWidth ?? 800} height={imgHeight ?? 600} className="w-full h-auto block" unoptimized />
+              <div className={previewContainerClass(displayWidth, displayHeight)}>
+                <Image
+                  src={preview}
+                  alt="Preview"
+                  width={imgWidth ?? 800}
+                  height={imgHeight ?? 600}
+                  className="w-full h-auto block transition-transform duration-200"
+                  style={{
+                    transform: rotationDegrees ? `rotate(${rotationDegrees}deg)` : "none",
+                  }}
+                  unoptimized
+                />
               </div>
             ) : (
               <>
@@ -404,12 +428,49 @@ export default function NewUploadPage() {
                 <span className="font-mono truncate max-w-xs">{file.name}</span>
                 <span>·</span>
                 <span>{(file.size / 1024 / 1024).toFixed(1)} MB</span>
-                {imgWidth && imgHeight && (
+                {displayWidth && displayHeight && (
                   <>
                     <span>·</span>
-                    <span>{imgWidth.toLocaleString()} × {imgHeight.toLocaleString()} px</span>
+                    <span>{displayWidth.toLocaleString()} × {displayHeight.toLocaleString()} px</span>
                   </>
                 )}
+                {rotationDegrees > 0 && (
+                  <>
+                    <span>·</span>
+                    <span>{rotationDegrees}° 회전 보정</span>
+                  </>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setRotationDegrees((value) => normalizeRotationDegrees(value + 270))}
+                  className="h-9 px-3 rounded-lg border border-outline-variant text-xs font-bold text-on-surface-variant hover:text-on-surface hover:border-outline flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-sm">rotate_left</span>
+                  왼쪽 회전
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRotationDegrees((value) => normalizeRotationDegrees(value + 90))}
+                  className="h-9 px-3 rounded-lg border border-outline-variant text-xs font-bold text-on-surface-variant hover:text-on-surface hover:border-outline flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-sm">rotate_right</span>
+                  오른쪽 회전
+                </button>
+                {rotationDegrees > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setRotationDegrees(0)}
+                    className="h-9 px-3 rounded-lg border border-outline-variant text-xs font-bold text-outline hover:text-on-surface hover:border-outline flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-sm">restart_alt</span>
+                    초기화
+                  </button>
+                )}
+                <span className="text-[11px] text-outline">
+                  세로/가로가 다르게 보이면 회전 보정 후 제출하세요. 워터마크와 썸네일에도 반영됩니다.
+                </span>
               </div>
               {/* EXIF metadata panel */}
               {exifData && <ExifPanel data={exifData} />}
@@ -653,6 +714,10 @@ export default function NewUploadPage() {
               ))}
             </div>
 
+            <p className="text-xs leading-relaxed text-on-surface-variant">
+              무료로 공개하려면 무료 사용 정책에서 <span className="font-semibold text-on-surface">전체 무료</span> 또는 <span className="font-semibold text-on-surface">교육용 무료</span>를 선택하세요. CC0/CC BY 계열을 선택하면 라이브러리에서도 해당 저작권 등급이 함께 표시됩니다.
+            </p>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold text-outline uppercase tracking-widest">출처 표기명</label>
@@ -740,6 +805,24 @@ export default function NewUploadPage() {
               <p className="text-xs text-error">AI 여부 또는 오리지널리티 보증을 선택해주세요.</p>
             )}
           </div>
+
+          <label className="flex cursor-pointer gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 transition-colors hover:border-outline">
+            <input
+              type="checkbox"
+              checked={factualityAgreed}
+              onChange={(e) => setFactualityAgreed(e.target.checked)}
+              className="mt-1 h-4 w-4 shrink-0 accent-primary"
+            />
+            <span>
+              <span className="block text-sm font-bold text-on-surface">업로드 내용 사실성 보증 *</span>
+              <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">
+                이번에 제출하는 사진, 제목, 설명, 캡션, 태그 및 관련 메타데이터가 사실과 부합하며, 제3자의 권리나 신원을 오인하게 만들지 않음을 확인합니다.
+              </span>
+              {!factualityAgreed && file && (
+                <span className="mt-2 block text-xs text-error">사실성 보증 동의가 필요합니다.</span>
+              )}
+            </span>
+          </label>
 
           {errorMsg && (
             <div className="px-4 py-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm flex items-center gap-2">

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 interface PhotographerProfileRow {
   id: string;
@@ -18,6 +18,8 @@ interface PhotographerImageRow {
   height: number | null;
   sales_count: number | null;
   views_count: number | null;
+  copyright_license: string | null;
+  free_usage_policy: string | null;
 }
 
 export async function GET(
@@ -25,7 +27,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: profile, error } = await supabase
     .from("profiles")
@@ -40,7 +42,7 @@ export async function GET(
 
   const { data: images, error: imagesError } = await supabase
     .from("images")
-    .select("id, title, category, storage_path_preview, width, height, sales_count, views_count")
+    .select("id, title, category, storage_path_preview, width, height, sales_count, views_count, copyright_license, free_usage_policy")
     .eq("photographer_id", id)
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
@@ -91,6 +93,8 @@ export async function GET(
       alt: img.title,
       width: img.width ?? 600,
       height: img.height ?? 400,
+      copyrightLicense: img.copyright_license,
+      freeUsagePolicy: img.free_usage_policy,
     })),
   });
 }

@@ -58,8 +58,9 @@ export async function GET(
   const { id } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  const admin = createAdminClient();
 
-  const { data: img, error } = await supabase
+  const { data: img, error } = await admin
     .from("images")
     .select(
       `id, asset_id, title, description, category, tags,
@@ -83,7 +84,6 @@ export async function GET(
   const image = img as ImageDetailRow;
 
   // Increment views via admin client — RLS blocks updates on approved images for non-owners
-  const admin = createAdminClient();
   admin
     .from("images")
     .update({ views_count: image.views_count + 1 })
@@ -104,7 +104,7 @@ export async function GET(
     .then(() => {});
 
   // Similar images (same category, excluding this one)
-  const { data: similar } = await supabase
+  const { data: similar } = await admin
     .from("images")
     .select("id, title, category, storage_path_preview, width, height, photographer:profiles!photographer_id(full_name)")
     .eq("status", "approved")
@@ -116,7 +116,7 @@ export async function GET(
   // Convert storage paths → public URLs
   function previewUrl(path: string | null | undefined): string {
     if (!path) return "";
-    const { data } = supabase.storage.from("images-preview").getPublicUrl(path);
+    const { data } = admin.storage.from("images-preview").getPublicUrl(path);
     return data.publicUrl;
   }
 

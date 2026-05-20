@@ -19,6 +19,7 @@ export interface ImageDeletionInput {
 
 export interface ImageDeletionContext {
   requesterRole: DeletionRequesterRole;
+  feeConfig?: DeletionFeeConfig;
 }
 
 export interface ImageDeletionImpact {
@@ -31,8 +32,15 @@ export interface ImageDeletionImpact {
   estimatedFeeKrw: number;
 }
 
-const SIMPLE_PHOTOGRAPHER_DELETE_FEE_KRW = 5000;
-const COMPLEX_PHOTOGRAPHER_DELETE_FEE_KRW = 30000;
+export interface DeletionFeeConfig {
+  simpleFeeKrw: number;
+  complexFeeKrw: number;
+}
+
+export const DEFAULT_DELETION_FEE_CONFIG: DeletionFeeConfig = {
+  simpleFeeKrw: 5000,
+  complexFeeKrw: 30000,
+};
 
 function hasValue(value: string | null | undefined) {
   return Boolean(value && value.trim());
@@ -54,10 +62,13 @@ function hasArweaveProof(image: ImageDeletionInput) {
   );
 }
 
-export function defaultDeletionFeeKrw(impact: Pick<ImageDeletionImpact, "buyerNoticeRequired" | "onchainNoticeRequired">) {
+export function defaultDeletionFeeKrw(
+  impact: Pick<ImageDeletionImpact, "buyerNoticeRequired" | "onchainNoticeRequired">,
+  config: DeletionFeeConfig = DEFAULT_DELETION_FEE_CONFIG,
+) {
   return impact.buyerNoticeRequired || impact.onchainNoticeRequired
-    ? COMPLEX_PHOTOGRAPHER_DELETE_FEE_KRW
-    : SIMPLE_PHOTOGRAPHER_DELETE_FEE_KRW;
+    ? config.complexFeeKrw
+    : config.simpleFeeKrw;
 }
 
 export function assessImageDeletion(
@@ -88,7 +99,7 @@ export function assessImageDeletion(
 
   return {
     ...impact,
-    estimatedFeeKrw: context.requesterRole === "photographer" ? defaultDeletionFeeKrw(impact) : 0,
+    estimatedFeeKrw: context.requesterRole === "photographer" ? defaultDeletionFeeKrw(impact, context.feeConfig) : 0,
   };
 }
 

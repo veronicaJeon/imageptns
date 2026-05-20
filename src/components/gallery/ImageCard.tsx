@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useCart } from "@/lib/store/cart";
 import { useRouter } from "next/navigation";
 import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
+import { getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 
 export interface ImageCardData {
   id: string;
@@ -17,6 +18,8 @@ export interface ImageCardData {
   photographer?: string;
   width: number;
   height: number;
+  copyrightLicense?: string | null;
+  freeUsagePolicy?: string | null;
 }
 
 interface ImageCardProps {
@@ -81,6 +84,9 @@ export function ImageCard({
     setTimeout(() => setCartAdded(false), 1500);
   }
 
+  const copyrightLicense = getCopyrightLicense(image.copyrightLicense);
+  const freeUsagePolicy = getFreeUsagePolicy(image.freeUsagePolicy);
+
   return (
     <div
       className={cn(
@@ -115,6 +121,18 @@ export function ImageCard({
             {image.photographer && (
               <p className="text-[10px] opacity-60 mt-0.5 truncate">{image.photographer}</p>
             )}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {copyrightLicense.code !== "standard" && (
+                <span className="rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide">
+                  {copyrightLicense.label.replace(" 4.0", "")}
+                </span>
+              )}
+              {freeUsagePolicy.code !== "none" && (
+                <span className="rounded-full bg-primary-container/90 px-2 py-0.5 text-[9px] font-bold text-on-primary-container">
+                  {freeUsagePolicy.label}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* 액션 버튼 */}

@@ -30,6 +30,14 @@ interface PolicyForm {
   ends_at: string;
 }
 
+interface DeletionFeeSetting {
+  code: "image_delete_complex" | "image_delete_simple";
+  label: string;
+  amount_krw: number;
+  active: boolean;
+  updated_at: string | null;
+}
+
 const SCOPE_LABELS: Record<CommissionScope, string> = {
   default: "기본",
   license: "라이선스",
@@ -60,6 +68,11 @@ const EMPTY_FORM: PolicyForm = {
   image_id: "",
   starts_at: "",
   ends_at: "",
+};
+
+const DELETION_FEE_HELP: Record<DeletionFeeSetting["code"], string> = {
+  image_delete_simple: "판매/온체인 이력이 없는 사진가 삭제 요청에 적용합니다.",
+  image_delete_complex: "구매자 고지, 구매이력 보존, 온체인/Arweave 기록 확인이 필요한 요청에 적용합니다.",
 };
 
 function formatRate(rate: number) {
@@ -102,6 +115,10 @@ export default function AdminCommissionPage() {
   const [saving, setSaving] = useState(false);
   const [actioning, setActioning] = useState<string | null>(null);
   const [rateDrafts, setRateDrafts] = useState<Record<string, string>>({});
+  const [deletionFees, setDeletionFees] = useState<DeletionFeeSetting[]>([]);
+  const [deletionFeeDrafts, setDeletionFeeDrafts] = useState<Record<string, string>>({});
+  const [feesLoading, setFeesLoading] = useState(true);
+  const [feesSaving, setFeesSaving] = useState(false);
   const [form, setForm] = useState<PolicyForm>(EMPTY_FORM);
 
   const targetField = useMemo(() => policyTargetField(form.scope), [form.scope]);
@@ -133,7 +150,37 @@ export default function AdminCommissionPage() {
     }
   }, []);
 
-  useEffect(() => { loadPolicies(); }, [loadPolicies]);
+  const loadDeletionFees = useCallback(async () => {
+    setFeesLoading(true);
+    try {
+      const res = await fetch("/api/admin/deletion-fees");
+      if (res.status === 403) {
+        setForbidden(true);
+        return;
+      }
+      if (!res.ok) {
+        const { error } = await res.json();
+        alert(error ?? "삭제 요청 수수료를 불러오지 못했습니다.");
+        return;
+      }
+      const { settings } = await res.json();
+      const nextFees = (settings ?? []) as DeletionFeeSetting[];
+      setDeletionFees(nextFees);
+      setDeletionFeeDrafts(
+        nextFees.reduce<Record<string, string>>((acc, fee) => {
+          acc[fee.code] = String(fee.amount_krw);
+          return acc;
+        }, {}),
+      );
+    } finally {
+      setFeesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPolicies();
+    loadDeletionFees();
+  }, [loadPolicies, loadDeletionFees]);
 
   function updateForm<K extends keyof PolicyForm>(key: K, value: PolicyForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -214,6 +261,33 @@ export default function AdminCommissionPage() {
     await patchPolicy(policy.id, { rate });
   }
 
+  async function saveDeletionFees() {
+    const settings = deletionFees.map((fee) => {
+      const amount = Number(deletionFeeDrafts[fee.code]);
+      if (!Number.isInteger(amount) || amount < 0) {
+        throw new Error("삭제 요청 수수료는 0 이상의 원화 정수로 입력해주세요.");
+      }
+      return { code: fee.code, amount_krw: amount, active: fee.active };
+    });
+
+    setFeesSaving(true);
+    try {
+      const res = await fetch("/api/admin/deletion-fees", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json();
+        alert(error ?? "삭제 요청 수수료를 저장하지 못했습니다.");
+        return;
+      }
+      await loadDeletionFees();
+    } finally {
+      setFeesSaving(false);
+    }
+  }
+
   if (forbidden) {
     return (
       <div className="p-10 flex flex-col items-center justify-center min-h-[60vh] gap-4 text-outline">
@@ -240,6 +314,74 @@ export default function AdminCommissionPage() {
             </span>
           )}
         </div>
+
+        <section className="bg-surface-container-lowest shadow-ghost rounded-xl p-5 flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+            <div>
+              <h2 className="font-headline text-lg font-extrabold text-on-surface">사진 삭제 요청 수수료</h2>
+              <p className="text-xs text-outline mt-0.5">
+                사진가가 삭제를 요청할 때 안내되는 수수료를 운영 상황에 맞게 조정합니다.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                saveDeletionFees().catch((error) => alert(error instanceof Error ? error.message : "저장하지 못했습니다."));
+              }}
+              disabled={feesSaving || feesLoading || deletionFees.length === 0}
+              className="h-10 flex items-center justify-center gap-2 px-4 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
+            >
+              {feesSaving ? (
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <span className="material-symbols-outlined text-base">save</span>
+              )}
+              수수료 저장
+            </button>
+          </div>
+
+          {feesLoading ? (
+            <div className="py-8 flex justify-center">
+              <span className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-3">
+              {deletionFees.map((fee) => (
+                <div key={fee.code} className="rounded-lg bg-surface-container-low p-4 flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-on-surface">{fee.label}</p>
+                      <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">{DELETION_FEE_HELP[fee.code]}</p>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs font-bold text-outline">
+                      <input
+                        type="checkbox"
+                        checked={fee.active}
+                        onChange={(e) => setDeletionFees((prev) => prev.map((row) => (
+                          row.code === fee.code ? { ...row, active: e.target.checked } : row
+                        )))}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      활성
+                    </label>
+                  </div>
+                  <div className="flex items-center h-11 bg-surface-container-lowest ring-1 ring-outline-variant rounded-lg overflow-hidden">
+                    <span className="px-3 text-xs font-bold text-outline">₩</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={deletionFeeDrafts[fee.code] ?? ""}
+                      onChange={(e) => setDeletionFeeDrafts((prev) => ({ ...prev, [fee.code]: e.target.value }))}
+                      className="flex-1 h-full bg-transparent px-2 text-sm font-semibold text-on-surface outline-none"
+                      aria-label={`${fee.label} 금액`}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <form
           onSubmit={createPolicy}
