@@ -15,6 +15,7 @@ interface ClaimConfirmBody {
 interface ClaimableLedgerRow {
   id: string;
   claimable_amount: number | string | null;
+  claim_review_status: string | null;
   created_at: string;
 }
 
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
 
   const { data: claimableRowsData, error: claimableRowsError } = await admin
     .from("earnings_ledger")
-    .select("id, claimable_amount, created_at")
+    .select("id, claimable_amount, claim_review_status, created_at")
     .eq("photographer_id", user.id)
     .eq("settlement_provider", "onchain_escrow")
     .eq("claim_status", "claimable");
@@ -179,6 +180,14 @@ export async function POST(req: NextRequest) {
 
   if (txAlreadyConfirmedForUser) {
     return NextResponse.json({ error: "Claim transaction hash is already used" }, { status: 409 });
+  }
+
+  const unapprovedRows = claimableRows.filter((row) => row.claim_review_status !== "approved");
+  if (unapprovedRows.length > 0) {
+    return NextResponse.json(
+      { error: "Onchain claim requires admin approval before confirmation" },
+      { status: 409 },
+    );
   }
 
   const latestClaimableCreatedAt = claimableRows.reduce((latest, row) => {

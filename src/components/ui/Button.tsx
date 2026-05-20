@@ -60,7 +60,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          "inline-flex items-center justify-center gap-2 select-none",
+          "inline-flex min-w-0 max-w-full items-center justify-center gap-2 select-none",
+          !isIcon && "whitespace-normal text-center leading-snug break-words",
           "disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none",
           variantStyles[variant],
           isIcon ? iconSizeStyles[size] : sizeStyles[size],

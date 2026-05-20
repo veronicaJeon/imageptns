@@ -30,7 +30,7 @@ export async function GET() {
     .from("earnings_ledger")
     .select(`
       id, gross_krw, commission_krw, net_krw, period, created_at,
-      settlement_provider, claim_status, claim_tx_hash, claimable_amount,
+      settlement_provider, claim_status, claim_tx_hash, claimable_amount, claim_review_status,
       payout:payouts!payout_id(id, status, paid_at),
       order_item:order_items!order_item_id(
         license_code,
