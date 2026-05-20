@@ -25,6 +25,7 @@ const NAV_ITEMS = [
   { href: "/admin/stats",             icon: "bar_chart",       label: "통계"         },
   { href: "/admin/image-insights",    icon: "insights",        label: "이미지 인사이트" },
   { href: "/admin/notices",           icon: "campaign",        label: "공지사항"      },
+  { href: "/admin/legal",             icon: "gavel",           label: "법률정보"      },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

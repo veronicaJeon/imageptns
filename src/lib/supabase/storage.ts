@@ -26,6 +26,7 @@ export function thumbnailUrlFromPreviewUrl(src: string, width = 320, height = 24
       src: url.toString(),
       w: String(width),
       h: String(height),
+      wm: "1",
     });
     return `/api/images/thumbnail?${params.toString()}`;
   } catch {

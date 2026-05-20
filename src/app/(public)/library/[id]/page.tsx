@@ -9,6 +9,7 @@ import { useCart } from "@/lib/store/cart";
 import { cn } from "@/lib/utils/cn";
 import { ImageCard, ImageCardData } from "@/components/gallery/ImageCard";
 import { getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
+import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 
 const LICENSE_PRICES: Record<string, number> = {
   editorial:  15000,
@@ -228,11 +229,12 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
               {imageData.storage_path_preview ? (
                 <>
                   <Image
-                    src={imageData.storage_path_preview}
+                    src={thumbnailUrlFromPreviewUrl(imageData.storage_path_preview, 1200, 900)}
                     alt={imageData.title}
                     width={imageData.width ?? 1200}
                     height={imageData.height ?? 800}
                     className="w-full h-auto object-cover"
+                    unoptimized
                   />
                   <div className="pointer-events-none absolute inset-0 overflow-hidden">
                     <div className="absolute inset-[-20%] grid grid-cols-3 gap-8 rotate-[-24deg] opacity-25">

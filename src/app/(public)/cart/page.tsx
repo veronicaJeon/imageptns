@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import NextImage from "next/image";
+import { cartStatementThumbnailUrl, collectCartStatementThumbnailUrls } from "@/lib/cart/print";
 import { useLang } from "@/lib/i18n/store";
 import { useCart, LicenseType, getLicensePrice } from "@/lib/store/cart";
 import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
@@ -39,7 +40,20 @@ export default function CartPage() {
   const issuedAt = new Date();
   const quoteNumber = `CART-${issuedAt.toISOString().slice(0, 10).replaceAll("-", "")}`;
 
-  function handlePrintStatement() {
+  async function preloadStatementThumbnails() {
+    const urls = collectCartStatementThumbnailUrls(items, window.location.origin);
+    await Promise.allSettled(
+      urls.map((url) => new Promise<void>((resolve) => {
+        const img = new window.Image();
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+        img.src = url;
+      })),
+    );
+  }
+
+  async function handlePrintStatement() {
+    await preloadStatementThumbnails();
     document.body.classList.add("printing-cart");
     const cleanup = () => document.body.classList.remove("printing-cart");
     window.addEventListener("afterprint", cleanup, { once: true });
@@ -78,13 +92,15 @@ export default function CartPage() {
                 <td className="py-3 pr-3 text-zinc-500">{index + 1}</td>
                 <td className="py-3 pr-3">
                   {item.src ? (
-                    <Image
-                      src={thumbnailUrlFromPreviewUrl(item.src, 160, 120)}
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={cartStatementThumbnailUrl(item.src, "", 160, 120)}
                       alt=""
-                      width={64}
-                      height={48}
+                      width="64"
+                      height="48"
+                      loading="eager"
+                      decoding="sync"
                       className="h-12 w-16 rounded object-cover"
-                      unoptimized
                     />
                   ) : (
                     <div className="h-12 w-16 rounded bg-zinc-100" />
@@ -157,7 +173,7 @@ export default function CartPage() {
               {items.map((item) => (
                 <div key={item.id} className="bg-surface-container-lowest shadow-ghost p-5 flex gap-5">
                   <Link href={`/library/${item.id}`} className="shrink-0">
-                    <Image
+                    <NextImage
                       src={thumbnailUrlFromPreviewUrl(item.src, 240, 180)}
                       alt={item.title}
                       width={100}
