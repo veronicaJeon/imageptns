@@ -32,8 +32,11 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [bio, setBio]     = useState("");
   const [walletAddress, setWalletAddress] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [activityRegions, setActivityRegions] = useState("");
   const [role, setRole]   = useState<"buyer" | "photographer" | null>(null);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState({ sales: true, reviews: true, newsletter: false });
   const [notifSaving, setNotifSaving] = useState(false);
@@ -81,6 +84,8 @@ export default function SettingsPage() {
         setEmail(profile.email ?? "");
         setBio(profile.bio ?? "");
         setWalletAddress(profile.wallet_address ?? "");
+        setPhoneNumber(profile.phone_number ?? "");
+        setActivityRegions((profile.primary_activity_regions ?? []).join("\n"));
         setRole(profile.role ?? null);
         setNotifications({
           sales:      profile.notif_sales      ?? true,
@@ -100,17 +105,28 @@ export default function SettingsPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setSaveError("");
     try {
       const res = await fetch("/api/profile", {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ full_name: name, bio, wallet_address: walletAddress }),
+        body: JSON.stringify({
+          full_name: name,
+          bio,
+          wallet_address: walletAddress,
+          ...(role === "photographer"
+            ? { phone_number: phoneNumber, primary_activity_regions: activityRegions }
+            : {}),
+        }),
       });
       if (res.ok) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
         // Silently refresh auth store in background (don't await — avoids hang)
         init().catch(() => {});
+      } else {
+        const { error } = await res.json().catch(() => ({ error: "" }));
+        setSaveError(error || "프로필 저장 중 오류가 발생했습니다.");
       }
     } finally {
       setLoading(false);
@@ -242,38 +258,61 @@ export default function SettingsPage() {
           </div>
 
           {role === "photographer" && (
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-                <Input
-                  label="Base 지갑 주소"
-                  type="text"
-                  value={walletAddress}
-                  onChange={(e) => {
-                    setWalletAddress(e.target.value);
-                    setWalletError("");
-                  }}
-                  icon="account_balance_wallet"
-                  placeholder="0x..."
-                  hint="사진 승인 증명과 USDC 정산에 사용할 Base 지갑입니다."
+            <div className="flex flex-col gap-5">
+              <Input
+                label={s.phoneLabel}
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                icon="phone"
+                placeholder="+82 10 1234 5678"
+              />
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-outline uppercase tracking-widest">{s.regionsLabel}</label>
+                <textarea
+                  value={activityRegions}
+                  onChange={(e) => setActivityRegions(e.target.value)}
+                  rows={3}
+                  className="w-full bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-none transition-all"
+                  placeholder={s.regionsPlaceholder}
                 />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="md"
-                  loading={walletConnecting}
-                  onClick={handleConnectWallet}
-                  className="h-12 shrink-0 whitespace-nowrap"
-                >
-                  <span className="material-symbols-outlined text-base">account_balance_wallet</span>
-                  MetaMask 연결
-                </Button>
+                <p className="text-xs text-outline">{s.regionsHint}</p>
               </div>
-              {walletError && (
-                <p className="text-xs text-error flex items-center gap-1">
-                  <span className="material-symbols-outlined text-base">error</span>
-                  {walletError}
-                </p>
-              )}
+
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                  <Input
+                    label="Base 지갑 주소"
+                    type="text"
+                    value={walletAddress}
+                    onChange={(e) => {
+                      setWalletAddress(e.target.value);
+                      setWalletError("");
+                    }}
+                    icon="account_balance_wallet"
+                    placeholder="0x..."
+                    hint="사진 승인 증명과 USDC 정산에 사용할 Base 지갑입니다."
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="md"
+                    loading={walletConnecting}
+                    onClick={handleConnectWallet}
+                    className="h-12 shrink-0 whitespace-nowrap"
+                  >
+                    <span className="material-symbols-outlined text-base">account_balance_wallet</span>
+                    MetaMask 연결
+                  </Button>
+                </div>
+                {walletError && (
+                  <p className="text-xs text-error flex items-center gap-1">
+                    <span className="material-symbols-outlined text-base">error</span>
+                    {walletError}
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -286,6 +325,12 @@ export default function SettingsPage() {
               </span>
             )}
           </div>
+          {saveError && (
+            <p className="text-xs text-error flex items-center gap-1">
+              <span className="material-symbols-outlined text-base">error</span>
+              {saveError}
+            </p>
+          )}
         </form>
       </section>
 

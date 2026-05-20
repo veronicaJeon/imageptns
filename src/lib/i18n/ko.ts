@@ -134,7 +134,7 @@ export const ko: Translations = {
     },
     uploads: { title: "내 업로드", uploadBtn: "새 업로드", empty: "업로드한 이미지가 없습니다. 작품을 공유해보세요.", cols: { image: "이미지", status: "상태", views: "조회", sales: "판매", uploaded: "업로드일" }, statuses: { approved: "승인됨", pending: "검토 중", rejected: "반려됨" } },
     earnings: { title: "수익", statTotal: "총 수익", statMonth: "이번 달", statPending: "정산 대기", payoutBtn: "정산 요청", historyTitle: "정산 내역" },
-    settings: { title: "설정", sections: { profile: "프로필", account: "계정", notifications: "알림", danger: "위험 구역" }, saveBtn: "변경 사항 저장", nameLabel: "이름", emailLabel: "이메일", bioLabel: "자기소개", deleteAccount: "계정과 모든 관련 데이터를 영구적으로 삭제합니다.", deleteBtn: "계정 삭제" },
+    settings: { title: "설정", sections: { profile: "프로필", account: "계정", notifications: "알림", danger: "위험 구역" }, saveBtn: "변경 사항 저장", nameLabel: "이름", emailLabel: "이메일", bioLabel: "자기소개", phoneLabel: "연락처 전화번호", regionsLabel: "주 활동 지역", regionsPlaceholder: "서울\n부산\n제주", regionsHint: "한 줄에 하나씩 입력하거나 쉼표로 구분하세요.", deleteAccount: "계정과 모든 관련 데이터를 영구적으로 삭제합니다.", deleteBtn: "계정 삭제" },
   },
   cart: {
     title: "장바구니", empty: "장바구니가 비어 있습니다.", emptyBtn: "라이브러리 둘러보기",

@@ -9,6 +9,8 @@ interface ProfileRow {
   avatar_url: string | null;
   is_admin: boolean;
   wallet_address: string | null;
+  phone_number: string | null;
+  primary_activity_regions: string[] | null;
   created_at: string;
   updated_at: string | null;
   last_login_at: string | null;
@@ -64,7 +66,7 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient();
   let profileQuery = admin
     .from("profiles")
-    .select("id, full_name, role, avatar_url, is_admin, wallet_address, created_at, updated_at, last_login_at, login_count, deleted_at")
+    .select("id, full_name, role, avatar_url, is_admin, wallet_address, phone_number, primary_activity_regions, created_at, updated_at, last_login_at, login_count, deleted_at")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(300);
@@ -108,7 +110,7 @@ export async function GET(req: NextRequest) {
     })
     .filter((user) => {
       if (!query) return true;
-      return [user.email, user.full_name, user.wallet_address, user.id]
+      return [user.email, user.full_name, user.wallet_address, user.phone_number, ...(user.primary_activity_regions ?? []), user.id]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query));
     });
