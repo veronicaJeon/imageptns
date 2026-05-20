@@ -12,6 +12,7 @@ interface PhotographerData {
   full_name: string;
   bio: string | null;
   avatar_url: string | null;
+  primary_activity_regions: string[];
   member_since: string;
   stats: {
     total_images: number;
@@ -137,6 +138,15 @@ export default function PhotographerProfilePage({ params }: { params: Promise<{ 
                 <p className="text-on-surface-variant leading-relaxed max-w-xl text-sm md:text-base">
                   {photographer.bio}
                 </p>
+              )}
+              {(photographer.primary_activity_regions?.length ?? 0) > 0 && (
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {photographer.primary_activity_regions?.map((region) => (
+                    <span key={region} className="rounded-full bg-surface-container-low px-3 py-1 text-[10px] font-bold text-on-surface-variant">
+                      {region}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
 

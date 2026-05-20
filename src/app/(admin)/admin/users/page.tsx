@@ -10,6 +10,8 @@ interface UserSummary {
   avatar_url: string | null;
   is_admin: boolean;
   wallet_address: string | null;
+  phone_number: string | null;
+  primary_activity_regions: string[] | null;
   created_at: string;
   last_login_at: string | null;
   login_count: number | null;
@@ -29,6 +31,8 @@ interface UserDetail {
   role: "buyer" | "photographer";
   avatar_url: string | null;
   wallet_address: string | null;
+  phone_number: string | null;
+  primary_activity_regions: string[] | null;
   is_admin: boolean;
   created_at: string;
   updated_at: string | null;
@@ -152,7 +156,7 @@ export default function AdminUsersPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="이름, 이메일, 지갑주소 검색"
+            placeholder="이름, 이메일, 지갑, 전화, 지역 검색"
             className="h-11 w-full rounded-lg bg-surface-container-lowest px-4 text-sm outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary sm:w-72"
           />
           <select
@@ -233,6 +237,16 @@ export default function AdminUsersPage() {
                   <div className="rounded-lg bg-surface-container-low p-3"><p className="text-xs text-outline">누적 결제</p><p className="mt-1 font-semibold">{formatKRW(selectedSummary?.totalPaidKrw ?? 0)}</p></div>
                 </div>
                 {detail.wallet_address && <p className="mt-3 truncate text-xs text-outline">지갑 {detail.wallet_address}</p>}
+                {detail.phone_number && <p className="mt-2 truncate text-xs text-outline">전화 {detail.phone_number}</p>}
+                {(detail.primary_activity_regions?.length ?? 0) > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {detail.primary_activity_regions?.map((region) => (
+                      <span key={region} className="rounded-full bg-surface-container-low px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
+                        {region}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <button
                   onClick={deleteUser}
                   disabled={deleting}
@@ -276,4 +290,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-

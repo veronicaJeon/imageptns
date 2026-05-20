@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAddress } from "viem";
+import { normalizePhoneNumber, normalizePrimaryActivityRegions } from "@/lib/profile/contact";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
@@ -9,7 +10,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, bio, avatar_url, role, wallet_address, notif_sales, notif_reviews, notif_newsletter, created_at")
+    .select("id, full_name, bio, avatar_url, role, wallet_address, phone_number, primary_activity_regions, notif_sales, notif_reviews, notif_newsletter, created_at")
     .eq("id", user.id)
     .single();
 
@@ -26,6 +27,17 @@ export async function PATCH(req: NextRequest) {
   const allowed: Record<string, unknown> = {};
   if ("full_name" in body) allowed.full_name = body.full_name;
   if ("bio"       in body) allowed.bio       = body.bio;
+  try {
+    if ("phone_number" in body) allowed.phone_number = normalizePhoneNumber(body.phone_number);
+    if ("primary_activity_regions" in body) {
+      allowed.primary_activity_regions = normalizePrimaryActivityRegions(body.primary_activity_regions);
+    }
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid profile contact fields" },
+      { status: 400 },
+    );
+  }
   if ("wallet_address" in body) {
     const rawWallet = typeof body.wallet_address === "string" ? body.wallet_address.trim() : "";
     if (rawWallet) {

@@ -87,7 +87,7 @@ export interface Translations {
     };
     uploads: { title: string; uploadBtn: string; empty: string; cols: { image: string; status: string; views: string; sales: string; uploaded: string }; statuses: { approved: string; pending: string; rejected: string } };
     earnings: { title: string; statTotal: string; statMonth: string; statPending: string; payoutBtn: string; historyTitle: string };
-    settings: { title: string; sections: { profile: string; account: string; notifications: string; danger: string }; saveBtn: string; nameLabel: string; emailLabel: string; bioLabel: string; deleteAccount: string; deleteBtn: string };
+    settings: { title: string; sections: { profile: string; account: string; notifications: string; danger: string }; saveBtn: string; nameLabel: string; emailLabel: string; bioLabel: string; phoneLabel: string; regionsLabel: string; regionsPlaceholder: string; regionsHint: string; deleteAccount: string; deleteBtn: string };
   };
   cart: {
     title: string; empty: string; emptyBtn: string;
@@ -335,7 +335,7 @@ export const en: Translations = {
     },
     uploads: { title: "My Uploads", uploadBtn: "New Upload", empty: "No uploads yet. Start sharing your work.", cols: { image: "Image", status: "Status", views: "Views", sales: "Sales", uploaded: "Uploaded" }, statuses: { approved: "Approved", pending: "Pending", rejected: "Rejected" } },
     earnings: { title: "Earnings", statTotal: "Total Earned", statMonth: "This Month", statPending: "Pending Payout", payoutBtn: "Request Payout", historyTitle: "Payout History" },
-    settings: { title: "Settings", sections: { profile: "Profile", account: "Account", notifications: "Notifications", danger: "Danger Zone" }, saveBtn: "Save Changes", nameLabel: "Full Name", emailLabel: "Email", bioLabel: "Bio", deleteAccount: "Permanently delete your account and all associated data.", deleteBtn: "Delete Account" },
+    settings: { title: "Settings", sections: { profile: "Profile", account: "Account", notifications: "Notifications", danger: "Danger Zone" }, saveBtn: "Save Changes", nameLabel: "Full Name", emailLabel: "Email", bioLabel: "Bio", phoneLabel: "Phone Number", regionsLabel: "Primary Activity Regions", regionsPlaceholder: "Seoul\nBusan\nJeju Island", regionsHint: "Enter one region per line, or separate regions with commas.", deleteAccount: "Permanently delete your account and all associated data.", deleteBtn: "Delete Account" },
   },
   cart: {
     title: "Cart", empty: "Your cart is empty.", emptyBtn: "Browse Library",

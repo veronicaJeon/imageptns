@@ -6,6 +6,7 @@ interface PhotographerProfileRow {
   full_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  primary_activity_regions: string[] | null;
   created_at: string;
 }
 
@@ -31,7 +32,7 @@ export async function GET(
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("id, full_name, bio, avatar_url, role, created_at")
+    .select("id, full_name, bio, avatar_url, primary_activity_regions, role, created_at")
     .eq("id", id)
     .eq("role", "photographer")
     .single();
@@ -78,6 +79,7 @@ export async function GET(
       full_name: profileRow.full_name,
       bio: profileRow.bio,
       avatar_url: profileRow.avatar_url,
+      primary_activity_regions: profileRow.primary_activity_regions ?? [],
       member_since: profileRow.created_at,
       stats: {
         total_images: totalImages ?? 0,
