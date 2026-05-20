@@ -43,6 +43,8 @@ interface AdminStats {
   onchain: {
     proof: {
       notRegistered: number;
+      available: number;
+      requested: number;
       pending: number;
       registered: number;
       failed: number;
@@ -76,6 +78,8 @@ const EMPTY_IMAGES: AdminStats["images"] = {
 
 const EMPTY_PROOF: AdminStats["onchain"]["proof"] = {
   notRegistered: 0,
+  available: 0,
+  requested: 0,
   pending: 0,
   registered: 0,
   failed: 0,
@@ -133,16 +137,24 @@ export default function AdminStatsPage() {
       icon: "sync_problem",
       label: "증명 등록 실패",
       value: proof.failed,
-      detail: "operator/RPC 문제 또는 지갑 누락 가능성이 있습니다.",
-      href: "/admin?status=all",
+      detail: "Arweave 업로드 또는 GraphQL 확인에 실패했습니다.",
+      href: "/admin/onchain-registrations",
       tone: "text-error bg-error/10",
     },
     {
       icon: "hourglass_top",
       label: "증명 등록 진행 중",
       value: proof.pending,
-      detail: "장시간 pending이면 stuck proof로 보고 재처리가 필요합니다.",
-      href: "/admin?status=all",
+      detail: "장시간 pending이면 GraphQL 재검증 또는 재처리가 필요합니다.",
+      href: "/admin/onchain-registrations",
+      tone: "text-amber-600 bg-amber-50 dark:bg-amber-900/20",
+    },
+    {
+      icon: "verified",
+      label: "사진가 등록 요청",
+      value: proof.requested,
+      detail: "사진가가 Arweave 자격증명 등록을 요청한 이미지입니다.",
+      href: "/admin/onchain-registrations",
       tone: "text-amber-600 bg-amber-50 dark:bg-amber-900/20",
     },
     {
@@ -199,14 +211,14 @@ export default function AdminStatsPage() {
           icon="verified"
           label="증명 등록 완료"
           value={proof.registered ?? 0}
-          sub={`대기 ${proof.pending ?? 0} / 실패 ${proof.failed ?? 0}`}
+          sub={`요청 ${proof.requested ?? 0} / 진행 ${proof.pending ?? 0} / 실패 ${proof.failed ?? 0}`}
           color="bg-primary/10 text-primary"
         />
         <StatCard
           icon="cloud_off"
-          label="증명 미등록"
-          value={proof.notRegistered ?? 0}
-          sub="승인 전 또는 이전 데이터"
+          label="등록가능"
+          value={proof.available ?? 0}
+          sub={`미등록 ${proof.notRegistered ?? 0}`}
           color="bg-surface-container-high text-on-surface-variant"
         />
         <StatCard

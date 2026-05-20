@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
+import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
 const VALID_CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
 type ValidCategory = typeof VALID_CATEGORIES[number];
@@ -37,7 +38,7 @@ export async function PATCH(
   if (!img) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { title, description, category, tags, exif_location, exif_taken_at, resubmit, copyright_license, free_usage_policy, attribution_name, attribution_url } = body as {
+  const { title, description, category, tags, exif_location, exif_taken_at, resubmit, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration } = body as {
     title?: string;
     description?: string;
     category?: string;
@@ -49,6 +50,7 @@ export async function PATCH(
     free_usage_policy?: string;
     attribution_name?: string | null;
     attribution_url?: string | null;
+    authorship_declaration?: AuthorshipDeclaration;
   };
 
   if (title !== undefined && !title.trim()) {
@@ -70,6 +72,13 @@ export async function PATCH(
   if (free_usage_policy !== undefined) update.free_usage_policy = normalizeFreeUsagePolicy(free_usage_policy);
   if (attribution_name !== undefined) update.attribution_name = attribution_name?.trim() || null;
   if (attribution_url !== undefined) update.attribution_url = attribution_url?.trim() || null;
+  if (authorship_declaration !== undefined) {
+    if (authorship_declaration !== "ai_generated" && authorship_declaration !== "human_original") {
+      return NextResponse.json({ error: "Invalid authorship_declaration" }, { status: 400 });
+    }
+    update.authorship_declaration = authorship_declaration;
+    update.authorship_declared_at = new Date().toISOString();
+  }
   // Resubmit: only for rejected/draft → pending (approved stays approved)
   if (resubmit && ["rejected", "draft"].includes(image.status)) {
     update.status = "pending";
@@ -82,7 +91,7 @@ export async function PATCH(
     .update(update)
     .eq("id", id)
     .eq("photographer_id", user.id)
-    .select("id, title, description, category, tags, status, rejection_reason, exif_location, exif_taken_at, copyright_license, free_usage_policy, attribution_name, attribution_url")
+    .select("id, title, description, category, tags, status, rejection_reason, exif_location, exif_taken_at, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -50,4 +50,19 @@ describe("buildUploadProofSteps", () => {
     expect(steps.find((step) => step.key === "review")?.state).toBe("failed");
     expect(steps.find((step) => step.key === "proof")?.state).toBe("pending");
   });
+
+  it("shows post-sale Arweave registration requests as the current proof step", () => {
+    const requested = buildUploadProofSteps({
+      status: "approved",
+      proofStatus: "requested",
+    });
+    const available = buildUploadProofSteps({
+      status: "approved",
+      proofStatus: "available",
+    });
+
+    expect(requested.find((step) => step.key === "proof")?.state).toBe("current");
+    expect(available.find((step) => step.key === "proof")?.state).toBe("current");
+    expect(requested.find((step) => step.key === "proof")?.description).toContain("첫 판매 이후");
+  });
 });

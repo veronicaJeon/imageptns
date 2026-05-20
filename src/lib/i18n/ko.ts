@@ -104,7 +104,7 @@ export const ko: Translations = {
     noResults: "검색 결과가 없습니다.",
   },
   dashboard: {
-    nav: { overview: "개요", favorites: "즐겨찾기", orders: "주문 내역", uploads: "업로드", earnings: "수익", settings: "설정" },
+    nav: { overview: "개요", favorites: "즐겨찾기", orders: "주문 내역", uploads: "업로드", blockchain: "블록체인 사진", earnings: "수익", settings: "설정" },
     role: { buyer: "이미지 바이어", photographer: "사진작가" },
     overview: {
       greeting: "반갑습니다",

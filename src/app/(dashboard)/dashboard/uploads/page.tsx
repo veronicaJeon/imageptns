@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useLang } from "@/lib/i18n/store";
 import { buildUploadProofSteps, type TimelineState } from "@/lib/ux/status";
 import { COPYRIGHT_LICENSES, FREE_USAGE_POLICIES, getCopyrightLicense, getFreeUsagePolicy, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
+import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
 const CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
 type Category = typeof CATEGORIES[number];
@@ -44,6 +45,7 @@ interface EditState {
   free_usage_policy: FreeUsagePolicyCode;
   attribution_name: string;
   attribution_url: string;
+  authorship_declaration: AuthorshipDeclaration;
 }
 
 interface UploadRow {
@@ -67,15 +69,23 @@ interface UploadRow {
   proof_tx_hash: string | null;
   proof_status: string | null;
   proof_registered_at: string | null;
+  proof_arweave_original_tx_id: string | null;
+  proof_arweave_metadata_tx_id: string | null;
+  proof_arweave_manifest_tx_id: string | null;
+  proof_arweave_confirmed_at: string | null;
+  proof_failure_reason: string | null;
   copyright_license: string | null;
   free_usage_policy: string | null;
   attribution_name: string | null;
   attribution_url: string | null;
+  authorship_declaration: AuthorshipDeclaration | null;
 }
 
 const PROOF_STATUS_LABELS: Record<string, string> = {
   not_registered: "증명 전",
-  pending: "등록 중",
+  available: "등록가능",
+  requested: "요청됨",
+  pending: "Arweave 등록 중",
   registered: "증명 완료",
   failed: "증명 실패",
 };
@@ -161,6 +171,7 @@ export default function UploadsPage() {
       free_usage_policy: getFreeUsagePolicy(img.free_usage_policy).code,
       attribution_name: img.attribution_name ?? "",
       attribution_url: img.attribution_url ?? "",
+      authorship_declaration: img.authorship_declaration ?? "human_original",
     });
   }
 
@@ -182,6 +193,7 @@ export default function UploadsPage() {
           free_usage_policy: editing.free_usage_policy,
           attribution_name: editing.attribution_name.trim() || null,
           attribution_url: editing.attribution_url.trim() || null,
+          authorship_declaration: editing.authorship_declaration,
           resubmit,
         }),
       });
@@ -339,6 +351,29 @@ export default function UploadsPage() {
                           <span className="bg-surface-container-low text-on-surface-variant px-2 py-0.5 rounded-full">
                             {PROOF_STATUS_LABELS[img.proof_status ?? "not_registered"] ?? img.proof_status}
                           </span>
+                          <span className="bg-surface-container-low text-on-surface-variant px-2 py-0.5 rounded-full">
+                            {img.authorship_declaration === "ai_generated" ? "AI 이미지" : "오리지널 보증"}
+                          </span>
+                          {img.proof_arweave_original_tx_id && (
+                            <a
+                              href={`https://arweave.net/${img.proof_arweave_original_tx_id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:opacity-70"
+                            >
+                              Arweave 원본
+                            </a>
+                          )}
+                          {img.proof_arweave_metadata_tx_id && (
+                            <a
+                              href={`https://arweave.net/${img.proof_arweave_metadata_tx_id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:opacity-70"
+                            >
+                              메타데이터
+                            </a>
+                          )}
                           {img.proof_tx_hash && (
                             <a
                               href={explorerTxUrl(img.chain_id, img.proof_tx_hash) ?? undefined}
@@ -411,6 +446,18 @@ export default function UploadsPage() {
                                   rows={2}
                                   className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 py-2 text-sm text-on-surface outline-none resize-none transition-all"
                                 />
+                              </div>
+
+                              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">AI / 오리지널리티 선언</label>
+                                <select
+                                  value={editing.authorship_declaration}
+                                  onChange={(e) => setEditing({ ...editing, authorship_declaration: e.target.value as AuthorshipDeclaration })}
+                                  className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all"
+                                >
+                                  <option value="human_original">AI 이미지가 아니며, 본인의 오리지널리티 보증</option>
+                                  <option value="ai_generated">AI 생성 이미지</option>
+                                </select>
                               </div>
 
                               <div className="flex flex-col gap-1.5">

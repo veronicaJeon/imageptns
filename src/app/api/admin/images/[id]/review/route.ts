@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAddress } from "viem";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendImageApproved, sendImageRejected } from "@/lib/email/resend";
-import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
-import { getOnchainServerConfig } from "@/lib/onchain/env";
-import { recordOnchainEvent } from "@/lib/onchain/events";
-import { imageAssetBytes32 } from "@/lib/onchain/ids";
-import { canonicalImageProofHash, sha256Buffer } from "@/lib/onchain/proof";
-import { getOnchainOperatorClient, getOnchainPublicClient } from "@/lib/onchain/server";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -29,9 +22,7 @@ interface ReviewImage {
   id: string;
   asset_id: string | null;
   title: string;
-  storage_path_original: string | null;
   photographer_id: string | null;
-  photographer: { wallet_address: string | null } | { wallet_address: string | null }[] | null;
 }
 
 interface ReviewResponseImage {
@@ -48,15 +39,6 @@ interface ReviewResponseImage {
 }
 
 const REVIEW_SELECT = "id, status, rejection_reason, approved_at, title, asset_id, photographer_id, proof_status, proof_registered_at, proof_tx_hash";
-
-function photographerWalletAddress(photographer: ReviewImage["photographer"]) {
-  const profile = Array.isArray(photographer) ? photographer[0] : photographer;
-  return profile?.wallet_address ?? null;
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
 
 export async function PATCH(
   req: NextRequest,
@@ -85,257 +67,37 @@ export async function PATCH(
   if (action === "approve") {
     const { data: loadedImage, error: loadError } = await admin
       .from("images")
-      .select("id, asset_id, title, storage_path_original, photographer_id, photographer:profiles!photographer_id(wallet_address)")
+      .select("id, asset_id, title, photographer_id")
       .eq("id", id)
       .single();
 
     if (loadError) return NextResponse.json({ error: loadError.message }, { status: 500 });
     const image = loadedImage as ReviewImage;
-    if (!image.asset_id) return NextResponse.json({ error: "Image asset_id required for onchain proof" }, { status: 400 });
-    if (!image.storage_path_original) return NextResponse.json({ error: "Original image file required for onchain proof" }, { status: 400 });
-    if (!image.photographer_id) return NextResponse.json({ error: "Photographer required for onchain proof" }, { status: 400 });
+    if (!image.asset_id) return NextResponse.json({ error: "Image asset_id required" }, { status: 400 });
+    if (!image.photographer_id) return NextResponse.json({ error: "Photographer required" }, { status: 400 });
 
-    const walletAddress = photographerWalletAddress(image.photographer);
-    if (!walletAddress) {
-      return NextResponse.json({ error: "Photographer wallet address required for onchain approval" }, { status: 400 });
-    }
-
-    let photographerAddress;
-    try {
-      photographerAddress = getAddress(walletAddress);
-    } catch {
-      return NextResponse.json({ error: "Photographer wallet address is invalid" }, { status: 400 });
-    }
-
-    const downloaded = await admin.storage.from("images-original").download(image.storage_path_original);
-    if (downloaded.error) {
-      return NextResponse.json({ error: downloaded.error.message }, { status: 500 });
-    }
-
-    const originalFileSha256 = sha256Buffer(Buffer.from(await downloaded.data.arrayBuffer()));
-    const contentHash = canonicalImageProofHash({
-      assetId: image.asset_id,
-      photographerId: image.photographer_id,
-      storagePathOriginal: image.storage_path_original,
-      title: image.title,
-      originalFileSha256,
-    });
-    const onchainAssetId = imageAssetBytes32(image.asset_id);
-    let config;
-    try {
-      config = getOnchainServerConfig();
-    } catch (error) {
-      console.error(error);
-      return NextResponse.json({ error: "Onchain proof registration is not configured" }, { status: 500 });
-    }
-
-    const { data: claimedImage, error: claimError } = await admin
-      .from("images")
-      .update({
-        proof_status: "pending",
-        content_hash: contentHash,
-        onchain_asset_id: onchainAssetId,
-        chain_id: config.chainId,
-      })
-      .eq("id", id)
-      .eq("status", "pending")
-      .in("proof_status", ["not_registered", "failed"])
-      .select("id")
-      .maybeSingle();
-
-    if (claimError) return NextResponse.json({ error: claimError.message }, { status: 500 });
-    if (!claimedImage) {
-      return NextResponse.json(
-        { error: "Image is no longer pending or proof registration is already in progress" },
-        { status: 409 }
-      );
-    }
-
-    let txHash: `0x${string}` | null = null;
-    try {
-      const walletClient = getOnchainOperatorClient();
-      const publicClient = getOnchainPublicClient();
-
-      txHash = await walletClient.writeContract({
-        address: config.escrowAddress,
-        abi: IMAGE_PARTNERS_ESCROW_ABI,
-        functionName: "registerAsset",
-        args: [onchainAssetId, contentHash, photographerAddress, `imageptns://${image.asset_id}`],
-      });
-
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-      if (receipt.status !== "success") {
-        await admin
-          .from("images")
-          .update({ proof_status: "failed", proof_tx_hash: txHash })
-          .eq("id", id)
-          .eq("proof_status", "pending");
-        await recordOnchainEvent(admin, {
-          eventType: "proof_registration_failed",
-          severity: "error",
-          actorId: user.id,
-          imageId: id,
-          txHash,
-          chainId: config.chainId,
-          metadata: {
-            stage: "receipt_status",
-            assetId: image.asset_id,
-            onchainAssetId,
-            photographerId: image.photographer_id,
-            receiptStatus: receipt.status,
-          },
-        });
-        return NextResponse.json({ error: "Onchain proof registration failed" }, { status: 502 });
-      }
-    } catch (error) {
-      console.error(error);
-      await admin
-        .from("images")
-        .update({ proof_status: "failed", proof_tx_hash: txHash })
-        .eq("id", id)
-        .eq("proof_status", "pending");
-      await recordOnchainEvent(admin, {
-        eventType: "proof_registration_failed",
-        severity: "error",
-        actorId: user.id,
-        imageId: id,
-        txHash,
-        chainId: config.chainId,
-        metadata: {
-          stage: "register_asset",
-          assetId: image.asset_id,
-          onchainAssetId,
-          photographerId: image.photographer_id,
-          errorMessage: errorMessage(error),
-        },
-      });
-      return NextResponse.json(
-        { error: "Onchain proof registration failed" },
-        { status: 502 }
-      );
-    }
-
-    const proofRegisteredAt = new Date().toISOString();
-    const { data: registeredProof, error: proofPersistError } = await admin
-      .from("images")
-      .update({
-        proof_status: "registered",
-        proof_registered_at: proofRegisteredAt,
-        proof_tx_hash: txHash,
-      })
-      .eq("id", id)
-      .eq("status", "pending")
-      .eq("proof_status", "pending")
-      .select("id")
-      .maybeSingle();
-
-    if (proofPersistError) {
-      await recordOnchainEvent(admin, {
-        eventType: "proof_registration_failed",
-        severity: "error",
-        actorId: user.id,
-        imageId: id,
-        txHash,
-        chainId: config.chainId,
-        metadata: {
-          stage: "proof_persist",
-          assetId: image.asset_id,
-          onchainAssetId,
-          photographerId: image.photographer_id,
-          errorMessage: proofPersistError.message,
-        },
-      });
-      return NextResponse.json({ error: proofPersistError.message }, { status: 500 });
-    }
-    if (!registeredProof) {
-      await recordOnchainEvent(admin, {
-        eventType: "proof_registration_failed",
-        severity: "warning",
-        actorId: user.id,
-        imageId: id,
-        txHash,
-        chainId: config.chainId,
-        metadata: {
-          stage: "proof_persist_conflict",
-          assetId: image.asset_id,
-          onchainAssetId,
-          photographerId: image.photographer_id,
-        },
-      });
-      return NextResponse.json(
-        { error: "Onchain proof registered, but image review state changed before proof persistence" },
-        { status: 409 }
-      );
-    }
-
+    const approvedAt = new Date().toISOString();
     const { data: approved, error: approveError } = await admin
       .from("images")
       .update({
         status: "approved",
-        approved_at: proofRegisteredAt,
+        approved_at: approvedAt,
         rejection_reason: null,
       })
       .eq("id", id)
       .eq("status", "pending")
-      .eq("proof_status", "registered")
-      .eq("proof_tx_hash", txHash)
       .select(REVIEW_SELECT)
       .maybeSingle();
 
     if (approveError) {
-      await recordOnchainEvent(admin, {
-        eventType: "proof_registration_failed",
-        severity: "error",
-        actorId: user.id,
-        imageId: id,
-        txHash,
-        chainId: config.chainId,
-        metadata: {
-          stage: "approval_finalize",
-          assetId: image.asset_id,
-          onchainAssetId,
-          photographerId: image.photographer_id,
-          errorMessage: approveError.message,
-        },
-      });
-      return NextResponse.json(
-        { error: "Onchain proof registered, but approval finalization failed" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: approveError.message }, { status: 500 });
     }
     if (!approved) {
-      await recordOnchainEvent(admin, {
-        eventType: "proof_registration_failed",
-        severity: "warning",
-        actorId: user.id,
-        imageId: id,
-        txHash,
-        chainId: config.chainId,
-        metadata: {
-          stage: "approval_finalize_conflict",
-          assetId: image.asset_id,
-          onchainAssetId,
-          photographerId: image.photographer_id,
-        },
-      });
       return NextResponse.json(
-        { error: "Onchain proof registered, but approval finalization needs review" },
+        { error: "Image is no longer pending" },
         { status: 409 }
       );
     }
-
-    await recordOnchainEvent(admin, {
-      eventType: "proof_registered",
-      actorId: user.id,
-      imageId: id,
-      txHash,
-      chainId: config.chainId,
-      metadata: {
-        assetId: image.asset_id,
-        onchainAssetId,
-        photographerId: image.photographer_id,
-      },
-    });
 
     data = approved;
   } else {
@@ -344,14 +106,13 @@ export async function PATCH(
       .update({ status: "rejected", rejection_reason: rejection_reason!.trim(), approved_at: null })
       .eq("id", id)
       .eq("status", "pending")
-      .in("proof_status", ["not_registered", "failed"])
       .select(REVIEW_SELECT)
       .maybeSingle();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!rejected) {
       return NextResponse.json(
-        { error: "Image is no longer pending or proof registration is already in progress" },
+        { error: "Image is no longer pending" },
         { status: 409 }
       );
     }

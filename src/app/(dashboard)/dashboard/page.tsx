@@ -67,6 +67,8 @@ interface PhotographerDashboardStats {
   onchain: {
     proof: {
       notRegistered: number;
+      available: number;
+      requested: number;
       pending: number;
       registered: number;
       failed: number;
@@ -92,6 +94,8 @@ const EMPTY_BUYER_ONCHAIN = {
 
 const EMPTY_PROOF = {
   notRegistered: 0,
+  available: 0,
+  requested: 0,
   pending: 0,
   registered: 0,
   failed: 0,
@@ -250,12 +254,12 @@ export default function DashboardPage() {
               color={photographerWalletReady ? "bg-blue-50 text-blue-500 dark:bg-blue-900/20" : "bg-error/10 text-error"}
               href="/dashboard/settings"
             />
-            <StatCard icon="verified" label="증명 등록" value={String(photographerProof.registered)} color="bg-primary/10 text-primary" href="/dashboard/uploads" />
-            <StatCard icon="sync_problem" label="증명 대기/실패" value={`${photographerProof.pending}/${photographerProof.failed}`} color="bg-amber-50 text-amber-500 dark:bg-amber-900/20" href="/dashboard/uploads" />
+            <StatCard icon="verified" label="증명 등록" value={String(photographerProof.registered)} color="bg-primary/10 text-primary" href="/dashboard/blockchain" />
+            <StatCard icon="sync_problem" label="등록가능/진행" value={`${photographerProof.available}/${photographerProof.requested + photographerProof.pending}`} color="bg-amber-50 text-amber-500 dark:bg-amber-900/20" href="/dashboard/blockchain" />
             <StatCard icon="savings" label="Claim 대기" value={formatUSDC(photographerClaims.claimableUsdc)} color="bg-green-50 text-green-500 dark:bg-green-900/20" href="/dashboard/earnings" />
           </div>
 
-          {(!photographerWalletReady || photographerProof.failed > 0 || photographerClaims.claimableUsdc > 0) && (
+          {(!photographerWalletReady || photographerProof.available > 0 || photographerProof.failed > 0 || photographerClaims.claimableUsdc > 0) && (
             <div className="mb-10 grid grid-cols-1 lg:grid-cols-3 gap-3">
               {!photographerWalletReady && (
                 <Link href="/dashboard/settings" className="bg-surface-container-lowest border border-error/20 p-4 hover:bg-surface-container-low transition-colors">
@@ -263,8 +267,14 @@ export default function DashboardPage() {
                   <p className="text-sm text-on-surface-variant mt-2">Base 정산을 받으려면 지갑 주소를 등록해야 합니다.</p>
                 </Link>
               )}
+              {photographerProof.available > 0 && (
+                <Link href="/dashboard/blockchain" className="bg-surface-container-lowest border border-primary/20 p-4 hover:bg-surface-container-low transition-colors">
+                  <p className="text-xs font-bold uppercase tracking-widest text-primary">Credential Ready</p>
+                  <p className="text-sm text-on-surface-variant mt-2">첫 판매가 완료된 사진 {photographerProof.available}개를 Arweave 등록 요청할 수 있습니다.</p>
+                </Link>
+              )}
               {photographerProof.failed > 0 && (
-                <Link href="/dashboard/uploads" className="bg-surface-container-lowest border border-amber-300/40 p-4 hover:bg-surface-container-low transition-colors">
+                <Link href="/dashboard/blockchain" className="bg-surface-container-lowest border border-amber-300/40 p-4 hover:bg-surface-container-low transition-colors">
                   <p className="text-xs font-bold uppercase tracking-widest text-amber-600">Proof Attention</p>
                   <p className="text-sm text-on-surface-variant mt-2">증명 등록 실패 이미지가 있어 관리자 재처리가 필요할 수 있습니다.</p>
                 </Link>
@@ -304,7 +314,7 @@ export default function DashboardPage() {
                   </span>
                   {item.proofStatus && item.proofStatus !== "not_registered" && (
                     <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant">
-                      proof {item.proofStatus}
+                      credential {item.proofStatus}
                     </span>
                   )}
                 </div>
