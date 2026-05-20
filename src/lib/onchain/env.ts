@@ -34,7 +34,8 @@ function baseChainIdEnv(name: string): number {
 }
 
 function privateKeyEnv(name: string): Hex {
-  const value = required(name);
+  const rawValue = required(name);
+  const value = rawValue.startsWith("0x") ? rawValue : `0x${rawValue}`;
   if (!/^0x[0-9a-fA-F]{64}$/.test(value)) {
     throw new Error(`${name} must be a 0x-prefixed 32-byte hex private key`);
   }
