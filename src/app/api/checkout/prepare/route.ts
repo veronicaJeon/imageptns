@@ -12,7 +12,13 @@ interface CartItemInput {
 
 interface CheckoutImageRow {
   id: string;
+  title: string;
+  asset_id: string | null;
   photographer_id: string | null;
+  storage_path_preview: string | null;
+  storage_path_original: string | null;
+  storage_path_full: string | null;
+  original_filename: string | null;
   status: string;
 }
 
@@ -73,9 +79,10 @@ export async function POST(req: NextRequest) {
   const imageIds = items.map((i) => i.id);
   const { data: images, error: imageError } = await admin
     .from("images")
-    .select("id, photographer_id, status")
+    .select("id, title, asset_id, photographer_id, storage_path_preview, storage_path_original, storage_path_full, original_filename, status")
     .in("id", imageIds)
-    .eq("status", "approved");
+    .eq("status", "approved")
+    .eq("lifecycle_status", "active");
 
   if (imageError) return NextResponse.json({ error: imageError.message }, { status: 500 });
 
@@ -109,6 +116,11 @@ export async function POST(req: NextRequest) {
       license_code:    item.license,
       price_krw:       item.priceKrw,
       photographer_id: img?.photographer_id ?? null,
+      image_title_snapshot: img?.title ?? null,
+      image_asset_id_snapshot: img?.asset_id ?? null,
+      image_preview_path_snapshot: img?.storage_path_preview ?? null,
+      image_original_path_snapshot: img?.storage_path_original ?? img?.storage_path_full ?? null,
+      image_original_filename_snapshot: img?.original_filename ?? null,
       gross_krw:       gross,
       commission_rate: commission.commissionRate,
       commission_krw:  commission.commissionKrw,

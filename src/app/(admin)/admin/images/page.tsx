@@ -13,6 +13,9 @@ interface AdminImage {
   category: string;
   tags: string[] | null;
   status: string;
+  lifecycle_status: string | null;
+  deletion_fee_krw: number | null;
+  deletion_fee_status: string | null;
   storage_path_preview: string | null;
   storage_path_original: string | null;
   file_format: string | null;
@@ -75,6 +78,7 @@ export default function AdminImagesPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const allPageSelected = images.length > 0 && images.every((image) => selectedSet.has(image.id));
@@ -166,6 +170,34 @@ export default function AdminImagesPage() {
     }
   }
 
+  async function deleteSelected() {
+    if (selectedIds.length === 0) return;
+    const reason = prompt("삭제/아카이브 사유를 입력하세요.", "관리자 이미지 정리");
+    if (reason === null) return;
+    if (!confirm(`${selectedIds.length}개 이미지를 삭제 정책에 따라 완전삭제 또는 아카이브 처리할까요?`)) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/admin/images/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageIds: selectedIds, reason }),
+      });
+      const data = await res.json().catch(() => null) as { results?: { action: string; errors?: string[] }[]; error?: string } | null;
+      if (!res.ok) throw new Error(data?.error ?? "삭제 처리에 실패했습니다.");
+      const results = data?.results ?? [];
+      const purged = results.filter((result) => result.action === "purge").length;
+      const archived = results.filter((result) => result.action === "archive").length;
+      const failed = results.filter((result) => (result.errors ?? []).length > 0).length;
+      alert(`처리 완료: 완전삭제 ${purged}개, 아카이브 ${archived}개${failed ? `, 경고 ${failed}개` : ""}`);
+      await loadImages();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "삭제 처리 중 오류가 발생했습니다.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="p-6 md:p-10">
       <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -202,14 +234,24 @@ export default function AdminImagesPage() {
           총 <span className="font-semibold text-on-surface">{pagination.total.toLocaleString("ko-KR")}</span>개
           {query && <span> · 검색어 <span className="font-semibold text-on-surface">{query}</span></span>}
         </p>
-        <button
-          onClick={downloadSelected}
-          disabled={selectedIds.length === 0 || downloading}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-on-surface px-4 text-xs font-bold uppercase tracking-widest text-surface-container-lowest transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <span className="material-symbols-outlined text-base">download</span>
-          {downloading ? "준비 중..." : `선택 원본 다운로드 (${selectedIds.length})`}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={deleteSelected}
+            disabled={selectedIds.length === 0 || deleting}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-error px-4 text-xs font-bold uppercase tracking-widest text-on-error transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <span className="material-symbols-outlined text-base">delete</span>
+            {deleting ? "처리 중..." : `선택 삭제/아카이브 (${selectedIds.length})`}
+          </button>
+          <button
+            onClick={downloadSelected}
+            disabled={selectedIds.length === 0 || downloading}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-on-surface px-4 text-xs font-bold uppercase tracking-widest text-surface-container-lowest transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <span className="material-symbols-outlined text-base">download</span>
+            {downloading ? "준비 중..." : `선택 원본 다운로드 (${selectedIds.length})`}
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto bg-surface-container-lowest shadow-ghost">
@@ -259,6 +301,11 @@ export default function AdminImagesPage() {
                   <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${STATUS_CLASSES[image.status] ?? "bg-surface-container-high text-outline"}`}>
                     {STATUS_LABELS[image.status] ?? image.status}
                   </span>
+                  {image.lifecycle_status && image.lifecycle_status !== "active" && (
+                    <p className="mt-2 rounded-full bg-error/10 px-2.5 py-1 text-[10px] font-bold text-error">
+                      {image.lifecycle_status === "deletion_requested" ? "삭제요청" : image.lifecycle_status}
+                    </p>
+                  )}
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex max-w-64 flex-wrap gap-1">

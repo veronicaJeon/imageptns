@@ -12,6 +12,7 @@ type CollectionItem = {
     title: string;
     category: string;
     status: string;
+    lifecycle_status?: string | null;
     storage_path_preview: string;
     photographer: { full_name: string } | null;
   } | null;
@@ -262,7 +263,7 @@ export default function CollectionsPage() {
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-4">
                         {items.map((item) => {
                           const img = item.image;
-                          const isDeleted = !img || (img.status && img.status !== "approved");
+                          const isDeleted = !img || (img.status && img.status !== "approved") || (img.lifecycle_status && img.lifecycle_status !== "active");
                           const title = img?.title ?? "삭제된 이미지";
                           const src = img?.storage_path_preview ?? "";
                           return (

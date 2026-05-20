@@ -14,11 +14,13 @@ export async function GET() {
     admin
       .from("images")
       .select("id", { count: "exact", head: true })
-      .eq("status", "approved"),
+      .eq("status", "approved")
+      .eq("lifecycle_status", "active"),
     admin
       .from("images")
       .select("photographer_id")
-      .eq("status", "approved"),
+      .eq("status", "approved")
+      .eq("lifecycle_status", "active"),
     admin
       .from("orders")
       .select("id", { count: "exact", head: true })

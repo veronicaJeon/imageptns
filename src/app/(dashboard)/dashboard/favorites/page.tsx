@@ -9,6 +9,7 @@ interface FavoriteImage {
   title?: string | null;
   category?: string | null;
   status?: string | null;
+  lifecycle_status?: string | null;
   storage_path_preview?: string | null;
   photographer?: { full_name?: string | null } | { full_name?: string | null }[] | null;
 }
@@ -71,7 +72,7 @@ export default function FavoritesPage() {
           {items.map((item) => {
             const img  = item.image;
             const id   = img?.id ?? item.image_id;
-            const isDeleted = !img || (img.status && img.status !== "approved");
+            const isDeleted = !img || (img.status && img.status !== "approved") || (img.lifecycle_status && img.lifecycle_status !== "active");
             const title = img?.title ?? "삭제된 이미지";
             const category = img?.category ?? "";
             const photographer = photographerName(img);

@@ -36,7 +36,7 @@ export async function GET(
     .from("collection_items")
     .select(`
       id, image_id, created_at,
-      image:images!image_id(id, title, category, status, storage_path_preview, width, height,
+      image:images!image_id(id, title, category, status, lifecycle_status, storage_path_preview, width, height,
         photographer:profiles!photographer_id(full_name))
     `)
     .eq("collection_id", collection_id)

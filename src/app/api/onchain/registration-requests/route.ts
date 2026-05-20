@@ -56,6 +56,7 @@ export async function GET() {
     `)
     .eq("photographer_id", user.id)
     .eq("status", "approved")
+    .eq("lifecycle_status", "active")
     .or("sales_count.gt.0,proof_status.in.(available,requested,pending,registered,failed)")
     .order("created_at", { ascending: false });
 
@@ -80,7 +81,8 @@ export async function POST(req: NextRequest) {
     .from("images")
     .select("id, status, sales_count, proof_status")
     .eq("photographer_id", user.id)
-    .in("id", imageIds);
+    .in("id", imageIds)
+    .eq("lifecycle_status", "active");
 
   if (loadError) return NextResponse.json({ error: loadError.message }, { status: 500 });
 

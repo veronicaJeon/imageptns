@@ -28,12 +28,17 @@ interface OrderImage {
   title: string | null;
   asset_id: string | null;
   storage_path_preview: string | null;
+  lifecycle_status: string | null;
+  deleted_at: string | null;
 }
 
 interface OrderItem {
   id: string;
   license_code: string;
   price_krw: number;
+  image_lifecycle_status: string | null;
+  image_deleted_at: string | null;
+  image_deletion_notice: string | null;
   image: OrderImage | null;
 }
 
@@ -66,6 +71,9 @@ interface OrderRow {
   title: string;
   src: string;
   assetId: string;
+  imageLifecycleStatus: string | null;
+  imageDeletedAt: string | null;
+  imageDeletionNotice: string | null;
   paymentProvider: string | null;
   chainId: number | null;
   paymentToken: string | null;
@@ -222,6 +230,9 @@ export default function OrdersPage() {
       title:       item.image?.title ?? "",
       src:         item.image?.storage_path_preview ?? "",
       assetId:     item.image?.asset_id ?? "",
+      imageLifecycleStatus: item.image_lifecycle_status ?? item.image?.lifecycle_status ?? "active",
+      imageDeletedAt: item.image_deleted_at ?? item.image?.deleted_at ?? null,
+      imageDeletionNotice: item.image_deletion_notice,
       paymentProvider: order.payment_provider,
       chainId: order.chain_id,
       paymentToken: order.payment_token,
@@ -264,6 +275,7 @@ export default function OrdersPage() {
               {rows.map((row) => {
                 const canRecoverBaseUsdc = row.isFirstItemInOrder && row.paymentProvider === "base_usdc" && row.cryptoStatus === "pending";
                 const isConfirming = Boolean(confirmingOrderIds[row.orderId]);
+                const imageUnavailable = row.imageLifecycleStatus && row.imageLifecycleStatus !== "active";
 
                 return (
                 <tr key={row.itemId} className="hover:bg-surface-container-low transition-colors align-top">
@@ -277,12 +289,17 @@ export default function OrdersPage() {
                         </div>
                       )}
                       <div className="min-w-0">
-                        {row.imageId ? (
+                        {row.imageId && !imageUnavailable ? (
                           <Link href={`/library/${row.imageId}`} className="text-on-surface font-medium hover:text-primary transition-colors truncate block max-w-[180px]">{row.title}</Link>
                         ) : (
                           <p className="text-on-surface font-medium truncate max-w-[180px]">{row.title}</p>
                         )}
                         <p className="text-xs text-outline">{row.orderNumber}</p>
+                        {imageUnavailable && (
+                          <p className="mt-1 rounded bg-error/10 px-2 py-1 text-[10px] font-bold text-error">
+                            판매중지/삭제 고지
+                          </p>
+                        )}
                         {row.paymentProvider === "base_usdc" && (
                           <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold">
                             <span className="bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-200 px-2 py-0.5 rounded-full">
@@ -339,6 +356,11 @@ export default function OrdersPage() {
                       <div className="mt-3 max-w-md rounded-lg bg-surface-container-low px-3 py-2 text-[11px] leading-relaxed text-on-surface-variant">
                         <span className="font-bold text-on-surface">라이선스:</span>{" "}
                         {LICENSE_SUMMARY[row.license] ?? "구매한 라이선스 조건에 따라 사용 가능합니다."}
+                      </div>
+                    )}
+                    {row.imageDeletionNotice && (
+                      <div className="mt-3 max-w-md rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-[11px] leading-relaxed text-error">
+                        {row.imageDeletionNotice}
                       </div>
                     )}
                   </td>

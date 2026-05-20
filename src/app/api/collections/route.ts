@@ -32,7 +32,7 @@ export async function GET(_req: NextRequest) {
       id, name, created_at,
       collection_items(
         id, image_id,
-        image:images!image_id(id, storage_path_preview)
+        image:images!image_id(id, lifecycle_status, storage_path_preview)
       )
     `)
     .eq("user_id", user.id)

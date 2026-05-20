@@ -31,12 +31,14 @@ export async function GET(req: NextRequest) {
       .from("images")
       .select("title")
       .eq("status", "approved")
+      .eq("lifecycle_status", "active")
       .ilike("title", pattern)
       .limit(5),
     supabase
       .from("images")
       .select("tags")
       .eq("status", "approved")
+      .eq("lifecycle_status", "active")
       .limit(200),
   ]);
 

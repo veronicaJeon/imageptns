@@ -10,11 +10,16 @@ interface DownloadOrderImage {
   title: string | null;
   storage_path_preview: string | null;
   asset_id: string | null;
+  lifecycle_status: string | null;
+  deleted_at: string | null;
 }
 
 interface DownloadOrderItem {
   id: string;
   license_code: string;
+  image_lifecycle_status: string | null;
+  image_deleted_at: string | null;
+  image_deletion_notice: string | null;
   image: DownloadOrderImage | null;
 }
 
@@ -67,6 +72,9 @@ export default function DownloadsPage() {
       title:       item.image?.title ?? "",
       src:         item.image?.storage_path_preview ?? "",
       assetId:     item.image?.asset_id ?? "",
+      imageLifecycleStatus: item.image_lifecycle_status ?? item.image?.lifecycle_status ?? "active",
+      imageDeletedAt: item.image_deleted_at ?? item.image?.deleted_at ?? null,
+      imageDeletionNotice: item.image_deletion_notice,
     }))
   );
 
@@ -107,6 +115,7 @@ export default function DownloadsPage() {
                 const date = row.completedAt
                   ? new Date(row.completedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                   : "—";
+                const imageUnavailable = row.imageLifecycleStatus && row.imageLifecycleStatus !== "active";
                 return (
                   <tr key={row.itemId} className="hover:bg-surface-container-low transition-colors">
                     <td className="px-6 py-4">
@@ -126,7 +135,7 @@ export default function DownloadsPage() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          {row.imageId ? (
+                          {row.imageId && !imageUnavailable ? (
                             <Link href={`/library/${row.imageId}`} className="text-on-surface font-medium hover:text-primary transition-colors truncate block max-w-[200px]">
                               {row.title}
                             </Link>
@@ -134,6 +143,9 @@ export default function DownloadsPage() {
                             <p className="text-on-surface font-medium truncate max-w-[200px]">{row.title}</p>
                           )}
                           {row.assetId && <p className="text-xs text-outline">{row.assetId}</p>}
+                          {row.imageDeletionNotice && (
+                            <p className="mt-1 max-w-xs text-[10px] leading-relaxed text-error">{row.imageDeletionNotice}</p>
+                          )}
                         </div>
                       </div>
                     </td>
