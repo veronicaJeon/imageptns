@@ -39,6 +39,7 @@ interface LedgerEarning {
   net_krw?: number | null;
   settlement_provider?: string | null;
   claim_status?: string | null;
+  claim_review_status?: string | null;
   claimable_amount?: number | string | null;
   claim_tx_hash?: string | null;
   created_at?: string | null;
@@ -247,7 +248,11 @@ function EarningsInner() {
   const ledger = data?.ledger ?? [];
   const onchainRows = filterOnchainEarnings(ledger, "all");
   const filteredOnchainRows = filterOnchainEarnings(ledger, claimFilter);
-  const onchainClaimable = sumClaimableUsdc(filterOnchainEarnings(ledger, "claimable"));
+  const onchainClaimableRows = filterOnchainEarnings(ledger, "claimable");
+  const approvedOnchainClaimableRows = onchainClaimableRows.filter((row) => row.claim_review_status === "approved");
+  const onchainClaimable = sumClaimableUsdc(onchainClaimableRows);
+  const approvedOnchainClaimable = sumClaimableUsdc(approvedOnchainClaimableRows);
+  const hasPendingClaimReview = onchainClaimableRows.some((row) => row.claim_review_status !== "approved");
   const totalGross = ledger.reduce((sum, row) => sum + (row.gross_krw ?? 0), 0);
   const totalCommission = ledger.reduce((sum, row) => sum + (row.commission_krw ?? 0), 0);
 
@@ -332,17 +337,19 @@ function EarningsInner() {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-primary">Base USDC Claim</p>
             <p className="text-sm text-on-surface-variant mt-1">
-              {formatUSDC(onchainClaimable)} is ready to claim on Base.
+              {hasPendingClaimReview
+                ? `${formatUSDC(onchainClaimable)} is waiting for admin review.`
+                : `${formatUSDC(approvedOnchainClaimable)} is approved to claim on Base.`}
             </p>
           </div>
           <button
             type="button"
-            disabled={claimingOnchain}
+            disabled={claimingOnchain || hasPendingClaimReview || approvedOnchainClaimable <= 0}
             onClick={claimOnchainUsdc}
             className="flex items-center justify-center gap-2 px-5 py-3 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-base">account_balance_wallet</span>
-            {claimingOnchain ? "Claiming..." : "Claim USDC"}
+            {claimingOnchain ? "Claiming..." : hasPendingClaimReview ? "Admin review required" : "Claim USDC"}
           </button>
         </div>
       )}
@@ -374,7 +381,7 @@ function EarningsInner() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-outline-variant/20">
-                  {["Status", "Image", "Gross / Commission / Net", "Claimable", "Claim Tx", "Created"].map((h) => (
+                  {["Status", "Review", "Image", "Gross / Commission / Net", "Claimable", "Claim Tx", "Created"].map((h) => (
                     <th key={h} className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">{h}</th>
                   ))}
                 </tr>
@@ -389,6 +396,17 @@ function EarningsInner() {
                           row.claim_status === "claimed" ? "bg-primary/10 text-primary" : "bg-amber-50 text-amber-600 dark:bg-amber-900/20"
                         }`}>
                           {row.claim_status ?? "unknown"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                          row.claim_review_status === "approved"
+                            ? "bg-primary/10 text-primary"
+                            : row.claim_review_status === "rejected"
+                            ? "bg-error/10 text-error"
+                            : "bg-surface-container-high text-on-surface-variant"
+                        }`}>
+                          {row.claim_review_status ?? "not_required"}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -418,7 +436,7 @@ function EarningsInner() {
                 })}
                 {filteredOnchainRows.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-10 text-center text-outline">No Base USDC rows for this filter.</td>
+                    <td colSpan={7} className="px-6 py-10 text-center text-outline">No Base USDC rows for this filter.</td>
                   </tr>
                 )}
               </tbody>

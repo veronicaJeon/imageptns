@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { getAddress } from "viem";
 import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
 import { Input } from "@/components/ui/Input";
@@ -15,6 +16,12 @@ interface Subscription {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
 }
+
+interface EthereumProvider {
+  request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
+}
+
+const BASE_SEPOLIA_CHAIN_ID_HEX = "0x14a34";
 
 export default function SettingsPage() {
   const { t } = useLang();
@@ -35,6 +42,8 @@ export default function SettingsPage() {
   const [cancelDone, setCancelDone] = useState(false);
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const [upgradeDone, setUpgradeDone] = useState(false);
+  const [walletConnecting, setWalletConnecting] = useState(false);
+  const [walletError, setWalletError] = useState("");
 
   // Load subscription
   useEffect(() => {
@@ -126,6 +135,58 @@ export default function SettingsPage() {
     }
   }
 
+  function browserEthereum(): EthereumProvider | null {
+    if (typeof window === "undefined") return null;
+    const maybeWindow = window as Window & { ethereum?: EthereumProvider };
+    return maybeWindow.ethereum ?? null;
+  }
+
+  async function ensureBaseSepolia(ethereum: EthereumProvider) {
+    try {
+      await ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: BASE_SEPOLIA_CHAIN_ID_HEX }],
+      });
+    } catch (error) {
+      const code = typeof error === "object" && error && "code" in error ? (error as { code?: number }).code : null;
+      if (code !== 4902) throw error;
+
+      await ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [{
+          chainId: BASE_SEPOLIA_CHAIN_ID_HEX,
+          chainName: "Base Sepolia",
+          nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 },
+          rpcUrls: ["https://sepolia.base.org"],
+          blockExplorerUrls: ["https://sepolia.basescan.org"],
+        }],
+      });
+    }
+  }
+
+  async function handleConnectWallet() {
+    setWalletError("");
+    const ethereum = browserEthereum();
+    if (!ethereum) {
+      setWalletError("MetaMask 또는 Base 호환 브라우저 지갑을 설치해주세요.");
+      return;
+    }
+
+    setWalletConnecting(true);
+    try {
+      const accounts = await ethereum.request({ method: "eth_requestAccounts" });
+      const account = Array.isArray(accounts) && typeof accounts[0] === "string" ? accounts[0] : "";
+      if (!account) throw new Error("지갑 연결을 완료해주세요.");
+
+      await ensureBaseSepolia(ethereum);
+      setWalletAddress(getAddress(account));
+    } catch (error) {
+      setWalletError(error instanceof Error ? error.message : "지갑 연결에 실패했습니다.");
+    } finally {
+      setWalletConnecting(false);
+    }
+  }
+
   async function toggleNotif(key: "sales" | "reviews" | "newsletter") {
     const next = { ...notifications, [key]: !notifications[key] };
     setNotifications(next);
@@ -181,14 +242,39 @@ export default function SettingsPage() {
           </div>
 
           {role === "photographer" && (
-            <Input
-              label="Base 지갑 주소"
-              type="text"
-              value={walletAddress}
-              onChange={(e) => setWalletAddress(e.target.value)}
-              icon="account_balance_wallet"
-              placeholder="0x..."
-            />
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                <Input
+                  label="Base 지갑 주소"
+                  type="text"
+                  value={walletAddress}
+                  onChange={(e) => {
+                    setWalletAddress(e.target.value);
+                    setWalletError("");
+                  }}
+                  icon="account_balance_wallet"
+                  placeholder="0x..."
+                  hint="사진 승인 증명과 USDC 정산에 사용할 Base 지갑입니다."
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  loading={walletConnecting}
+                  onClick={handleConnectWallet}
+                  className="h-12 shrink-0 whitespace-nowrap"
+                >
+                  <span className="material-symbols-outlined text-base">account_balance_wallet</span>
+                  MetaMask 연결
+                </Button>
+              </div>
+              {walletError && (
+                <p className="text-xs text-error flex items-center gap-1">
+                  <span className="material-symbols-outlined text-base">error</span>
+                  {walletError}
+                </p>
+              )}
+            </div>
           )}
 
           <div className="flex items-center gap-3">
