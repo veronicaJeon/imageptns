@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n/store";
+import { buildSiteUrl } from "@/lib/routing/canonical";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -21,7 +22,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     const supabase = createClient();
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
+      redirectTo: buildSiteUrl("/update-password"),
     });
     // Always show success (don't reveal whether email exists)
     setLoading(false);

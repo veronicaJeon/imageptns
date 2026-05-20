@@ -1,7 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { getCanonicalRedirectUrl } from "@/lib/routing/canonical";
 
 export async function proxy(request: NextRequest) {
+  const canonicalRedirect = getCanonicalRedirectUrl(request.nextUrl);
+  if (canonicalRedirect) {
+    return NextResponse.redirect(canonicalRedirect, 307);
+  }
+
+  const { pathname } = request.nextUrl;
+
+  if (!pathname.startsWith("/dashboard") && !pathname.startsWith("/admin")) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -27,8 +39,6 @@ export async function proxy(request: NextRequest) {
 
   // Refresh session
   const { data: { user } } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
 
   // Protect /dashboard and /admin routes — redirect unauthenticated users to /login
   if ((pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) && !user) {
@@ -56,5 +66,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 };
