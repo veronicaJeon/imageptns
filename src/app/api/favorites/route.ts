@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { previewUrl } from "@/lib/supabase/storage";
 
+interface FavoriteImageRow {
+  storage_path_preview: string | null;
+}
+
+interface FavoriteRow {
+  image: FavoriteImageRow | FavoriteImageRow[] | null;
+}
+
+function firstImage(image: FavoriteRow["image"]) {
+  return Array.isArray(image) ? image[0] : image;
+}
+
 export async function GET(_req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -19,10 +31,13 @@ export async function GET(_req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const favorites = (data ?? []).map((fav: any) => ({
-    ...fav,
-    image: fav.image ? { ...fav.image, storage_path_preview: previewUrl(fav.image.storage_path_preview) } : null,
-  }));
+  const favorites = ((data ?? []) as FavoriteRow[]).map((fav) => {
+    const image = firstImage(fav.image);
+    return {
+      ...fav,
+      image: image ? { ...image, storage_path_preview: previewUrl(image.storage_path_preview) } : null,
+    };
+  });
 
   return NextResponse.json({ favorites });
 }

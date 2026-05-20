@@ -4,9 +4,18 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/store/auth";
 
+interface PortfolioUpload {
+  id: string;
+  title: string | null;
+  category: string | null;
+  status: string;
+  storage_path_preview: string | null;
+  sales_count: number | null;
+}
+
 export default function PortfolioPage() {
   const { user, init } = useAuth();
-  const [uploads, setUploads] = useState<any[]>([]);
+  const [uploads, setUploads] = useState<PortfolioUpload[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { init(); }, [init]);
@@ -15,7 +24,7 @@ export default function PortfolioPage() {
     fetch("/api/uploads")
       .then((r) => r.json())
       .then(({ uploads }) =>
-        setUploads((uploads ?? []).filter((u: any) => u.status === "approved"))
+        setUploads(((uploads ?? []) as PortfolioUpload[]).filter((u) => u.status === "approved"))
       )
       .finally(() => setLoading(false));
   }, []);
@@ -58,13 +67,13 @@ export default function PortfolioPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {uploads.map((img: any) => (
+          {uploads.map((img) => (
             <div key={img.id} className="group relative overflow-hidden bg-surface-container-low rounded shadow-ghost">
               <div className="aspect-[4/3] overflow-hidden">
                 {img.storage_path_preview ? (
                   <img
                     src={img.storage_path_preview}
-                    alt={img.title}
+                    alt={img.title ?? ""}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 ) : (

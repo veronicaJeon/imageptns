@@ -11,7 +11,9 @@ import { useAuth } from "@/lib/store/auth";
 
 export function TopNavBar() {
   const pathname = usePathname();
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("theme") === "dark" : false,
+  );
   const { lang, t, toggle } = useLang();
   const cartCount = useCart((s) => s.items.length);
   const { user, loading, init, signOut } = useAuth();
@@ -33,12 +35,8 @@ export function TopNavBar() {
 
   // Restore dark mode
   useEffect(() => {
-    const saved = localStorage.getItem("theme");
-    if (saved === "dark") {
-      document.documentElement.classList.add("dark");
-      setIsDark(true);
-    }
-  }, []);
+    document.documentElement.classList.toggle("dark", isDark);
+  }, [isDark]);
 
   function toggleDark() {
     const next = !isDark;

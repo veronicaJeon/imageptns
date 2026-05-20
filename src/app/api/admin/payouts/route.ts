@@ -3,6 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPayoutApproved, sendPayoutRejected } from "@/lib/email/resend";
 
+interface PayoutNotificationRow {
+  period: string;
+  total_net_krw: number;
+  photographer_id: string;
+}
+
 async function requireAdmin() {
   const supabase = await createClient();
   const {
@@ -99,26 +105,26 @@ export async function POST(req: NextRequest) {
   // Fire-and-forget payout notification email
   if (existing) {
     (async () => {
-      const { data: payoutFull } = await admin
+      const { data: payoutFullData } = await admin
         .from("payouts")
         .select("period, total_net_krw, photographer_id")
         .eq("id", payout_id)
         .single();
+      const payoutFull = payoutFullData as PayoutNotificationRow | null;
       if (!payoutFull) return;
 
       const [profileRes, authRes] = await Promise.all([
-        admin.from("profiles").select("full_name").eq("id", (payoutFull as any).photographer_id).single(),
-        admin.auth.admin.getUserById((payoutFull as any).photographer_id),
+        admin.from("profiles").select("full_name").eq("id", payoutFull.photographer_id).single(),
+        admin.auth.admin.getUserById(payoutFull.photographer_id),
       ]);
       const email = authRes.data.user?.email;
       const name  = profileRes.data?.full_name ?? "사진작가";
       if (!email) return;
 
-      const payoutAny = payoutFull as any;
       if (action === "approve") {
-        await sendPayoutApproved({ photographerEmail: email, photographerName: name, period: payoutAny.period, netKrw: payoutAny.total_net_krw });
+        await sendPayoutApproved({ photographerEmail: email, photographerName: name, period: payoutFull.period, netKrw: payoutFull.total_net_krw });
       } else {
-        await sendPayoutRejected({ photographerEmail: email, photographerName: name, period: payoutAny.period, netKrw: payoutAny.total_net_krw, note: note });
+        await sendPayoutRejected({ photographerEmail: email, photographerName: name, period: payoutFull.period, netKrw: payoutFull.total_net_krw, note: note });
       }
     })().catch(console.error);
   }

@@ -4,10 +4,31 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n/store";
 
+interface FavoriteImage {
+  id?: string | null;
+  title?: string | null;
+  category?: string | null;
+  status?: string | null;
+  storage_path_preview?: string | null;
+  photographer?: { full_name?: string | null } | { full_name?: string | null }[] | null;
+}
+
+interface FavoriteItem {
+  id: string;
+  image_id: string;
+  created_at: string;
+  image: FavoriteImage | null;
+}
+
+function photographerName(image: FavoriteImage | null) {
+  const photographer = Array.isArray(image?.photographer) ? image?.photographer[0] : image?.photographer;
+  return photographer?.full_name ?? "";
+}
+
 export default function FavoritesPage() {
   const { t } = useLang();
   const fav = t.dashboard.favorites;
-  const [items, setItems]   = useState<any[]>([]);
+  const [items, setItems]   = useState<FavoriteItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,13 +68,13 @@ export default function FavoritesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {items.map((item: any) => {
+          {items.map((item) => {
             const img  = item.image;
             const id   = img?.id ?? item.image_id;
             const isDeleted = !img || (img.status && img.status !== "approved");
             const title = img?.title ?? "삭제된 이미지";
             const category = img?.category ?? "";
-            const photographer = img?.photographer?.full_name ?? "";
+            const photographer = photographerName(img);
             const src   = img?.storage_path_preview ?? "";
             const savedAt = new Date(item.created_at).toLocaleDateString("en-US", {
               month: "short", day: "numeric", year: "numeric",
