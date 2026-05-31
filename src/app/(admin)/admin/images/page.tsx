@@ -42,6 +42,27 @@ interface DownloadFile {
   error?: string;
 }
 
+interface ImageTransactionResponse {
+  image: {
+    title?: string;
+    assetId: string | null;
+    ledgerKey: string | null;
+    arweave: { originalTxId: string | null; metadataTxId: string | null; manifestTxId: string | null };
+  };
+  transactions: Array<{
+    orderNumber: string;
+    completedAt: string | null;
+    buyer: { name: string | null; email: string | null; walletAddress: string | null };
+    licenseCode: string;
+    priceKrw: number;
+    netKrw: number;
+    subscriptionCovered: boolean;
+    paymentProvider: string | null;
+    paymentTxHash: string | null;
+    contractOrderId: string | null;
+  }>;
+}
+
 const PAGE_SIZE = 50;
 
 const STATUS_LABELS: Record<string, string> = {
@@ -79,6 +100,8 @@ export default function AdminImagesPage() {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [transactionLoadingId, setTransactionLoadingId] = useState<string | null>(null);
+  const [transactionModal, setTransactionModal] = useState<ImageTransactionResponse | null>(null);
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const allPageSelected = images.length > 0 && images.every((image) => selectedSet.has(image.id));
@@ -195,6 +218,23 @@ export default function AdminImagesPage() {
       alert(error instanceof Error ? error.message : "삭제 처리 중 오류가 발생했습니다.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function openTransactions(image: AdminImage) {
+    setTransactionLoadingId(image.id);
+    try {
+      const res = await fetch(`/api/images/${image.id}/transactions`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "거래내역을 불러오지 못했습니다.");
+      setTransactionModal({
+        ...(data as ImageTransactionResponse),
+        image: { ...(data as ImageTransactionResponse).image, title: image.title },
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "거래내역을 불러오지 못했습니다.");
+    } finally {
+      setTransactionLoadingId(null);
     }
   }
 
@@ -322,6 +362,14 @@ export default function AdminImagesPage() {
                 <td className="px-4 py-4 text-xs text-on-surface-variant">
                   <p>조회 {image.views_count ?? 0}</p>
                   <p className="mt-1">판매 {image.sales_count ?? 0}</p>
+                  <button
+                    type="button"
+                    onClick={() => openTransactions(image)}
+                    disabled={transactionLoadingId === image.id}
+                    className="mt-2 inline-flex items-center gap-1 rounded border border-outline-variant px-2 py-1 text-[10px] font-bold text-on-surface-variant hover:border-primary hover:text-primary disabled:opacity-50"
+                  >
+                    {transactionLoadingId === image.id ? "로딩" : "거래내역"}
+                  </button>
                 </td>
                 <td className="px-4 py-4 text-xs text-on-surface-variant">{formatDate(image.created_at)}</td>
                 <td className="px-4 py-4 text-xs text-on-surface-variant">{image.photographer?.full_name ?? "-"}</td>
@@ -352,6 +400,68 @@ export default function AdminImagesPage() {
           </button>
         </div>
       </div>
+
+      {transactionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[86vh] w-full max-w-5xl overflow-hidden rounded-xl bg-surface-container-lowest shadow-ghost">
+            <div className="flex items-start justify-between gap-4 border-b border-outline-variant/20 p-5">
+              <div className="min-w-0">
+                <h2 className="font-headline text-lg font-extrabold text-on-surface">이미지 거래 데이터</h2>
+                <p className="mt-1 truncate text-xs text-outline">{transactionModal.image.title ?? transactionModal.image.assetId ?? "-"}</p>
+                <p className="mt-2 break-all font-mono text-[10px] text-outline">장부 키 {transactionModal.image.ledgerKey ?? "-"}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTransactionModal(null)}
+                className="rounded-lg p-2 text-outline hover:bg-surface-container-low hover:text-on-surface"
+                aria-label="닫기"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="max-h-[64vh] overflow-auto p-5">
+              <div className="mb-4 grid gap-2 text-[11px] text-on-surface-variant md:grid-cols-3">
+                <p className="rounded-lg bg-surface-container-low p-3 break-all">Arweave 원본 {transactionModal.image.arweave.originalTxId ?? "-"}</p>
+                <p className="rounded-lg bg-surface-container-low p-3 break-all">Arweave 메타 {transactionModal.image.arweave.metadataTxId ?? "-"}</p>
+                <p className="rounded-lg bg-surface-container-low p-3 break-all">Manifest {transactionModal.image.arweave.manifestTxId ?? "-"}</p>
+              </div>
+              <table className="w-full min-w-[860px] text-xs">
+                <thead>
+                  <tr className="border-b border-outline-variant/20 text-outline">
+                    {["일시", "주문", "구매자", "라이선스", "결제", "작가수익", "온체인"].map((head) => (
+                      <th key={head} className="px-3 py-2 text-left font-bold">{head}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/20">
+                  {transactionModal.transactions.length === 0 ? (
+                    <tr><td colSpan={7} className="px-3 py-10 text-center text-outline">완료된 거래가 없습니다.</td></tr>
+                  ) : transactionModal.transactions.map((tx) => (
+                    <tr key={tx.orderNumber}>
+                      <td className="px-3 py-2 text-on-surface-variant">{tx.completedAt ? new Date(tx.completedAt).toLocaleString("ko-KR") : "-"}</td>
+                      <td className="px-3 py-2 font-mono text-on-surface">{tx.orderNumber}</td>
+                      <td className="px-3 py-2 text-on-surface-variant">
+                        <p>{tx.buyer.name ?? "-"}</p>
+                        <p className="text-[10px] text-outline">{tx.buyer.email ?? tx.buyer.walletAddress ?? "-"}</p>
+                      </td>
+                      <td className="px-3 py-2 text-on-surface-variant">
+                        {tx.licenseCode}
+                        {tx.subscriptionCovered && <span className="ml-1 text-primary">구독</span>}
+                      </td>
+                      <td className="px-3 py-2 font-semibold text-on-surface">₩{tx.priceKrw.toLocaleString("ko-KR")}</td>
+                      <td className="px-3 py-2 font-semibold text-on-surface">₩{tx.netKrw.toLocaleString("ko-KR")}</td>
+                      <td className="px-3 py-2 font-mono text-[10px] text-outline">
+                        <p className="max-w-[220px] truncate">{tx.contractOrderId ?? "-"}</p>
+                        <p className="max-w-[220px] truncate">{tx.paymentTxHash ?? tx.paymentProvider ?? "-"}</p>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

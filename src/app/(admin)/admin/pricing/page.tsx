@@ -13,6 +13,14 @@ interface LicenseTypeRow {
   description_ko: string | null;
 }
 
+interface CommerceSettingsRow {
+  download_access_days: number;
+  subscription_basic_downloads: number;
+  subscription_pro_downloads: number;
+  subscription_enterprise_downloads: number;
+  arweave_self_funded_request_fee_krw: number;
+}
+
 function formatKRW(amount: number) {
   return `₩${amount.toLocaleString("ko-KR")}`;
 }
@@ -23,6 +31,16 @@ export default function AdminPricingPage() {
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [commerceSettings, setCommerceSettings] = useState<CommerceSettingsRow | null>(null);
+  const [commerceDrafts, setCommerceDrafts] = useState<Record<keyof CommerceSettingsRow, string>>({
+    download_access_days: "30",
+    subscription_basic_downloads: "5",
+    subscription_pro_downloads: "30",
+    subscription_enterprise_downloads: "100",
+    arweave_self_funded_request_fee_krw: "10000",
+  });
+  const [commerceLoading, setCommerceLoading] = useState(true);
+  const [commerceSaving, setCommerceSaving] = useState(false);
 
   const loadLicenses = useCallback(async () => {
     setLoading(true);
@@ -49,6 +67,47 @@ export default function AdminPricingPage() {
   }, []);
 
   useEffect(() => { loadLicenses(); }, [loadLicenses]);
+
+  const loadCommerceSettings = useCallback(async () => {
+    setCommerceLoading(true);
+    try {
+      const res = await fetch("/api/admin/commerce-settings");
+      if (res.status === 403) {
+        setForbidden(true);
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error ?? "운영 정책을 불러오지 못했습니다.");
+      }
+      const data = await res.json() as { row?: CommerceSettingsRow | null; settings?: {
+        downloadAccessDays: number;
+        subscriptionDownloadQuotas: { basic: number; pro: number; enterprise: number };
+        arweaveSelfFundedRequestFeeKrw: number;
+      } };
+      const row = data.row ?? {
+        download_access_days: data.settings?.downloadAccessDays ?? 30,
+        subscription_basic_downloads: data.settings?.subscriptionDownloadQuotas.basic ?? 5,
+        subscription_pro_downloads: data.settings?.subscriptionDownloadQuotas.pro ?? 30,
+        subscription_enterprise_downloads: data.settings?.subscriptionDownloadQuotas.enterprise ?? 100,
+        arweave_self_funded_request_fee_krw: data.settings?.arweaveSelfFundedRequestFeeKrw ?? 10000,
+      };
+      setCommerceSettings(row);
+      setCommerceDrafts({
+        download_access_days: String(row.download_access_days),
+        subscription_basic_downloads: String(row.subscription_basic_downloads),
+        subscription_pro_downloads: String(row.subscription_pro_downloads),
+        subscription_enterprise_downloads: String(row.subscription_enterprise_downloads),
+        arweave_self_funded_request_fee_krw: String(row.arweave_self_funded_request_fee_krw),
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "운영 정책을 불러오지 못했습니다.");
+    } finally {
+      setCommerceLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadCommerceSettings(); }, [loadCommerceSettings]);
 
   async function savePrice(license: LicenseTypeRow) {
     setSaving(license.code);
@@ -77,6 +136,30 @@ export default function AdminPricingPage() {
     }
   }
 
+  async function saveCommerceSettings() {
+    const body = Object.fromEntries(
+      Object.entries(commerceDrafts).map(([key, value]) => [key, Number(value)]),
+    );
+
+    setCommerceSaving(true);
+    try {
+      const res = await fetch("/api/admin/commerce-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(payload?.error ?? "운영 정책을 저장하지 못했습니다.");
+      }
+      await loadCommerceSettings();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "운영 정책을 저장하지 못했습니다.");
+    } finally {
+      setCommerceSaving(false);
+    }
+  }
+
   if (forbidden) {
     return (
       <div className="p-10 flex flex-col items-center justify-center min-h-[60vh] gap-4 text-outline">
@@ -95,6 +178,62 @@ export default function AdminPricingPage() {
           이미지 라이선스 상품별 판매 가격을 관리합니다. 저장 후 일반 결제와 온체인 결제 주문 생성에 즉시 반영됩니다.
         </p>
       </div>
+
+      <section className="mb-8 bg-surface-container-lowest p-5 shadow-ghost">
+        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="font-headline text-lg font-extrabold text-on-surface">구매/구독 운영 정책</h2>
+            <p className="mt-1 text-xs text-outline">
+              원본 다운로드 가능 기간, 구독 플랜별 무료다운 개수, 판매 전 Arweave 셀프 등록 요청 수수료를 조정합니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={saveCommerceSettings}
+            disabled={commerceSaving || commerceLoading || !commerceSettings}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {commerceSaving ? (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <span className="material-symbols-outlined text-base">save</span>
+            )}
+            운영 정책 저장
+          </button>
+        </div>
+
+        {commerceLoading ? (
+          <div className="flex justify-center py-8">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-5">
+            {([
+              ["download_access_days", "다운로드 기간", "일", 1, 3650],
+              ["subscription_basic_downloads", "Basic 무료다운", "개", 0, 10000],
+              ["subscription_pro_downloads", "Pro 무료다운", "개", 0, 10000],
+              ["subscription_enterprise_downloads", "Enterprise 무료다운", "개", 0, 10000],
+              ["arweave_self_funded_request_fee_krw", "Arweave 셀프등록 수수료", "KRW", 0, 10000000],
+            ] as const).map(([key, label, suffix, min, max]) => (
+              <label key={key} className="flex flex-col gap-2 rounded-lg bg-surface-container-low p-4">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-outline">{label}</span>
+                <div className="flex h-11 items-center overflow-hidden rounded-lg bg-surface-container-lowest ring-1 ring-outline-variant">
+                  <input
+                    type="number"
+                    min={min}
+                    max={max}
+                    step={key === "arweave_self_funded_request_fee_krw" ? 1000 : 1}
+                    value={commerceDrafts[key]}
+                    onChange={(event) => setCommerceDrafts((prev) => ({ ...prev, [key]: event.target.value }))}
+                    className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm font-semibold text-on-surface outline-none"
+                  />
+                  <span className="px-3 text-[10px] font-bold text-outline">{suffix}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+      </section>
 
       {loading ? (
         <div className="flex items-center justify-center min-h-[40vh]">

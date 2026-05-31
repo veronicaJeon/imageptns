@@ -59,6 +59,14 @@ interface CheckoutPrepareResponse {
   free?: boolean;
 }
 
+interface SubscriptionEntitlement {
+  active: boolean;
+  quota: number;
+  used: number;
+  remaining: number;
+  downloadAccessDays: number;
+}
+
 function formatKRW(n: number) {
   return "₩" + n.toLocaleString("ko-KR");
 }
@@ -98,6 +106,7 @@ function CheckoutContent() {
   const { user, loading: authLoading, init } = useAuth();
   const router = useRouter();
   const [licensePrices, setLicensePrices] = useState<Partial<Record<LicenseType, number>>>({});
+  const [subscriptionEntitlement, setSubscriptionEntitlement] = useState<SubscriptionEntitlement | null>(null);
 
   useEffect(() => { init(); }, [init]);
 
@@ -118,11 +127,36 @@ function CheckoutContent() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/subscription")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { entitlement?: SubscriptionEntitlement } | null) => {
+        setSubscriptionEntitlement(data?.entitlement ?? null);
+      })
+      .catch(() => setSubscriptionEntitlement(null));
+  }, [user]);
+
   function displayPrice(license: LicenseType) {
     return licensePrices[license] ?? getLicensePrice(license);
   }
 
-  const subtotal = items.reduce((s, i) => s + displayPrice(i.license), 0);
+  let remainingSubscriptionDownloads = subscriptionEntitlement?.active ? subscriptionEntitlement.remaining : 0;
+  const pricedCartItems = items.map((item) => {
+    const originalPrice = displayPrice(item.license);
+    const subscriptionCovered = originalPrice > 0 && remainingSubscriptionDownloads > 0;
+    if (subscriptionCovered) remainingSubscriptionDownloads -= 1;
+    return {
+      ...item,
+      originalPrice,
+      effectivePrice: subscriptionCovered ? 0 : originalPrice,
+      subscriptionCovered,
+    };
+  });
+  const subscriptionCoveredCount = pricedCartItems.filter((item) => item.subscriptionCovered).length;
+  const subtotal = pricedCartItems.reduce((s, i) => s + i.effectivePrice, 0);
+  const originalSubtotal = pricedCartItems.reduce((s, i) => s + i.originalPrice, 0);
+  const subscriptionDiscount = Math.max(0, originalSubtotal - subtotal);
   const vat      = Math.round(subtotal * 0.1);
   const total    = subtotal + vat;
 
@@ -487,7 +521,7 @@ function CheckoutContent() {
               <h2 className="text-xs font-bold text-outline uppercase tracking-widest mb-5">{ch.paymentMethod}</h2>
               {isFreeCheckout ? (
                 <div className="mb-5 rounded-lg bg-green-50 p-4 text-sm text-green-800 ring-1 ring-green-200 dark:bg-green-900/20 dark:text-green-200 dark:ring-green-900/50">
-                  <p className="font-bold">무료 라이선스 주문</p>
+                  <p className="font-bold">{subscriptionCoveredCount > 0 ? "구독 무료다운 주문" : "무료 라이선스 주문"}</p>
                   <p className="mt-1 text-xs leading-relaxed">
                     결제 수단 입력 없이 구매가 확정되고 원본 다운로드 권한이 즉시 생성됩니다.
                   </p>
@@ -640,7 +674,7 @@ function CheckoutContent() {
               <h2 className="font-headline font-bold text-on-surface mb-6">{ch.orderSummary}</h2>
 
               <div className="flex flex-col gap-4 mb-6 max-h-64 overflow-y-auto pr-1">
-                {items.map((item) => (
+                {pricedCartItems.map((item) => (
                   <div key={item.id} className="flex gap-3">
                     <Image
                       src={thumbnailUrlFromPreviewUrl(item.src, 160, 120)}
@@ -653,13 +687,43 @@ function CheckoutContent() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-on-surface truncate">{item.title}</p>
                       <p className="text-[10px] text-outline capitalize">{item.license}</p>
+                      {item.subscriptionCovered && (
+                        <p className="mt-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary w-fit">
+                          구독 무료다운 적용
+                        </p>
+                      )}
                     </div>
-                    <p className="text-xs font-bold text-on-surface shrink-0">{formatKRW(displayPrice(item.license))}</p>
+                    <div className="shrink-0 text-right">
+                      <p className="text-xs font-bold text-on-surface">{formatKRW(item.effectivePrice)}</p>
+                      {item.subscriptionCovered && (
+                        <p className="text-[10px] text-outline line-through">{formatKRW(item.originalPrice)}</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
 
+              {subscriptionEntitlement?.active && (
+                <div className="mb-4 rounded-lg bg-primary/8 px-4 py-3 text-xs text-on-surface-variant">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-bold text-on-surface">구독 활성</span>
+                    <span className="text-primary font-bold">
+                      잔여 {subscriptionEntitlement.remaining.toLocaleString("ko-KR")} / {subscriptionEntitlement.quota.toLocaleString("ko-KR")}개
+                    </span>
+                  </div>
+                  <p className="mt-1 leading-relaxed">
+                    이번 주문에서 {subscriptionCoveredCount.toLocaleString("ko-KR")}개가 무료다운으로 적용됩니다.
+                    다운로드 권한은 구매 확정일부터 {subscriptionEntitlement.downloadAccessDays.toLocaleString("ko-KR")}일간 유지됩니다.
+                  </p>
+                </div>
+              )}
+
               <div className="border-t border-outline-variant/20 pt-4 flex flex-col gap-2 text-sm">
+                {subscriptionDiscount > 0 && (
+                  <div className="flex justify-between text-primary">
+                    <span>구독 무료다운 할인</span><span>-{formatKRW(subscriptionDiscount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-on-surface-variant">
                   <span>{t.cart.subtotal}</span><span>{formatKRW(subtotal)}</span>
                 </div>

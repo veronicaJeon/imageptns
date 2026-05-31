@@ -63,6 +63,6 @@ describe("buildUploadProofSteps", () => {
 
     expect(requested.find((step) => step.key === "proof")?.state).toBe("current");
     expect(available.find((step) => step.key === "proof")?.state).toBe("current");
-    expect(requested.find((step) => step.key === "proof")?.description).toContain("첫 판매 이후");
+    expect(requested.find((step) => step.key === "proof")?.description).toContain("사진가 셀프 등록 요청");
   });
 });

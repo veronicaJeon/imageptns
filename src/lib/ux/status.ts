@@ -79,7 +79,7 @@ export function buildUploadProofSteps(upload: UploadProofInput): TimelineStep[] 
     {
       key: "proof",
       label: "Arweave 자격증명",
-      description: "첫 판매 이후 사진가 요청과 관리자 일괄 등록을 거쳐 원본과 해시를 Arweave에 기록합니다.",
+      description: "첫 판매 이후 또는 사진가 셀프 등록 요청으로 관리자 일괄 등록을 거쳐 원본과 해시를 Arweave에 기록합니다.",
       state: proofRegistered ? "done" : proofFailed ? "failed" : proofActive ? "current" : approved ? "pending" : "pending",
     },
   ];

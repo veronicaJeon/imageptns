@@ -26,6 +26,9 @@ interface AdminRegistrationImage {
   proof_arweave_manifest_tx_id: string | null;
   proof_arweave_confirmed_at: string | null;
   proof_failure_reason: string | null;
+  proof_request_fee_payer: string | null;
+  proof_request_kind: string | null;
+  proof_request_fee_krw: number | null;
   photographer:
     | { id: string; full_name: string | null; wallet_address: string | null }
     | { id: string; full_name: string | null; wallet_address: string | null }[]
@@ -96,7 +99,7 @@ function formatBytes(bytes: number) {
 }
 
 function canRegister(image: AdminRegistrationImage) {
-  return ["available", "requested", "failed"].includes(image.proof_status ?? "not_registered") && (image.sales_count ?? 0) > 0;
+  return ["available", "requested", "failed"].includes(image.proof_status ?? "not_registered");
 }
 
 function canVerify(image: AdminRegistrationImage) {
@@ -204,7 +207,7 @@ export default function AdminOnchainRegistrationsPage() {
       <div className="mb-8">
         <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">온체인 등록사진</h1>
         <p className="mt-1 text-sm text-on-surface-variant">
-          사진가가 요청한 판매 완료 이미지를 Arweave에 일괄 등록하고 GraphQL 컨펌 결과를 기록합니다.
+          사진가가 요청한 판매 완료 또는 셀프 등록 이미지를 Arweave에 일괄 등록하고 GraphQL 컨펌 결과를 기록합니다.
         </p>
       </div>
 
@@ -350,8 +353,13 @@ export default function AdminOnchainRegistrationsPage() {
                       )}
                     </td>
                     <td className="px-5 py-4 text-on-surface-variant">
-                      <p>{image.sales_count ?? 0}건</p>
-                      <p className="text-xs text-outline">{(image.file_size_mb ?? 0).toLocaleString("ko-KR", { maximumFractionDigits: 2 })} MB</p>
+                        <p>{image.sales_count ?? 0}건</p>
+                        <p className="text-xs text-outline">{(image.file_size_mb ?? 0).toLocaleString("ko-KR", { maximumFractionDigits: 2 })} MB</p>
+                      {image.proof_request_kind === "self_funded" && (
+                        <p className="mt-1 rounded-full bg-surface-container-low px-2 py-0.5 text-[10px] font-bold text-on-surface-variant">
+                          사진가 부담 ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")}
+                        </p>
+                      )}
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-1.5">
