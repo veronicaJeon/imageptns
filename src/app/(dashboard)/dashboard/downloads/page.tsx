@@ -17,9 +17,12 @@ interface DownloadOrderImage {
 interface DownloadOrderItem {
   id: string;
   license_code: string;
+  subscription_covered: boolean | null;
+  subscription_plan: string | null;
   image_lifecycle_status: string | null;
   image_deleted_at: string | null;
   image_deletion_notice: string | null;
+  downloads: { id: string; expires_at: string | null; download_count: number | null }[] | null;
   image: DownloadOrderImage | null;
 }
 
@@ -68,6 +71,10 @@ export default function DownloadsPage() {
       completedAt: order.completed_at,
       itemId:      item.id,
       license:     item.license_code,
+      subscriptionCovered: Boolean(item.subscription_covered),
+      subscriptionPlan: item.subscription_plan,
+      downloadExpiresAt: item.downloads?.[0]?.expires_at ?? null,
+      downloadCount: item.downloads?.[0]?.download_count ?? 0,
       imageId:     item.image?.id,
       title:       item.image?.title ?? "",
       src:         item.image?.storage_path_preview ?? "",
@@ -105,7 +112,7 @@ export default function DownloadsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
-                {["Image", "License", "Purchased", ""].map((h, i) => (
+                {["Image", "License", "Purchased", "Expires", ""].map((h, i) => (
                   <th key={i} className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">{h}</th>
                 ))}
               </tr>
@@ -149,8 +156,21 @@ export default function DownloadsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-on-surface-variant capitalize">{row.license}</td>
+                    <td className="px-6 py-4 text-on-surface-variant capitalize">
+                      <p>{row.license}</p>
+                      {row.subscriptionCovered && (
+                        <p className="mt-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                          {row.subscriptionPlan ?? "subscription"} 무료다운
+                        </p>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-on-surface-variant">{date}</td>
+                    <td className="px-6 py-4 text-on-surface-variant">
+                      {row.downloadExpiresAt
+                        ? new Date(row.downloadExpiresAt).toLocaleDateString("ko-KR", { year: "2-digit", month: "2-digit", day: "2-digit" })
+                        : "-"}
+                      <p className="mt-1 text-[10px] text-outline">다운로드 {row.downloadCount}회</p>
+                    </td>
                     <td className="px-6 py-4">
                       <button
                         onClick={() => handleDownload(row.itemId)}

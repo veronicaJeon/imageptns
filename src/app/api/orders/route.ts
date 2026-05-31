@@ -19,12 +19,16 @@ interface OrderItem {
   id: string;
   license_code: string;
   price_krw: number;
+  subscription_covered: boolean | null;
+  subscription_original_price_krw: number | null;
+  subscription_plan: string | null;
   image_title_snapshot: string | null;
   image_asset_id_snapshot: string | null;
   image_preview_path_snapshot: string | null;
   image_lifecycle_status: string | null;
   image_deleted_at: string | null;
   image_deletion_notice: string | null;
+  downloads: { id: string; expires_at: string | null; download_count: number | null }[] | null;
   image: OrderImage | OrderImage[] | null;
 }
 
@@ -81,8 +85,10 @@ export async function GET() {
       buyer_wallet_address,
       order_items(
         id, license_code, price_krw,
+        subscription_covered, subscription_original_price_krw, subscription_plan,
         image_title_snapshot, image_asset_id_snapshot, image_preview_path_snapshot,
         image_lifecycle_status, image_deleted_at, image_deletion_notice,
+        downloads(id, expires_at, download_count),
         image:images!image_id(id, title, category, asset_id, storage_path_preview, lifecycle_status, deleted_at, width, height,
           photographer:profiles!photographer_id(full_name))
       )

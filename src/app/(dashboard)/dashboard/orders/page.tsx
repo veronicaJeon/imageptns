@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n/store";
+import { buildOrderReceiptHtml, type ReceiptOrder } from "@/lib/receipts/order";
 import { buildOrderStatusSteps, type TimelineState } from "@/lib/ux/status";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -36,9 +37,13 @@ interface OrderItem {
   id: string;
   license_code: string;
   price_krw: number;
+  subscription_covered: boolean | null;
+  subscription_original_price_krw: number | null;
+  subscription_plan: string | null;
   image_lifecycle_status: string | null;
   image_deleted_at: string | null;
   image_deletion_notice: string | null;
+  downloads: { id: string; expires_at: string | null; download_count: number | null }[] | null;
   image: OrderImage | null;
 }
 
@@ -47,7 +52,12 @@ interface Order {
   order_number: string;
   status: string;
   created_at: string;
+  completed_at: string | null;
+  subtotal_krw: number;
+  vat_krw: number;
   total_krw: number;
+  billing_name: string | null;
+  billing_email: string | null;
   payment_provider: string | null;
   chain_id: number | null;
   payment_token: string | null;
@@ -67,6 +77,10 @@ interface OrderRow {
   itemId: string;
   license: string;
   priceKrw: number;
+  originalPriceKrw: number | null;
+  subscriptionCovered: boolean;
+  subscriptionPlan: string | null;
+  downloadExpiresAt: string | null;
   imageId: string | undefined;
   title: string;
   src: string;
@@ -122,6 +136,29 @@ function OrderTimeline({ row }: { row: OrderRow }) {
   );
 }
 
+function receiptOrderFromOrder(order: Order): ReceiptOrder {
+  return {
+    orderNumber: order.order_number,
+    completedAt: order.completed_at,
+    billingName: order.billing_name,
+    billingEmail: order.billing_email,
+    paymentProvider: order.payment_provider,
+    paymentTxHash: order.payment_tx_hash,
+    contractOrderId: order.contract_order_id,
+    subtotalKrw: order.subtotal_krw,
+    vatKrw: order.vat_krw,
+    totalKrw: order.total_krw,
+    items: (order.order_items ?? []).map((item) => ({
+      title: item.image?.title ?? "",
+      assetId: item.image?.asset_id ?? "",
+      license: item.license_code,
+      priceKrw: item.price_krw,
+      subscriptionCovered: Boolean(item.subscription_covered),
+      downloadExpiresAt: item.downloads?.[0]?.expires_at ?? null,
+    })),
+  };
+}
+
 export default function OrdersPage() {
   const { t } = useLang();
   const ord = t.dashboard.orders;
@@ -163,6 +200,20 @@ export default function OrdersPage() {
     } finally {
       setDownloading(null);
     }
+  }
+
+  function handlePrintReceipt(order: Order) {
+    const popup = window.open("", "_blank", "noopener,noreferrer,width=960,height=720");
+    if (!popup) {
+      alert("팝업이 차단되어 영수증 창을 열지 못했습니다.");
+      return;
+    }
+
+    popup.document.open();
+    popup.document.write(buildOrderReceiptHtml(receiptOrderFromOrder(order)));
+    popup.document.close();
+    popup.focus();
+    window.setTimeout(() => popup.print(), 250);
   }
 
   function handleRecoveryTxHashChange(orderDbId: string, txHash: string) {
@@ -226,6 +277,10 @@ export default function OrdersPage() {
       itemId:      item.id,
       license:     item.license_code,
       priceKrw:     item.price_krw,
+      originalPriceKrw: item.subscription_original_price_krw,
+      subscriptionCovered: Boolean(item.subscription_covered),
+      subscriptionPlan: item.subscription_plan,
+      downloadExpiresAt: item.downloads?.[0]?.expires_at ?? null,
       imageId:     item.image?.id,
       title:       item.image?.title ?? "",
       src:         item.image?.storage_path_preview ?? "",
@@ -276,6 +331,7 @@ export default function OrdersPage() {
                 const canRecoverBaseUsdc = row.isFirstItemInOrder && row.paymentProvider === "base_usdc" && row.cryptoStatus === "pending";
                 const isConfirming = Boolean(confirmingOrderIds[row.orderId]);
                 const imageUnavailable = row.imageLifecycleStatus && row.imageLifecycleStatus !== "active";
+                const order = orders.find((item) => item.id === row.orderId);
 
                 return (
                 <tr key={row.itemId} className="hover:bg-surface-container-low transition-colors align-top">
@@ -317,7 +373,17 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-6 py-4 text-on-surface-variant capitalize">
                     <p>{row.license}</p>
-                    <p className="mt-1 text-xs text-outline">{formatKRW(row.priceKrw)}</p>
+                    <p className="mt-1 text-xs text-outline">
+                      {formatKRW(row.priceKrw)}
+                      {row.subscriptionCovered && row.originalPriceKrw !== null && (
+                        <span className="ml-1 line-through">{formatKRW(row.originalPriceKrw)}</span>
+                      )}
+                    </p>
+                    {row.subscriptionCovered && (
+                      <p className="mt-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                        {row.subscriptionPlan ?? "subscription"} 무료다운
+                      </p>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-on-surface-variant">{row.date}</td>
                   <td className="px-6 py-4">
@@ -356,6 +422,12 @@ export default function OrdersPage() {
                       <div className="mt-3 max-w-md rounded-lg bg-surface-container-low px-3 py-2 text-[11px] leading-relaxed text-on-surface-variant">
                         <span className="font-bold text-on-surface">라이선스:</span>{" "}
                         {LICENSE_SUMMARY[row.license] ?? "구매한 라이선스 조건에 따라 사용 가능합니다."}
+                        {row.downloadExpiresAt && (
+                          <p className="mt-1">
+                            <span className="font-bold text-on-surface">다운로드 만료:</span>{" "}
+                            {new Date(row.downloadExpiresAt).toLocaleDateString("ko-KR", { year: "numeric", month: "short", day: "numeric" })}
+                          </p>
+                        )}
                       </div>
                     )}
                     {row.imageDeletionNotice && (
@@ -366,17 +438,29 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-6 py-4">
                     {row.status === "completed" && (
-                      <button
-                        onClick={() => handleDownload(row.itemId)}
-                        disabled={downloading === row.itemId}
-                        className="flex items-center gap-1 text-xs font-bold text-primary hover:opacity-70 transition-opacity disabled:opacity-50"
-                      >
-                        {downloading === row.itemId
-                          ? <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                          : <span className="material-symbols-outlined text-base">download</span>
-                        }
-                        {ord.download}
-                      </button>
+                      <div className="flex flex-col items-start gap-2">
+                        <button
+                          onClick={() => handleDownload(row.itemId)}
+                          disabled={downloading === row.itemId}
+                          className="flex items-center gap-1 text-xs font-bold text-primary hover:opacity-70 transition-opacity disabled:opacity-50"
+                        >
+                          {downloading === row.itemId
+                            ? <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            : <span className="material-symbols-outlined text-base">download</span>
+                          }
+                          {ord.download}
+                        </button>
+                        {row.isFirstItemInOrder && order && (
+                          <button
+                            type="button"
+                            onClick={() => handlePrintReceipt(order)}
+                            className="flex items-center gap-1 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-base">print</span>
+                            영수증 PDF
+                          </button>
+                        )}
+                      </div>
                     )}
                     {canRecoverBaseUsdc && (
                       <form

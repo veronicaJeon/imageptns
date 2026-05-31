@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { calculateCommission, selectCommissionPolicy, type CommissionPolicy } from "@/lib/commerce/commission";
 import { priceCartItemsFromLicenses, type LicensePriceRow } from "@/lib/commerce/pricing";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { loadSubscriptionCoverageForCheckout } from "@/lib/subscription/checkout";
 
 interface CartItemInput {
   id: string;           // image id
@@ -51,7 +52,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid license" }, { status: 400 });
   }
 
-  const subtotal = pricedItems.reduce((s, i) => s + i.priceKrw, 0);
+  const coverage = await loadSubscriptionCoverageForCheckout({
+    admin,
+    userId: user.id,
+    items: pricedItems,
+  });
+  const payableItems = coverage.items;
+  const subtotal = payableItems.reduce((s, i) => s + i.effectivePriceKrw, 0);
   const vat      = Math.round(subtotal * 0.1);
   const total    = subtotal + vat;
   const tossOrderId = randomUUID();
@@ -100,9 +107,9 @@ export async function POST(req: NextRequest) {
     rate: Number(policy.rate),
   }));
 
-  const orderItems = pricedItems.map((item) => {
+  const orderItems = payableItems.map((item) => {
     const img      = imageMap[item.id];
-    const gross    = item.priceKrw;
+    const gross    = item.effectivePriceKrw;
     const commissionPolicy = selectCommissionPolicy({
       imageId: item.id,
       photographerId: img?.photographer_id ?? null,
@@ -114,7 +121,7 @@ export async function POST(req: NextRequest) {
       order_id:        order.id,
       image_id:        item.id,
       license_code:    item.license,
-      price_krw:       item.priceKrw,
+      price_krw:       item.effectivePriceKrw,
       photographer_id: img?.photographer_id ?? null,
       image_title_snapshot: img?.title ?? null,
       image_asset_id_snapshot: img?.asset_id ?? null,
@@ -125,6 +132,10 @@ export async function POST(req: NextRequest) {
       commission_rate: commission.commissionRate,
       commission_krw:  commission.commissionKrw,
       net_krw:         commission.netKrw,
+      subscription_id: item.subscriptionCovered ? coverage.subscriptionId : null,
+      subscription_covered: item.subscriptionCovered,
+      subscription_original_price_krw: item.subscriptionCovered ? item.originalPriceKrw : null,
+      subscription_plan: item.subscriptionCovered ? coverage.subscriptionPlan : null,
     };
   });
 
@@ -149,8 +160,11 @@ export async function POST(req: NextRequest) {
       orderDbId: completedOrder.id,
       orderNumber: completedOrder.order_number,
       amount: total,
-      orderName: items.length === 1 ? `무료 이미지 라이선스 (${items[0].license})` : `무료 이미지 라이선스 외 ${items.length - 1}건`,
+      orderName: coverage.coveredCount > 0
+        ? items.length === 1 ? `구독 무료다운 이미지 라이선스 (${items[0].license})` : `구독 무료다운 이미지 라이선스 외 ${items.length - 1}건`
+        : items.length === 1 ? `무료 이미지 라이선스 (${items[0].license})` : `무료 이미지 라이선스 외 ${items.length - 1}건`,
       free: true,
+      subscriptionCoverage: coverage,
     });
   }
 
@@ -166,5 +180,6 @@ export async function POST(req: NextRequest) {
     orderDbId: order.id,
     amount:    total,
     orderName,
+    subscriptionCoverage: coverage,
   });
 }

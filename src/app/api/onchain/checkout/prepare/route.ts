@@ -10,6 +10,7 @@ import { getOnchainServerConfig } from "@/lib/onchain/env";
 import { recordOnchainEvent } from "@/lib/onchain/events";
 import { orderBytes32 } from "@/lib/onchain/ids";
 import { createStaticKrwUsdcQuote } from "@/lib/onchain/quote";
+import { loadSubscriptionCoverageForCheckout } from "@/lib/subscription/checkout";
 
 interface CartItemInput {
   id: string;
@@ -135,6 +136,21 @@ export async function POST(req: NextRequest) {
     ...policy,
     rate: Number(policy.rate),
   }));
+  const pricedItems: { id: string; license: string; priceKrw: number }[] = [];
+  for (const item of normalizedItems) {
+    const license = licenseMap.get(item.license);
+    if (!license) return badRequest(`Invalid license: ${item.license}`);
+    pricedItems.push({
+      id: item.id!,
+      license: item.license!,
+      priceKrw: license.price_krw,
+    });
+  }
+  const coverage = await loadSubscriptionCoverageForCheckout({
+    admin,
+    userId: user.id,
+    items: pricedItems,
+  });
   const quote = createStaticKrwUsdcQuote(config.usdcPerKrw);
   const orderItems = [];
   const assetIds: `0x${string}`[] = [];
@@ -142,10 +158,8 @@ export async function POST(req: NextRequest) {
   const grossAmounts: bigint[] = [];
   let subtotal = 0;
 
-  for (const item of normalizedItems) {
-    const license = licenseMap.get(item.license);
-    if (!license) return badRequest(`Invalid license: ${item.license}`);
-
+  for (const [index, item] of normalizedItems.entries()) {
+    const coveredItem = coverage.items[index];
     const image = imageMap.get(item.id);
     if (!image?.asset_id || image.proof_status !== "registered" || !image.onchain_asset_id) {
       return badRequest("All images must be approved and registered onchain");
@@ -159,7 +173,7 @@ export async function POST(req: NextRequest) {
       return badRequest("Photographer wallet address is missing or invalid");
     }
 
-    const price = license.price_krw;
+    const price = coveredItem.effectivePriceKrw;
     const commissionPolicy = selectCommissionPolicy({
       imageId: item.id,
       photographerId: image.photographer_id,
@@ -171,9 +185,11 @@ export async function POST(req: NextRequest) {
     const grossCryptoAmount = krwToUsdcAmount(price, quote.usdcPerKrw);
     const netCryptoAmount = krwToUsdcAmount(netKrw, quote.usdcPerKrw);
     subtotal += price;
-    grossAmounts.push(grossCryptoAmount);
-    assetIds.push(image.onchain_asset_id);
-    photographers.push(photographerAddress);
+    if (grossCryptoAmount > BigInt(0)) {
+      grossAmounts.push(grossCryptoAmount);
+      assetIds.push(image.onchain_asset_id);
+      photographers.push(photographerAddress);
+    }
     orderItems.push({
       image_id: item.id,
       license_code: item.license,
@@ -190,6 +206,10 @@ export async function POST(req: NextRequest) {
       net_krw: netKrw,
       crypto_gross_amount: bigintToDecimalString(grossCryptoAmount),
       crypto_net_amount: bigintToDecimalString(netCryptoAmount),
+      subscription_id: coveredItem.subscriptionCovered ? coverage.subscriptionId : null,
+      subscription_covered: coveredItem.subscriptionCovered,
+      subscription_original_price_krw: coveredItem.subscriptionCovered ? coveredItem.originalPriceKrw : null,
+      subscription_plan: coveredItem.subscriptionCovered ? coverage.subscriptionPlan : null,
     });
   }
 
@@ -198,6 +218,9 @@ export async function POST(req: NextRequest) {
   const vat = 0;
   const total = subtotal + vat;
   const cryptoAmount = grossAmounts.reduce((sum, amount) => sum + amount, BigInt(0));
+  if (cryptoAmount === BigInt(0)) {
+    return badRequest("All items are covered by subscription or free pricing. Use standard checkout completion.");
+  }
   const tossOrderId = randomUUID();
   const contractOrderId = orderBytes32(tossOrderId);
   const confirmToken = createOnchainConfirmToken();
@@ -257,6 +280,11 @@ export async function POST(req: NextRequest) {
       contractOrderId,
       buyerWalletAddress,
       quote,
+      subscriptionCoverage: {
+        coveredCount: coverage.coveredCount,
+        remainingBeforeOrder: coverage.remainingBeforeOrder,
+        remainingAfterOrder: coverage.remainingAfterOrder,
+      },
     },
   });
 
@@ -272,5 +300,6 @@ export async function POST(req: NextRequest) {
     assetIds,
     photographers,
     grossAmounts: grossAmounts.map((amount) => amount.toString()),
+    subscriptionCoverage: coverage,
   });
 }

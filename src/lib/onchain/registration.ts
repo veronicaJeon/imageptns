@@ -9,6 +9,7 @@ export type ImageProofStatus =
 export type BlockchainRegistrationState =
   | "not_approved"
   | "waiting_first_sale"
+  | "self_funded_available"
   | ImageProofStatus;
 
 export type AuthorshipDeclaration = "ai_generated" | "human_original";
@@ -40,6 +41,8 @@ export interface ArweaveCredentialMetadataInput {
   authorshipDeclaration: AuthorshipDeclaration;
   arweaveOriginalTxId: string;
   contentHash?: string;
+  onchainAssetId?: string;
+  ledgerKey?: string;
   createdAt: string;
 }
 
@@ -77,12 +80,12 @@ export function getBlockchainRegistrationState(
   if (TERMINAL_OR_ACTIVE_STATUSES.has(proofStatus)) return proofStatus;
   if (proofStatus === "available") return "available";
 
-  return (input.salesCount ?? 0) > 0 ? "available" : "waiting_first_sale";
+  return (input.salesCount ?? 0) > 0 ? "available" : "self_funded_available";
 }
 
 export function canRequestBlockchainRegistration(input: RegistrationStateInput): boolean {
   const state = getBlockchainRegistrationState(input);
-  return state === "available" || state === "failed";
+  return state === "available" || state === "self_funded_available" || state === "failed";
 }
 
 export function summarizeRegistrationSelection(items: RegistrationSelectionItem[]) {

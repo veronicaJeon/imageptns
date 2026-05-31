@@ -165,11 +165,14 @@ async function loadExpectedPurchaseItems(
       return { response: NextResponse.json({ error: "Order item photographer wallet is missing or invalid" }, { status: 409 }) };
     }
 
+    const grossAmount = decimalToUnits(item.crypto_gross_amount ?? "", 6);
+    if (grossAmount === BigInt(0)) continue;
+
     expectedItems.push({
       orderItemId: item.id,
       assetId,
       photographer,
-      grossAmount: decimalToUnits(item.crypto_gross_amount ?? "", 6),
+      grossAmount,
       claimableAmount: decimalToUnits(item.crypto_net_amount ?? "", 6),
     });
   }

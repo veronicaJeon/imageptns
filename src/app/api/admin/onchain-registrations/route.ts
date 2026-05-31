@@ -42,6 +42,9 @@ interface AdminRegistrationImage {
   proof_arweave_manifest_tx_id: string | null;
   proof_arweave_confirmed_at: string | null;
   proof_failure_reason: string | null;
+  proof_request_fee_payer: string | null;
+  proof_request_kind: string | null;
+  proof_request_fee_krw: number | null;
   photographer: { id: string; full_name: string | null; wallet_address: string | null } | { id: string; full_name: string | null; wallet_address: string | null }[] | null;
 }
 
@@ -171,6 +174,7 @@ export async function GET(req: NextRequest) {
       proof_status, proof_requested_at, proof_registered_at, proof_batch_id,
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id,
       proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason,
+      proof_request_fee_payer, proof_request_kind, proof_request_fee_krw,
       photographer:profiles!photographer_id(id, full_name, wallet_address)
     `)
     .eq("status", "approved")
@@ -229,6 +233,7 @@ export async function POST(req: NextRequest) {
       proof_status, proof_requested_at, proof_registered_at, proof_batch_id,
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id,
       proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason,
+      proof_request_fee_payer, proof_request_kind, proof_request_fee_krw,
       photographer:profiles!photographer_id(id, full_name, wallet_address)
     `)
     .in("id", imageIds)
@@ -240,14 +245,13 @@ export async function POST(req: NextRequest) {
   const images = (loaded ?? []) as AdminRegistrationImage[];
   const eligible = images.filter((image) =>
     ["requested", "available", "failed"].includes(image.proof_status ?? "not_registered") &&
-    (image.sales_count ?? 0) > 0 &&
     image.asset_id &&
     image.photographer_id &&
     image.storage_path_original
   );
   if (eligible.length !== imageIds.length) {
     return NextResponse.json(
-      { error: "Only sold approved images with requested/available/failed status and original files can be registered" },
+      { error: "Only approved images with requested/available/failed status and original files can be registered" },
       { status: 409 },
     );
   }
@@ -339,6 +343,8 @@ export async function POST(req: NextRequest) {
         authorshipDeclaration: image.authorship_declaration ?? "human_original",
         arweaveOriginalTxId: originalUpload.id,
         contentHash,
+        onchainAssetId,
+        ledgerKey: onchainAssetId,
         createdAt: now,
       });
       const metadataBuffer = Buffer.from(JSON.stringify(metadata, null, 2));

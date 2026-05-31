@@ -17,6 +17,14 @@ interface Subscription {
   cancel_at_period_end: boolean;
 }
 
+interface SubscriptionEntitlement {
+  active: boolean;
+  quota: number;
+  used: number;
+  remaining: number;
+  downloadAccessDays: number;
+}
+
 interface EthereumProvider {
   request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
 }
@@ -41,6 +49,7 @@ export default function SettingsPage() {
   const [notifications, setNotifications] = useState({ sales: true, reviews: true, newsletter: false });
   const [notifSaving, setNotifSaving] = useState(false);
   const [subscription, setSubscription] = useState<Subscription | null | undefined>(undefined);
+  const [subscriptionEntitlement, setSubscriptionEntitlement] = useState<SubscriptionEntitlement | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelDone, setCancelDone] = useState(false);
   const [upgradeLoading, setUpgradeLoading] = useState(false);
@@ -52,10 +61,14 @@ export default function SettingsPage() {
   useEffect(() => {
     fetch("/api/subscription")
       .then((r) => r.json())
-      .then(({ subscription: sub }: { subscription: Subscription | null }) => {
+      .then(({ subscription: sub, entitlement }: { subscription: Subscription | null; entitlement?: SubscriptionEntitlement }) => {
         setSubscription(sub ?? null);
+        setSubscriptionEntitlement(entitlement ?? null);
       })
-      .catch(() => setSubscription(null));
+      .catch(() => {
+        setSubscription(null);
+        setSubscriptionEntitlement(null);
+      });
   }, []);
 
   async function handleCancelSubscription() {
@@ -469,6 +482,26 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+
+            {subscriptionEntitlement?.active && (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg bg-surface-container-lowest px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-outline">무료다운 잔여</p>
+                  <p className="mt-1 text-lg font-black text-primary">
+                    {subscriptionEntitlement.remaining.toLocaleString("ko-KR")}
+                    <span className="text-xs font-bold text-outline"> / {subscriptionEntitlement.quota.toLocaleString("ko-KR")}개</span>
+                  </p>
+                </div>
+                <div className="rounded-lg bg-surface-container-lowest px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-outline">이번 기간 사용</p>
+                  <p className="mt-1 text-lg font-black text-on-surface">{subscriptionEntitlement.used.toLocaleString("ko-KR")}개</p>
+                </div>
+                <div className="rounded-lg bg-surface-container-lowest px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-outline">다운로드 보존</p>
+                  <p className="mt-1 text-lg font-black text-on-surface">{subscriptionEntitlement.downloadAccessDays.toLocaleString("ko-KR")}일</p>
+                </div>
+              </div>
+            )}
 
             {subscription.cancel_at_period_end ? (
               <div className="flex items-center gap-2 text-sm text-on-surface-variant bg-surface-container-lowest rounded px-4 py-3">

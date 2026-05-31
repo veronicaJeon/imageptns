@@ -17,14 +17,14 @@ describe("getBlockchainRegistrationState", () => {
     ).toBe("available");
   });
 
-  it("does not allow unsold approved images to be requested", () => {
+  it("marks unsold approved images as self-funded requestable", () => {
     expect(
       getBlockchainRegistrationState({
         imageStatus: "approved",
         salesCount: 0,
         proofStatus: "not_registered",
       })
-    ).toBe("waiting_first_sale");
+    ).toBe("self_funded_available");
   });
 
   it("preserves requested, pending, registered, and failed proof states", () => {
@@ -63,6 +63,8 @@ describe("buildArweaveCredentialMetadata", () => {
       freeUsagePolicy: "none",
       authorshipDeclaration: "human_original",
       arweaveOriginalTxId: "abc123",
+      onchainAssetId: "0xabc",
+      ledgerKey: "0xabc",
       createdAt: "2026-05-20T00:00:00.000Z",
     });
 
@@ -72,6 +74,7 @@ describe("buildArweaveCredentialMetadata", () => {
       originalFileSha256: "a".repeat(64),
       authorshipDeclaration: "human_original",
       arweaveOriginalTxId: "abc123",
+      ledgerKey: "0xabc",
     });
   });
 });

@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
 type RegistrationState =
   | "not_approved"
   | "waiting_first_sale"
+  | "self_funded_available"
   | "not_registered"
   | "available"
   | "requested"
@@ -27,15 +28,40 @@ interface BlockchainImage {
   proof_arweave_metadata_tx_id: string | null;
   proof_arweave_confirmed_at: string | null;
   proof_failure_reason: string | null;
+  proof_request_fee_payer: string | null;
+  proof_request_kind: string | null;
+  proof_request_fee_krw: number | null;
   storage_path_preview: string | null;
   file_size_mb: number | null;
   created_at: string;
   registration_state: RegistrationState;
 }
 
+interface ImageTransaction {
+  orderNumber: string;
+  completedAt: string | null;
+  buyer: { name: string | null; email: string | null; walletAddress: string | null };
+  licenseCode: string;
+  priceKrw: number;
+  netKrw: number;
+  subscriptionCovered: boolean;
+  paymentProvider: string | null;
+  paymentTxHash: string | null;
+  contractOrderId: string | null;
+}
+
+interface ImageTransactionResponse {
+  image: {
+    ledgerKey: string | null;
+    arweave: { originalTxId: string | null; metadataTxId: string | null; manifestTxId: string | null };
+  };
+  transactions: ImageTransaction[];
+}
+
 const STATE_LABELS: Record<RegistrationState, string> = {
   not_approved: "승인 전",
   waiting_first_sale: "첫 판매 대기",
+  self_funded_available: "셀프 등록가능",
   not_registered: "증명 전",
   available: "등록가능",
   requested: "요청됨",
@@ -47,6 +73,7 @@ const STATE_LABELS: Record<RegistrationState, string> = {
 const STATE_STYLES: Record<RegistrationState, string> = {
   not_approved: "bg-surface-container-high text-outline",
   waiting_first_sale: "bg-surface-container-high text-outline",
+  self_funded_available: "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-200",
   not_registered: "bg-surface-container-high text-outline",
   available: "bg-primary/10 text-primary",
   requested: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-200",
@@ -56,7 +83,7 @@ const STATE_STYLES: Record<RegistrationState, string> = {
 };
 
 function canSelect(image: BlockchainImage) {
-  return image.registration_state === "available" || image.registration_state === "failed";
+  return image.registration_state === "available" || image.registration_state === "self_funded_available" || image.registration_state === "failed";
 }
 
 function arweaveUrl(txId: string) {
@@ -78,6 +105,9 @@ export default function PhotographerBlockchainPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedTransactions, setExpandedTransactions] = useState<string | null>(null);
+  const [transactionLoading, setTransactionLoading] = useState<string | null>(null);
+  const [transactionsByImage, setTransactionsByImage] = useState<Record<string, ImageTransactionResponse>>({});
 
   const fetchImages = useCallback(async () => {
     setLoading(true);
@@ -135,13 +165,34 @@ export default function PhotographerBlockchainPage() {
     }
   }
 
+  async function toggleTransactions(imageId: string) {
+    if (expandedTransactions === imageId) {
+      setExpandedTransactions(null);
+      return;
+    }
+    setExpandedTransactions(imageId);
+    if (transactionsByImage[imageId]) return;
+
+    setTransactionLoading(imageId);
+    try {
+      const res = await fetch(`/api/images/${imageId}/transactions`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "거래내역을 불러오지 못했습니다.");
+      setTransactionsByImage((prev) => ({ ...prev, [imageId]: data as ImageTransactionResponse }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTransactionLoading(null);
+    }
+  }
+
   return (
     <div className="p-6 md:p-10">
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">블록체인 사진</h1>
           <p className="mt-1 text-sm text-on-surface-variant">
-            첫 판매가 완료된 사진을 선택해 Arweave 원본 보관 및 자격증명 등록을 요청합니다.
+            판매 완료 사진은 플랫폼 부담으로, 아직 판매되지 않은 사진은 사진가 부담 셀프 등록으로 Arweave 원본 보관 및 자격증명 등록을 요청합니다.
           </p>
         </div>
         <Link
@@ -158,6 +209,13 @@ export default function PhotographerBlockchainPage() {
           <span>선택 {selected.length}개</span>
           <span>예상 원본 용량 {selectedTotalMb.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} MB</span>
           <span>요청 가능 {selectableIds.length}개</span>
+          <span>
+            예상 셀프등록 수수료 ₩
+            {selectedImages
+              .filter((image) => (image.sales_count ?? 0) <= 0)
+              .reduce((sum, image) => sum + (image.proof_request_fee_krw ?? 0), 0)
+              .toLocaleString("ko-KR")}
+          </span>
         </div>
         <button
           onClick={submitRequest}
@@ -208,14 +266,17 @@ export default function PhotographerBlockchainPage() {
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">판매</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">용량</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">TxID</th>
+                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">거래</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">일시</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20">
               {images.map((image) => {
                 const selectable = canSelect(image);
+                const transactionData = transactionsByImage[image.id];
                 return (
-                  <tr key={image.id} className="hover:bg-surface-container-low">
+                  <Fragment key={image.id}>
+                  <tr className="hover:bg-surface-container-low">
                     <td className="px-5 py-4">
                       <input
                         type="checkbox"
@@ -247,6 +308,16 @@ export default function PhotographerBlockchainPage() {
                       {image.proof_failure_reason && (
                         <p className="mt-1 max-w-[220px] text-[10px] text-error line-clamp-2">{image.proof_failure_reason}</p>
                       )}
+                      {image.registration_state === "self_funded_available" && (
+                        <p className="mt-1 max-w-[220px] text-[10px] text-outline">
+                          사진가 부담 예상 수수료 ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")}
+                        </p>
+                      )}
+                      {image.proof_request_kind === "self_funded" && image.proof_status === "requested" && (
+                        <p className="mt-1 max-w-[220px] text-[10px] text-outline">
+                          셀프 등록 요청 · ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")}
+                        </p>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-on-surface-variant">{image.sales_count ?? 0}</td>
                     <td className="px-5 py-4 text-on-surface-variant">
@@ -269,6 +340,21 @@ export default function PhotographerBlockchainPage() {
                         )}
                       </div>
                     </td>
+                    <td className="px-5 py-4">
+                      <button
+                        type="button"
+                        onClick={() => toggleTransactions(image.id)}
+                        disabled={transactionLoading === image.id}
+                        className="inline-flex items-center gap-1 rounded border border-outline-variant px-3 py-1.5 text-[10px] font-bold text-on-surface-variant hover:border-primary hover:text-primary disabled:opacity-50"
+                      >
+                        {transactionLoading === image.id ? (
+                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        ) : (
+                          <span className="material-symbols-outlined text-sm">query_stats</span>
+                        )}
+                        조회
+                      </button>
+                    </td>
                     <td className="px-5 py-4 text-xs text-on-surface-variant">
                       {image.proof_arweave_confirmed_at
                         ? formatDate(image.proof_arweave_confirmed_at)
@@ -277,6 +363,63 @@ export default function PhotographerBlockchainPage() {
                           : formatDate(image.created_at)}
                     </td>
                   </tr>
+                  {expandedTransactions === image.id && (
+                    <tr>
+                      <td colSpan={8} className="bg-surface-container-low px-5 py-4">
+                        {!transactionData ? (
+                          <p className="text-xs text-outline">거래내역을 불러오는 중입니다.</p>
+                        ) : (
+                          <div className="grid gap-3 lg:grid-cols-[260px_1fr]">
+                            <div className="rounded-lg bg-surface-container-lowest p-3 text-[11px] text-on-surface-variant">
+                              <p className="font-bold text-on-surface">이미지 장부 키</p>
+                              <p className="mt-1 break-all font-mono text-outline">{transactionData.image.ledgerKey ?? "-"}</p>
+                              <p className="mt-3 font-bold text-on-surface">Arweave Tx</p>
+                              <p className="mt-1 break-all font-mono text-outline">원본 {transactionData.image.arweave.originalTxId ?? "-"}</p>
+                              <p className="mt-1 break-all font-mono text-outline">메타 {transactionData.image.arweave.metadataTxId ?? "-"}</p>
+                            </div>
+                            <div className="overflow-x-auto rounded-lg bg-surface-container-lowest">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b border-outline-variant/20 text-outline">
+                                    <th className="px-3 py-2 text-left">일시</th>
+                                    <th className="px-3 py-2 text-left">구매자</th>
+                                    <th className="px-3 py-2 text-left">라이선스</th>
+                                    <th className="px-3 py-2 text-right">결제금액</th>
+                                    <th className="px-3 py-2 text-right">작가수익</th>
+                                    <th className="px-3 py-2 text-left">Base 장부</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-outline-variant/20">
+                                  {transactionData.transactions.length === 0 ? (
+                                    <tr><td colSpan={6} className="px-3 py-6 text-center text-outline">완료된 거래가 없습니다.</td></tr>
+                                  ) : transactionData.transactions.map((tx) => (
+                                    <tr key={tx.orderNumber}>
+                                      <td className="px-3 py-2 text-on-surface-variant">{formatDate(tx.completedAt)}</td>
+                                      <td className="px-3 py-2 text-on-surface-variant">
+                                        <p>{tx.buyer.name ?? "-"}</p>
+                                        <p className="text-[10px] text-outline">{tx.buyer.email ?? tx.buyer.walletAddress ?? "-"}</p>
+                                      </td>
+                                      <td className="px-3 py-2 text-on-surface-variant">
+                                        {tx.licenseCode}
+                                        {tx.subscriptionCovered && <span className="ml-1 text-primary">구독</span>}
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-semibold text-on-surface">₩{tx.priceKrw.toLocaleString("ko-KR")}</td>
+                                      <td className="px-3 py-2 text-right font-semibold text-on-surface">₩{tx.netKrw.toLocaleString("ko-KR")}</td>
+                                      <td className="px-3 py-2 font-mono text-[10px] text-outline">
+                                        <p>{tx.contractOrderId ?? "-"}</p>
+                                        <p className="truncate max-w-[220px]">{tx.paymentTxHash ?? tx.paymentProvider ?? "-"}</p>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>
