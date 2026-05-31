@@ -9,6 +9,7 @@ import { canonicalImageProofHash, sha256Buffer } from "@/lib/onchain/proof";
 import { recordOnchainEvent } from "@/lib/onchain/events";
 import {
   buildArweaveCredentialMetadata,
+  canAdminRegisterImage,
   summarizeRegistrationSelection,
   type AuthorshipDeclaration,
 } from "@/lib/onchain/registration";
@@ -45,6 +46,7 @@ interface AdminRegistrationImage {
   proof_request_fee_payer: string | null;
   proof_request_kind: string | null;
   proof_request_fee_krw: number | null;
+  proof_request_payment_status: string | null;
   photographer: { id: string; full_name: string | null; wallet_address: string | null } | { id: string; full_name: string | null; wallet_address: string | null }[] | null;
 }
 
@@ -174,7 +176,7 @@ export async function GET(req: NextRequest) {
       proof_status, proof_requested_at, proof_registered_at, proof_batch_id,
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id,
       proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason,
-      proof_request_fee_payer, proof_request_kind, proof_request_fee_krw,
+      proof_request_fee_payer, proof_request_kind, proof_request_fee_krw, proof_request_payment_status,
       photographer:profiles!photographer_id(id, full_name, wallet_address)
     `)
     .eq("status", "approved")
@@ -233,7 +235,7 @@ export async function POST(req: NextRequest) {
       proof_status, proof_requested_at, proof_registered_at, proof_batch_id,
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id,
       proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason,
-      proof_request_fee_payer, proof_request_kind, proof_request_fee_krw,
+      proof_request_fee_payer, proof_request_kind, proof_request_fee_krw, proof_request_payment_status,
       photographer:profiles!photographer_id(id, full_name, wallet_address)
     `)
     .in("id", imageIds)
@@ -244,14 +246,25 @@ export async function POST(req: NextRequest) {
 
   const images = (loaded ?? []) as AdminRegistrationImage[];
   const eligible = images.filter((image) =>
-    ["requested", "available", "failed"].includes(image.proof_status ?? "not_registered") &&
+    canAdminRegisterImage({
+      proofStatus: image.proof_status,
+      proofRequestKind: image.proof_request_kind,
+      proofRequestPaymentStatus: image.proof_request_payment_status,
+    }) &&
     image.asset_id &&
     image.photographer_id &&
     image.storage_path_original
   );
   if (eligible.length !== imageIds.length) {
+    const unpaidSelfFunded = images.some(
+      (image) => image.proof_request_kind === "self_funded" && image.proof_request_payment_status !== "paid",
+    );
     return NextResponse.json(
-      { error: "Only approved images with requested/available/failed status and original files can be registered" },
+      {
+        error: unpaidSelfFunded
+          ? "사진가 부담 셀프등록 이미지는 수수료 결제 완료 후에만 등록할 수 있습니다."
+          : "등록 가능한 상태(요청됨/등록가능/실패)와 원본 파일이 있는 승인 이미지만 등록할 수 있습니다.",
+      },
       { status: 409 },
     );
   }

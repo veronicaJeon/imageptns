@@ -10,14 +10,20 @@ export type BlockchainRegistrationState =
   | "not_approved"
   | "waiting_first_sale"
   | "self_funded_available"
+  | "self_funded_payment_pending"
   | ImageProofStatus;
 
 export type AuthorshipDeclaration = "ai_generated" | "human_original";
+
+export type ProofRequestKind = "post_sale" | "self_funded";
+export type ProofRequestPaymentStatus = "none" | "pending" | "paid" | "refunded";
 
 export interface RegistrationStateInput {
   imageStatus: string | null;
   salesCount: number | null | undefined;
   proofStatus: string | null | undefined;
+  proofRequestKind?: string | null | undefined;
+  proofRequestPaymentStatus?: string | null | undefined;
 }
 
 export interface RegistrationSelectionItem {
@@ -80,12 +86,42 @@ export function getBlockchainRegistrationState(
   if (TERMINAL_OR_ACTIVE_STATUSES.has(proofStatus)) return proofStatus;
   if (proofStatus === "available") return "available";
 
-  return (input.salesCount ?? 0) > 0 ? "available" : "self_funded_available";
+  if ((input.salesCount ?? 0) > 0) return "available";
+
+  if (input.proofRequestPaymentStatus === "pending") return "self_funded_payment_pending";
+
+  return "self_funded_available";
 }
 
 export function canRequestBlockchainRegistration(input: RegistrationStateInput): boolean {
   const state = getBlockchainRegistrationState(input);
   return state === "available" || state === "self_funded_available" || state === "failed";
+}
+
+/**
+ * Photographer free (platform-funded, post-sale) request path.
+ * Self-funded (pre-sale) images must go through the paid fee flow instead.
+ */
+export function canRequestFreeRegistration(input: RegistrationStateInput): boolean {
+  const state = getBlockchainRegistrationState(input);
+  return state === "available" || state === "failed";
+}
+
+/**
+ * Admin may only register an image when it is in a requestable proof state, and
+ * — for self-funded (photographer-paid) requests — only once the fee is paid.
+ */
+export function canAdminRegisterImage(input: {
+  proofStatus: string | null | undefined;
+  proofRequestKind?: string | null | undefined;
+  proofRequestPaymentStatus?: string | null | undefined;
+}): boolean {
+  const proofStatus = normalizeProofStatus(input.proofStatus);
+  if (!["requested", "available", "failed"].includes(proofStatus)) return false;
+  if (input.proofRequestKind === "self_funded") {
+    return input.proofRequestPaymentStatus === "paid";
+  }
+  return true;
 }
 
 export function summarizeRegistrationSelection(items: RegistrationSelectionItem[]) {

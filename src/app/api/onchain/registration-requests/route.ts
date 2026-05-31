@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { previewUrl } from "@/lib/supabase/storage";
 import {
-  canRequestBlockchainRegistration,
+  canRequestFreeRegistration,
   getBlockchainRegistrationState,
 } from "@/lib/onchain/registration";
 import { recordOnchainEvent } from "@/lib/onchain/events";
@@ -26,6 +26,8 @@ interface RegistrationImageRow {
   proof_request_fee_payer: string | null;
   proof_request_kind: string | null;
   proof_request_fee_krw: number | null;
+  proof_request_payment_status: string | null;
+  proof_request_fee_order_id: string | null;
   storage_path_preview: string | null;
   file_size_mb: number | null;
   created_at: string;
@@ -36,6 +38,8 @@ function normalizeImage(row: RegistrationImageRow, commerceSettings?: ReturnType
     imageStatus: row.status,
     salesCount: row.sales_count,
     proofStatus: row.proof_status,
+    proofRequestKind: row.proof_request_kind,
+    proofRequestPaymentStatus: row.proof_request_payment_status,
   });
 
   return {
@@ -65,6 +69,7 @@ export async function GET() {
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id,
       proof_arweave_confirmed_at, proof_failure_reason,
       proof_request_fee_payer, proof_request_kind, proof_request_fee_krw,
+      proof_request_payment_status, proof_request_fee_order_id,
       storage_path_preview, file_size_mb, created_at
     `)
     .eq("photographer_id", userId)
@@ -106,9 +111,12 @@ export async function POST(req: NextRequest) {
 
   if (loadError) return NextResponse.json({ error: loadError.message }, { status: 500 });
 
+  // Free path covers only platform-funded (post-sale) and failed-retry requests.
+  // Pre-sale (self-funded) images must pay the fee via /api/onchain/registration-fee.
   const eligibleRows = ((rows ?? []) as Pick<RegistrationImageRow, "id" | "status" | "sales_count" | "proof_status">[])
     .filter((row) =>
-      canRequestBlockchainRegistration({
+      (row.sales_count ?? 0) > 0 &&
+      canRequestFreeRegistration({
         imageStatus: row.status,
         salesCount: row.sales_count,
         proofStatus: row.proof_status,
@@ -118,7 +126,11 @@ export async function POST(req: NextRequest) {
 
   if (eligibleIds.length !== imageIds.length) {
     return NextResponse.json(
-      { error: "Only approved images with requestable or failed proof status can be requested" },
+      {
+        error:
+          "판매 완료 이미지만 무료 등록 요청할 수 있습니다. 판매 전 이미지는 셀프등록 수수료 결제 후 요청됩니다.",
+        code: "SELF_FUNDED_FEE_REQUIRED",
+      },
       { status: 409 },
     );
   }
@@ -130,39 +142,23 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   const settings = normalizeCommerceSettings(settingsRow as CommerceSettingsRow | null);
   const requestedAt = new Date().toISOString();
-  const selfFundedIds = eligibleRows.filter((row) => (row.sales_count ?? 0) <= 0).map((row) => row.id);
-  const postSaleIds = eligibleRows.filter((row) => (row.sales_count ?? 0) > 0).map((row) => row.id);
 
-  async function updateGroup(ids: string[], patch: Record<string, unknown>) {
-    if (ids.length === 0) return { error: null };
-    return admin
-      .from("images")
-      .update({
-        proof_status: "requested",
-        proof_requested_at: requestedAt,
-        proof_requested_by: userId,
-        proof_failure_reason: null,
-        ...patch,
-      })
-      .in("id", ids)
-      .eq("photographer_id", userId);
-  }
-
-  const [postSaleUpdate, selfFundedUpdate] = await Promise.all([
-    updateGroup(postSaleIds, {
+  const { error: updateError } = await admin
+    .from("images")
+    .update({
+      proof_status: "requested",
+      proof_requested_at: requestedAt,
+      proof_requested_by: userId,
+      proof_failure_reason: null,
       proof_request_fee_payer: "platform",
       proof_request_kind: "post_sale",
       proof_request_fee_krw: 0,
-    }),
-    updateGroup(selfFundedIds, {
-      proof_request_fee_payer: "photographer",
-      proof_request_kind: "self_funded",
-      proof_request_fee_krw: settings.arweaveSelfFundedRequestFeeKrw,
-    }),
-  ]);
+      proof_request_payment_status: "none",
+    })
+    .in("id", eligibleIds)
+    .eq("photographer_id", userId);
 
-  const error = postSaleUpdate.error ?? selfFundedUpdate.error;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 
   const { data, error: reloadError } = await admin
     .from("images")
@@ -172,6 +168,7 @@ export async function POST(req: NextRequest) {
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id,
       proof_arweave_confirmed_at, proof_failure_reason,
       proof_request_fee_payer, proof_request_kind, proof_request_fee_krw,
+      proof_request_payment_status, proof_request_fee_order_id,
       storage_path_preview, file_size_mb, created_at
     `)
     .in("id", eligibleIds)
@@ -187,9 +184,9 @@ export async function POST(req: NextRequest) {
         imageId,
         metadata: {
           requestedAt,
-          requestKind: selfFundedIds.includes(imageId) ? "self_funded" : "post_sale",
-          feePayer: selfFundedIds.includes(imageId) ? "photographer" : "platform",
-          feeKrw: selfFundedIds.includes(imageId) ? settings.arweaveSelfFundedRequestFeeKrw : 0,
+          requestKind: "post_sale",
+          feePayer: "platform",
+          feeKrw: 0,
         },
       }),
     ),

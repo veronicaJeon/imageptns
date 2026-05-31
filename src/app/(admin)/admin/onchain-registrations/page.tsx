@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { canAdminRegisterImage } from "@/lib/onchain/registration";
+import { buildRegistrationFeeReceiptHtml } from "@/lib/receipts/registration-fee";
 
 type RegistrationFilter = "requested" | "pending" | "registered" | "failed" | "available" | "all";
 
@@ -29,10 +31,38 @@ interface AdminRegistrationImage {
   proof_request_fee_payer: string | null;
   proof_request_kind: string | null;
   proof_request_fee_krw: number | null;
+  proof_request_payment_status: string | null;
   photographer:
     | { id: string; full_name: string | null; wallet_address: string | null }
     | { id: string; full_name: string | null; wallet_address: string | null }[]
     | null;
+}
+
+interface FeeOrderItem {
+  imageId: string;
+  feeKrw: number;
+  title: string | null;
+  assetId: string | null;
+}
+
+interface FeeOrder {
+  id: string;
+  photographerId: string;
+  photographerName: string | null;
+  tossOrderId: string;
+  paymentKey: string | null;
+  unitFeeKrw: number;
+  imageCount: number;
+  amountKrw: number;
+  status: string;
+  billingName: string | null;
+  billingEmail: string | null;
+  createdAt: string;
+  paidAt: string | null;
+  canceledAt: string | null;
+  refundedAt: string | null;
+  cancelReason: string | null;
+  items: FeeOrderItem[];
 }
 
 interface RegistrationBatch {
@@ -98,8 +128,27 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toLocaleString("ko-KR", { maximumFractionDigits: 2 })} MB`;
 }
 
+const PAYMENT_LABELS: Record<string, string> = {
+  none: "수수료 없음",
+  pending: "수수료 결제대기",
+  paid: "수수료 결제완료",
+  refunded: "수수료 환불",
+};
+
+const FEE_STATUS_LABELS: Record<string, string> = {
+  pending: "결제대기",
+  paid: "결제완료",
+  failed: "결제실패",
+  canceled: "취소",
+  refunded: "환불",
+};
+
 function canRegister(image: AdminRegistrationImage) {
-  return ["available", "requested", "failed"].includes(image.proof_status ?? "not_registered");
+  return canAdminRegisterImage({
+    proofStatus: image.proof_status,
+    proofRequestKind: image.proof_request_kind,
+    proofRequestPaymentStatus: image.proof_request_payment_status,
+  });
 }
 
 function canVerify(image: AdminRegistrationImage) {
@@ -120,6 +169,8 @@ export default function AdminOnchainRegistrationsPage() {
   const [forbidden, setForbidden] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [feeOrders, setFeeOrders] = useState<FeeOrder[]>([]);
+  const [feeActioning, setFeeActioning] = useState<string | null>(null);
 
   const fetchRows = useCallback(async (nextFilter: RegistrationFilter) => {
     setLoading(true);
@@ -142,9 +193,68 @@ export default function AdminOnchainRegistrationsPage() {
     }
   }, []);
 
+  const fetchFeeOrders = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/registration-fees");
+      if (!res.ok) return;
+      const data = await res.json();
+      setFeeOrders(data.orders ?? []);
+    } catch {
+      // non-blocking
+    }
+  }, []);
+
   useEffect(() => {
     fetchRows(filter);
   }, [filter, fetchRows]);
+
+  useEffect(() => {
+    fetchFeeOrders();
+  }, [fetchFeeOrders]);
+
+  async function feeAction(feeOrderId: string, action: "cancel" | "refund") {
+    const label = action === "cancel" ? "취소" : "환불";
+    if (!window.confirm(`이 수수료 주문을 ${label}하시겠습니까?`)) return;
+    setFeeActioning(feeOrderId);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/registration-fees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, feeOrderId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `${label}에 실패했습니다.`);
+      setMessage(`수수료 주문을 ${label} 처리했습니다.`);
+      await Promise.all([fetchFeeOrders(), fetchRows(filter)]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setFeeActioning(null);
+    }
+  }
+
+  function printFeeReceipt(order: FeeOrder) {
+    const html = buildRegistrationFeeReceiptHtml({
+      orderNumber: order.tossOrderId,
+      paidAt: order.paidAt,
+      billingName: order.billingName,
+      billingEmail: order.billingEmail,
+      paymentProvider: "toss",
+      paymentKey: order.paymentKey,
+      unitFeeKrw: order.unitFeeKrw,
+      imageCount: order.imageCount,
+      amountKrw: order.amountKrw,
+      items: order.items.map((item) => ({ title: item.title ?? "", assetId: item.assetId ?? "", feeKrw: item.feeKrw })),
+    });
+    const win = window.open("", "_blank", "width=820,height=900");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  }
 
   const selectedImages = useMemo(
     () => images.filter((image) => selected.includes(image.id)),
@@ -356,9 +466,22 @@ export default function AdminOnchainRegistrationsPage() {
                         <p>{image.sales_count ?? 0}건</p>
                         <p className="text-xs text-outline">{(image.file_size_mb ?? 0).toLocaleString("ko-KR", { maximumFractionDigits: 2 })} MB</p>
                       {image.proof_request_kind === "self_funded" && (
-                        <p className="mt-1 rounded-full bg-surface-container-low px-2 py-0.5 text-[10px] font-bold text-on-surface-variant">
-                          사진가 부담 ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")}
-                        </p>
+                        <div className="mt-1 flex flex-col gap-1">
+                          <span className="w-fit rounded-full bg-surface-container-low px-2 py-0.5 text-[10px] font-bold text-on-surface-variant">
+                            사진가 부담 ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")}
+                          </span>
+                          <span
+                            className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              image.proof_request_payment_status === "paid"
+                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200"
+                                : image.proof_request_payment_status === "pending"
+                                  ? "bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-200"
+                                  : "bg-surface-container-high text-outline"
+                            }`}
+                          >
+                            {PAYMENT_LABELS[image.proof_request_payment_status ?? "none"] ?? image.proof_request_payment_status}
+                          </span>
+                        </div>
                       )}
                     </td>
                     <td className="px-5 py-4">
@@ -434,6 +557,92 @@ export default function AdminOnchainRegistrationsPage() {
                     <td className="px-5 py-4 text-xs text-on-surface-variant">
                       <p>GraphQL {formatDate(batch.graph_verified_at)}</p>
                       <p className="text-outline">Confirmed {formatDate(batch.arweave_confirmed_at)}</p>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="mt-10">
+        <p className="mb-4 text-xs font-bold uppercase tracking-widest text-outline">사진가 부담 셀프등록 수수료</p>
+        <div className="overflow-x-auto bg-surface-container-lowest shadow-ghost">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-outline-variant/20">
+                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">작가</th>
+                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">금액</th>
+                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">이미지</th>
+                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">상태</th>
+                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">결제일</th>
+                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">처리</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant/20">
+              {feeOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-8 text-center text-sm text-outline">수수료 결제 내역이 없습니다.</td>
+                </tr>
+              ) : (
+                feeOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-surface-container-low">
+                    <td className="px-5 py-4">
+                      <p className="font-semibold text-on-surface">{order.photographerName ?? "-"}</p>
+                      <p className="text-[10px] text-outline">{order.billingEmail ?? "-"}</p>
+                    </td>
+                    <td className="px-5 py-4 text-on-surface">
+                      <p className="font-bold">₩{order.amountKrw.toLocaleString("ko-KR")}</p>
+                      <p className="text-[10px] text-outline">건당 ₩{order.unitFeeKrw.toLocaleString("ko-KR")}</p>
+                    </td>
+                    <td className="px-5 py-4 text-on-surface-variant">{order.imageCount}건</td>
+                    <td className="px-5 py-4">
+                      <span
+                        className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                          order.status === "paid"
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200"
+                            : order.status === "pending"
+                              ? "bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-200"
+                              : order.status === "refunded"
+                                ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-200"
+                                : "bg-surface-container-high text-outline"
+                        }`}
+                      >
+                        {FEE_STATUS_LABELS[order.status] ?? order.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-xs text-on-surface-variant">{formatDate(order.paidAt ?? order.createdAt)}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {order.status === "paid" && (
+                          <button
+                            onClick={() => printFeeReceipt(order)}
+                            className="rounded border border-outline-variant px-2.5 py-1 text-[10px] font-bold text-on-surface-variant hover:border-primary hover:text-primary"
+                          >
+                            영수증
+                          </button>
+                        )}
+                        {order.status === "pending" && (
+                          <button
+                            onClick={() => feeAction(order.id, "cancel")}
+                            disabled={feeActioning === order.id}
+                            className="rounded border border-outline-variant px-2.5 py-1 text-[10px] font-bold text-on-surface-variant hover:border-error hover:text-error disabled:opacity-50"
+                          >
+                            취소
+                          </button>
+                        )}
+                        {order.status === "paid" && (
+                          <button
+                            onClick={() => feeAction(order.id, "refund")}
+                            disabled={feeActioning === order.id}
+                            className="rounded border border-error/40 px-2.5 py-1 text-[10px] font-bold text-error hover:bg-error/5 disabled:opacity-50"
+                          >
+                            환불
+                          </button>
+                        )}
+                        {!["pending", "paid"].includes(order.status) && <span className="text-xs text-outline">-</span>}
+                      </div>
                     </td>
                   </tr>
                 ))

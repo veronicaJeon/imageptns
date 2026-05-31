@@ -1,13 +1,15 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type RegistrationState =
   | "not_approved"
   | "waiting_first_sale"
   | "self_funded_available"
+  | "self_funded_payment_pending"
   | "not_registered"
   | "available"
   | "requested"
@@ -31,6 +33,8 @@ interface BlockchainImage {
   proof_request_fee_payer: string | null;
   proof_request_kind: string | null;
   proof_request_fee_krw: number | null;
+  proof_request_payment_status: string | null;
+  proof_request_fee_order_id: string | null;
   storage_path_preview: string | null;
   file_size_mb: number | null;
   created_at: string;
@@ -62,6 +66,7 @@ const STATE_LABELS: Record<RegistrationState, string> = {
   not_approved: "승인 전",
   waiting_first_sale: "첫 판매 대기",
   self_funded_available: "셀프 등록가능",
+  self_funded_payment_pending: "수수료 결제대기",
   not_registered: "증명 전",
   available: "등록가능",
   requested: "요청됨",
@@ -74,6 +79,7 @@ const STATE_STYLES: Record<RegistrationState, string> = {
   not_approved: "bg-surface-container-high text-outline",
   waiting_first_sale: "bg-surface-container-high text-outline",
   self_funded_available: "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-200",
+  self_funded_payment_pending: "bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-200",
   not_registered: "bg-surface-container-high text-outline",
   available: "bg-primary/10 text-primary",
   requested: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-200",
@@ -82,8 +88,16 @@ const STATE_STYLES: Record<RegistrationState, string> = {
   failed: "bg-error/10 text-error",
 };
 
+function isPostSaleSelectable(image: BlockchainImage) {
+  return image.registration_state === "available" || image.registration_state === "failed";
+}
+
+function isSelfFundedSelectable(image: BlockchainImage) {
+  return image.registration_state === "self_funded_available";
+}
+
 function canSelect(image: BlockchainImage) {
-  return image.registration_state === "available" || image.registration_state === "self_funded_available" || image.registration_state === "failed";
+  return isPostSaleSelectable(image) || isSelfFundedSelectable(image);
 }
 
 function arweaveUrl(txId: string) {
@@ -99,11 +113,15 @@ function formatDate(value: string | null) {
   });
 }
 
-export default function PhotographerBlockchainPage() {
+function PhotographerBlockchainContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const feeResult = searchParams.get("fee");
   const [images, setImages] = useState<BlockchainImage[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [payingFee, setPayingFee] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedTransactions, setExpandedTransactions] = useState<string | null>(null);
   const [transactionLoading, setTransactionLoading] = useState<string | null>(null);
@@ -136,6 +154,10 @@ export default function PhotographerBlockchainPage() {
   const selectedTotalMb = selectedImages.reduce((sum, image) => sum + (Number(image.file_size_mb) || 0), 0);
   const allSelectableChecked = selectableIds.length > 0 && selectableIds.every((id) => selected.includes(id));
 
+  const selectedPostSale = selectedImages.filter(isPostSaleSelectable);
+  const selectedSelfFunded = selectedImages.filter(isSelfFundedSelectable);
+  const selfFundedFeeTotal = selectedSelfFunded.reduce((sum, image) => sum + (image.proof_request_fee_krw ?? 0), 0);
+
   function toggle(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   }
@@ -144,15 +166,15 @@ export default function PhotographerBlockchainPage() {
     setSelected(allSelectableChecked ? [] : selectableIds);
   }
 
-  async function submitRequest() {
-    if (selected.length === 0) return;
+  async function submitFreeRequest() {
+    if (selectedPostSale.length === 0) return;
     setSubmitting(true);
     setError(null);
     try {
       const res = await fetch("/api/onchain/registration-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageIds: selected }),
+        body: JSON.stringify({ imageIds: selectedPostSale.map((image) => image.id) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "등록 요청에 실패했습니다.");
@@ -162,6 +184,25 @@ export default function PhotographerBlockchainPage() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function startSelfFundedPayment() {
+    if (selectedSelfFunded.length === 0) return;
+    setPayingFee(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/onchain/registration-fee/prepare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageIds: selectedSelfFunded.map((image) => image.id) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "수수료 결제 준비에 실패했습니다.");
+      router.push(`/dashboard/blockchain/fee-payment?order=${encodeURIComponent(data.feeOrderId)}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setPayingFee(false);
     }
   }
 
@@ -208,28 +249,50 @@ export default function PhotographerBlockchainPage() {
         <div className="flex flex-wrap gap-4 text-xs text-on-surface-variant">
           <span>선택 {selected.length}개</span>
           <span>예상 원본 용량 {selectedTotalMb.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} MB</span>
-          <span>요청 가능 {selectableIds.length}개</span>
-          <span>
-            예상 셀프등록 수수료 ₩
-            {selectedImages
-              .filter((image) => (image.sales_count ?? 0) <= 0)
-              .reduce((sum, image) => sum + (image.proof_request_fee_krw ?? 0), 0)
-              .toLocaleString("ko-KR")}
-          </span>
+          <span>판매완료 {selectedPostSale.length}개</span>
+          <span>판매전 셀프 {selectedSelfFunded.length}개</span>
+          <span>셀프등록 수수료 ₩{selfFundedFeeTotal.toLocaleString("ko-KR")}</span>
         </div>
-        <button
-          onClick={submitRequest}
-          disabled={selected.length === 0 || submitting}
-          className="inline-flex items-center justify-center gap-2 rounded bg-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          {submitting ? (
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-          ) : (
-            <span className="material-symbols-outlined text-base">verified</span>
-          )}
-          등록 요청
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={submitFreeRequest}
+            disabled={selectedPostSale.length === 0 || submitting}
+            className="inline-flex items-center justify-center gap-2 rounded border border-outline-variant px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface transition-opacity hover:border-primary hover:text-primary disabled:opacity-50"
+          >
+            {submitting ? (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <span className="material-symbols-outlined text-base">verified</span>
+            )}
+            무료 등록 요청
+          </button>
+          <button
+            onClick={startSelfFundedPayment}
+            disabled={selectedSelfFunded.length === 0 || payingFee}
+            className="inline-flex items-center justify-center gap-2 rounded bg-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {payingFee ? (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <span className="material-symbols-outlined text-base">payments</span>
+            )}
+            수수료 결제 후 등록 (₩{selfFundedFeeTotal.toLocaleString("ko-KR")})
+          </button>
+        </div>
       </div>
+
+      {feeResult === "success" && (
+        <div className="mb-5 flex items-start gap-2 border border-emerald-500/20 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200">
+          <span className="material-symbols-outlined text-base">check_circle</span>
+          셀프등록 수수료 결제가 완료되었습니다. 관리자 검토 후 Arweave에 등록됩니다.
+        </div>
+      )}
+      {feeResult === "fail" && (
+        <div className="mb-5 flex items-start gap-2 border border-error/20 bg-error/8 px-4 py-3 text-sm text-error">
+          <span className="material-symbols-outlined text-base">error</span>
+          수수료 결제가 완료되지 않았습니다. 다시 시도해주세요.
+        </div>
+      )}
 
       {error && (
         <div className="mb-5 flex items-start gap-2 border border-error/20 bg-error/8 px-4 py-3 text-sm text-error">
@@ -311,6 +374,19 @@ export default function PhotographerBlockchainPage() {
                       {image.registration_state === "self_funded_available" && (
                         <p className="mt-1 max-w-[220px] text-[10px] text-outline">
                           사진가 부담 예상 수수료 ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")}
+                        </p>
+                      )}
+                      {image.registration_state === "self_funded_payment_pending" && (
+                        <p className="mt-1 max-w-[220px] text-[10px] text-orange-600">
+                          수수료 ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")} 결제 대기 중
+                          {image.proof_request_fee_order_id && (
+                            <Link
+                              href={`/dashboard/blockchain/fee-payment?order=${image.proof_request_fee_order_id}`}
+                              className="ml-1 font-bold underline"
+                            >
+                              결제 이어서
+                            </Link>
+                          )}
                         </p>
                       )}
                       {image.proof_request_kind === "self_funded" && image.proof_status === "requested" && (
@@ -427,5 +503,19 @@ export default function PhotographerBlockchainPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function PhotographerBlockchainPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <span className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      }
+    >
+      <PhotographerBlockchainContent />
+    </Suspense>
   );
 }
