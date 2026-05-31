@@ -54,10 +54,14 @@ const BASE_RECOVERY_STORAGE_KEY = "imagepartners.basePaymentRecovery";
 
 interface CheckoutPrepareResponse {
   orderId: string;
+  orderDbId: string;
   orderName: string;
   orderNumber?: string;
   free?: boolean;
 }
+
+// TEMPORARY: Toss 유료결제 우회(결제 pass). Toss live 연동 완료 시 이 플래그/관련 블록 제거.
+const PAYMENT_PASS_ENABLED = process.env.NEXT_PUBLIC_PAYMENT_PASS_ENABLED === "true";
 
 interface SubscriptionEntitlement {
   active: boolean;
@@ -295,6 +299,43 @@ function CheckoutContent() {
     } catch (err) {
       console.error(err);
       alert(checkoutErrorMessage(err, "무료 구매를 완료하지 못했습니다."));
+      setLoading(false);
+    }
+  }
+
+  // TEMPORARY: Toss 유료결제 우회. Toss live 연동 완료 시 이 함수와 호출 버튼 제거.
+  async function handlePassCheckout() {
+    setLoading(true);
+    try {
+      const prepRes = await fetch("/api/checkout/prepare", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((i) => ({ id: i.id, license: i.license, price: i.price })),
+          billing,
+        }),
+      });
+      if (!prepRes.ok) throw new Error(await readApiError(prepRes, "주문 생성 실패"));
+      const prepared = await prepRes.json() as CheckoutPrepareResponse;
+
+      // ₩0 주문은 prepare 단계에서 이미 완료됨
+      if (prepared.free) {
+        router.push(`/checkout/success?order=${encodeURIComponent(prepared.orderNumber ?? "")}`);
+        return;
+      }
+
+      const passRes = await fetch("/api/checkout/pass", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderDbId: prepared.orderDbId }),
+      });
+      if (!passRes.ok) throw new Error(await readApiError(passRes, "결제 우회 처리 실패"));
+
+      const { orderNumber } = await passRes.json() as { orderNumber?: string };
+      router.push(`/checkout/success?order=${encodeURIComponent(orderNumber ?? "")}`);
+    } catch (err) {
+      console.error(err);
+      alert(checkoutErrorMessage(err, "결제 우회를 완료하지 못했습니다."));
       setLoading(false);
     }
   }
@@ -660,6 +701,30 @@ function CheckoutContent() {
                 )
               }
             </button>
+
+            {/* TEMPORARY: Toss 유료결제 우회(결제 pass). Toss live 연동 완료 시 이 블록 제거. */}
+            {PAYMENT_PASS_ENABLED && !isFreeCheckout && paymentMethod === "toss" && (
+              <div className="rounded-lg border border-dashed border-amber-400/60 bg-amber-50/60 dark:bg-amber-900/15 p-4">
+                <div className="flex items-start gap-2">
+                  <span className="material-symbols-outlined text-amber-600 text-base mt-0.5">science</span>
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-on-surface">결제 우회 (테스트 전용)</p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                      Toss 유료결제 연동 전 임시 기능입니다. 실제 결제 없이 주문을 완료하고 다운로드/정산 흐름을 점검합니다.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handlePassCheckout}
+                  disabled={loading}
+                  className="mt-3 w-full py-3 bg-amber-500 text-white font-bold text-xs uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-base">bolt</span>
+                  결제 없이 주문 완료 · {formatKRW(displayTotal)}
+                </button>
+              </div>
+            )}
 
             <p className="text-[10px] text-outline text-center">{ch.secureNote}</p>
             <p className="text-center text-[11px] leading-relaxed text-on-surface-variant">
