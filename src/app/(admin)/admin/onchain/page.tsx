@@ -56,6 +56,39 @@ interface ReconciliationResponse {
   contractReconciliationError: string | null;
 }
 
+interface DiagnosticCheck {
+  id: string;
+  label: string;
+  status: "pass" | "fail" | "warn" | "info";
+  detail: string;
+  expected?: string;
+  actual?: string;
+}
+
+interface DiagnosticsResponse {
+  generatedAt: string;
+  configured: boolean;
+  config: {
+    chainId: number;
+    explorerUrl: string;
+    escrowAddress: string;
+    usdcAddress: string;
+    treasuryAddress: string;
+    operatorAddress: string;
+    platformFeeBps: number;
+    usdcPerKrw: number;
+  } | null;
+  checks: DiagnosticCheck[];
+  summary: { pass: number; fail: number; warn: number; info: number; ok: boolean };
+}
+
+const DIAG_STATUS_STYLE: Record<DiagnosticCheck["status"], { dot: string; text: string; label: string }> = {
+  pass: { dot: "bg-emerald-500", text: "text-emerald-600", label: "PASS" },
+  fail: { dot: "bg-error", text: "text-error", label: "FAIL" },
+  warn: { dot: "bg-amber-500", text: "text-amber-600", label: "WARN" },
+  info: { dot: "bg-blue-500", text: "text-blue-600", label: "INFO" },
+};
+
 const EMPTY_SUMMARY: ReconciliationSummary = {
   pending: 0,
   stalePending: 0,
@@ -101,6 +134,10 @@ export default function AdminOnchainPage() {
   const [forbidden, setForbidden] = useState(false);
   const [txInputs, setTxInputs] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState<Record<string, boolean>>({});
+  const [cancelling, setCancelling] = useState<Record<string, boolean>>({});
+  const [diag, setDiag] = useState<DiagnosticsResponse | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagError, setDiagError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/admin/onchain/reconciliation");
@@ -116,6 +153,49 @@ export default function AdminOnchainPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [refresh]);
+
+  async function runDiagnostics() {
+    setDiagLoading(true);
+    setDiagError(null);
+    try {
+      const res = await fetch("/api/admin/onchain/diagnostics");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error ?? "진단 실행에 실패했습니다.");
+      }
+      setDiag(await res.json() as DiagnosticsResponse);
+    } catch (error) {
+      setDiagError(error instanceof Error ? error.message : "진단 실행에 실패했습니다.");
+    } finally {
+      setDiagLoading(false);
+    }
+  }
+
+  async function cancelOrder(orderId: string, orderLabel: string) {
+    if (!window.confirm(`주문 ${orderLabel}을(를) 취소 처리할까요?\n구매 트랜잭션이 감지된 주문은 취소되지 않습니다.`)) return;
+
+    setCancelling((prev) => ({ ...prev, [orderId]: true }));
+    try {
+      const res = await fetch("/api/admin/onchain/cancel-pending", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error ?? "주문 취소에 실패했습니다.");
+      }
+      await refresh();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "주문 취소에 실패했습니다.");
+    } finally {
+      setCancelling((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+    }
+  }
 
   async function confirmOrder(orderId: string) {
     const txHash = txInputs[orderId]?.trim();
@@ -182,6 +262,78 @@ export default function AdminOnchainPage() {
         <p className="text-sm text-on-surface-variant">
           Base USDC 주문 중 확인 대기, 장기 pending, 실패 상태를 점검합니다.
         </p>
+      </div>
+
+      <div className="mb-10 bg-surface-container-lowest shadow-ghost p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div>
+            <p className="text-xs font-bold text-outline uppercase tracking-widest">테스트망 배선 진단</p>
+            <p className="text-sm text-on-surface-variant mt-1">
+              escrow 배포·USDC 주소·operator 권한(setOperator)·RPC 네트워크를 dry-run read로 점검합니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={runDiagnostics}
+            disabled={diagLoading}
+            className="shrink-0 rounded-md bg-primary px-4 py-2 text-xs font-bold uppercase tracking-widest text-on-primary transition-opacity hover:opacity-80 disabled:opacity-50"
+          >
+            {diagLoading ? "진단 중..." : "환경 진단 실행"}
+          </button>
+        </div>
+
+        {diagError && <p className="text-xs text-error mb-3">{diagError}</p>}
+
+        {diag && (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <span className={`font-bold ${diag.summary.ok ? "text-emerald-600" : "text-error"}`}>
+                {diag.summary.ok ? "치명적 문제 없음" : "FAIL 항목 있음"}
+              </span>
+              <span className="text-outline">·</span>
+              <span className="text-emerald-600 font-bold">{diag.summary.pass} pass</span>
+              <span className="text-error font-bold">{diag.summary.fail} fail</span>
+              <span className="text-amber-600 font-bold">{diag.summary.warn} warn</span>
+              <span className="text-blue-600 font-bold">{diag.summary.info} info</span>
+              <span className="text-outline ml-auto">{new Date(diag.generatedAt).toLocaleString("ko-KR")}</span>
+            </div>
+
+            {diag.config && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px] font-mono text-outline bg-surface-container-low px-3 py-3 rounded">
+                <span className="truncate">chain {diag.config.chainId}</span>
+                <span className="truncate">fee {diag.config.platformFeeBps} bps</span>
+                <span className="truncate">escrow {diag.config.escrowAddress}</span>
+                <span className="truncate">usdc {diag.config.usdcAddress}</span>
+                <span className="truncate">operator {diag.config.operatorAddress}</span>
+                <span className="truncate">treasury {diag.config.treasuryAddress}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col divide-y divide-outline-variant/20">
+              {diag.checks.map((check) => {
+                const style = DIAG_STATUS_STYLE[check.status];
+                return (
+                  <div key={check.id} className="flex items-start gap-3 py-2.5">
+                    <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${style.dot}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-on-surface">{check.label}</p>
+                        <span className={`text-[10px] font-bold ${style.text}`}>{style.label}</span>
+                      </div>
+                      <p className="text-xs text-on-surface-variant mt-0.5">{check.detail}</p>
+                      {(check.expected || check.actual) && (
+                        <p className="text-[10px] font-mono text-outline mt-1 break-all">
+                          {check.expected && <>expected {check.expected} · </>}
+                          {check.actual && <>actual {check.actual}</>}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
@@ -356,6 +508,16 @@ export default function AdminOnchainPage() {
                       </form>
                     ) : (
                       <span className="text-xs text-outline">-</span>
+                    )}
+                    {order.cryptoStatus === "pending" && !order.paymentTxHash && (
+                      <button
+                        type="button"
+                        onClick={() => cancelOrder(order.id, order.orderNumber ?? order.id)}
+                        disabled={Boolean(cancelling[order.id])}
+                        className="mt-2 rounded-md border border-error/40 px-3 py-1.5 text-xs font-bold text-error transition-colors hover:bg-error/10 disabled:opacity-50"
+                      >
+                        {cancelling[order.id] ? "취소 중" : "주문 취소"}
+                      </button>
                     )}
                     {order.confirmAttempts > 0 && (
                       <p className="text-[10px] text-outline mt-2">{order.confirmAttempts} attempts</p>

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildArweaveCredentialMetadata,
+  canAdminRegisterImage,
+  canRequestFreeRegistration,
   getBlockchainRegistrationState,
   summarizeRegistrationSelection,
 } from "./registration";
@@ -32,6 +34,59 @@ describe("getBlockchainRegistrationState", () => {
     expect(getBlockchainRegistrationState({ imageStatus: "approved", salesCount: 2, proofStatus: "pending" })).toBe("pending");
     expect(getBlockchainRegistrationState({ imageStatus: "approved", salesCount: 2, proofStatus: "registered" })).toBe("registered");
     expect(getBlockchainRegistrationState({ imageStatus: "approved", salesCount: 2, proofStatus: "failed" })).toBe("failed");
+  });
+
+  it("marks unsold images with a pending fee payment as payment pending", () => {
+    expect(
+      getBlockchainRegistrationState({
+        imageStatus: "approved",
+        salesCount: 0,
+        proofStatus: "not_registered",
+        proofRequestKind: "self_funded",
+        proofRequestPaymentStatus: "pending",
+      })
+    ).toBe("self_funded_payment_pending");
+  });
+
+  it("returns to self-funded available after a refund", () => {
+    expect(
+      getBlockchainRegistrationState({
+        imageStatus: "approved",
+        salesCount: 0,
+        proofStatus: "not_registered",
+        proofRequestKind: "self_funded",
+        proofRequestPaymentStatus: "refunded",
+      })
+    ).toBe("self_funded_available");
+  });
+});
+
+describe("canRequestFreeRegistration", () => {
+  it("allows post-sale available and failed images", () => {
+    expect(canRequestFreeRegistration({ imageStatus: "approved", salesCount: 3, proofStatus: "not_registered" })).toBe(true);
+    expect(canRequestFreeRegistration({ imageStatus: "approved", salesCount: 3, proofStatus: "failed" })).toBe(true);
+  });
+
+  it("rejects pre-sale self-funded images (they must pay the fee)", () => {
+    expect(canRequestFreeRegistration({ imageStatus: "approved", salesCount: 0, proofStatus: "not_registered" })).toBe(false);
+  });
+});
+
+describe("canAdminRegisterImage", () => {
+  it("allows platform-funded post-sale requests without payment", () => {
+    expect(canAdminRegisterImage({ proofStatus: "requested", proofRequestKind: "post_sale", proofRequestPaymentStatus: "none" })).toBe(true);
+    expect(canAdminRegisterImage({ proofStatus: "available", proofRequestKind: "post_sale" })).toBe(true);
+  });
+
+  it("blocks self-funded requests until the fee is paid", () => {
+    expect(canAdminRegisterImage({ proofStatus: "requested", proofRequestKind: "self_funded", proofRequestPaymentStatus: "pending" })).toBe(false);
+    expect(canAdminRegisterImage({ proofStatus: "requested", proofRequestKind: "self_funded", proofRequestPaymentStatus: "none" })).toBe(false);
+    expect(canAdminRegisterImage({ proofStatus: "requested", proofRequestKind: "self_funded", proofRequestPaymentStatus: "paid" })).toBe(true);
+  });
+
+  it("rejects non-registerable proof states", () => {
+    expect(canAdminRegisterImage({ proofStatus: "pending", proofRequestKind: "post_sale" })).toBe(false);
+    expect(canAdminRegisterImage({ proofStatus: "registered", proofRequestKind: "self_funded", proofRequestPaymentStatus: "paid" })).toBe(false);
   });
 });
 

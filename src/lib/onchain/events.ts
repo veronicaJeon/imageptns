@@ -9,7 +9,11 @@ export type OnchainEventType =
   | "proof_registration_batch_created"
   | "proof_arweave_uploaded"
   | "proof_arweave_confirmed"
-  | "proof_registration_failed";
+  | "proof_registration_failed"
+  | "proof_self_funded_fee_requested"
+  | "proof_self_funded_fee_paid"
+  | "proof_self_funded_fee_canceled"
+  | "proof_self_funded_fee_refunded";
 
 export interface OnchainEvent {
   eventType: OnchainEventType;
