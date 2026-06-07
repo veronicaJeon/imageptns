@@ -30,6 +30,12 @@ describe("creative commons metadata", () => {
     expect(license.requiresAttribution).toBe(true);
   });
 
+  it("requires platform attribution for CC0-like assets", () => {
+    const license = getCopyrightLicense("cc0");
+
+    expect(license.requiresAttribution).toBe(true);
+  });
+
   it("normalizes free usage policies", () => {
     expect(getFreeUsagePolicy("education").label).toBe("교육용 무료");
     expect(normalizeFreeUsagePolicy("bad-value")).toBe("none");
@@ -37,6 +43,10 @@ describe("creative commons metadata", () => {
 
   it("builds the platform credit line from immutable photographer id", () => {
     expect(creditLineForPhotographerId("jiri_mountain_01")).toBe("jiri_mountain_01 / Image Partners");
+  });
+
+  it("uses an unassigned credit line fallback when photographer id is missing", () => {
+    expect(creditLineForPhotographerId(null)).toBe("unassigned / Image Partners");
   });
 
   it("maps backend license fields into buyer-friendly usage conditions", () => {
@@ -47,6 +57,33 @@ describe("creative commons metadata", () => {
 
     expect(conditions).toEqual([
       { key: "education_free", label: "교육용 무료 사용 가능", allowed: true },
+      { key: "commercial", label: "상업 사용 가능", allowed: true },
+      { key: "derivatives", label: "원 저작물 변경 가능", allowed: true },
+      { key: "attribution", label: "저작자 표시 필요", allowed: true },
+    ]);
+  });
+
+  it("maps non-commercial no-derivatives licenses into restricted buyer conditions", () => {
+    const conditions = buyerUsageConditions({
+      copyrightLicense: "cc_by_nc_nd",
+      freeUsagePolicy: "none",
+    });
+
+    expect(conditions).toEqual([
+      { key: "commercial", label: "상업 사용 제한", allowed: false },
+      { key: "derivatives", label: "원 저작물 변경 제한", allowed: false },
+      { key: "attribution", label: "저작자 표시 필요", allowed: true },
+    ]);
+  });
+
+  it("includes free and platform attribution conditions for the standard free policy", () => {
+    const conditions = buyerUsageConditions({
+      copyrightLicense: "standard",
+      freeUsagePolicy: "all",
+    });
+
+    expect(conditions).toEqual([
+      { key: "free", label: "무료 사용 가능", allowed: true },
       { key: "commercial", label: "상업 사용 가능", allowed: true },
       { key: "derivatives", label: "원 저작물 변경 가능", allowed: true },
       { key: "attribution", label: "저작자 표시 필요", allowed: true },

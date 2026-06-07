@@ -41,9 +41,9 @@ export const COPYRIGHT_LICENSES: CopyrightLicenseOption[] = [
   {
     code: "cc0",
     label: "CC0",
-    summary: "가능한 범위에서 저작권을 포기해 누구나 자유롭게 사용할 수 있습니다.",
+    summary: "폭넓은 사용이 가능하지만 Image Partners 출처 표시는 필요합니다.",
     url: "https://creativecommons.org/publicdomain/zero/1.0/",
-    requiresAttribution: false,
+    requiresAttribution: true,
     allowsCommercialUse: true,
     allowsDerivatives: true,
     requiresShareAlike: false,
@@ -169,7 +169,7 @@ export interface BuyerUsageCondition {
 
 export function creditLineForPhotographerId(photographerId: string | null | undefined): string {
   const normalized = (photographerId ?? "").trim();
-  return `${normalized || "unknown"} / Image Partners`;
+  return `${normalized || "unassigned"} / Image Partners`;
 }
 
 export function buyerUsageConditions(input: {
