@@ -2,42 +2,33 @@ import sharp from "sharp";
 import { normalizeRotationDegrees } from "@/lib/images/orientation";
 
 function watermarkSvg(w: number, h: number) {
-  // Font size scales with image: ~3.5% of the shorter dimension, clamped
-  const fontSize = Math.max(18, Math.min(72, Math.round(Math.min(w, h) * 0.035)));
-  const letterSpacing = Math.round(fontSize * 0.18);
-
-  // Build a tiled diagonal grid of "IMAGE PARTNERS" texts
-  // Each tile is roughly 2.8× fontSize wide × 2.2× fontSize tall spacing
-  const tileW = fontSize * 12;
-  const tileH = fontSize * 5;
-  const texts: string[] = [];
-
-  // Extend coverage beyond image edges so rotation doesn't leave gaps
-  for (let ty = -tileH * 2; ty < h + tileH * 2; ty += tileH) {
-    for (let tx = -tileW; tx < w + tileW * 2; tx += tileW) {
-      // Stagger every other row by half tileW
-      const rowOffset = Math.round(ty / tileH) % 2 === 0 ? 0 : tileW / 2;
-      const x = tx + rowOffset;
-      const y = ty;
-      texts.push(
-        `<text x="${x}" y="${y}"
-          font-family="Arial, Helvetica, sans-serif"
-          font-size="${fontSize}"
-          font-weight="bold"
-          fill="white"
-          fill-opacity="0.38"
-          text-anchor="middle"
-          dominant-baseline="middle"
-          letter-spacing="${letterSpacing}"
-          transform="rotate(-30 ${x} ${y})"
-        >IMAGE PARTNERS</text>`
-      );
-    }
-  }
+  const fontSize = Math.max(22, Math.min(76, Math.round(Math.min(w, h) * 0.05)));
+  const smallSize = Math.max(12, Math.round(fontSize * 0.32));
 
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-  ${texts.join("\n  ")}
-</svg>`;
+    <rect x="0" y="0" width="${w}" height="${h}" fill="transparent"/>
+    <text x="${w / 2}" y="${h / 2}"
+      font-family="Arial, Helvetica, sans-serif"
+      font-size="${fontSize}"
+      font-weight="800"
+      fill="white"
+      fill-opacity="0.28"
+      text-anchor="middle"
+      dominant-baseline="middle"
+      letter-spacing="${Math.round(fontSize * 0.14)}"
+      transform="rotate(-24 ${w / 2} ${h / 2})"
+    >IMAGE PARTNERS</text>
+    <text x="${w - 18}" y="${h - 18}"
+      font-family="Arial, Helvetica, sans-serif"
+      font-size="${smallSize}"
+      font-weight="700"
+      fill="white"
+      fill-opacity="0.68"
+      text-anchor="end"
+      dominant-baseline="auto"
+      letter-spacing="${Math.round(smallSize * 0.12)}"
+    >IMAGE PARTNERS PREVIEW</text>
+  </svg>`;
 }
 
 export async function applyWatermark(input: Buffer, rotationDegrees: unknown = 0): Promise<Buffer> {
