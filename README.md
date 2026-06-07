@@ -26,8 +26,16 @@ This project keeps local and remote environments separate. Local development use
 
 Prerequisites:
 
-- Docker Desktop, running
+- Docker runtime, either Docker Desktop or Colima
+- Supabase CLI
 - Node.js 20+
+
+On macOS, a CLI-only setup works well:
+
+```bash
+brew install docker docker-compose colima supabase/tap/supabase
+colima start --cpu 4 --memory 8 --disk 60
+```
 
 1. Copy the local env template:
 
@@ -49,9 +57,9 @@ npm run supabase:status
 
 Use:
 
-- `API URL` → `NEXT_PUBLIC_SUPABASE_URL`
-- `anon key` → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `service_role key` → `SUPABASE_SERVICE_ROLE_KEY`
+- `Project URL` or `API URL` → `NEXT_PUBLIC_SUPABASE_URL`
+- `Publishable` or `anon key` → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `Secret` or `service_role key` → `SUPABASE_SERVICE_ROLE_KEY`
 
 4. Check that the local API is reachable:
 
