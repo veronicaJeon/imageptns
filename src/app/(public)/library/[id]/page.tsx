@@ -8,7 +8,7 @@ import { useLang } from "@/lib/i18n/store";
 import { useCart } from "@/lib/store/cart";
 import { cn } from "@/lib/utils/cn";
 import { ImageCard, ImageCardData } from "@/components/gallery/ImageCard";
-import { getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
+import { buyerUsageConditions, creditLineForPhotographerId, getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 
 const LICENSE_PRICES: Record<string, number> = {
@@ -131,6 +131,8 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
       src:          imageData.storage_path_preview ?? "",
       category:     imageData.category,
       license,
+      creditLine,
+      usageConditions: usageConditions.map((condition) => condition.label),
     });
     setCartFeedback("added");
     setTimeout(() => setCartFeedback("idle"), 2000);
@@ -147,6 +149,8 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
       src:          imageData.storage_path_preview ?? "",
       category:     imageData.category,
       license,
+      creditLine,
+      usageConditions: usageConditions.map((condition) => condition.label),
     });
     router.push("/checkout");
   }
@@ -172,11 +176,15 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const photographer = imageData.photographer?.display_name || imageData.photographer?.full_name || "Unknown";
-  const photographerId = imageData.photographer?.id;
+  const photographerId = imageData.photographer?.id ?? null;
+  const photographer = photographerId ?? "unknown";
+  const creditLine = creditLineForPhotographerId(photographerId);
   const copyrightLicense = getCopyrightLicense(imageData.copyright_license);
   const freeUsagePolicy = getFreeUsagePolicy(imageData.free_usage_policy);
-  const attributionName = imageData.attribution_name || photographer;
+  const usageConditions = buyerUsageConditions({
+    copyrightLicense: imageData.copyright_license,
+    freeUsagePolicy: imageData.free_usage_policy,
+  });
 
   const uploadedDate = new Date(imageData.approved_at ?? imageData.created_at)
     .toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
@@ -236,18 +244,6 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                     className="w-full h-auto object-cover"
                     unoptimized
                   />
-                  <div className="pointer-events-none absolute inset-0 overflow-hidden">
-                    <div className="absolute inset-[-20%] grid grid-cols-3 gap-8 rotate-[-24deg] opacity-25">
-                      {Array.from({ length: 18 }).map((_, index) => (
-                        <span
-                          key={index}
-                          className="select-none whitespace-nowrap text-center font-headline text-xl font-black uppercase tracking-[0.35em] text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]"
-                        >
-                          IMAGE PARTNERS
-                        </span>
-                      ))}
-                    </div>
-                  </div>
                   <div className="pointer-events-none absolute bottom-4 right-4 rounded bg-black/55 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white">
                     Watermarked Preview
                   </div>
@@ -293,51 +289,61 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
             <div>
               <p className="text-xs font-bold text-outline uppercase tracking-widest mb-4">{d.license}</p>
               <div className="mb-4 rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-                    {copyrightLicense.label}
-                  </span>
-                  {freeUsagePolicy.code !== "none" && (
-                    <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700 dark:bg-green-900/20 dark:text-green-200">
-                      {freeUsagePolicy.label}
+                <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 조건</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {usageConditions.map((condition) => (
+                    <span
+                      key={condition.key}
+                      className={cn(
+                        "rounded-full px-3 py-1 text-xs font-bold",
+                        condition.allowed
+                          ? "bg-primary/10 text-primary"
+                          : "bg-error/10 text-error"
+                      )}
+                    >
+                      {condition.label}
                     </span>
-                  )}
+                  ))}
                 </div>
-                <p className="mt-3 text-xs leading-relaxed text-on-surface-variant">{copyrightLicense.summary}</p>
-                {freeUsagePolicy.code !== "none" && (
-                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{freeUsagePolicy.summary}</p>
-                )}
-                <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] font-bold uppercase tracking-widest text-outline">
-                  <span>{copyrightLicense.requiresAttribution ? "출처 표기 필요" : "출처 표기 선택"}</span>
-                  <span>{copyrightLicense.allowsCommercialUse ? "상업 이용 가능" : "상업 이용 제한"}</span>
-                  <span>{copyrightLicense.allowsDerivatives ? "변경 가능" : "변경본 배포 제한"}</span>
-                  <span>{copyrightLicense.requiresShareAlike ? "동일조건 적용" : "동일조건 없음"}</span>
+                <div className="mt-4 rounded-md bg-surface-container-low px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-outline">저작자 표시</p>
+                  <div className="mt-1 flex items-center justify-between gap-3">
+                    <code className="break-all text-xs font-bold text-on-surface">{creditLine}</code>
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard?.writeText(creditLine)}
+                      className="shrink-0 rounded bg-on-surface px-2.5 py-1 text-[10px] font-bold text-surface"
+                    >
+                      복사
+                    </button>
+                  </div>
                 </div>
-                {copyrightLicense.requiresAttribution && (
-                  <p className="mt-3 text-xs text-on-surface-variant">
-                    권장 출처: <span className="font-semibold text-on-surface">{attributionName}</span>
-                    {imageData.attribution_url && (
-                      <>
-                        {" · "}
-                        <a href={imageData.attribution_url} target="_blank" rel="noreferrer" className="text-primary hover:opacity-70">
-                          출처 링크
-                        </a>
-                      </>
-                    )}
-                  </p>
-                )}
-                {copyrightLicense.url && (
-                  <a
-                    href={copyrightLicense.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-primary hover:opacity-70"
-                  >
-                    Creative Commons 원문 보기
-                    <span className="material-symbols-outlined text-sm">open_in_new</span>
-                  </a>
-                )}
+                <p className="mt-3 text-xs leading-relaxed text-on-surface-variant">
+                  모든 사용에는 위 저작자 표시가 필요합니다. 사용상 주의사항이 있는 이미지는 이 영역에 별도로 표시됩니다.
+                </p>
               </div>
+              {(copyrightLicense.url || freeUsagePolicy.code !== "none") && (
+                <details className="mb-4 text-xs text-on-surface-variant">
+                  <summary className="cursor-pointer font-bold text-outline">라이선스 세부 정보</summary>
+                  <div className="mt-2 space-y-1 leading-relaxed">
+                    <p>{copyrightLicense.label}: {copyrightLicense.summary}</p>
+                    {freeUsagePolicy.code !== "none" && (
+                      <p>{freeUsagePolicy.label}: {freeUsagePolicy.summary}</p>
+                    )}
+                    {copyrightLicense.url && (
+                      <a
+                        href={copyrightLicense.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-bold text-primary hover:opacity-70"
+                      >
+                        Creative Commons 원문 보기
+                        <span className="material-symbols-outlined text-sm">open_in_new</span>
+                      </a>
+                    )}
+                  </div>
+                </details>
+              )}
               <div className="flex flex-col gap-3">
                 {licenseKeys.map((key) => (
                   <label

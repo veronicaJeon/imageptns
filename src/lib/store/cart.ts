@@ -18,6 +18,8 @@ export interface CartItem {
   src: string;
   category: string;
   license: LicenseType;
+  creditLine: string;
+  usageConditions: string[];
   price: number; // KRW
 }
 
