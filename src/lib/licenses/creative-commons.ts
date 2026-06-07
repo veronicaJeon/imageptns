@@ -33,7 +33,7 @@ export const COPYRIGHT_LICENSES: CopyrightLicenseOption[] = [
     label: "Image Partners Standard",
     summary: "플랫폼 유료 라이선스로 판매합니다. 무료 사용 권한은 별도 정책을 따릅니다.",
     url: null,
-    requiresAttribution: false,
+    requiresAttribution: true,
     allowsCommercialUse: true,
     allowsDerivatives: true,
     requiresShareAlike: false,
@@ -152,4 +152,48 @@ export function getCopyrightLicense(value: unknown) {
 export function getFreeUsagePolicy(value: unknown) {
   const code = normalizeFreeUsagePolicy(value);
   return FREE_USAGE_POLICIES.find((policy) => policy.code === code) ?? FREE_USAGE_POLICIES[0];
+}
+
+export type BuyerUsageConditionKey =
+  | "free"
+  | "education_free"
+  | "commercial"
+  | "derivatives"
+  | "attribution";
+
+export interface BuyerUsageCondition {
+  key: BuyerUsageConditionKey;
+  label: string;
+  allowed: boolean;
+}
+
+export function creditLineForPhotographerId(photographerId: string | null | undefined): string {
+  const normalized = (photographerId ?? "").trim();
+  return `${normalized || "unknown"} / Image Partners`;
+}
+
+export function buyerUsageConditions(input: {
+  copyrightLicense: unknown;
+  freeUsagePolicy: unknown;
+}): BuyerUsageCondition[] {
+  const license = getCopyrightLicense(input.copyrightLicense);
+  const freePolicy = getFreeUsagePolicy(input.freeUsagePolicy);
+
+  const conditions: BuyerUsageCondition[] = [];
+
+  if (freePolicy.code === "all") {
+    conditions.push({ key: "free", label: "무료 사용 가능", allowed: true });
+  }
+
+  if (freePolicy.code === "education") {
+    conditions.push({ key: "education_free", label: "교육용 무료 사용 가능", allowed: true });
+  }
+
+  conditions.push(
+    { key: "commercial", label: license.allowsCommercialUse ? "상업 사용 가능" : "상업 사용 제한", allowed: license.allowsCommercialUse },
+    { key: "derivatives", label: license.allowsDerivatives ? "원 저작물 변경 가능" : "원 저작물 변경 제한", allowed: license.allowsDerivatives },
+    { key: "attribution", label: "저작자 표시 필요", allowed: true },
+  );
+
+  return conditions;
 }
