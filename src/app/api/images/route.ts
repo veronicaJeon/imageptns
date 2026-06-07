@@ -12,6 +12,7 @@ interface ImageListRow {
   storage_path_preview: string | null;
   width: number | null;
   height: number | null;
+  photographer_id: string | null;
   photographer?: { full_name: string | null } | { full_name: string | null }[] | null;
   copyright_license: string | null;
   free_usage_policy: string | null;
@@ -25,6 +26,7 @@ interface SearchImageRpcRow {
   storage_path_preview: string | null;
   width: number | null;
   height: number | null;
+  photographer_id?: string | null;
   photographer_name: string | null;
   copyright_license: string | null;
   free_usage_policy: string | null;
@@ -55,7 +57,7 @@ export async function GET(req: NextRequest) {
   let q = supabase
     .from("images")
     .select(
-      "id, asset_id, title, category, tags, storage_path_preview, width, height, copyright_license, free_usage_policy, photographer:profiles!photographer_id(full_name)"
+      "id, asset_id, title, category, tags, storage_path_preview, width, height, photographer_id, copyright_license, free_usage_policy, photographer:profiles!photographer_id(full_name)"
     )
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
@@ -116,6 +118,7 @@ export async function GET(req: NextRequest) {
           assetId:      img.asset_id,
           title:        img.title,
           category:     img.category,
+          photographerId: img.photographer_id ?? null,
           photographer: img.photographer_name ?? "",
           src,
           alt:          img.title,
@@ -160,6 +163,7 @@ export async function GET(req: NextRequest) {
       assetId:      img.asset_id,
       title:        img.title,
       category:     img.category,
+      photographerId: img.photographer_id,
       photographer: firstPhotographer(img.photographer)?.full_name ?? "",
       src,
       alt:          img.title,

@@ -40,6 +40,7 @@ interface SimilarImageRow {
   storage_path_preview: string | null;
   width: number | null;
   height: number | null;
+  photographer_id: string | null;
   photographer: { full_name: string | null } | { full_name: string | null }[] | null;
 }
 
@@ -106,7 +107,7 @@ export async function GET(
   // Similar images (same category, excluding this one)
   const { data: similar } = await admin
     .from("images")
-    .select("id, title, category, storage_path_preview, width, height, photographer:profiles!photographer_id(full_name)")
+    .select("id, title, category, storage_path_preview, width, height, photographer_id, photographer:profiles!photographer_id(full_name)")
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
     .eq("category", image.category)
@@ -140,6 +141,7 @@ export async function GET(
       id: s.id,
       title: s.title,
       category: s.category,
+      photographerId: s.photographer_id,
       photographer: firstPhotographer(s.photographer)?.full_name ?? "",
       src: previewUrl(s.storage_path_preview),
       alt: s.title,

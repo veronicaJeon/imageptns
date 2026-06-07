@@ -15,6 +15,7 @@ export interface ImageCardData {
   category: string;
   src: string;
   alt: string;
+  photographerId?: string | null;
   photographer?: string;
   width: number;
   height: number;
@@ -78,7 +79,7 @@ export function ImageCard({
       src: image.src,
       category: image.category,
       license: "editorial",
-      creditLine: creditLineForPhotographerId(image.photographer),
+      creditLine: creditLineForPhotographerId(image.photographerId ?? image.photographer),
       usageConditions: usageConditions.map((condition) => condition.label),
     });
     onAddToCart?.(image.id);
