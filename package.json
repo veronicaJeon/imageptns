@@ -4,6 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:local": "npm run supabase:start && npm run dev",
+    "supabase:start": "npx supabase start --workdir .",
+    "supabase:stop": "npx supabase stop --workdir .",
+    "supabase:status": "npx supabase status --workdir .",
+    "supabase:reset": "npx supabase db reset --workdir .",
+    "supabase:check": "node scripts/check-local-supabase.mjs",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
