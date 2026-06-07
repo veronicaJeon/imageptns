@@ -6,7 +6,6 @@ import Link from "next/link";
 import { MasonryGrid } from "@/components/gallery/MasonryGrid";
 import { ImageCard, ImageCardData } from "@/components/gallery/ImageCard";
 import { CategoryPill } from "@/components/ui/CategoryPill";
-import { COPYRIGHT_LICENSES, type CopyrightLicenseCode } from "@/lib/licenses/creative-commons";
 
 const PAGE_SIZE = 20;
 
@@ -15,8 +14,6 @@ type CategoryKey = typeof CATEGORY_KEYS[number];
 
 const SORT_KEYS = ["newest", "popular", "relevant"] as const;
 type SortKey = typeof SORT_KEYS[number];
-
-const CC_LICENSE_FILTERS = COPYRIGHT_LICENSES.filter((license) => license.code !== "standard");
 
 function AdRail({ side }: { side: "left" | "right" }) {
   return (
@@ -41,8 +38,10 @@ export default function LibraryPage() {
   const [query, setQuery]             = useState("");
   const [category, setCategory]       = useState<CategoryKey>("all");
   const [sort, setSort]               = useState<SortKey>("newest");
-  const [selectedLicenses, setSelectedLicenses] = useState<CopyrightLicenseCode[]>([]);
   const [freeOnly, setFreeOnly]       = useState(false);
+  const [educationFreeOnly, setEducationFreeOnly] = useState(false);
+  const [commercialOnly, setCommercialOnly] = useState(false);
+  const [derivativesOnly, setDerivativesOnly] = useState(false);
   const [images, setImages]           = useState<ImageCardData[]>([]);
   const [offset, setOffset]           = useState(0);
   const [hasMore, setHasMore]         = useState(true);
@@ -100,8 +99,10 @@ export default function LibraryPage() {
       const params = new URLSearchParams({ sort, limit: String(PAGE_SIZE), offset: String(currentOffset) });
       if (category !== "all") params.set("category", category);
       if (debouncedQuery)     params.set("query", debouncedQuery);
-      selectedLicenses.forEach((license) => params.append("license", license));
       if (freeOnly) params.set("free", "true");
+      if (educationFreeOnly) params.set("educationFree", "true");
+      if (commercialOnly) params.set("commercial", "true");
+      if (derivativesOnly) params.set("derivatives", "true");
 
       const res = await fetch(`/api/images?${params}`);
       if (!res.ok) throw new Error();
@@ -117,14 +118,14 @@ export default function LibraryPage() {
       else setLoadingMore(false);
       isFetchingRef.current = false;
     }
-  }, [category, sort, debouncedQuery, selectedLicenses, freeOnly]);
+  }, [category, sort, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly]);
 
   // Reset whenever filters change
   useEffect(() => {
     setOffset(0);
     setHasMore(true);
     fetchPage(0, true);
-  }, [category, sort, debouncedQuery, selectedLicenses, freeOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [category, sort, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // IntersectionObserver: fires when the sentinel enters the viewport
   useEffect(() => {
@@ -149,12 +150,6 @@ export default function LibraryPage() {
     setQuery("");
     setSuggestions([]);
     setShowSuggestions(false);
-  }
-
-  function toggleLicense(code: CopyrightLicenseCode) {
-    setSelectedLicenses((prev) => (
-      prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code]
-    ));
   }
 
   return (
@@ -271,43 +266,32 @@ export default function LibraryPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 border-t border-outline-variant/20 pt-3">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-outline">CC</span>
-            {CC_LICENSE_FILTERS.map((license) => (
+            <span className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 조건</span>
+            {[
+              { label: "무료 사용 가능", checked: freeOnly, onChange: setFreeOnly, icon: "redeem" },
+              { label: "교육용 무료", checked: educationFreeOnly, onChange: setEducationFreeOnly, icon: "school" },
+              { label: "상업 사용 가능", checked: commercialOnly, onChange: setCommercialOnly, icon: "business_center" },
+              { label: "변경 가능", checked: derivativesOnly, onChange: setDerivativesOnly, icon: "edit" },
+            ].map((filter) => (
               <label
-                key={license.code}
+                key={filter.label}
                 className={[
                   "flex h-8 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors",
-                  selectedLicenses.includes(license.code)
+                  filter.checked
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-outline-variant bg-surface-container-low text-on-surface-variant hover:border-outline",
                 ].join(" ")}
               >
                 <input
                   type="checkbox"
-                  checked={selectedLicenses.includes(license.code)}
-                  onChange={() => toggleLicense(license.code)}
+                  checked={filter.checked}
+                  onChange={(event) => filter.onChange(event.target.checked)}
                   className="sr-only"
                 />
-                {license.label.replace(" 4.0", "")}
+                <span className="material-symbols-outlined text-sm">{filter.icon}</span>
+                {filter.label}
               </label>
             ))}
-            <label
-              className={[
-                "ml-0 flex h-8 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors md:ml-2",
-                freeOnly
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-outline-variant bg-surface-container-low text-on-surface-variant hover:border-outline",
-              ].join(" ")}
-            >
-              <input
-                type="checkbox"
-                checked={freeOnly}
-                onChange={(e) => setFreeOnly(e.target.checked)}
-                className="sr-only"
-              />
-              <span className="material-symbols-outlined text-sm">redeem</span>
-              무료
-            </label>
           </div>
         </div>
       </div>

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeCopyrightLicenseCode } from "@/lib/licenses/creative-commons";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const PAGE_SIZE = 20;
@@ -45,11 +44,11 @@ export async function GET(req: NextRequest) {
   const limit = Number.isInteger(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : PAGE_SIZE;
   const offset = Number.isInteger(rawOffset) ? Math.max(rawOffset, 0) : 0;
   const fetchCount = limit + 1; // fetch one extra to determine hasMore
-  const licenseFilters = Array.from(new Set(searchParams.getAll("license")
-    .flatMap((value) => value.split(","))
-    .map((value) => normalizeCopyrightLicenseCode(value))
-    .filter((value) => value !== "standard" || searchParams.getAll("license").some((raw) => raw.includes("standard")))));
   const freeOnly = searchParams.get("free") === "true";
+  const educationFreeOnly = searchParams.get("educationFree") === "true";
+  const commercialOnly = searchParams.get("commercial") === "true";
+  const derivativesOnly = searchParams.get("derivatives") === "true";
+  const hasUsageFilters = freeOnly || educationFreeOnly || commercialOnly || derivativesOnly;
 
   const supabase = createAdminClient();
 
@@ -70,22 +69,30 @@ export async function GET(req: NextRequest) {
     q = q.textSearch("fts", query, { type: "plain" });
   }
 
-  if (licenseFilters.length > 0) {
-    q = q.in("copyright_license", licenseFilters);
-  }
-
   if (freeOnly) {
-    q = q.or("free_usage_policy.neq.none,copyright_license.neq.standard");
+    q = q.eq("free_usage_policy", "all");
   }
 
-  if (sort === "relevant" && query) {
+  if (educationFreeOnly) {
+    q = q.eq("free_usage_policy", "education");
+  }
+
+  if (commercialOnly) {
+    q = q.in("copyright_license", ["standard", "cc0", "cc_by", "cc_by_sa", "cc_by_nd"]);
+  }
+
+  if (derivativesOnly) {
+    q = q.in("copyright_license", ["standard", "cc0", "cc_by", "cc_by_sa", "cc_by_nc", "cc_by_nc_sa"]);
+  }
+
+  if (sort === "relevant" && query && !hasUsageFilters) {
     const { data: rpcData, error: rpcError } = await supabase.rpc("search_images", {
       search_query:    query,
       category_filter: category === "all" ? "" : category,
       lim:             limit,
       off:             offset,
-      license_filters: licenseFilters.length > 0 ? licenseFilters : null,
-      free_only:       freeOnly,
+      license_filters: null,
+      free_only:       false,
     });
 
     if (rpcError) {
