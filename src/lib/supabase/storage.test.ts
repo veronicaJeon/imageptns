@@ -11,6 +11,6 @@ describe("thumbnailUrlFromPreviewUrl", () => {
     expect(parsed.searchParams.get("src")).toBe(src);
     expect(parsed.searchParams.get("w")).toBe("640");
     expect(parsed.searchParams.get("h")).toBe("480");
-    expect(parsed.searchParams.get("wm")).toBe("1");
+    expect(parsed.searchParams.get("wm")).toBeNull();
   });
 });
