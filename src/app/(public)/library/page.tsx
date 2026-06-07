@@ -15,6 +15,23 @@ type CategoryKey = typeof CATEGORY_KEYS[number];
 const SORT_KEYS = ["newest", "popular", "relevant"] as const;
 type SortKey = typeof SORT_KEYS[number];
 
+const USAGE_FILTER_LABELS = {
+  ko: {
+    title: "사용 조건",
+    free: "무료 사용 가능",
+    educationFree: "교육용 무료",
+    commercial: "상업 사용 가능",
+    derivatives: "변경 가능",
+  },
+  en: {
+    title: "Usage",
+    free: "Free use",
+    educationFree: "Free for education",
+    commercial: "Commercial use",
+    derivatives: "Modifications allowed",
+  },
+} as const;
+
 function AdRail({ side }: { side: "left" | "right" }) {
   return (
     <aside className="hidden 2xl:block">
@@ -32,8 +49,9 @@ function AdRail({ side }: { side: "left" | "right" }) {
 
 /* ── Page ───────────────────────────────────────────────── */
 export default function LibraryPage() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const l = t.library;
+  const usageLabels = USAGE_FILTER_LABELS[lang];
 
   const [query, setQuery]             = useState("");
   const [category, setCategory]       = useState<CategoryKey>("all");
@@ -56,6 +74,7 @@ export default function LibraryPage() {
   const sentinelRef   = useRef<HTMLDivElement | null>(null);
   const observerRef   = useRef<IntersectionObserver | null>(null);
   const isFetchingRef = useRef(false); // prevents concurrent fetches
+  const requestSeqRef = useRef(0);
 
   useEffect(() => {
     fetch("/api/stats")
@@ -89,11 +108,17 @@ export default function LibraryPage() {
 
   // Fetch a single page of images
   const fetchPage = useCallback(async (currentOffset: number, replace: boolean) => {
-    if (isFetchingRef.current) return;
+    if (!replace && isFetchingRef.current) return;
+
+    const requestSeq = ++requestSeqRef.current;
     isFetchingRef.current = true;
 
-    if (replace) setLoading(true);
-    else setLoadingMore(true);
+    if (replace) {
+      setLoading(true);
+      setLoadingMore(false);
+    } else {
+      setLoadingMore(true);
+    }
 
     try {
       const params = new URLSearchParams({ sort, limit: String(PAGE_SIZE), offset: String(currentOffset) });
@@ -108,15 +133,25 @@ export default function LibraryPage() {
       if (!res.ok) throw new Error();
       const { images: data, hasMore: more } = await res.json();
 
+      if (requestSeq !== requestSeqRef.current) return;
+
       setImages((prev) => replace ? (data ?? []) : [...prev, ...(data ?? [])]);
       setHasMore(!!more);
       setOffset(currentOffset + PAGE_SIZE);
     } catch {
+      if (requestSeq !== requestSeqRef.current) return;
+
       if (replace) setImages([]);
     } finally {
-      if (replace) setLoading(false);
-      else setLoadingMore(false);
-      isFetchingRef.current = false;
+      if (requestSeq === requestSeqRef.current) {
+        if (replace) {
+          setLoading(false);
+          setLoadingMore(false);
+        } else {
+          setLoadingMore(false);
+        }
+        isFetchingRef.current = false;
+      }
     }
   }, [category, sort, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly]);
 
@@ -266,12 +301,12 @@ export default function LibraryPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 border-t border-outline-variant/20 pt-3">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 조건</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-outline">{usageLabels.title}</span>
             {[
-              { label: "무료 사용 가능", checked: freeOnly, onChange: setFreeOnly, icon: "redeem" },
-              { label: "교육용 무료", checked: educationFreeOnly, onChange: setEducationFreeOnly, icon: "school" },
-              { label: "상업 사용 가능", checked: commercialOnly, onChange: setCommercialOnly, icon: "business_center" },
-              { label: "변경 가능", checked: derivativesOnly, onChange: setDerivativesOnly, icon: "edit" },
+              { label: usageLabels.free, checked: freeOnly, onChange: setFreeOnly, icon: "redeem" },
+              { label: usageLabels.educationFree, checked: educationFreeOnly, onChange: setEducationFreeOnly, icon: "school" },
+              { label: usageLabels.commercial, checked: commercialOnly, onChange: setCommercialOnly, icon: "business_center" },
+              { label: usageLabels.derivatives, checked: derivativesOnly, onChange: setDerivativesOnly, icon: "edit" },
             ].map((filter) => (
               <label
                 key={filter.label}
