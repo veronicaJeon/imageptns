@@ -33,4 +33,14 @@ describe("cart print thumbnails", () => {
     expect(urls).toHaveLength(1);
     expect(urls[0]).toContain("/api/images/thumbnail?");
   });
+
+  it("keeps the original preview URL encoded behind the thumbnail route", () => {
+    const src = "https://example.supabase.co/storage/v1/object/public/images-preview/a.jpg";
+    const url = cartStatementThumbnailUrl(src, "https://imagepartners.kr");
+    const parsed = new URL(url);
+
+    expect(parsed.pathname).toBe("/api/images/thumbnail");
+    expect(parsed.toString()).not.toBe(src);
+    expect(parsed.searchParams.get("src")).toBe(src);
+  });
 });

@@ -14,6 +14,14 @@ function formatKRW(n: number) {
   return "₩" + n.toLocaleString("ko-KR");
 }
 
+function itemCreditLine(item: { creditLine?: string; photographer?: string }) {
+  return item.creditLine || `${item.photographer || "unassigned"} / Image Partners`;
+}
+
+function itemUsageConditions(item: { usageConditions?: string[] }) {
+  return item.usageConditions?.length ? item.usageConditions : ["저작자 표시 필요"];
+}
+
 export default function CartPage() {
   const { t } = useLang();
   const c = t.cart;
@@ -79,7 +87,7 @@ export default function CartPage() {
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b-2 border-zinc-900">
-              {["No.", "썸네일", "이미지 / 에셋 ID", "작가", "라이선스", "단가"].map((header) => (
+              {["No.", "이미지", "상품명 / 에셋 ID", "저작자 표시", "사용 조건", "금액"].map((header) => (
                 <th key={header} className="py-3 text-left text-xs font-bold uppercase tracking-widest text-zinc-600">
                   {header}
                 </th>
@@ -111,8 +119,8 @@ export default function CartPage() {
                   <p className="text-xs text-zinc-500">{item.category}</p>
                   <p className="text-xs font-mono text-zinc-500">{item.assetId ?? item.id}</p>
                 </td>
-                <td className="py-3 pr-3 text-zinc-700">{item.photographer || "-"}</td>
-                <td className="py-3 pr-3 text-zinc-700">{c.licenseTypes[item.license]}</td>
+                <td className="py-3 pr-3 text-zinc-700">{itemCreditLine(item)}</td>
+                <td className="py-3 pr-3 text-zinc-700">{itemUsageConditions(item).join(", ")}</td>
                 <td className="py-3 text-right font-semibold text-zinc-950">{formatKRW(displayPrice(item.license))}</td>
               </tr>
             ))}
@@ -191,8 +199,19 @@ export default function CartPage() {
                     {item.photographer && (
                       <p className="text-xs text-outline mt-0.5">{item.photographer}</p>
                     )}
+                    <p className="mt-2 text-xs text-on-surface-variant">
+                      저작자 표시: <span className="font-semibold text-on-surface">{itemCreditLine(item)}</span>
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {itemUsageConditions(item).map((condition) => (
+                        <span key={condition} className="rounded-full bg-surface-container-low px-2 py-1 text-[10px] font-bold text-on-surface-variant">
+                          {condition}
+                        </span>
+                      ))}
+                    </div>
 
                     {/* License selector */}
+                    <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-outline">구매 옵션</p>
                     <div className="flex gap-2 mt-3 flex-wrap">
                       {LICENSE_KEYS.map((key) => (
                         <button
