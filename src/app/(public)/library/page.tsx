@@ -6,6 +6,7 @@ import Link from "next/link";
 import { MasonryGrid } from "@/components/gallery/MasonryGrid";
 import { ImageCard, ImageCardData } from "@/components/gallery/ImageCard";
 import { CategoryPill } from "@/components/ui/CategoryPill";
+import { buildPhotoRequestHref } from "@/lib/contact/photo-request-draft";
 
 const PAGE_SIZE = 20;
 
@@ -182,10 +183,17 @@ export default function LibraryPage() {
 
   function handleCategoryChange(key: CategoryKey) {
     setCategory(key);
-    setQuery("");
-    setSuggestions([]);
     setShowSuggestions(false);
   }
+
+  const photoRequestHref = buildPhotoRequestHref({
+    query,
+    category,
+    freeOnly,
+    educationFreeOnly,
+    commercialOnly,
+    derivativesOnly,
+  });
 
   return (
     <>
@@ -278,11 +286,18 @@ export default function LibraryPage() {
               ))}
             </div>
 
-            {/* Sort + result count */}
-            <div className="flex items-center gap-4 shrink-0">
+            {/* Sort + request + result count */}
+            <div className="flex items-center gap-3 shrink-0">
               <span className="text-xs text-outline font-medium">
                 {loading ? "…" : `${images.length}${hasMore ? "+" : ""}`} {l.results}
               </span>
+              <Link
+                href={photoRequestHref}
+                className="flex h-9 items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3 text-xs font-bold text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
+              >
+                <span className="material-symbols-outlined text-base">add_photo_alternate</span>
+                사진 요청
+              </Link>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-outline uppercase tracking-widest hidden sm:inline">
                   {l.sort.label}
@@ -341,9 +356,16 @@ export default function LibraryPage() {
                 <span className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : images.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-40 gap-4 text-outline">
+              <div className="flex flex-col items-center justify-center py-40 gap-4 text-center text-outline">
                 <span className="material-symbols-outlined text-6xl">image_search</span>
                 <p className="text-base">{l.noResults}</p>
+                <Link
+                  href={photoRequestHref}
+                  className="mt-2 flex h-11 items-center gap-2 rounded bg-primary px-5 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90"
+                >
+                  <span className="material-symbols-outlined text-base">assignment_add</span>
+                  이 조건으로 사진 요청
+                </Link>
               </div>
             ) : (
               <>

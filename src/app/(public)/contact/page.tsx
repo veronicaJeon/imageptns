@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
+import { draftPhotoRequestFromSearchParams } from "@/lib/contact/photo-request-draft";
 import { cn } from "@/lib/utils/cn";
 
 type ContactMode = "general" | "photo";
@@ -36,10 +38,11 @@ function numericOrNull(value: string) {
   return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : null;
 }
 
-export default function ContactPage() {
+function ContactPageContent() {
   const { t } = useLang();
   const c = t.contact;
   const f = c.form;
+  const searchParams = useSearchParams();
 
   const { user, init } = useAuth();
   const [mode, setMode] = useState<ContactMode>("general");
@@ -81,6 +84,21 @@ export default function ContactPage() {
     setSent(false);
     setError("");
   }, [mode]);
+
+  useEffect(() => {
+    const draft = draftPhotoRequestFromSearchParams(searchParams);
+    if (draft.mode !== "photo") return;
+
+    setMode("photo");
+    setPhotoForm((prev) => ({
+      ...prev,
+      title: prev.title || draft.title,
+      brief: prev.brief || draft.brief,
+      category: draft.category,
+      tags: prev.tags || draft.tags,
+      usage_intent: prev.usage_intent || draft.usage_intent,
+    }));
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -524,5 +542,13 @@ export default function ContactPage() {
         </div>
       </section>
     </>
+  );
+}
+
+export default function ContactPage() {
+  return (
+    <Suspense fallback={null}>
+      <ContactPageContent />
+    </Suspense>
   );
 }
