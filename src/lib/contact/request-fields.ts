@@ -51,6 +51,15 @@ export interface NormalizedContactSubmission {
   request_status: "submitted";
 }
 
+export interface PhotoRequestBuyerValidationFields {
+  usage_intent: unknown;
+  budget_min_krw: unknown;
+  budget_max_krw: unknown;
+  deadline_at: unknown;
+  reference_url: unknown;
+  non_copying_attested: unknown;
+}
+
 function hasValue<T extends readonly string[]>(values: T, value: string): value is T[number] {
   return values.includes(value as T[number]);
 }
@@ -252,6 +261,52 @@ export function normalizeReferenceUrl(value: unknown): string | null {
   }
 
   return url.toString();
+}
+
+export function validatePhotoRequestBuyerFields(
+  input: PhotoRequestBuyerValidationFields,
+  now: Date = new Date(),
+): string | null {
+  let usageIntent: string | null;
+  try {
+    usageIntent = normalizeOptionalText(input.usage_intent, "usage_intent", 500);
+  } catch {
+    return "사용 목적은 500자 이내로 입력해주세요.";
+  }
+  if (!usageIntent) {
+    return "사용 목적을 입력해주세요. 예: 웹사이트, 기사, 캠페인, 인쇄물, 내부 자료";
+  }
+
+  try {
+    normalizeBudgetRange(input.budget_min_krw, input.budget_max_krw);
+  } catch {
+    if (
+      Number.isInteger(input.budget_min_krw)
+      && Number.isInteger(input.budget_max_krw)
+      && (input.budget_min_krw as number) > (input.budget_max_krw as number)
+    ) {
+      return "최소 예산은 최대 예산보다 클 수 없습니다. 예산 범위를 다시 확인해주세요.";
+    }
+    return "예산 범위를 원화 숫자로 입력해주세요. 아직 정확하지 않아도 대략적인 최소/최대 금액이면 됩니다.";
+  }
+
+  try {
+    normalizeDeadline(input.deadline_at, now);
+  } catch {
+    return "희망 마감일은 오늘 이후 날짜로 선택해주세요.";
+  }
+
+  try {
+    normalizeReferenceUrl(input.reference_url);
+  } catch {
+    return "참고 URL은 http:// 또는 https://로 시작하는 웹 주소만 입력할 수 있습니다.";
+  }
+
+  if (input.non_copying_attested !== true) {
+    return "참고 이미지를 그대로 복제하거나 혼동될 정도로 유사한 결과물을 요구하지 않는다는 확인이 필요합니다.";
+  }
+
+  return null;
 }
 
 export function normalizeContactSubmissionInput(

@@ -1,4 +1,5 @@
 import { escapeHtml } from "./html";
+import type { PhotoRequestInviteEmailPayload } from "./contact";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Override via env vars in Vercel dashboard; defaults kept for local dev reference
@@ -29,6 +30,7 @@ async function sendEmail(payload: EmailPayload): Promise<void> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     console.error("[resend] send failed", err);
+    throw new Error("Resend email delivery failed");
   }
 }
 
@@ -170,6 +172,30 @@ export async function sendImageRejected(opts: {
       <p><strong>에셋 ID:</strong> ${opts.assetId}</p>
       <p><strong>반려 사유:</strong> ${opts.reason}</p>
       <p>수정 후 다시 제출해 주시면 재검토 해드리겠습니다.</p>
+      <br><p>Image Partners 팀 드림</p>
+    `,
+  });
+}
+
+export async function sendPhotoRequestInvite(opts: PhotoRequestInviteEmailPayload) {
+  const photographerName = escapeHtml(opts.photographerName);
+  const requestTitle = escapeHtml(opts.requestTitle);
+  const locationLabel = opts.locationLabel ? escapeHtml(opts.locationLabel) : null;
+  const deadlineAt = opts.deadlineAt ? escapeHtml(new Date(opts.deadlineAt).toLocaleDateString("ko-KR")) : null;
+  const budgetLabel = opts.budgetLabel ? escapeHtml(opts.budgetLabel) : null;
+
+  await sendEmail({
+    to: opts.photographerEmail,
+    subject: `[Image Partners] 사진 의뢰 초대 — ${opts.requestTitle}`,
+    html: `
+      <p>${photographerName}님, 안녕하세요.</p>
+      <p>Image Partners 운영팀에서 아래 사진 의뢰 후보로 초대드립니다.</p>
+      <p><strong>의뢰:</strong> ${requestTitle}</p>
+      ${locationLabel ? `<p><strong>지역:</strong> ${locationLabel}</p>` : ""}
+      ${deadlineAt ? `<p><strong>희망 마감:</strong> ${deadlineAt}</p>` : ""}
+      ${budgetLabel ? `<p><strong>예산:</strong> ${budgetLabel}</p>` : ""}
+      <p>참여 가능 여부와 세부 조건은 Image Partners 계정에서 확인해 주세요.</p>
+      <p>문의 사항은 ${OPS_EMAIL}으로 연락해 주세요.</p>
       <br><p>Image Partners 팀 드림</p>
     `,
   });

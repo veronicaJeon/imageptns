@@ -11,6 +11,7 @@ export interface PhotoRequestDraft {
   mode: "photo" | null;
   title: string;
   brief: string;
+  location_guidance: string;
   category: string;
   tags: string;
   usage_intent: string;
@@ -72,6 +73,7 @@ export function draftPhotoRequestFromSearchParams(params: URLSearchParams): Phot
       mode: null,
       title: "",
       brief: "",
+      location_guidance: "",
       category: "editorial",
       tags: "",
       usage_intent: "",
@@ -87,13 +89,16 @@ export function draftPhotoRequestFromSearchParams(params: URLSearchParams): Phot
     `카테고리: ${CATEGORY_LABELS[category] ?? "에디토리얼"}`,
     usageLabels.length > 0 ? `희망 사용 조건: ${usageLabels.join(", ")}` : "",
     "검색 결과에서 적합한 사진을 찾지 못해 사진 의뢰로 전환했습니다.",
-    "필요한 장면, 위치, 마감일, 예산은 아래 항목에서 보완해주세요.",
+    "필요한 장면, 촬영 위치, 대상 지역, 마감일, 예산은 아래 항목에서 보완해주세요.",
   ].filter(Boolean);
 
   return {
     mode: "photo",
     title: query ? `${query} 사진 의뢰` : "사진 의뢰",
     brief: lines.join("\n"),
+    location_guidance: query
+      ? "검색어에 지역명이 포함되어 있다면 촬영 위치에는 실제 촬영 지점, 대상 지역에는 작가를 찾을 시/군/구나 권역을 직접 입력해주세요."
+      : "촬영 위치에는 실제 촬영 지점, 대상 지역에는 작가를 찾을 시/군/구나 권역을 입력해주세요.",
     category,
     tags: keywordDraft(query),
     usage_intent: usageLabels.length > 0 ? "검색 조건과 동일한 사용 목적 검토" : "",

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
 import { draftPhotoRequestFromSearchParams } from "@/lib/contact/photo-request-draft";
+import { validatePhotoRequestBuyerFields } from "@/lib/contact/request-fields";
 import { cn } from "@/lib/utils/cn";
 
 type ContactMode = "general" | "photo";
@@ -38,6 +39,15 @@ function numericOrNull(value: string) {
   return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : null;
 }
 
+function dateInputValue(daysFromToday: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromToday);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function ContactPageContent() {
   const { t } = useLang();
   const c = t.contact;
@@ -63,6 +73,7 @@ function ContactPageContent() {
     reference_note: "",
     non_copying_attested: false,
   });
+  const [draftLocationGuidance, setDraftLocationGuidance] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -86,10 +97,16 @@ function ContactPageContent() {
   }, [mode]);
 
   useEffect(() => {
+    if (mode !== "photo" || photoForm.deadline_at) return;
+    setPhotoForm((prev) => ({ ...prev, deadline_at: prev.deadline_at || dateInputValue(14) }));
+  }, [mode, photoForm.deadline_at]);
+
+  useEffect(() => {
     const draft = draftPhotoRequestFromSearchParams(searchParams);
     if (draft.mode !== "photo") return;
 
     setMode("photo");
+    setDraftLocationGuidance(draft.location_guidance);
     setPhotoForm((prev) => ({
       ...prev,
       title: prev.title || draft.title,
@@ -132,21 +149,40 @@ function ContactPageContent() {
       return;
     }
 
-    if (!photoForm.non_copying_attested) {
-      setError("참고 이미지를 그대로 복제하지 않는다는 확인이 필요합니다.");
+    const budgetMin = numericOrNull(photoForm.budget_min_krw);
+    const budgetMax = numericOrNull(photoForm.budget_max_krw);
+
+    if (!photoForm.title.trim()) {
+      setError("의뢰 제목을 입력해주세요. 예: 성수동 카페 외관 및 실내 컷");
+      setLoading(false);
+      return;
+    }
+    if (!photoForm.brief.trim()) {
+      setError("상세 브리프를 입력해주세요. 필요한 장면, 분위기, 납품 형태를 간단히 적어도 괜찮습니다.");
+      setLoading(false);
+      return;
+    }
+    if (!photoForm.location_label.trim()) {
+      setError("촬영 위치를 입력해주세요. 정확한 주소가 아니어도 지역명이나 랜드마크면 됩니다.");
+      setLoading(false);
+      return;
+    }
+    if (splitList(photoForm.target_regions).length === 0) {
+      setError("대상 지역을 입력해주세요. 작가를 찾을 시/군/구나 권역을 쉼표로 구분해 적어주세요.");
       setLoading(false);
       return;
     }
 
-    const budgetMin = numericOrNull(photoForm.budget_min_krw);
-    const budgetMax = numericOrNull(photoForm.budget_max_krw);
-    if (budgetMin === null || budgetMax === null) {
-      setError("예산 범위를 입력해주세요.");
-      setLoading(false);
-      return;
-    }
-    if (budgetMin !== null && budgetMax !== null && budgetMin > budgetMax) {
-      setError("최소 예산은 최대 예산보다 클 수 없습니다.");
+    const buyerValidationError = validatePhotoRequestBuyerFields({
+      usage_intent: photoForm.usage_intent,
+      budget_min_krw: budgetMin,
+      budget_max_krw: budgetMax,
+      deadline_at: photoForm.deadline_at ? `${photoForm.deadline_at}T23:59:59.000Z` : "",
+      reference_url: photoForm.reference_url,
+      non_copying_attested: photoForm.non_copying_attested,
+    });
+    if (buyerValidationError) {
+      setError(buyerValidationError);
       setLoading(false);
       return;
     }
@@ -321,18 +357,24 @@ function ContactPageContent() {
                 </button>
               </form>
             ) : (
-              <form onSubmit={handlePhotoSubmit} className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <form onSubmit={handlePhotoSubmit} noValidate className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 {error && (
                   <div className="rounded-lg border border-error/20 bg-error/10 px-4 py-3 text-sm text-error md:col-span-2">
                     {error}
                   </div>
                 )}
 
+                <div className="md:col-span-2 rounded-lg bg-surface-container-lowest p-4 ring-1 ring-outline-variant">
+                  <p className="text-sm font-semibold text-on-surface">아는 만큼만 적어도 의뢰할 수 있습니다.</p>
+                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                    위치, 예산, 사용 목적은 작가 매칭을 위한 초안입니다. 최종 가격, 권리 조건, 안내 메일 문구는 담당자가 검토합니다.
+                  </p>
+                </div>
+
                 <div className="flex flex-col gap-2 md:col-span-2">
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">의뢰 제목</label>
                   <input
                     type="text"
-                    required
                     value={photoForm.title}
                     onChange={setPhoto("title")}
                     placeholder="예: 성수동 카페 외관 및 실내 컷"
@@ -343,37 +385,49 @@ function ContactPageContent() {
                 <div className="flex flex-col gap-2 md:col-span-2">
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">상세 브리프</label>
                   <textarea
-                    required
                     value={photoForm.brief}
                     onChange={setPhoto("brief")}
                     rows={5}
                     placeholder="필요한 장면, 분위기, 촬영 대상, 납품 형태를 적어주세요."
                     className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-y min-h-32 transition-all"
                   />
+                  <p className="text-xs leading-relaxed text-on-surface-variant">
+                    문장으로 길게 쓰지 않아도 됩니다. 필요한 컷, 분위기, 피해야 할 요소만 적어도 충분합니다.
+                  </p>
                 </div>
+
+                {draftLocationGuidance && (
+                  <div className="md:col-span-2 rounded-lg bg-primary/5 px-4 py-3 text-xs leading-relaxed text-primary ring-1 ring-primary/15">
+                    {draftLocationGuidance}
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">촬영 위치</label>
                   <input
                     type="text"
-                    required
                     value={photoForm.location_label}
                     onChange={setPhoto("location_label")}
                     placeholder="서울 성동구 성수동"
                     className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                   />
+                  <p className="text-xs leading-relaxed text-on-surface-variant">
+                    정확한 주소가 없어도 됩니다. 지역명, 랜드마크, 촬영 장소 성격을 적어주세요.
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">대상 지역</label>
                   <input
                     type="text"
-                    required
                     value={photoForm.target_regions}
                     onChange={setPhoto("target_regions")}
                     placeholder="서울, 성수, 수도권"
                     className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                   />
+                  <p className="text-xs leading-relaxed text-on-surface-variant">
+                    작가를 찾을 지역입니다. 여러 곳이면 쉼표로 구분해주세요.
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -404,7 +458,6 @@ function ContactPageContent() {
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">사용 목적</label>
                   <input
                     type="text"
-                    required
                     value={photoForm.usage_intent}
                     onChange={setPhoto("usage_intent")}
                     placeholder="기사, 캠페인, 웹사이트, 인쇄물 등"
@@ -429,18 +482,20 @@ function ContactPageContent() {
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">희망 마감일</label>
                   <input
                     type="date"
-                    required
                     value={photoForm.deadline_at}
                     onChange={setPhoto("deadline_at")}
+                    min={dateInputValue(1)}
                     className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface outline-none transition-all"
                   />
+                  <p className="text-xs leading-relaxed text-on-surface-variant">
+                    기본값은 2주 뒤입니다. 더 급한 일정이면 담당자가 가능 여부를 확인합니다.
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">최소 예산</label>
                   <input
                     type="number"
-                    required
                     min="0"
                     step="1000"
                     value={photoForm.budget_min_krw}
@@ -454,7 +509,6 @@ function ContactPageContent() {
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">최대 예산</label>
                   <input
                     type="number"
-                    required
                     min="0"
                     step="1000"
                     value={photoForm.budget_max_krw}
@@ -462,6 +516,9 @@ function ContactPageContent() {
                     placeholder="1200000"
                     className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                   />
+                  <p className="text-xs leading-relaxed text-on-surface-variant">
+                    정확한 견적이 아니어도 됩니다. 최종 가격은 작가 조건과 사용 범위를 보고 검토합니다.
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">

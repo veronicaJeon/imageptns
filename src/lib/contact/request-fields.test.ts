@@ -5,6 +5,7 @@ import {
   normalizeContactSubmissionInput,
   normalizeInquiryType,
   normalizePhotoRequestStatus,
+  validatePhotoRequestBuyerFields,
   normalizeReferenceUrl,
   normalizeTargetRegions,
 } from "./request-fields";
@@ -178,5 +179,62 @@ describe("normalizeContactSubmissionInput", () => {
       budget_min_krw: 150000,
       deadline_at: "2026-05-19T23:59:59.000Z",
     }, NOW)).toThrow("deadline_at");
+  });
+});
+
+describe("validatePhotoRequestBuyerFields", () => {
+  const base = {
+    usage_intent: "웹사이트 상세 페이지",
+    budget_min_krw: 100000,
+    budget_max_krw: 300000,
+    deadline_at: "2026-06-10T23:59:59.000Z",
+    reference_url: "https://example.com/reference",
+    non_copying_attested: true,
+  };
+
+  it("accepts a complete buyer-facing photo request validation set", () => {
+    expect(validatePhotoRequestBuyerFields(base, NOW)).toBeNull();
+  });
+
+  it("explains budget validation in Korean", () => {
+    expect(validatePhotoRequestBuyerFields({
+      ...base,
+      budget_min_krw: null,
+    }, NOW)).toBe("예산 범위를 원화 숫자로 입력해주세요. 아직 정확하지 않아도 대략적인 최소/최대 금액이면 됩니다.");
+
+    expect(validatePhotoRequestBuyerFields({
+      ...base,
+      budget_min_krw: 400000,
+      budget_max_krw: 300000,
+    }, NOW)).toBe("최소 예산은 최대 예산보다 클 수 없습니다. 예산 범위를 다시 확인해주세요.");
+  });
+
+  it("explains deadline and usage intent validation in Korean", () => {
+    expect(validatePhotoRequestBuyerFields({
+      ...base,
+      usage_intent: "",
+    }, NOW)).toBe("사용 목적을 입력해주세요. 예: 웹사이트, 기사, 캠페인, 인쇄물, 내부 자료");
+
+    expect(validatePhotoRequestBuyerFields({
+      ...base,
+      usage_intent: "웹".repeat(501),
+    }, NOW)).toBe("사용 목적은 500자 이내로 입력해주세요.");
+
+    expect(validatePhotoRequestBuyerFields({
+      ...base,
+      deadline_at: "2026-05-19T23:59:59.000Z",
+    }, NOW)).toBe("희망 마감일은 오늘 이후 날짜로 선택해주세요.");
+  });
+
+  it("explains reference URL and non-copying confirmation validation in Korean", () => {
+    expect(validatePhotoRequestBuyerFields({
+      ...base,
+      reference_url: "ftp://example.com/reference",
+    }, NOW)).toBe("참고 URL은 http:// 또는 https://로 시작하는 웹 주소만 입력할 수 있습니다.");
+
+    expect(validatePhotoRequestBuyerFields({
+      ...base,
+      non_copying_attested: false,
+    }, NOW)).toBe("참고 이미지를 그대로 복제하거나 혼동될 정도로 유사한 결과물을 요구하지 않는다는 확인이 필요합니다.");
   });
 });

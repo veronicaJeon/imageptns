@@ -57,6 +57,20 @@ const PRIORITY_LABELS: Record<string, string> = {
   urgent: "긴급",
 };
 
+const MATCH_STATUS_STYLES: Record<string, string> = {
+  candidate: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300",
+  invited: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300",
+  interested: "bg-primary/10 text-primary",
+  declined: "bg-surface-container text-outline",
+};
+
+const MATCH_STATUS_LABELS: Record<string, string> = {
+  candidate: "후보",
+  invited: "초대됨",
+  interested: "관심 있음",
+  declined: "거절",
+};
+
 interface PhotoMatch {
   id: string;
   photographer_id: string;
@@ -105,7 +119,9 @@ interface SupportSubmission {
 
 function formatDate(iso?: string | null) {
   if (!iso) return "-";
-  return new Date(iso).toLocaleString("ko-KR", {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("ko-KR", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -127,6 +143,20 @@ function formatBudget(request: PhotoRequestDetail) {
   return request.budget_min_krw != null
     ? `${formatKRW(request.budget_min_krw)} 이상`
     : `${formatKRW(request.budget_max_krw)} 이하`;
+}
+
+function displayList(values?: string[] | null) {
+  return (values ?? []).filter(Boolean);
+}
+
+function shortId(value: string) {
+  return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
+}
+
+function candidateMatchIds(matches?: PhotoMatch[] | null) {
+  return (matches ?? [])
+    .filter((match) => match.status === "candidate")
+    .map((match) => match.id);
 }
 
 export default function AdminSupportPage() {
@@ -170,16 +200,16 @@ export default function AdminSupportPage() {
   ) {
     setActioning(submission.id);
     try {
+      const body: Record<string, unknown> = { id: submission.id };
+      if (patch.status !== undefined) body.status = patch.status;
+      if (patch.priority !== undefined) body.priority = patch.priority;
+      if (patch.admin_note !== undefined) body.admin_note = patch.admin_note;
+      if (patch.assigned_to !== undefined) body.assigned_to = patch.assigned_to;
+
       const res = await fetch("/api/admin/support", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: submission.id,
-          status: patch.status ?? submission.status,
-          priority: patch.priority ?? submission.priority ?? "normal",
-          admin_note: patch.admin_note ?? notes[submission.id] ?? "",
-          assigned_to: patch.assigned_to ?? submission.assigned_to ?? null,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (res.status === 403) {
@@ -193,15 +223,7 @@ export default function AdminSupportPage() {
 
       const { submission: updated } = await res.json() as { submission: SupportSubmission };
       setNotes((prev) => ({ ...prev, [updated.id]: updated.admin_note ?? "" }));
-
-      if (tab !== "all" && updated.status !== tab) {
-        setSubmissions((prev) => prev.filter((row) => row.id !== updated.id));
-        return;
-      }
-
-      setSubmissions((prev) =>
-        prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row))
-      );
+      await fetchSubmissions(tab, kind);
     } catch (error) {
       alert(error instanceof Error ? error.message : "문의 상태를 저장하지 못했습니다.");
     } finally {
@@ -231,6 +253,45 @@ export default function AdminSupportPage() {
       await fetchSubmissions(tab, kind);
     } catch (error) {
       alert(error instanceof Error ? error.message : "사진가 매칭에 실패했습니다.");
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  async function sendInvites(submission: SupportSubmission) {
+    if (submission.kind !== "photo_request") return;
+    const matchIds = candidateMatchIds(submission.photo_request?.matches);
+    if (matchIds.length === 0) {
+      alert("초대할 후보가 없습니다. 후보를 먼저 생성하거나 이미 초대된 후보 상태를 확인하세요.");
+      return;
+    }
+
+    setActioning(submission.id);
+    try {
+      const res = await fetch("/api/admin/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_photo_request_invites",
+          requestId: submission.id,
+          matchIds,
+        }),
+      });
+      if (res.status === 403) {
+        setForbidden(true);
+        return;
+      }
+      const body = await res.json().catch(() => null) as {
+        error?: string;
+        sent?: number;
+        invited?: number;
+        skipped?: unknown[];
+      } | null;
+      if (!res.ok) throw new Error(body?.error ?? "사진가 초대 메일 발송에 실패했습니다.");
+      alert(`초대 메일 ${body?.sent ?? 0}건을 발송했고, 후보 ${body?.invited ?? 0}명을 초대 상태로 변경했습니다.${body?.skipped?.length ? ` 스킵 ${body.skipped.length}건` : ""}`);
+      await fetchSubmissions(tab, kind);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "사진가 초대 메일 발송에 실패했습니다.");
     } finally {
       setActioning(null);
     }
@@ -311,14 +372,21 @@ export default function AdminSupportPage() {
             const isPhotoRequest = submission.kind === "photo_request";
             const photoRequest = submission.photo_request;
             const matchCount = photoRequest?.matches?.length ?? 0;
+            const candidateCount = candidateMatchIds(photoRequest?.matches).length;
 
             return (
-              <div key={submission.id} className="bg-surface-container-lowest shadow-ghost rounded-xl overflow-hidden">
+              <div
+                key={submission.id}
+                className={cn(
+                  "bg-surface-container-lowest shadow-ghost rounded-xl overflow-hidden border",
+                  isPhotoRequest ? "border-primary/30 border-l-4" : "border-transparent"
+                )}
+              >
                 <div className="p-5 flex flex-col gap-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="material-symbols-outlined text-base text-on-surface-variant">
+                        <span className={cn("material-symbols-outlined text-base", isPhotoRequest ? "text-primary" : "text-on-surface-variant")}>
                           {isPhotoRequest ? "add_photo_alternate" : "person"}
                         </span>
                         <h2 className="font-headline font-bold text-base text-on-surface truncate">
@@ -355,6 +423,9 @@ export default function AdminSupportPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
+                    {isPhotoRequest && (
+                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary">Photo Request Ops</p>
+                    )}
                     <p className="font-semibold text-on-surface">{submission.subject || "제목 없음"}</p>
                     <p className="text-sm text-on-surface-variant leading-relaxed whitespace-pre-wrap">
                       {submission.message || "내용 없음"}
@@ -362,7 +433,28 @@ export default function AdminSupportPage() {
                   </div>
 
                   {isPhotoRequest && photoRequest && (
-                    <div className="grid grid-cols-1 gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-low p-4 text-sm md:grid-cols-3">
+                    <div className="rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">의뢰 운영 정보</p>
+                          <p className="mt-1 text-xs text-on-surface-variant">request_status: {submission.status}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold", STATUS_STYLES[submission.status] ?? "bg-surface-container text-outline")}>
+                            {STATUS_LABELS[submission.status] ?? submission.status}
+                          </span>
+                          <span className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
+                            후보 {matchCount}명
+                          </span>
+                          {candidateCount > 0 && (
+                            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-600 dark:bg-amber-900/20 dark:text-amber-300">
+                              초대 가능 {candidateCount}명
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-outline">위치</p>
                         <p className="mt-1 text-on-surface">{photoRequest.location_label ?? "-"}</p>
@@ -380,46 +472,117 @@ export default function AdminSupportPage() {
                         <p className="mt-1 text-on-surface">{formatBudget(photoRequest)}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">라이선스</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 목적</p>
+                        <p className="mt-1 text-on-surface">{photoRequest.usage_intent ?? "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">라이선스 의도</p>
                         <p className="mt-1 text-on-surface">{photoRequest.license_intent ?? "-"}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">매칭</p>
-                        <p className="mt-1 text-on-surface">{matchCount}명</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">원본성 확인</p>
+                        <p className="mt-1 text-on-surface">{photoRequest.non_copying_attested ? "확인됨" : "-"}</p>
                       </div>
-                      <div className="md:col-span-3">
+                      <div className="md:col-span-4">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-outline">대상 지역</p>
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                          {(photoRequest.target_regions ?? []).length > 0 ? photoRequest.target_regions?.map((region) => (
+                          {displayList(photoRequest.target_regions).length > 0 ? displayList(photoRequest.target_regions).map((region) => (
                             <span key={region} className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
                               {region}
                             </span>
                           )) : <span className="text-xs text-outline">-</span>}
                         </div>
                       </div>
-                      {(photoRequest.tags ?? []).length > 0 && (
-                        <div className="md:col-span-3">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">태그</p>
-                          <p className="mt-1 text-on-surface-variant">{photoRequest.tags?.join(", ")}</p>
+                      <div className="md:col-span-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">태그</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {displayList(photoRequest.tags).length > 0 ? displayList(photoRequest.tags).map((tag) => (
+                            <span key={tag} className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
+                              #{tag}
+                            </span>
+                          )) : <span className="text-xs text-outline">-</span>}
                         </div>
-                      )}
-                      {photoRequest.usage_intent && (
-                        <div className="md:col-span-3">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 목적</p>
-                          <p className="mt-1 text-on-surface-variant">{photoRequest.usage_intent}</p>
-                        </div>
-                      )}
-                      {(photoRequest.reference_url || photoRequest.reference_note) && (
-                        <div className="md:col-span-3">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">참고 자료</p>
+                      </div>
+                      {(photoRequest.reference_url || photoRequest.reference_note) ? (
+                        <div className="md:col-span-4">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">참고 URL/메모</p>
                           {photoRequest.reference_url && (
-                            <a href={photoRequest.reference_url} target="_blank" rel="noreferrer" className="mt-1 block text-primary hover:underline">
+                            <a href={photoRequest.reference_url} target="_blank" rel="noreferrer" className="mt-1 block break-all text-primary hover:underline">
                               {photoRequest.reference_url}
                             </a>
                           )}
                           {photoRequest.reference_note && (
-                            <p className="mt-1 text-on-surface-variant">{photoRequest.reference_note}</p>
+                            <p className="mt-1 text-on-surface-variant whitespace-pre-wrap">{photoRequest.reference_note}</p>
                           )}
+                        </div>
+                      ) : (
+                        <div className="md:col-span-4">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">참고 URL/메모</p>
+                          <p className="mt-1 text-xs text-outline">-</p>
+                        </div>
+                      )}
+                      </div>
+                    </div>
+                  )}
+
+                  {isPhotoRequest && photoRequest && (
+                    <div className="rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">후보 사진가 매칭</p>
+                        <button
+                          onClick={() => createMatches(submission)}
+                          disabled={isBusy}
+                          className="flex items-center gap-1.5 rounded border border-primary/40 bg-surface-container-lowest px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+                        >
+                          {isBusy ? (
+                            <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <span className="material-symbols-outlined text-sm">hub</span>
+                          )}
+                          {matchCount > 0 ? "후보 재생성" : "후보 생성"}
+                        </button>
+                        {candidateCount > 0 && (
+                          <button
+                            onClick={() => sendInvites(submission)}
+                            disabled={isBusy}
+                            className="flex items-center gap-1.5 rounded bg-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                          >
+                            {isBusy ? (
+                              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <span className="material-symbols-outlined text-sm">outgoing_mail</span>
+                            )}
+                            후보 초대 메일 발송
+                          </button>
+                        )}
+                      </div>
+
+                      {matchCount === 0 ? (
+                        <p className="text-sm text-outline">아직 생성된 후보가 없습니다. 대상 지역 기반으로 후보를 생성하세요.</p>
+                      ) : (
+                        <div className="divide-y divide-outline-variant/30 overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest">
+                          {photoRequest.matches.map((match) => (
+                            <div key={match.id} className="grid grid-cols-1 gap-2 p-3 text-sm md:grid-cols-[minmax(0,1fr)_88px_minmax(0,2fr)] md:items-start">
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-outline">photographer_id</p>
+                                <p className="mt-1 font-mono text-xs text-on-surface" title={match.photographer_id}>
+                                  {shortId(match.photographer_id)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-outline">점수</p>
+                                <p className="mt-1 font-bold text-on-surface">{match.score ?? "-"}</p>
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold", MATCH_STATUS_STYLES[match.status] ?? "bg-surface-container text-outline")}>
+                                    {MATCH_STATUS_LABELS[match.status] ?? match.status}
+                                  </span>
+                                  <p className="min-w-0 text-on-surface-variant">{match.reason || "매칭 사유 없음"}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -444,48 +607,33 @@ export default function AdminSupportPage() {
                     )}
                   </div>
 
-                  {!isPhotoRequest && (
-                    <div className="flex flex-col gap-2 p-3 bg-surface-container-low border border-outline-variant/30 rounded-lg">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-outline">관리자 메모</label>
-                      <textarea
-                        value={noteValue}
-                        onChange={(e) => setNotes((prev) => ({ ...prev, [submission.id]: e.target.value }))}
-                        rows={3}
-                        placeholder="처리 내용, 후속 조치, 내부 공유 메모를 입력하세요"
-                        className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-3 py-2 text-sm text-on-surface placeholder:text-outline outline-none resize-y min-h-24"
-                      />
-                      <div className="flex justify-end">
-                        <button
-                          onClick={() => updateSubmission(submission, { admin_note: noteValue })}
-                          disabled={isBusy}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-surface-container-lowest border border-outline-variant text-xs font-bold text-on-surface-variant rounded hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
-                        >
-                          {isBusy ? (
-                            <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <span className="material-symbols-outlined text-sm">save</span>
-                          )}
-                          메모 저장
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 flex-wrap">
-                    {isPhotoRequest ? (
+                  <div className="flex flex-col gap-2 p-3 bg-surface-container-low border border-outline-variant/30 rounded-lg">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">관리자 메모</label>
+                    <textarea
+                      value={noteValue}
+                      onChange={(e) => setNotes((prev) => ({ ...prev, [submission.id]: e.target.value }))}
+                      rows={3}
+                      placeholder="처리 내용, 후속 조치, 내부 공유 메모를 입력하세요"
+                      className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-3 py-2 text-sm text-on-surface placeholder:text-outline outline-none resize-y min-h-24"
+                    />
+                    <div className="flex justify-end">
                       <button
-                        onClick={() => createMatches(submission)}
+                        onClick={() => updateSubmission(submission, { admin_note: noteValue })}
                         disabled={isBusy}
-                        className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-4 py-2 bg-surface-container-lowest border border-outline-variant text-xs font-bold text-on-surface-variant rounded hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
                       >
                         {isBusy ? (
-                          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                         ) : (
-                          <span className="material-symbols-outlined text-sm">hub</span>
+                          <span className="material-symbols-outlined text-sm">save</span>
                         )}
-                        지역 기반 매칭
+                        메모 저장
                       </button>
-                    ) : submission.status !== "in_progress" && (
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 flex-wrap">
+                    {submission.status_group !== "in_progress" && (
                       <button
                         onClick={() => updateSubmission(submission, { status: "in_progress" })}
                         disabled={isBusy}
@@ -496,10 +644,10 @@ export default function AdminSupportPage() {
                         ) : (
                           <span className="material-symbols-outlined text-sm">support_agent</span>
                         )}
-                        처리 중
+                        {isPhotoRequest ? "검토 시작" : "처리 중"}
                       </button>
                     )}
-                    {!isPhotoRequest && submission.status !== "resolved" && (
+                    {submission.status_group !== "resolved" && (
                       <button
                         onClick={() => updateSubmission(submission, { status: "resolved" })}
                         disabled={isBusy}
@@ -510,7 +658,21 @@ export default function AdminSupportPage() {
                         ) : (
                           <span className="material-symbols-outlined text-sm">check_circle</span>
                         )}
-                        해결
+                        {isPhotoRequest ? "의뢰 완료" : "해결"}
+                      </button>
+                    )}
+                    {isPhotoRequest && submission.status_group !== "pending" && (
+                      <button
+                        onClick={() => updateSubmission(submission, { status: "pending" })}
+                        disabled={isBusy}
+                        className="flex items-center gap-1.5 px-5 py-2.5 border border-outline-variant text-on-surface-variant text-xs font-bold uppercase tracking-widest rounded hover:border-amber-500 hover:text-amber-600 transition-colors disabled:opacity-50"
+                      >
+                        {isBusy ? (
+                          <span className="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <span className="material-symbols-outlined text-sm">undo</span>
+                        )}
+                        접수로 되돌림
                       </button>
                     )}
                   </div>

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordAdminAuditLog } from "@/lib/admin/audit";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
+import { buildPhotoRequestInviteRecipients, formatPhotoRequestBudget } from "@/lib/contact/photo-request-invites";
+import { sendPhotoRequestInviteEmails } from "@/lib/email/contact";
+import { sendPhotoRequestInvite } from "@/lib/email/resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type SupportKind = "all" | "general" | "photo";
@@ -52,6 +55,19 @@ interface PhotographerProfileRow {
   full_name: string | null;
   primary_activity_regions: string[] | null;
 }
+
+interface PhotoRequestInviteMatchRow {
+  id: string;
+  photographer_id: string;
+  status: string;
+}
+
+type SupportPostBody = {
+  action?: unknown;
+  requestId?: unknown;
+  limit?: unknown;
+  matchIds?: unknown;
+};
 
 function first<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
@@ -300,11 +316,11 @@ export async function POST(req: NextRequest) {
   const adminUser = await requireAdminUser();
   if (!adminUser) return forbidden();
 
-  const body = await req.json().catch(() => null) as {
-    action?: unknown;
-    requestId?: unknown;
-    limit?: unknown;
-  } | null;
+  const body = await req.json().catch(() => null) as SupportPostBody | null;
+
+  if (body?.action === "send_photo_request_invites") {
+    return sendPhotoRequestInvites(body, adminUser.id);
+  }
 
   if (body?.action !== "create_photo_request_matches") {
     return NextResponse.json({ error: "Unsupported support action" }, { status: 400 });
@@ -410,5 +426,152 @@ export async function POST(req: NextRequest) {
     matches: matches ?? [],
     inserted: rows.length,
     skipped: candidates.length - rows.length,
+  });
+}
+
+async function sendPhotoRequestInvites(body: SupportPostBody, adminUserId: string) {
+  const requestId = typeof body.requestId === "string" ? body.requestId.trim() : "";
+  if (!requestId) return NextResponse.json({ error: "requestId is required" }, { status: 400 });
+
+  const matchIds = Array.from(new Set(
+    Array.isArray(body.matchIds)
+      ? body.matchIds
+        .map((matchId) => typeof matchId === "string" ? matchId.trim() : "")
+        .filter(Boolean)
+      : [],
+  ));
+  if (matchIds.length === 0) {
+    return NextResponse.json({ error: "matchIds is required" }, { status: 400 });
+  }
+  if (matchIds.length > 50) {
+    return NextResponse.json({ error: "matchIds must include 50 items or fewer" }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const { data: requestData, error: requestError } = await admin
+    .from("contact_submissions")
+    .select("id, subject, request_status, location_label, budget_min_krw, budget_max_krw, deadline_at")
+    .eq("id", requestId)
+    .eq("inquiry_type", "photo_request")
+    .single();
+
+  if (requestError || !requestData) {
+    return NextResponse.json({ error: "Photo request not found" }, { status: 404 });
+  }
+
+  const requestRow = requestData as Pick<
+    ContactSubmissionRow,
+    "id" | "subject" | "request_status" | "location_label" | "budget_min_krw" | "budget_max_krw" | "deadline_at"
+  >;
+  if (["fulfilled", "cancelled", "rejected"].includes(requestRow.request_status ?? "")) {
+    return NextResponse.json(
+      { error: "Photo request is not open for invites" },
+      { status: 409 },
+    );
+  }
+
+  const { data: matchData, error: matchError } = await admin
+    .from("photo_request_matches")
+    .select("id, photographer_id, status")
+    .eq("contact_submission_id", requestId)
+    .in("id", matchIds);
+
+  if (matchError) return NextResponse.json({ error: matchError.message }, { status: 500 });
+
+  const matches = (matchData ?? []) as PhotoRequestInviteMatchRow[];
+  const foundMatchIds = new Set(matches.map((match) => match.id));
+  const missing = matchIds
+    .filter((matchId) => !foundMatchIds.has(matchId))
+    .map((matchId) => ({ matchId, status: null, reason: "not_found" }));
+
+  const photographerIds = Array.from(new Set(matches.map((match) => match.photographer_id)));
+  const { data: profileData, error: profileError } = photographerIds.length > 0
+    ? await admin
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", photographerIds)
+    : { data: [], error: null };
+
+  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
+
+  const namesById = new Map(
+    ((profileData ?? []) as Pick<PhotographerProfileRow, "id" | "full_name">[])
+      .map((profile) => [profile.id, profile.full_name] as const),
+  );
+  const emailsById = new Map<string, string | null>();
+  await Promise.all(photographerIds.map(async (photographerId) => {
+    const { data } = await admin.auth.admin.getUserById(photographerId);
+    emailsById.set(photographerId, data.user?.email ?? null);
+  }));
+
+  const { recipients, skipped } = buildPhotoRequestInviteRecipients(
+    matches.map((match) => ({
+      ...match,
+      photographerEmail: emailsById.get(match.photographer_id) ?? null,
+      photographerName: namesById.get(match.photographer_id) ?? null,
+    })),
+  );
+
+  if (recipients.length === 0) {
+    return NextResponse.json({ sent: 0, invited: 0, skipped: [...skipped, ...missing] });
+  }
+
+  const budgetLabel = formatPhotoRequestBudget(requestRow.budget_min_krw, requestRow.budget_max_krw);
+  const requestTitle = requestRow.subject?.trim() || "사진 의뢰";
+  const payloads = recipients.map((recipient) => ({
+    photographerEmail: recipient.photographerEmail,
+    photographerName: recipient.photographerName,
+    requestId,
+    requestTitle,
+    locationLabel: requestRow.location_label,
+    deadlineAt: requestRow.deadline_at,
+    budgetLabel,
+  }));
+
+  try {
+    await sendPhotoRequestInviteEmails(payloads, sendPhotoRequestInvite);
+  } catch (emailError) {
+    console.error("[admin/support] photo request invite delivery failed", emailError);
+    return NextResponse.json(
+      { error: "Photo request invites were not fully delivered" },
+      { status: 502 },
+    );
+  }
+
+  const now = new Date().toISOString();
+  const { data: updatedMatches, error: updateError } = await admin
+    .from("photo_request_matches")
+    .update({ status: "invited", updated_at: now })
+    .eq("contact_submission_id", requestId)
+    .in("id", recipients.map((recipient) => recipient.matchId))
+    .eq("status", "candidate")
+    .select("id");
+
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+
+  await admin
+    .from("contact_submissions")
+    .update({ request_status: "in_progress", status: "in_progress", updated_at: now })
+    .eq("id", requestId)
+    .in("request_status", ["submitted", "matching", "in_progress"]);
+
+  await recordAdminAuditLog(admin, {
+    actorId: adminUserId,
+    action: "photo_request.invites_sent",
+    targetType: "contact_submission",
+    targetId: requestId,
+    targetLabel: requestTitle,
+    before: { request: requestRow, matchIds },
+    after: {
+      invited: (updatedMatches ?? []).length,
+      sent: recipients.length,
+      skipped: [...skipped, ...missing],
+    },
+  });
+
+  return NextResponse.json({
+    sent: recipients.length,
+    invited: (updatedMatches ?? []).length,
+    skipped: [...skipped, ...missing],
   });
 }
