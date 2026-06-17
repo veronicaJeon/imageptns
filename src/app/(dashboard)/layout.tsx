@@ -13,6 +13,7 @@ type NavItem = { href: string; icon: string; key: string; label?: string };
 
 const NAV_ITEMS_BUYER: NavItem[] = [
   { href: "/dashboard",           icon: "grid_view",        key: "overview"   },
+  { href: "/dashboard/sourcing",  icon: "travel_explore",   key: "sourcing", label: "내 소싱 요청" },
   { href: "/dashboard/favorites", icon: "favorite",         key: "favorites"  },
   { href: "/dashboard/orders",    icon: "receipt_long",     key: "orders"     },
   { href: "/dashboard/settings",  icon: "settings",         key: "settings"   },
