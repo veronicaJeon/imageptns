@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { buyerUsageConditions, creditLineForPhotographerId } from "@/lib/licenses/creative-commons";
 import { useCart } from "@/lib/store/cart";
 import { revisionLimitNotice } from "@/lib/sourcing/status";
@@ -20,6 +20,16 @@ const RIGHTS_LABELS: Record<string, string> = {
   unverified: "확인 불가",
   not_recommended: "사용 비권장",
 };
+
+const REVISION_REASONS = [
+  { value: "wrong_location", label: "장소가 다름" },
+  { value: "wrong_season_or_time", label: "계절/시간대가 다름" },
+  { value: "wrong_composition", label: "구도/거리감이 다름" },
+  { value: "usage_terms_do_not_fit", label: "상업 사용 조건이 맞지 않음" },
+  { value: "price_does_not_fit", label: "가격이 맞지 않음" },
+  { value: "need_more_candidates", label: "더 많은 후보가 필요함" },
+  { value: "other", label: "기타" },
+] as const;
 
 interface CandidateImage {
   id: string;
@@ -70,9 +80,11 @@ export default function BuyerSourcingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [cartAdded, setCartAdded] = useState<string | null>(null);
+  const [revisionDrafts, setRevisionDrafts] = useState<Record<string, { reasons: string[]; message: string }>>({});
+  const [submittingRevisionId, setSubmittingRevisionId] = useState<string | null>(null);
   const addItem = useCart((state) => state.addItem);
 
-  useEffect(() => {
+  const loadRequests = useCallback(() => {
     let mounted = true;
     fetch("/api/sourcing/requests")
       .then(async (res) => {
@@ -88,6 +100,8 @@ export default function BuyerSourcingPage() {
       });
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => loadRequests(), [loadRequests]);
 
   const requestCount = useMemo(() => requests.length, [requests]);
 
@@ -109,6 +123,37 @@ export default function BuyerSourcingPage() {
     });
     setCartAdded(image.id);
     window.setTimeout(() => setCartAdded(null), 1400);
+  }
+
+  function toggleRevisionReason(requestId: string, reason: string, checked: boolean) {
+    setRevisionDrafts((prev) => {
+      const current = prev[requestId] ?? { reasons: [], message: "" };
+      const reasons = checked
+        ? Array.from(new Set([...current.reasons, reason]))
+        : current.reasons.filter((value) => value !== reason);
+      return { ...prev, [requestId]: { ...current, reasons } };
+    });
+  }
+
+  async function submitRevision(request: SourcingRequest) {
+    const draft = revisionDrafts[request.id] ?? { reasons: [], message: "" };
+    setSubmittingRevisionId(request.id);
+    try {
+      const res = await fetch(`/api/sourcing/requests/${request.id}/revision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      const body = await res.json().catch(() => null) as { error?: string } | null;
+      if (!res.ok) throw new Error(body?.error ?? "수정요청을 보내지 못했습니다.");
+      setRevisionDrafts((prev) => ({ ...prev, [request.id]: { reasons: [], message: "" } }));
+      setLoading(true);
+      loadRequests();
+    } catch (submitError) {
+      alert(submitError instanceof Error ? submitError.message : "수정요청을 보내지 못했습니다.");
+    } finally {
+      setSubmittingRevisionId(null);
+    }
   }
 
   return (
@@ -141,6 +186,9 @@ export default function BuyerSourcingPage() {
             const answer = latestAnswer(request.answers);
             const candidates = answer?.candidates?.filter((candidate) => candidate.image) ?? [];
             const status = request.buyer_sourcing_status ?? "received";
+            const revisionCount = request.revisions?.length ?? 0;
+            const revisionDraft = revisionDrafts[request.id] ?? { reasons: [], message: "" };
+            const canRevise = !!answer && status === "answer_ready" && revisionCount < 3;
             return (
               <article key={request.id} className="rounded-xl bg-surface-container-lowest p-5 shadow-ghost">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -223,7 +271,50 @@ export default function BuyerSourcingPage() {
                   </div>
                 )}
 
-                <p className="mt-5 text-xs text-outline">{revisionLimitNotice}</p>
+                <div className="mt-5 rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
+                  <p className="text-xs text-outline">{revisionLimitNotice}</p>
+                  {canRevise ? (
+                    <div className="mt-3 flex flex-col gap-3">
+                      <div className="flex flex-wrap gap-2">
+                        {REVISION_REASONS.map((reason) => (
+                          <label key={reason.value} className="flex items-center gap-2 rounded-full bg-surface-container-lowest px-3 py-2 text-[10px] font-bold text-on-surface-variant">
+                            <input
+                              type="checkbox"
+                              checked={revisionDraft.reasons.includes(reason.value)}
+                              onChange={(event) => toggleRevisionReason(request.id, reason.value, event.target.checked)}
+                              className="h-3.5 w-3.5 accent-primary"
+                            />
+                            {reason.label}
+                          </label>
+                        ))}
+                      </div>
+                      <textarea
+                        value={revisionDraft.message}
+                        onChange={(event) => setRevisionDrafts((prev) => ({
+                          ...prev,
+                          [request.id]: { reasons: revisionDraft.reasons, message: event.target.value },
+                        }))}
+                        rows={3}
+                        placeholder="원하는 수정 방향을 적어주세요."
+                        className="rounded-lg bg-surface-container-lowest px-3 py-2 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                      />
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => submitRevision(request)}
+                          disabled={submittingRevisionId === request.id}
+                          className="rounded bg-primary px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-50"
+                        >
+                          {submittingRevisionId === request.id ? "전송 중" : `수정요청 보내기 (${revisionCount}/3)`}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-outline">
+                      현재 수정요청을 보낼 수 없습니다. 답변 공개 전이거나 수정요청 한도에 도달했습니다.
+                    </p>
+                  )}
+                </div>
               </article>
             );
           })}
