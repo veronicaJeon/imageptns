@@ -36,10 +36,22 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = await createClient();
+  let buyerId: string | null = null;
+
+  if (submission.inquiry_type === "photo_request") {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "이미지 소싱 요청은 로그인 후 접수할 수 있습니다." },
+        { status: 401 },
+      );
+    }
+    buyerId = user.id;
+  }
 
   const { error } = await supabase
     .from("contact_submissions")
-    .insert(submission);
+    .insert({ ...submission, buyer_id: buyerId });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

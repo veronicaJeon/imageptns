@@ -18,6 +18,8 @@ export const PHOTO_REQUEST_MATCH_STATUSES = [
   "cancelled",
 ] as const;
 
+export const SOURCING_PURPOSES = ["rights_check", "similar_search", "supply_check"] as const;
+
 const MAX_REGIONS = 12;
 const MAX_REGION_LENGTH = 80;
 const MAX_TAGS = 20;
@@ -29,6 +31,7 @@ const MAX_DEADLINE_YEARS_AHEAD = 2;
 export type InquiryType = (typeof INQUIRY_TYPES)[number];
 export type PhotoRequestStatus = (typeof PHOTO_REQUEST_STATUSES)[number];
 export type PhotoRequestMatchStatus = (typeof PHOTO_REQUEST_MATCH_STATUSES)[number];
+export type SourcingPurpose = (typeof SOURCING_PURPOSES)[number];
 
 export interface NormalizedContactSubmission {
   name: string;
@@ -48,6 +51,10 @@ export interface NormalizedContactSubmission {
   reference_url: string | null;
   reference_note: string | null;
   non_copying_attested: boolean;
+  buyer_id: string | null;
+  sourcing_purposes: SourcingPurpose[];
+  internal_sourcing_status: "submitted";
+  buyer_sourcing_status: "received";
   request_status: "submitted";
 }
 
@@ -192,6 +199,29 @@ function normalizeTags(value: unknown): string[] {
   return tags;
 }
 
+export function normalizeSourcingPurposes(value: unknown): SourcingPurpose[] {
+  const raw = Array.isArray(value) ? value : [];
+  const purposes: SourcingPurpose[] = [];
+  const seen = new Set<string>();
+
+  for (const item of raw) {
+    if (typeof item !== "string") {
+      throw new Error("sourcing_purposes must be a list of labels");
+    }
+
+    const purpose = item.trim();
+    if (!purpose) continue;
+    if (!hasValue(SOURCING_PURPOSES, purpose)) {
+      throw new Error("sourcing_purposes contains unsupported values");
+    }
+    if (seen.has(purpose)) continue;
+    seen.add(purpose);
+    purposes.push(purpose);
+  }
+
+  return purposes.length > 0 ? purposes : ["similar_search"];
+}
+
 function normalizeBudgetRange(minValue: unknown, maxValue: unknown): {
   budget_min_krw: number;
   budget_max_krw: number;
@@ -325,6 +355,7 @@ export function normalizeContactSubmissionInput(
     subject: normalizeText(body.subject, "subject", 160),
     message: normalizeText(body.message, "message", 5000),
     inquiry_type,
+    buyer_id: null,
     request_status: "submitted" as const,
   };
 
@@ -343,6 +374,9 @@ export function normalizeContactSubmissionInput(
       reference_url: null,
       reference_note: null,
       non_copying_attested: false,
+      sourcing_purposes: [],
+      internal_sourcing_status: "submitted",
+      buyer_sourcing_status: "received",
     };
   }
 
@@ -365,5 +399,8 @@ export function normalizeContactSubmissionInput(
     reference_url: normalizeReferenceUrl(body.reference_url),
     reference_note: normalizeOptionalText(body.reference_note, "reference_note", 1000),
     non_copying_attested: true,
+    sourcing_purposes: normalizeSourcingPurposes(body.sourcing_purposes),
+    internal_sourcing_status: "submitted",
+    buyer_sourcing_status: "received",
   };
 }

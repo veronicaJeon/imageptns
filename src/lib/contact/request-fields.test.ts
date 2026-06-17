@@ -5,6 +5,7 @@ import {
   normalizeContactSubmissionInput,
   normalizeInquiryType,
   normalizePhotoRequestStatus,
+  normalizeSourcingPurposes,
   validatePhotoRequestBuyerFields,
   normalizeReferenceUrl,
   normalizeTargetRegions,
@@ -44,6 +45,23 @@ describe("normalizeTargetRegions", () => {
     expect(() => normalizeTargetRegions(["Seoul", 123])).toThrow("target_regions");
     expect(() => normalizeTargetRegions(["S".repeat(81)])).toThrow("target_regions");
     expect(() => normalizeTargetRegions(Array.from({ length: 13 }, (_, index) => `Region ${index}`))).toThrow("target_regions");
+  });
+});
+
+describe("normalizeSourcingPurposes", () => {
+  it("normalizes unique supported sourcing purposes", () => {
+    expect(normalizeSourcingPurposes(["rights_check", "similar_search", "rights_check"])).toEqual([
+      "rights_check",
+      "similar_search",
+    ]);
+  });
+
+  it("defaults empty purpose input to similar search", () => {
+    expect(normalizeSourcingPurposes(undefined)).toEqual(["similar_search"]);
+  });
+
+  it("rejects unsupported purpose values", () => {
+    expect(() => normalizeSourcingPurposes(["photographer_matching"])).toThrow("sourcing_purposes");
   });
 });
 
@@ -93,6 +111,10 @@ describe("normalizeContactSubmissionInput", () => {
       reference_url: null,
       reference_note: null,
       non_copying_attested: false,
+      buyer_id: null,
+      sourcing_purposes: [],
+      internal_sourcing_status: "submitted",
+      buyer_sourcing_status: "received",
       request_status: "submitted",
     });
   });
@@ -116,6 +138,7 @@ describe("normalizeContactSubmissionInput", () => {
       reference_url: "https://example.com/reference.png",
       reference_note: "Use as mood only; do not copy composition.",
       non_copying_attested: true,
+      sourcing_purposes: ["rights_check", "similar_search", "supply_check"],
     }, NOW)).toEqual({
       name: "Buyer",
       email: "buyer@example.com",
@@ -134,6 +157,10 @@ describe("normalizeContactSubmissionInput", () => {
       reference_url: "https://example.com/reference.png",
       reference_note: "Use as mood only; do not copy composition.",
       non_copying_attested: true,
+      buyer_id: null,
+      sourcing_purposes: ["rights_check", "similar_search", "supply_check"],
+      internal_sourcing_status: "submitted",
+      buyer_sourcing_status: "received",
       request_status: "submitted",
     });
   });
