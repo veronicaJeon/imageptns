@@ -4,6 +4,7 @@ import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { buildPhotoRequestInviteRecipients, formatPhotoRequestBudget } from "@/lib/contact/photo-request-invites";
 import { sendPhotoRequestInviteEmails } from "@/lib/email/contact";
 import { sendPhotoRequestInvite } from "@/lib/email/resend";
+import { candidateImageEligibility } from "@/lib/sourcing/candidates";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type SupportKind = "all" | "general" | "photo";
@@ -38,6 +39,7 @@ interface ContactSubmissionRow {
   request_status: string | null;
   assignee: { id: string; full_name: string | null } | { id: string; full_name: string | null }[] | null;
   matches?: PhotoRequestMatchRow[] | null;
+  answers?: SourcingAnswerRow[] | null;
 }
 
 interface PhotoRequestMatchRow {
@@ -62,11 +64,52 @@ interface PhotoRequestInviteMatchRow {
   status: string;
 }
 
+interface SourcingCandidateImageRow {
+  id: string;
+  asset_id: string | null;
+  title: string | null;
+  storage_path_preview: string | null;
+  status: string | null;
+  lifecycle_status: string | null;
+  is_published: boolean | null;
+  price_krw?: number | null;
+  copyright_license: string | null;
+  free_usage_policy: string | null;
+  photographer_id: string | null;
+}
+
+interface SourcingCandidateRow {
+  id: string;
+  image_id: string;
+  sort_order: number;
+  is_visible: boolean;
+  note: string | null;
+  image?: SourcingCandidateImageRow | SourcingCandidateImageRow[] | null;
+}
+
+interface SourcingAnswerRow {
+  id: string;
+  answer_text: string | null;
+  rights_result: string | null;
+  rights_explanation: string | null;
+  status: string;
+  revision_round: number;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+  candidates?: SourcingCandidateRow[] | null;
+}
+
 type SupportPostBody = {
   action?: unknown;
   requestId?: unknown;
   limit?: unknown;
   matchIds?: unknown;
+  answerId?: unknown;
+  answerText?: unknown;
+  rightsResult?: unknown;
+  rightsExplanation?: unknown;
+  imageIds?: unknown;
 };
 
 function first<T>(value: T | T[] | null): T | null {
@@ -192,6 +235,7 @@ function mapPhotoSubmission(submission: ContactSubmissionRow) {
       reference_note: submission.reference_note,
       non_copying_attested: submission.non_copying_attested,
       matches: submission.matches ?? [],
+      answers: submission.answers ?? [],
     },
   };
 }
@@ -230,7 +274,14 @@ export async function GET(req: NextRequest) {
         category, tags, usage_intent, license_intent, budget_min_krw, budget_max_krw,
         deadline_at, reference_url, reference_note, non_copying_attested, request_status,
         assignee:profiles!contact_submissions_assigned_to_fkey(id, full_name),
-        matches:photo_request_matches(id, photographer_id, status, score, reason, created_at, updated_at)
+        matches:photo_request_matches(id, photographer_id, status, score, reason, created_at, updated_at),
+        answers:sourcing_request_answers(
+          id, answer_text, rights_result, rights_explanation, status, revision_round, published_at, created_at, updated_at,
+          candidates:sourcing_request_candidates(
+            id, image_id, sort_order, is_visible, note,
+            image:images(id, asset_id, title, storage_path_preview, status, lifecycle_status, is_published, copyright_license, free_usage_policy, photographer_id)
+          )
+        )
       `)
       .eq("inquiry_type", "photo_request")
       .order("created_at", { ascending: false })
@@ -320,6 +371,18 @@ export async function POST(req: NextRequest) {
 
   if (body?.action === "send_photo_request_invites") {
     return sendPhotoRequestInvites(body, adminUser.id);
+  }
+
+  if (body?.action === "save_sourcing_answer_draft") {
+    return saveSourcingAnswerDraft(body, adminUser.id);
+  }
+
+  if (body?.action === "set_sourcing_candidates") {
+    return setSourcingCandidates(body, adminUser.id);
+  }
+
+  if (body?.action === "publish_sourcing_answer") {
+    return publishSourcingAnswer(body, adminUser.id);
   }
 
   if (body?.action !== "create_photo_request_matches") {
@@ -427,6 +490,214 @@ export async function POST(req: NextRequest) {
     inserted: rows.length,
     skipped: candidates.length - rows.length,
   });
+}
+
+async function saveSourcingAnswerDraft(body: SupportPostBody, adminUserId: string) {
+  const requestId = typeof body.requestId === "string" ? body.requestId.trim() : "";
+  const answerText = typeof body.answerText === "string" ? body.answerText.trim() : "";
+  const rightsResult = typeof body.rightsResult === "string" && body.rightsResult.trim()
+    ? body.rightsResult.trim()
+    : null;
+  const rightsExplanation = typeof body.rightsExplanation === "string" && body.rightsExplanation.trim()
+    ? body.rightsExplanation.trim()
+    : null;
+
+  if (!requestId) return NextResponse.json({ error: "requestId is required" }, { status: 400 });
+  if (
+    rightsResult !== null
+    && !["usable", "conditional", "unverified", "not_recommended"].includes(rightsResult)
+  ) {
+    return NextResponse.json({ error: "rightsResult is not supported" }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const { data: requestRow, error: requestError } = await admin
+    .from("contact_submissions")
+    .select("id, subject")
+    .eq("id", requestId)
+    .eq("inquiry_type", "photo_request")
+    .single();
+
+  if (requestError || !requestRow) {
+    return NextResponse.json({ error: "Sourcing request not found" }, { status: 404 });
+  }
+
+  const { data, error } = await admin
+    .from("sourcing_request_answers")
+    .insert({
+      contact_submission_id: requestId,
+      answer_text: answerText || null,
+      rights_result: rightsResult,
+      rights_explanation: rightsExplanation,
+      status: "draft",
+      created_by: adminUserId,
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await recordAdminAuditLog(admin, {
+    actorId: adminUserId,
+    action: "sourcing_request.answer_draft_saved",
+    targetType: "contact_submission",
+    targetId: requestId,
+    targetLabel: requestRow.subject,
+    after: data,
+  });
+
+  return NextResponse.json({ answer: data });
+}
+
+async function setSourcingCandidates(body: SupportPostBody, adminUserId: string) {
+  const answerId = typeof body.answerId === "string" ? body.answerId.trim() : "";
+  const imageIds = Array.from(new Set(
+    Array.isArray(body.imageIds)
+      ? body.imageIds.map((id) => typeof id === "string" ? id.trim() : "").filter(Boolean)
+      : [],
+  ));
+
+  if (!answerId) return NextResponse.json({ error: "answerId is required" }, { status: 400 });
+  if (imageIds.length > 30) {
+    return NextResponse.json({ error: "imageIds must include 30 items or fewer" }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const { data: answer, error: answerError } = await admin
+    .from("sourcing_request_answers")
+    .select("id, contact_submission_id, status")
+    .eq("id", answerId)
+    .single();
+
+  if (answerError || !answer) return NextResponse.json({ error: "Sourcing answer not found" }, { status: 404 });
+  if (answer.status !== "draft") {
+    return NextResponse.json({ error: "Published answers cannot be edited" }, { status: 409 });
+  }
+
+  const { error: deleteError } = await admin
+    .from("sourcing_request_candidates")
+    .delete()
+    .eq("answer_id", answerId);
+
+  if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
+
+  if (imageIds.length === 0) {
+    return NextResponse.json({ candidates: [] });
+  }
+
+  const { data: images, error: imageError } = await admin
+    .from("images")
+    .select("id, status, lifecycle_status, is_published")
+    .in("id", imageIds);
+
+  if (imageError) return NextResponse.json({ error: imageError.message }, { status: 500 });
+
+  const imageMap = new Map(((images ?? []) as SourcingCandidateImageRow[]).map((image) => [image.id, image]));
+  const invalid = imageIds
+    .map((imageId) => {
+      const image = imageMap.get(imageId);
+      if (!image) return { imageId, reason: "image_not_found" };
+      const eligibility = candidateImageEligibility(image);
+      return eligibility.eligible ? null : { imageId, reason: eligibility.reason };
+    })
+    .filter(Boolean);
+
+  if (invalid.length > 0) {
+    return NextResponse.json({ error: "Some images cannot be published as candidates", invalid }, { status: 400 });
+  }
+
+  const rows = imageIds.map((imageId, index) => ({
+    answer_id: answerId,
+    image_id: imageId,
+    sort_order: index,
+    is_visible: false,
+  }));
+
+  const { data, error } = await admin
+    .from("sourcing_request_candidates")
+    .insert(rows)
+    .select();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await recordAdminAuditLog(admin, {
+    actorId: adminUserId,
+    action: "sourcing_request.candidates_set",
+    targetType: "sourcing_request_answer",
+    targetId: answerId,
+    before: { answerId },
+    after: { imageIds },
+  });
+
+  return NextResponse.json({ candidates: data ?? [] });
+}
+
+async function publishSourcingAnswer(body: SupportPostBody, adminUserId: string) {
+  const answerId = typeof body.answerId === "string" ? body.answerId.trim() : "";
+  if (!answerId) return NextResponse.json({ error: "answerId is required" }, { status: 400 });
+
+  const admin = createAdminClient();
+  const { data: answer, error: answerError } = await admin
+    .from("sourcing_request_answers")
+    .select("id, contact_submission_id, answer_text, rights_result, status, candidates:sourcing_request_candidates(id)")
+    .eq("id", answerId)
+    .single();
+
+  if (answerError || !answer) return NextResponse.json({ error: "Sourcing answer not found" }, { status: 404 });
+  if (answer.status !== "draft") {
+    return NextResponse.json({ error: "Only draft answers can be published" }, { status: 409 });
+  }
+
+  const candidates = Array.isArray(answer.candidates) ? answer.candidates : [];
+  if (!answer.answer_text && !answer.rights_result && candidates.length === 0) {
+    return NextResponse.json({ error: "답변 내용, 권리 확인 결과, 후보 이미지 중 하나 이상이 필요합니다." }, { status: 400 });
+  }
+
+  const now = new Date().toISOString();
+  const { data: published, error: publishError } = await admin
+    .from("sourcing_request_answers")
+    .update({
+      status: "published",
+      published_at: now,
+      updated_at: now,
+    })
+    .eq("id", answerId)
+    .select()
+    .single();
+
+  if (publishError) return NextResponse.json({ error: publishError.message }, { status: 500 });
+
+  const { error: candidateError } = await admin
+    .from("sourcing_request_candidates")
+    .update({ is_visible: true })
+    .eq("answer_id", answerId);
+
+  if (candidateError) return NextResponse.json({ error: candidateError.message }, { status: 500 });
+
+  const { error: requestError } = await admin
+    .from("contact_submissions")
+    .update({
+      internal_sourcing_status: "answered",
+      buyer_sourcing_status: "answer_ready",
+      request_status: "in_progress",
+      status: "in_progress",
+      updated_at: now,
+    })
+    .eq("id", answer.contact_submission_id);
+
+  if (requestError) return NextResponse.json({ error: requestError.message }, { status: 500 });
+
+  await recordAdminAuditLog(admin, {
+    actorId: adminUserId,
+    action: "sourcing_request.answer_published",
+    targetType: "contact_submission",
+    targetId: answer.contact_submission_id,
+    before: answer as unknown as Record<string, unknown>,
+    after: published,
+  });
+
+  return NextResponse.json({ answer: published });
 }
 
 async function sendPhotoRequestInvites(body: SupportPostBody, adminUserId: string) {
