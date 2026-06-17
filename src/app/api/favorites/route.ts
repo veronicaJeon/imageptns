@@ -14,7 +14,7 @@ function firstImage(image: FavoriteRow["image"]) {
   return Array.isArray(image) ? image[0] : image;
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,10 +23,11 @@ export async function GET(_req: NextRequest) {
     .from("favorites")
     .select(`
       id, image_id, created_at,
-      image:images!image_id(id, title, category, status, lifecycle_status, storage_path_preview, width, height,
+      image:images!image_id(id, title, category, status, lifecycle_status, is_published, storage_path_preview, width, height,
         photographer:profiles!photographer_id(full_name))
     `)
     .eq("user_id", user.id)
+    .eq("image.is_published", true)
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

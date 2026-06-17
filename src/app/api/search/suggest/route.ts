@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       .select("title")
       .eq("status", "approved")
       .eq("lifecycle_status", "active")
+      .eq("is_published", true)
       .ilike("title", pattern)
       .limit(5),
     supabase
@@ -39,6 +40,7 @@ export async function GET(req: NextRequest) {
       .select("tags")
       .eq("status", "approved")
       .eq("lifecycle_status", "active")
+      .eq("is_published", true)
       .limit(200),
   ]);
 

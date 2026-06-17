@@ -47,6 +47,7 @@ export async function GET(
     .eq("photographer_id", id)
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
+    .eq("is_published", true)
     .order("created_at", { ascending: false })
     .limit(60);
 
@@ -59,7 +60,8 @@ export async function GET(
     .select("id", { count: "exact", head: true })
     .eq("photographer_id", id)
     .eq("status", "approved")
-    .eq("lifecycle_status", "active");
+    .eq("lifecycle_status", "active")
+    .eq("is_published", true);
 
   const profileRow = profile as PhotographerProfileRow;
   const imageList = (images ?? []) as PhotographerImageRow[];

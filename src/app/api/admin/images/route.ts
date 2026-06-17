@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     .from("images")
     .select(`
     id, asset_id, title, description, category, tags,
-    status, rejection_reason,
+    status, rejection_reason, is_published, unpublished_at, unpublished_reason,
     lifecycle_status, deletion_requested_at, deletion_fee_krw, deletion_fee_status,
     chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at,
     proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,

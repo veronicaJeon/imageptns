@@ -13,6 +13,9 @@ interface AdminImage {
   category: string;
   tags: string[] | null;
   status: string;
+  is_published: boolean;
+  unpublished_at: string | null;
+  unpublished_reason: string | null;
   lifecycle_status: string | null;
   deletion_fee_krw: number | null;
   deletion_fee_status: string | null;
@@ -238,6 +241,25 @@ export default function AdminImagesPage() {
     }
   }
 
+  async function togglePublished(image: AdminImage) {
+    const next = !image.is_published;
+    const reason = next ? null : prompt("게시 OFF 사유를 입력하세요.", "관리자 공개 중지");
+    if (!next && reason === null) return;
+
+    try {
+      const res = await fetch(`/api/admin/images/${image.id}/publish`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_published: next, reason }),
+      });
+      const body = await res.json().catch(() => null) as { image?: Partial<AdminImage>; error?: string } | null;
+      if (!res.ok) throw new Error(body?.error ?? "게시 상태를 변경하지 못했습니다.");
+      setImages((prev) => prev.map((row) => row.id === image.id ? { ...row, ...body?.image } : row));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "게시 상태를 변경하지 못했습니다.");
+    }
+  }
+
   return (
     <div className="p-6 md:p-10">
       <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -346,6 +368,16 @@ export default function AdminImagesPage() {
                       {image.lifecycle_status === "deletion_requested" ? "삭제요청" : image.lifecycle_status}
                     </p>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => togglePublished(image)}
+                    className={`mt-2 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                      image.is_published ? "bg-primary/10 text-primary" : "bg-error/10 text-error"
+                    }`}
+                    title={image.unpublished_reason ?? undefined}
+                  >
+                    {image.is_published ? "게시 ON" : "게시 OFF"}
+                  </button>
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex max-w-64 flex-wrap gap-1">

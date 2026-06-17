@@ -21,6 +21,7 @@ interface CheckoutImageRow {
   storage_path_full: string | null;
   original_filename: string | null;
   status: string;
+  is_published: boolean | null;
 }
 
 export async function POST(req: NextRequest) {
@@ -86,17 +87,18 @@ export async function POST(req: NextRequest) {
   const imageIds = items.map((i) => i.id);
   const { data: images, error: imageError } = await admin
     .from("images")
-    .select("id, title, asset_id, photographer_id, storage_path_preview, storage_path_original, storage_path_full, original_filename, status")
+    .select("id, title, asset_id, photographer_id, storage_path_preview, storage_path_original, storage_path_full, original_filename, status, is_published")
     .in("id", imageIds)
     .eq("status", "approved")
-    .eq("lifecycle_status", "active");
+    .eq("lifecycle_status", "active")
+    .eq("is_published", true);
 
   if (imageError) return NextResponse.json({ error: imageError.message }, { status: 500 });
 
   const imageRows = (images ?? []) as CheckoutImageRow[];
   const imageMap = Object.fromEntries(imageRows.map((img) => [img.id, img]));
   if (imageIds.some((id) => !imageMap[id])) {
-    return NextResponse.json({ error: "All items must be approved images" }, { status: 400 });
+    return NextResponse.json({ error: "현재 구매할 수 없는 이미지가 포함되어 있습니다." }, { status: 409 });
   }
   const { data: policyRows } = await admin
     .from("commission_policies")

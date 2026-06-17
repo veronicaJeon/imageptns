@@ -61,6 +61,7 @@ export async function GET(req: NextRequest) {
     )
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
+    .eq("is_published", true)
     .range(offset, offset + fetchCount - 1);
 
   if (category && category !== "all") {
@@ -85,9 +86,9 @@ export async function GET(req: NextRequest) {
     q = q.in("copyright_license", ["standard", "cc0", "cc_by", "cc_by_sa", "cc_by_nc", "cc_by_nc_sa"]);
   }
 
-  // The search_images RPC does not accept the new usage filters yet, so filtered
-  // relevant searches fall through to the table query and use newest ordering.
-  const useRpcSearch = sort === "relevant" && query && !hasUsageFilters;
+  // The search_images RPC does not accept publishing controls yet, so relevant
+  // searches fall through to the table query to avoid exposing hidden images.
+  const useRpcSearch = false && sort === "relevant" && query && !hasUsageFilters;
 
   if (useRpcSearch) {
     const { data: rpcData, error: rpcError } = await supabase.rpc("search_images", {

@@ -36,10 +36,11 @@ export async function GET(
     .from("collection_items")
     .select(`
       id, image_id, created_at,
-      image:images!image_id(id, title, category, status, lifecycle_status, storage_path_preview, width, height,
+      image:images!image_id(id, title, category, status, lifecycle_status, is_published, storage_path_preview, width, height,
         photographer:profiles!photographer_id(full_name))
     `)
     .eq("collection_id", collection_id)
+    .eq("image.is_published", true)
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
