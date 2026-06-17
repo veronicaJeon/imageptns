@@ -15,6 +15,7 @@ export interface PhotoRequestDraft {
   category: string;
   tags: string;
   usage_intent: string;
+  sourcing_purposes: Array<"rights_check" | "similar_search" | "supply_check">;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -62,8 +63,17 @@ export function buildPhotoRequestHref(state: LibrarySearchState) {
   if (state.educationFreeOnly) params.set("educationFree", "true");
   if (state.commercialOnly) params.set("commercial", "true");
   if (state.derivativesOnly) params.set("derivatives", "true");
+  params.set("similarSearch", "true");
 
   return `/contact?${params.toString()}`;
+}
+
+function sourcingPurposesFromParams(params: URLSearchParams): PhotoRequestDraft["sourcing_purposes"] {
+  const purposes: PhotoRequestDraft["sourcing_purposes"] = [];
+  if (params.get("rightsCheck") === "true") purposes.push("rights_check");
+  if (params.get("similarSearch") === "true") purposes.push("similar_search");
+  if (params.get("supplyCheck") === "true") purposes.push("supply_check");
+  return purposes.length > 0 ? purposes : ["similar_search"];
 }
 
 export function draftPhotoRequestFromSearchParams(params: URLSearchParams): PhotoRequestDraft {
@@ -77,6 +87,7 @@ export function draftPhotoRequestFromSearchParams(params: URLSearchParams): Phot
       category: "editorial",
       tags: "",
       usage_intent: "",
+      sourcing_purposes: [],
     };
   }
 
@@ -88,13 +99,13 @@ export function draftPhotoRequestFromSearchParams(params: URLSearchParams): Phot
     query ? `찾고 있는 사진: ${query}` : "찾고 있는 사진:",
     `카테고리: ${CATEGORY_LABELS[category] ?? "에디토리얼"}`,
     usageLabels.length > 0 ? `희망 사용 조건: ${usageLabels.join(", ")}` : "",
-    "검색 결과에서 적합한 사진을 찾지 못해 사진 의뢰로 전환했습니다.",
+    "검색 결과에서 적합한 이미지를 찾지 못해 이미지 소싱 요청으로 전환했습니다.",
     "필요한 장면, 촬영 위치, 대상 지역, 마감일, 예산은 아래 항목에서 보완해주세요.",
   ].filter(Boolean);
 
   return {
     mode: "photo",
-    title: query ? `${query} 사진 의뢰` : "사진 의뢰",
+    title: query ? `${query} 이미지 소싱 요청` : "이미지 소싱 요청",
     brief: lines.join("\n"),
     location_guidance: query
       ? "검색어에 지역명이 포함되어 있다면 촬영 위치에는 실제 촬영 지점, 대상 지역에는 작가를 찾을 시/군/구나 권역을 직접 입력해주세요."
@@ -102,5 +113,6 @@ export function draftPhotoRequestFromSearchParams(params: URLSearchParams): Phot
     category,
     tags: keywordDraft(query),
     usage_intent: usageLabels.length > 0 ? "검색 조건과 동일한 사용 목적 검토" : "",
+    sourcing_purposes: sourcingPurposesFromParams(params),
   };
 }

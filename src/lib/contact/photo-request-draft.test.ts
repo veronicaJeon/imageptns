@@ -14,7 +14,7 @@ describe("photo request draft helpers", () => {
       commercialOnly: true,
       derivativesOnly: true,
     })).toBe(
-      "/contact?mode=photo&query=%EC%A7%80%EB%A6%AC%EC%82%B0+%EC%B2%9C%EC%99%95%EB%B4%89+%EA%B2%A8%EC%9A%B8+%EC%84%A4%EA%B2%BD&category=nature&free=true&commercial=true&derivatives=true",
+      "/contact?mode=photo&query=%EC%A7%80%EB%A6%AC%EC%82%B0+%EC%B2%9C%EC%99%95%EB%B4%89+%EA%B2%A8%EC%9A%B8+%EC%84%A4%EA%B2%BD&category=nature&free=true&commercial=true&derivatives=true&similarSearch=true",
     );
   });
 
@@ -29,7 +29,7 @@ describe("photo request draft helpers", () => {
     }));
 
     expect(draft.mode).toBe("photo");
-    expect(draft.title).toBe("전북 익산 석탑 낮 사진 사진 의뢰");
+    expect(draft.title).toBe("전북 익산 석탑 낮 사진 이미지 소싱 요청");
     expect(draft.brief).toContain("전북 익산 석탑 낮 사진");
     expect(draft.brief).toContain("교육용 무료 사용 가능");
     expect(draft.brief).toContain("상업 사용 가능");
@@ -39,6 +39,19 @@ describe("photo request draft helpers", () => {
     expect(draft.category).toBe("architecture");
     expect(draft.tags).toBe("전북, 익산, 석탑, 낮, 사진");
     expect(draft.usage_intent).toBe("검색 조건과 동일한 사용 목적 검토");
+    expect(draft.sourcing_purposes).toEqual(["similar_search"]);
+  });
+
+  it("keeps multiple sourcing purpose hints from search params", () => {
+    const draft = draftPhotoRequestFromSearchParams(new URLSearchParams({
+      mode: "photo",
+      query: "지리산 천왕봉 사진",
+      rightsCheck: "true",
+      similarSearch: "true",
+      supplyCheck: "true",
+    }));
+
+    expect(draft.sourcing_purposes).toEqual(["rights_check", "similar_search", "supply_check"]);
   });
 
   it("does not force photo mode when no photo request context is present", () => {
@@ -47,5 +60,6 @@ describe("photo request draft helpers", () => {
     expect(draft.mode).toBeNull();
     expect(draft.title).toBe("");
     expect(draft.brief).toBe("");
+    expect(draft.sourcing_purposes).toEqual([]);
   });
 });

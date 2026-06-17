@@ -9,6 +9,7 @@ import { validatePhotoRequestBuyerFields } from "@/lib/contact/request-fields";
 import { cn } from "@/lib/utils/cn";
 
 type ContactMode = "general" | "photo";
+type SourcingPurpose = "rights_check" | "similar_search" | "supply_check";
 
 const CATEGORY_OPTIONS = [
   { value: "editorial", label: "에디토리얼" },
@@ -24,6 +25,12 @@ const LICENSE_OPTIONS = [
   { value: "commercial", label: "커머셜" },
   { value: "extended", label: "익스텐디드" },
   { value: "not_sure", label: "상담 필요" },
+];
+
+const SOURCING_PURPOSE_OPTIONS: Array<{ value: SourcingPurpose; label: string }> = [
+  { value: "rights_check", label: "권리 확인" },
+  { value: "similar_search", label: "유사 이미지 탐색" },
+  { value: "supply_check", label: "신규 촬영/보유 이미지 확인" },
 ];
 
 function splitList(value: string) {
@@ -71,6 +78,7 @@ function ContactPageContent() {
     deadline_at: "",
     reference_url: "",
     reference_note: "",
+    sourcing_purposes: ["similar_search"] as SourcingPurpose[],
     non_copying_attested: false,
   });
   const [draftLocationGuidance, setDraftLocationGuidance] = useState("");
@@ -114,6 +122,7 @@ function ContactPageContent() {
       category: draft.category,
       tags: prev.tags || draft.tags,
       usage_intent: prev.usage_intent || draft.usage_intent,
+      sourcing_purposes: draft.sourcing_purposes.length > 0 ? draft.sourcing_purposes : prev.sourcing_purposes,
     }));
   }, [searchParams]);
 
@@ -153,7 +162,7 @@ function ContactPageContent() {
     const budgetMax = numericOrNull(photoForm.budget_max_krw);
 
     if (!photoForm.title.trim()) {
-      setError("의뢰 제목을 입력해주세요. 예: 성수동 카페 외관 및 실내 컷");
+      setError("요청 제목을 입력해주세요. 예: 성수동 카페 외관 및 실내 컷");
       setLoading(false);
       return;
     }
@@ -213,16 +222,17 @@ function ContactPageContent() {
           deadline_at: photoForm.deadline_at ? `${photoForm.deadline_at}T23:59:59.000Z` : null,
           reference_url: photoForm.reference_url.trim() || null,
           reference_note: photoForm.reference_note.trim() || null,
+          sourcing_purposes: photoForm.sourcing_purposes,
           non_copying_attested: photoForm.non_copying_attested,
         }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null) as { error?: string } | null;
-        throw new Error(body?.error ?? "사진 의뢰 접수에 실패했습니다.");
+        throw new Error(body?.error ?? "이미지 소싱 요청 접수에 실패했습니다.");
       }
       setSent(true);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "사진 의뢰 접수에 실패했습니다.");
+      setError(submitError instanceof Error ? submitError.message : "이미지 소싱 요청 접수에 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -240,6 +250,15 @@ function ContactPageContent() {
         : e.target.value;
       setPhotoForm((prev) => ({ ...prev, [key]: value }));
     };
+  }
+
+  function toggleSourcingPurpose(value: SourcingPurpose, checked: boolean) {
+    setPhotoForm((prev) => {
+      const next = checked
+        ? Array.from(new Set([...prev.sourcing_purposes, value]))
+        : prev.sourcing_purposes.filter((purpose) => purpose !== value);
+      return { ...prev, sourcing_purposes: next.length > 0 ? next : ["similar_search"] };
+    });
   }
 
   const isLoggedIn = !!user;
@@ -265,7 +284,7 @@ function ContactPageContent() {
             <div className="mb-6 flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl bg-surface-container-lowest p-1 shadow-ghost">
               {([
                 { key: "general", label: "일반 문의", icon: "support_agent" },
-                { key: "photo", label: "사진 의뢰", icon: "add_photo_alternate" },
+                { key: "photo", label: "이미지 소싱 요청", icon: "travel_explore" },
               ] as const).map((item) => (
                 <button
                   key={item.key}
@@ -290,7 +309,7 @@ function ContactPageContent() {
                   {mode === "photo" ? "assignment_turned_in" : "mark_email_read"}
                 </span>
                 <p className="text-on-surface font-semibold">
-                  {mode === "photo" ? "사진 의뢰가 접수되었습니다." : c.success}
+                  {mode === "photo" ? "이미지 소싱 요청이 접수되었습니다." : c.success}
                 </p>
                 <button
                   type="button"
@@ -365,14 +384,14 @@ function ContactPageContent() {
                 )}
 
                 <div className="md:col-span-2 rounded-lg bg-surface-container-lowest p-4 ring-1 ring-outline-variant">
-                  <p className="text-sm font-semibold text-on-surface">아는 만큼만 적어도 의뢰할 수 있습니다.</p>
+                  <p className="text-sm font-semibold text-on-surface">필요한 이미지를 자연어로 요청할 수 있습니다.</p>
                   <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-                    위치, 예산, 사용 목적은 작가 매칭을 위한 초안입니다. 최종 가격, 권리 조건, 안내 메일 문구는 담당자가 검토합니다.
+                    권리 확인, 유사 이미지 탐색, 내부 보유 이미지 확인이 함께 필요할 수 있습니다. 답변과 후보 이미지는 담당자가 검토 후 발송합니다.
                   </p>
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">의뢰 제목</label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">요청 제목</label>
                   <input
                     type="text"
                     value={photoForm.title}
@@ -383,7 +402,7 @@ function ContactPageContent() {
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">상세 브리프</label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">필요한 이미지 설명</label>
                   <textarea
                     value={photoForm.brief}
                     onChange={setPhoto("brief")}
@@ -401,6 +420,26 @@ function ContactPageContent() {
                     {draftLocationGuidance}
                   </div>
                 )}
+
+                <div className="md:col-span-2 flex flex-col gap-2">
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">요청 유형</label>
+                  <div className="flex flex-wrap gap-2">
+                    {SOURCING_PURPOSE_OPTIONS.map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex items-center gap-2 rounded-full border border-outline-variant px-3 py-2 text-xs font-bold text-on-surface-variant"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={photoForm.sourcing_purposes.includes(option.value)}
+                          onChange={(event) => toggleSourcingPurpose(option.value, event.target.checked)}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">촬영 위치</label>
@@ -562,7 +601,7 @@ function ContactPageContent() {
                 >
                   {loading
                     ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    : <><span className="material-symbols-outlined text-base">send</span>사진 의뢰 접수</>
+                    : <><span className="material-symbols-outlined text-base">send</span>이미지 소싱 요청 접수</>
                   }
                 </button>
               </form>
