@@ -53,8 +53,7 @@ export function TopNavBar() {
   const NAV_LINKS = [
     { href: "/library", label: t.nav.library },
     { href: "/notices", label: "공지사항" },
-    { href: "/",        label: t.nav.company },
-    { href: "/support", label: t.nav.qa },
+    { href: "/about",   label: t.nav.company },
   ];
 
   return (

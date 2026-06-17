@@ -41,7 +41,6 @@ export default function ForgotPasswordPage() {
           IMAGE PARTNERS
         </Link>
         <div className="relative z-10">
-          <p className="text-white/50 text-xs uppercase tracking-[0.3em] mb-6">Est. 1994</p>
           <p className="font-headline text-3xl font-extrabold text-white leading-snug mb-4">{t.auth.brand.tagline}</p>
           <p className="text-white/60 text-sm italic">{t.auth.brand.quote}</p>
         </div>

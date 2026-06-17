@@ -184,6 +184,7 @@ export interface Translations {
   footer: {
     tagline: string;
     copyright: string;
+    company: { title: string; address: string; email: string };
     sections: { Resources: string; Legal: string; Company: string };
     links: {
       imageLibrary: string;
@@ -395,20 +396,19 @@ export const en: Translations = {
   },
   home: {
     hero: {
-      badge: "Est. 1994",
-      headline1: "WE CURATE",
-      headline2: "VISUAL EXCELLENCE.",
+      badge: "",
+      headline1: "ACCURATE IMAGES",
+      headline2: "FOR PUBLISHERS.",
       description:
-        "A premier archival and contemporary image agency dedicated to the publishing industry, bridging the gap between historical significance and modern storytelling.",
+        "A premier archival and contemporary image agency bridging the gap between historical significance and modern storytelling.",
       scroll: "Scroll to explore",
     },
     about: {
       headline1: "The Digital",
       headline2: "Curator.",
       body: "In an era of infinite imagery, IMAGE PARTNERS stands as a filter for quality. We are not a warehouse; we are a gallery. Our mission is to provide editors and creators with more than just assets—we provide context, narrative, and soul.",
-      floatTitle: "Our Core Expertise",
-      floatBody:
-        "Specializing in high-resolution archival restoration and contemporary editorial licensing for international print media.",
+      floatTitle: "",
+      floatBody: "",
     },
     values: {
       title: "",
@@ -418,12 +418,12 @@ export const en: Translations = {
           desc: "Every image in our archive is rigorously verified for metadata accuracy and legal clearance, ensuring peace of mind for global publishers.",
         },
         {
-          title: "Restoration Mastery",
-          desc: "Our in-house digital preservation lab breathes new life into historical negatives using proprietary AI-assisted enhancement tools.",
+          title: "Verified Captions",
+          desc: "We treat source clarity and caption accuracy as essential parts of each image.",
         },
         {
           title: "Global Network",
-          desc: "With partners in 40+ countries, we provide a truly international perspective on culture, history, and news through local eyes.",
+          desc: "We work with global partners to preserve local context and perspective.",
         },
       ],
     },
@@ -432,9 +432,9 @@ export const en: Translations = {
       subtitle: "Three decades of visual storytelling.",
       items: [
         {
-          year: "1994",
-          title: "Founding",
-          desc: "IMAGE PARTNERS launched as a specialized boutique agency for documentary photography in London, focusing on historical archives.",
+          year: "Verified",
+          title: "Company History",
+          desc: "Company history copy is being verified before public launch.",
         },
         {
           year: "2008",
@@ -453,7 +453,7 @@ export const en: Translations = {
       headline1: "READY TO DEFINE YOUR",
       headline2: "VISUAL NARRATIVE?",
       browse: "Browse our library",
-      contact: "Contact sales",
+      contact: "Contact",
     },
   },
   photographerProfile: {
@@ -467,9 +467,13 @@ export const en: Translations = {
     backToLibrary: "← Back to Library",
   },
   footer: {
-    tagline:
-      "Elevating the world's publishing standards through curated visual excellence since 1994.",
+    tagline: "Accurate images for publishers.",
     copyright: "© 2026 Image Partners. All rights reserved.",
+    company: {
+      title: "Company",
+      address: "No. 1, 57, Geobukgol-ro 21-gil, Seodaemun-gu, Seoul",
+      email: "helpimagepartners@gmail.com",
+    },
     sections: { Resources: "Resources", Legal: "Legal", Company: "Company" },
     links: {
       imageLibrary: "Image Library",

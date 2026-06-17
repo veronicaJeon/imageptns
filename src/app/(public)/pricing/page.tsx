@@ -48,7 +48,7 @@ export default function PricingPage() {
   }, [init]);
 
   async function handleSubscribe(planIndex: number) {
-    // 엔터프라이즈는 영업팀 문의로 연결
+    // 엔터프라이즈는 문의 화면으로 연결
     if (planIndex === 2) {
       router.push("/contact");
       return;
