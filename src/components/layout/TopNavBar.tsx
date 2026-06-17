@@ -18,6 +18,7 @@ export function TopNavBar() {
   const cartCount = useCart((s) => s.items.length);
   const { user, loading, init, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { init(); }, [init]);
@@ -59,16 +60,17 @@ export function TopNavBar() {
   return (
     <nav
       className={cn(
-        "fixed top-0 w-full z-50 h-20 transition-all duration-300",
+        "fixed top-0 w-full z-50 h-16 md:h-20 transition-all duration-300",
         isDark ? "glass-dark" : "glass"
       )}
     >
-      <div className="flex justify-between items-center px-6 md:px-8 h-20 max-w-[1920px] mx-auto">
+      <div className="flex justify-between items-center px-4 md:px-8 h-16 md:h-20 max-w-[1920px] mx-auto">
 
         {/* Brand */}
         <Link
           href="/"
-          className="text-lg font-headline font-black uppercase tracking-tighter text-on-surface hover:text-primary transition-colors duration-200"
+          onClick={() => setMobileMenuOpen(false)}
+          className="min-w-0 text-base md:text-lg font-headline font-black uppercase tracking-tighter text-on-surface hover:text-primary transition-colors duration-200"
         >
           IMAGE PARTNERS
         </Link>
@@ -100,11 +102,11 @@ export function TopNavBar() {
           {/* Language toggle */}
           <button
             onClick={toggle}
-            className="inline-flex items-center gap-1 h-9 px-3 rounded-lg text-xs font-bold tracking-widest text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200"
+            className="inline-flex items-center justify-center gap-1 h-9 w-9 rounded-lg text-xs font-bold tracking-widest text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200 sm:w-auto sm:px-3"
             aria-label="언어 변경"
           >
             <span className="material-symbols-outlined text-base leading-none">language</span>
-            <span>{lang === "ko" ? "KO" : "EN"}</span>
+            <span className="hidden sm:inline">{lang === "ko" ? "KO" : "EN"}</span>
           </button>
 
           {/* Dark mode toggle */}
@@ -128,12 +130,12 @@ export function TopNavBar() {
             )}
           </Link>
 
-          <div className="w-px h-5 bg-outline-variant/40 mx-1" />
+          <div className="hidden md:block w-px h-5 bg-outline-variant/40 mx-1" />
 
           {/* Auth section */}
           {loading ? (
             // Skeleton while loading — prevents login flash
-            <div className="w-24 h-8 rounded-lg bg-surface-container-low animate-pulse" />
+            <div className="hidden md:block w-24 h-8 rounded-lg bg-surface-container-low animate-pulse" />
           ) : user ? (
             // Logged in: user avatar + dropdown
             <div className="relative" ref={menuRef}>
@@ -193,17 +195,103 @@ export function TopNavBar() {
             </div>
           ) : (
             // Logged out: login + signup buttons
-            <>
+            <div className="hidden md:flex items-center gap-1">
               <Link href="/login">
                 <Button variant="ghost" size="sm">{t.nav.login}</Button>
               </Link>
               <Link href="/signup">
                 <Button variant="primary" size="sm">{t.nav.signup}</Button>
               </Link>
-            </>
+            </div>
           )}
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((value) => !value)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface md:hidden"
+            aria-label="모바일 메뉴"
+            aria-expanded={mobileMenuOpen}
+          >
+            <span className="material-symbols-outlined text-xl">{mobileMenuOpen ? "close" : "menu"}</span>
+          </button>
         </div>
       </div>
+
+      {mobileMenuOpen && (
+        <div className="border-t border-outline-variant/20 bg-surface/98 px-4 py-3 shadow-ghost backdrop-blur-md md:hidden">
+          <div className="flex flex-col gap-1">
+            {NAV_LINKS.map(({ href, label }) => {
+              const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex h-11 items-center justify-between rounded-lg px-3 text-sm font-semibold transition-colors",
+                    isActive ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-surface-container-low"
+                  )}
+                >
+                  {label}
+                  <span className="material-symbols-outlined text-base text-outline">chevron_right</span>
+                </Link>
+              );
+            })}
+
+            <div className="my-2 h-px bg-outline-variant/20" />
+
+            {loading ? (
+              <div className="h-10 rounded-lg bg-surface-container-low animate-pulse" />
+            ) : user ? (
+              <>
+                <Link
+                  href="/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-on-surface hover:bg-surface-container-low"
+                >
+                  <span className="material-symbols-outlined text-base text-outline">dashboard</span>
+                  My Dashboard
+                </Link>
+                {user.is_admin && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary hover:bg-surface-container-low"
+                  >
+                    <span className="material-symbols-outlined text-base">admin_panel_settings</span>
+                    Admin
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setMobileMenuOpen(false); signOut(); }}
+                  className="flex h-11 items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-on-surface hover:bg-surface-container-low"
+                >
+                  <span className="material-symbols-outlined text-base text-outline">logout</span>
+                  로그아웃
+                </button>
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex h-11 items-center justify-center rounded-lg border border-outline-variant text-sm font-bold text-on-surface"
+                >
+                  {t.nav.login}
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex h-11 items-center justify-center rounded-lg bg-primary text-sm font-bold text-white"
+                >
+                  {t.nav.signup}
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

@@ -285,7 +285,7 @@ export default function LibraryPage() {
       </section>
 
       {/* ── Filter Bar ────────────────────────────── */}
-      <div className="sticky top-20 z-40 border-b border-outline-variant/20 bg-surface/95 backdrop-blur-md md:bg-surface/80">
+      <div className="sticky top-16 z-40 border-b border-outline-variant/20 bg-surface/95 backdrop-blur-md md:top-20 md:bg-surface/80">
         <div className="max-w-7xl mx-auto px-4 py-3 md:px-8 md:py-4 flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2 md:hidden">
             <span className="text-xs font-medium text-outline">
