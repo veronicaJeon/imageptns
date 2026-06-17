@@ -37,6 +37,7 @@ export default function SettingsPage() {
   const { user, init } = useAuth();
 
   const [name, setName]   = useState("");
+  const [organization, setOrganization] = useState("");
   const [email, setEmail] = useState("");
   const [bio, setBio]     = useState("");
   const [walletAddress, setWalletAddress] = useState("");
@@ -94,6 +95,7 @@ export default function SettingsPage() {
       .then(({ profile }) => {
         if (!profile) return;
         setName(profile.full_name ?? "");
+        setOrganization(profile.organization ?? "");
         setEmail(profile.email ?? "");
         setBio(profile.bio ?? "");
         setWalletAddress(profile.wallet_address ?? "");
@@ -110,6 +112,7 @@ export default function SettingsPage() {
         // Unauthenticated — use auth store fallback
         if (user) {
           setName(user.full_name);
+          setOrganization(user.organization ?? "");
           setEmail(user.email);
         }
       });
@@ -125,6 +128,7 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: name,
+          organization,
           bio,
           wallet_address: walletAddress,
           ...(role === "photographer"
@@ -257,6 +261,14 @@ export default function SettingsPage() {
           </div>
 
           <Input label={s.nameLabel}  type="text"  value={name}  onChange={(e) => setName(e.target.value)}  icon="person" />
+          <Input
+            label="소속(기관/업체/개인 활동명)"
+            type="text"
+            value={organization}
+            onChange={(e) => setOrganization(e.target.value)}
+            icon="business"
+            placeholder="예: ○○출판사, 국립○○박물관, 프리랜서"
+          />
           <Input label={s.emailLabel} type="email" value={email} disabled icon="mail" />
 
           <div className="flex flex-col gap-2">

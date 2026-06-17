@@ -50,9 +50,11 @@ describe("normalizeTargetRegions", () => {
 
 describe("normalizeSourcingPurposes", () => {
   it("normalizes unique supported sourcing purposes", () => {
-    expect(normalizeSourcingPurposes(["rights_check", "similar_search", "rights_check"])).toEqual([
+    expect(normalizeSourcingPurposes(["rights_check", "similar_search", "context_reference", "shooting_request", "rights_check"])).toEqual([
       "rights_check",
       "similar_search",
+      "context_reference",
+      "shooting_request",
     ]);
   });
 
@@ -111,6 +113,9 @@ describe("normalizeContactSubmissionInput", () => {
       reference_url: null,
       reference_note: null,
       non_copying_attested: false,
+      requester_organization: null,
+      usage_project: null,
+      usage_context: null,
       buyer_id: null,
       sourcing_purposes: [],
       internal_sourcing_status: "submitted",
@@ -126,84 +131,72 @@ describe("normalizeContactSubmissionInput", () => {
       email: "buyer@example.com",
       subject: "Rooftop campaign",
       message: "Need bright Seoul rooftop lifestyle images with morning light.",
-      location_label: " Seoul, South Korea ",
-      target_regions: ["Seoul", "Jongno-gu", "seoul"],
-      category: " Editorial ",
-      tags: [" rooftop ", "campaign", "Rooftop"],
-      usage_intent: "Brand social and newsletter use",
-      license_intent: "Commercial digital campaign",
-      budget_min_krw: 150000,
-      budget_max_krw: 300000,
+      requester_organization: " Image Partners Books ",
+      usage_project: " Middle school history workbook ",
+      usage_context: " Opening spread about modern Seoul lifestyles ",
       deadline_at: "2026-06-10T09:00:00.000Z",
       reference_url: "https://example.com/reference.png",
-      reference_note: "Use as mood only; do not copy composition.",
-      non_copying_attested: true,
-      sourcing_purposes: ["rights_check", "similar_search", "supply_check"],
+      reference_note: "Use the composition only.",
+      sourcing_purposes: ["rights_check", "similar_search", "context_reference", "shooting_request"],
     }, NOW)).toEqual({
       name: "Buyer",
       email: "buyer@example.com",
       subject: "Rooftop campaign",
       message: "Need bright Seoul rooftop lifestyle images with morning light.",
       inquiry_type: "photo_request",
-      location_label: "Seoul, South Korea",
-      target_regions: ["Seoul", "Jongno-gu"],
-      category: "Editorial",
-      tags: ["rooftop", "campaign"],
-      usage_intent: "Brand social and newsletter use",
-      license_intent: "Commercial digital campaign",
-      budget_min_krw: 150000,
-      budget_max_krw: 300000,
+      location_label: null,
+      target_regions: [],
+      category: null,
+      tags: [],
+      usage_intent: null,
+      license_intent: null,
+      budget_min_krw: null,
+      budget_max_krw: null,
       deadline_at: "2026-06-10T09:00:00.000Z",
       reference_url: "https://example.com/reference.png",
-      reference_note: "Use as mood only; do not copy composition.",
-      non_copying_attested: true,
+      reference_note: "Use the composition only.",
+      non_copying_attested: false,
+      requester_organization: "Image Partners Books",
+      usage_project: "Middle school history workbook",
+      usage_context: "Opening spread about modern Seoul lifestyles",
       buyer_id: null,
-      sourcing_purposes: ["rights_check", "similar_search", "supply_check"],
+      sourcing_purposes: ["rights_check", "similar_search", "context_reference", "shooting_request"],
       internal_sourcing_status: "submitted",
       buyer_sourcing_status: "received",
       request_status: "submitted",
     });
   });
 
-  it("requires request-specific fields for photo requests", () => {
+  it("requires requester organization, project, and usage context for photo requests", () => {
     expect(() => normalizeContactSubmissionInput({
       inquiry_type: "photo_request",
       name: "Buyer",
       email: "buyer@example.com",
       subject: "Rooftop campaign",
       message: "Need bright Seoul rooftop lifestyle images with morning light.",
-      location_label: "Seoul, South Korea",
-      target_regions: ["Seoul"],
-      usage_intent: "Brand social and newsletter use",
-      license_intent: "Commercial digital campaign",
-      budget_min_krw: 150000,
-      budget_max_krw: 300000,
+      requester_organization: "",
+      usage_project: "Middle school history workbook",
+      usage_context: "Chapter opener",
       deadline_at: "2026-06-10T09:00:00.000Z",
-      non_copying_attested: false,
-    }, NOW)).toThrow("non_copying_attested");
+    }, NOW)).toThrow("requester_organization");
   });
 
-  it("rejects invalid budget ranges and deadlines", () => {
+  it("rejects invalid deadlines while allowing omitted budget and region fields", () => {
     const base = {
       inquiry_type: "photo_request",
       name: "Buyer",
       email: "buyer@example.com",
       subject: "Rooftop campaign",
       message: "Need bright Seoul rooftop lifestyle images with morning light.",
-      location_label: "Seoul, South Korea",
-      target_regions: ["Seoul"],
-      usage_intent: "Brand social and newsletter use",
-      license_intent: "Commercial digital campaign",
-      budget_min_krw: 300000,
-      budget_max_krw: 150000,
+      requester_organization: "Image Partners Books",
+      usage_project: "Middle school history workbook",
+      usage_context: "Chapter opener",
       deadline_at: "2026-06-10T09:00:00.000Z",
-      non_copying_attested: true,
     };
 
-    expect(() => normalizeContactSubmissionInput(base, NOW)).toThrow("budget");
+    expect(normalizeContactSubmissionInput(base, NOW).budget_min_krw).toBeNull();
     expect(() => normalizeContactSubmissionInput({
       ...base,
-      budget_min_krw: 150000,
       deadline_at: "2026-05-19T23:59:59.000Z",
     }, NOW)).toThrow("deadline_at");
   });
@@ -211,41 +204,39 @@ describe("normalizeContactSubmissionInput", () => {
 
 describe("validatePhotoRequestBuyerFields", () => {
   const base = {
-    usage_intent: "웹사이트 상세 페이지",
-    budget_min_krw: 100000,
-    budget_max_krw: 300000,
+    requester_organization: "Image Partners Books",
+    usage_project: "중학교 한국사 보조교재",
+    usage_context: "백제 문화 설명 본문 옆 삽입 이미지",
     deadline_at: "2026-06-10T23:59:59.000Z",
     reference_url: "https://example.com/reference",
-    non_copying_attested: true,
   };
 
   it("accepts a complete buyer-facing photo request validation set", () => {
     expect(validatePhotoRequestBuyerFields(base, NOW)).toBeNull();
   });
 
-  it("explains budget validation in Korean", () => {
+  it("explains required source context fields in Korean", () => {
     expect(validatePhotoRequestBuyerFields({
       ...base,
-      budget_min_krw: null,
-    }, NOW)).toBe("예산 범위를 원화 숫자로 입력해주세요. 아직 정확하지 않아도 대략적인 최소/최대 금액이면 됩니다.");
+      requester_organization: "",
+    }, NOW)).toBe("요청자 소속을 입력해주세요. 예: ○○출판사, 국립○○박물관, 프리랜서");
 
     expect(validatePhotoRequestBuyerFields({
       ...base,
-      budget_min_krw: 400000,
-      budget_max_krw: 300000,
-    }, NOW)).toBe("최소 예산은 최대 예산보다 클 수 없습니다. 예산 범위를 다시 확인해주세요.");
+      usage_project: "",
+    }, NOW)).toBe("사용 프로젝트를 입력해주세요. 예: 중학교 한국사 보조교재, 전시 리플렛, 단행본 개정판");
   });
 
-  it("explains deadline and usage intent validation in Korean", () => {
+  it("explains deadline and usage context validation in Korean", () => {
     expect(validatePhotoRequestBuyerFields({
       ...base,
-      usage_intent: "",
-    }, NOW)).toBe("사용 목적을 입력해주세요. 예: 웹사이트, 기사, 캠페인, 인쇄물, 내부 자료");
+      usage_context: "",
+    }, NOW)).toBe("사용 맥락을 입력해주세요. 이미지가 어떤 내용 옆에서 어떤 역할로 쓰이는지 적어주세요.");
 
     expect(validatePhotoRequestBuyerFields({
       ...base,
-      usage_intent: "웹".repeat(501),
-    }, NOW)).toBe("사용 목적은 500자 이내로 입력해주세요.");
+      usage_context: "웹".repeat(1001),
+    }, NOW)).toBe("사용 맥락은 1000자 이내로 입력해주세요.");
 
     expect(validatePhotoRequestBuyerFields({
       ...base,
@@ -253,15 +244,10 @@ describe("validatePhotoRequestBuyerFields", () => {
     }, NOW)).toBe("희망 마감일은 오늘 이후 날짜로 선택해주세요.");
   });
 
-  it("explains reference URL and non-copying confirmation validation in Korean", () => {
+  it("explains reference URL validation in Korean", () => {
     expect(validatePhotoRequestBuyerFields({
       ...base,
       reference_url: "ftp://example.com/reference",
     }, NOW)).toBe("참고 URL은 http:// 또는 https://로 시작하는 웹 주소만 입력할 수 있습니다.");
-
-    expect(validatePhotoRequestBuyerFields({
-      ...base,
-      non_copying_attested: false,
-    }, NOW)).toBe("참고 이미지를 그대로 복제하거나 혼동될 정도로 유사한 결과물을 요구하지 않는다는 확인이 필요합니다.");
   });
 });

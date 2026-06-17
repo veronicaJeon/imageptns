@@ -77,7 +77,7 @@ export async function GET() {
     .from("contact_submissions")
     .select(`
       id, subject, message, created_at, updated_at, buyer_sourcing_status, internal_sourcing_status,
-      sourcing_purposes, usage_intent, deadline_at
+      sourcing_purposes, usage_intent, requester_organization, usage_project, usage_context, deadline_at
     `)
     .eq("inquiry_type", "photo_request")
     .or(`buyer_id.eq.${user.id},email.eq.${user.email}`)

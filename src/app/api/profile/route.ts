@@ -10,7 +10,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, bio, avatar_url, role, wallet_address, phone_number, primary_activity_regions, notif_sales, notif_reviews, notif_newsletter, created_at")
+    .select("id, full_name, organization, bio, avatar_url, role, wallet_address, phone_number, primary_activity_regions, notif_sales, notif_reviews, notif_newsletter, created_at")
     .eq("id", user.id)
     .single();
 
@@ -26,6 +26,10 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json();
   const allowed: Record<string, unknown> = {};
   if ("full_name" in body) allowed.full_name = body.full_name;
+  if ("organization" in body) {
+    const organization = typeof body.organization === "string" ? body.organization.trim().replace(/\s+/g, " ") : "";
+    allowed.organization = organization || null;
+  }
   if ("bio"       in body) allowed.bio       = body.bio;
   try {
     if ("phone_number" in body) allowed.phone_number = normalizePhoneNumber(body.phone_number);

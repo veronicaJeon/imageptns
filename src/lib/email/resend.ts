@@ -181,6 +181,8 @@ export async function sendPhotoRequestInvite(opts: PhotoRequestInviteEmailPayloa
   const photographerName = escapeHtml(opts.photographerName);
   const requestTitle = escapeHtml(opts.requestTitle);
   const locationLabel = opts.locationLabel ? escapeHtml(opts.locationLabel) : null;
+  const usageProject = opts.usageProject ? escapeHtml(opts.usageProject) : null;
+  const usageContext = opts.usageContext ? escapeHtml(opts.usageContext) : null;
   const deadlineAt = opts.deadlineAt ? escapeHtml(new Date(opts.deadlineAt).toLocaleDateString("ko-KR")) : null;
   const budgetLabel = opts.budgetLabel ? escapeHtml(opts.budgetLabel) : null;
 
@@ -191,6 +193,8 @@ export async function sendPhotoRequestInvite(opts: PhotoRequestInviteEmailPayloa
       <p>${photographerName}님, 안녕하세요.</p>
       <p>Image Partners 운영팀에서 아래 사진 의뢰 후보로 초대드립니다.</p>
       <p><strong>의뢰:</strong> ${requestTitle}</p>
+      ${usageProject ? `<p><strong>사용 프로젝트:</strong> ${usageProject}</p>` : ""}
+      ${usageContext ? `<p><strong>사용 맥락:</strong> ${usageContext}</p>` : ""}
       ${locationLabel ? `<p><strong>지역:</strong> ${locationLabel}</p>` : ""}
       ${deadlineAt ? `<p><strong>희망 마감:</strong> ${deadlineAt}</p>` : ""}
       ${budgetLabel ? `<p><strong>예산:</strong> ${budgetLabel}</p>` : ""}

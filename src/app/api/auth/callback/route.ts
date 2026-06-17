@@ -10,6 +10,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const role = searchParams.get("role"); // "buyer" | "photographer" — passed via redirectTo
+  const organization = searchParams.get("organization")?.trim().replace(/\s+/g, " ") ?? "";
   const next = getSafeRelativePath(searchParams.get("next"), "/dashboard");
   const redirectOrigin = getCanonicalRedirectOrigin(origin);
 
@@ -21,14 +22,17 @@ export async function GET(request: Request) {
       // For Google OAuth with a selected role: update both user metadata AND profiles table.
       // The DB trigger already ran at user-creation time (before the callback),
       // so we must update the profile row directly to save the correct role.
-      if (role && (role === "buyer" || role === "photographer")) {
-        await supabase.auth.updateUser({ data: { role } });
+      if ((role && (role === "buyer" || role === "photographer")) || organization) {
+        await supabase.auth.updateUser({ data: { ...(role ? { role } : {}), ...(organization ? { organization } : {}) } });
 
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          const patch: Record<string, string> = {};
+          if (role && (role === "buyer" || role === "photographer")) patch.role = role;
+          if (organization) patch.organization = organization;
           await supabase
             .from("profiles")
-            .update({ role })
+            .update(patch)
             .eq("id", user.id);
         }
       }

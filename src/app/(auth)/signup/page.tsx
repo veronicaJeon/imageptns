@@ -18,6 +18,7 @@ export default function SignupPage() {
 
   const [role, setRole]           = useState<Role>("buyer");
   const [name, setName]           = useState("");
+  const [organization, setOrganization] = useState("");
   const [email, setEmail]         = useState("");
   const [password, setPassword]   = useState("");
   const [loading, setLoading]     = useState(false);
@@ -32,7 +33,7 @@ export default function SignupPage() {
       provider: "google",
       options: {
         // Pass role via callback URL; server route will attach it to user metadata
-        redirectTo: buildSiteUrl(`/api/auth/callback?role=${role}`),
+        redirectTo: buildSiteUrl(`/api/auth/callback?role=${role}&organization=${encodeURIComponent(organization.trim())}`),
       },
     });
     if (error) { setError(t.auth.login.errorOAuth); setLoading(false); }
@@ -47,7 +48,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        data: { full_name: name, role },
+        data: { full_name: name, role, organization: organization.trim() },
         emailRedirectTo: buildSiteUrl("/api/auth/callback"),
       },
     });
@@ -191,6 +192,16 @@ export default function SignupPage() {
                   icon="person"
                   required
                   autoComplete="name"
+                />
+                <Input
+                  label="소속(기관/업체/개인 활동명)"
+                  type="text"
+                  placeholder="예: ○○출판사, 국립○○박물관, 프리랜서"
+                  value={organization}
+                  onChange={(e) => setOrganization(e.target.value)}
+                  icon="business"
+                  required
+                  autoComplete="organization"
                 />
                 <Input
                   label={a.emailLabel}

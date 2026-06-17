@@ -20,6 +20,9 @@ interface ContactPhotoRequest {
   deadline_at: string | null;
   reference_url: string | null;
   reference_note: string | null;
+  requester_organization: string | null;
+  usage_project: string | null;
+  usage_context: string | null;
   request_status: string;
   created_at: string;
 }
@@ -184,41 +187,34 @@ export default function DashboardRequestsPage() {
 
                   <div className="grid grid-cols-1 gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-low p-4 text-sm md:grid-cols-4">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">위치</p>
-                      <p className="mt-1 text-on-surface">{request.location_label ?? "-"}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">요청자 소속</p>
+                      <p className="mt-1 text-on-surface">{request.requester_organization ?? "-"}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 프로젝트</p>
+                      <p className="mt-1 text-on-surface">{request.usage_project ?? "-"}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">카테고리</p>
-                      <p className="mt-1 text-on-surface">{request.category ?? "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">마감</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">희망 회신일</p>
                       <p className="mt-1 text-on-surface">{formatDate(request.deadline_at)}</p>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">예산</p>
-                      <p className="mt-1 text-on-surface">{formatBudget(request)}</p>
-                    </div>
-                    <div className="md:col-span-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">대상 지역</p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {(request.target_regions ?? []).length > 0 ? request.target_regions?.map((region) => (
-                          <span key={region} className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
-                            {region}
-                          </span>
-                        )) : <span className="text-xs text-outline">-</span>}
-                      </div>
-                    </div>
-                    <div className="md:col-span-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용/라이선스</p>
+                    <div className="md:col-span-4">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 맥락</p>
                       <p className="mt-1 text-on-surface-variant">
-                        {[request.usage_intent, request.license_intent].filter(Boolean).join(" / ") || "-"}
+                        {request.usage_context ?? "-"}
                       </p>
                     </div>
-                    {(request.tags ?? []).length > 0 && (
+                    {(request.location_label || request.category || formatBudget(request) !== "-" || (request.target_regions ?? []).length > 0 || (request.tags ?? []).length > 0) && (
                       <div className="md:col-span-4">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">태그</p>
-                        <p className="mt-1 text-on-surface-variant">{request.tags?.join(", ")}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">기존 보조정보</p>
+                        <p className="mt-1 text-on-surface-variant">
+                          위치 {request.location_label ?? "-"} · 카테고리 {request.category ?? "-"} · 예산 {formatBudget(request)}
+                        </p>
+                        {((request.target_regions ?? []).length > 0 || (request.tags ?? []).length > 0) && (
+                          <p className="mt-1 text-on-surface-variant">
+                            지역 {request.target_regions?.join(", ") || "-"} · 태그 {request.tags?.join(", ") || "-"}
+                          </p>
+                        )}
                       </div>
                     )}
                     {(request.reference_url || request.reference_note) && (

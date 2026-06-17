@@ -14,7 +14,8 @@ const MATCH_SELECT = `
   request:contact_submissions!contact_submission_id(
     id, subject, message, location_label, target_regions, category, tags,
     usage_intent, license_intent, budget_min_krw, budget_max_krw, deadline_at,
-    reference_url, reference_note, request_status, created_at
+    reference_url, reference_note, requester_organization, usage_project, usage_context,
+    request_status, created_at
   )
 `;
 

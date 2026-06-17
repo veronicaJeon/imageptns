@@ -64,6 +64,10 @@ interface SourcingRequest {
   id: string;
   subject: string | null;
   message: string | null;
+  requester_organization?: string | null;
+  usage_project?: string | null;
+  usage_context?: string | null;
+  deadline_at?: string | null;
   created_at: string;
   buyer_sourcing_status: string | null;
   answers: SourcingAnswer[] | null;
@@ -205,6 +209,25 @@ export default function BuyerSourcingPage() {
                 <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-on-surface-variant">
                   {request.message ?? "요청 내용 없음"}
                 </p>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-surface-container-low p-4 text-sm md:grid-cols-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">요청자 소속</p>
+                    <p className="mt-1 text-on-surface">{request.requester_organization ?? "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 프로젝트</p>
+                    <p className="mt-1 text-on-surface">{request.usage_project ?? "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">희망 회신일</p>
+                    <p className="mt-1 text-on-surface">{request.deadline_at ? new Date(request.deadline_at).toLocaleDateString("ko-KR") : "-"}</p>
+                  </div>
+                  <div className="md:col-span-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 맥락</p>
+                    <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{request.usage_context ?? "-"}</p>
+                  </div>
+                </div>
 
                 {answer ? (
                   <section className="mt-5 rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">

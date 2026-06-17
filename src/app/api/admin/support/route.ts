@@ -36,6 +36,10 @@ interface ContactSubmissionRow {
   reference_url: string | null;
   reference_note: string | null;
   non_copying_attested: boolean | null;
+  requester_organization: string | null;
+  usage_project: string | null;
+  usage_context: string | null;
+  sourcing_purposes: string[] | null;
   request_status: string | null;
   assignee: { id: string; full_name: string | null } | { id: string; full_name: string | null }[] | null;
   matches?: PhotoRequestMatchRow[] | null;
@@ -236,6 +240,10 @@ function mapPhotoSubmission(submission: ContactSubmissionRow) {
       reference_url: submission.reference_url,
       reference_note: submission.reference_note,
       non_copying_attested: submission.non_copying_attested,
+      requester_organization: submission.requester_organization,
+      usage_project: submission.usage_project,
+      usage_context: submission.usage_context,
+      sourcing_purposes: submission.sourcing_purposes ?? [],
       matches: submission.matches ?? [],
       answers: submission.answers ?? [],
     },
@@ -335,7 +343,9 @@ export async function GET(req: NextRequest) {
         id, name, email, subject, message, status, priority, admin_note, assigned_to,
         created_at, updated_at, resolved_at, inquiry_type, location_label, target_regions,
         category, tags, usage_intent, license_intent, budget_min_krw, budget_max_krw,
-        deadline_at, reference_url, reference_note, non_copying_attested, request_status,
+        deadline_at, reference_url, reference_note, non_copying_attested,
+        requester_organization, usage_project, usage_context, sourcing_purposes,
+        request_status,
         assignee:profiles!contact_submissions_assigned_to_fkey(id, full_name),
         matches:photo_request_matches(id, photographer_id, status, score, reason, created_at, updated_at)
       `)
@@ -472,9 +482,6 @@ export async function POST(req: NextRequest) {
 
   const requestRow = requestData as Pick<ContactSubmissionRow, "id" | "subject" | "request_status" | "target_regions">;
   const targetRegions = normalizeTextList(requestRow.target_regions);
-  if (targetRegions.length === 0) {
-    return NextResponse.json({ error: "사진 의뢰에 대상 지역이 없습니다." }, { status: 400 });
-  }
 
   const { data: photographerData, error: photographerError } = await admin
     .from("profiles")
@@ -487,9 +494,11 @@ export async function POST(req: NextRequest) {
   const candidates = ((photographerData ?? []) as PhotographerProfileRow[])
     .map((photographer) => ({
       photographer,
-      ...scorePhotographer(targetRegions, photographer.primary_activity_regions),
+      ...(targetRegions.length > 0
+        ? scorePhotographer(targetRegions, photographer.primary_activity_regions)
+        : { score: 0, reason: "지역 조건 없음" }),
     }))
-    .filter((candidate) => candidate.score > 0)
+    .filter((candidate) => targetRegions.length === 0 || candidate.score > 0)
     .sort((a, b) => b.score - a.score || (a.photographer.full_name ?? "").localeCompare(b.photographer.full_name ?? ""))
     .slice(0, limit);
 
@@ -790,7 +799,7 @@ async function sendPhotoRequestInvites(body: SupportPostBody, adminUserId: strin
   const admin = createAdminClient();
   const { data: requestData, error: requestError } = await admin
     .from("contact_submissions")
-    .select("id, subject, request_status, location_label, budget_min_krw, budget_max_krw, deadline_at")
+    .select("id, subject, request_status, location_label, budget_min_krw, budget_max_krw, deadline_at, usage_project, usage_context")
     .eq("id", requestId)
     .eq("inquiry_type", "photo_request")
     .single();
@@ -801,7 +810,7 @@ async function sendPhotoRequestInvites(body: SupportPostBody, adminUserId: strin
 
   const requestRow = requestData as Pick<
     ContactSubmissionRow,
-    "id" | "subject" | "request_status" | "location_label" | "budget_min_krw" | "budget_max_krw" | "deadline_at"
+    "id" | "subject" | "request_status" | "location_label" | "budget_min_krw" | "budget_max_krw" | "deadline_at" | "usage_project" | "usage_context"
   >;
   if (["fulfilled", "cancelled", "rejected"].includes(requestRow.request_status ?? "")) {
     return NextResponse.json(
@@ -864,6 +873,8 @@ async function sendPhotoRequestInvites(body: SupportPostBody, adminUserId: strin
     requestId,
     requestTitle,
     locationLabel: requestRow.location_label,
+    usageProject: requestRow.usage_project,
+    usageContext: requestRow.usage_context,
     deadlineAt: requestRow.deadline_at,
     budgetLabel,
   }));

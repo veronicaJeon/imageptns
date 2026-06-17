@@ -11,23 +11,9 @@ export interface PhotoRequestDraft {
   mode: "photo" | null;
   title: string;
   brief: string;
-  location_guidance: string;
-  category: string;
-  tags: string;
-  usage_intent: string;
-  sourcing_purposes: Array<"rights_check" | "similar_search" | "supply_check">;
+  usage_context: string;
+  sourcing_purposes: Array<"rights_check" | "similar_search" | "supply_check" | "context_reference" | "shooting_request">;
 }
-
-const CATEGORY_LABELS: Record<string, string> = {
-  nature: "자연",
-  people: "인물",
-  editorial: "에디토리얼",
-  urban: "도시/공간",
-  abstract: "추상/그래픽",
-  architecture: "건축",
-};
-
-const CATEGORY_VALUES = new Set(Object.keys(CATEGORY_LABELS));
 
 function cleanText(value: string | null | undefined) {
   return (value ?? "").trim().replace(/\s+/g, " ");
@@ -40,16 +26,6 @@ function usageLabelsFromParams(params: URLSearchParams) {
   if (params.get("commercial") === "true") labels.push("상업 사용 가능");
   if (params.get("derivatives") === "true") labels.push("원 저작물 변경 가능");
   return labels;
-}
-
-function keywordDraft(query: string) {
-  return Array.from(new Set(
-    query
-      .split(/[\s,]+/)
-      .map((keyword) => keyword.trim())
-      .filter(Boolean)
-      .slice(0, 8),
-  )).join(", ");
 }
 
 export function buildPhotoRequestHref(state: LibrarySearchState) {
@@ -83,36 +59,25 @@ export function draftPhotoRequestFromSearchParams(params: URLSearchParams): Phot
       mode: null,
       title: "",
       brief: "",
-      location_guidance: "",
-      category: "editorial",
-      tags: "",
-      usage_intent: "",
+      usage_context: "",
       sourcing_purposes: [],
     };
   }
 
   const query = cleanText(params.get("query"));
-  const categoryParam = cleanText(params.get("category"));
-  const category = CATEGORY_VALUES.has(categoryParam) ? categoryParam : "editorial";
   const usageLabels = usageLabelsFromParams(params);
   const lines = [
     query ? `찾고 있는 사진: ${query}` : "찾고 있는 사진:",
-    `카테고리: ${CATEGORY_LABELS[category] ?? "에디토리얼"}`,
     usageLabels.length > 0 ? `희망 사용 조건: ${usageLabels.join(", ")}` : "",
     "검색 결과에서 적합한 이미지를 찾지 못해 이미지 소싱 요청으로 전환했습니다.",
-    "필요한 장면, 촬영 위치, 대상 지역, 마감일, 예산은 아래 항목에서 보완해주세요.",
+    "필요한 장면, 사용 프로젝트, 사용 맥락은 아래 항목에서 보완해주세요.",
   ].filter(Boolean);
 
   return {
     mode: "photo",
     title: query ? `${query} 이미지 소싱 요청` : "이미지 소싱 요청",
     brief: lines.join("\n"),
-    location_guidance: query
-      ? "검색어에 지역명이 포함되어 있다면 촬영 위치에는 실제 촬영 지점, 대상 지역에는 작가를 찾을 시/군/구나 권역을 직접 입력해주세요."
-      : "촬영 위치에는 실제 촬영 지점, 대상 지역에는 작가를 찾을 시/군/구나 권역을 입력해주세요.",
-    category,
-    tags: keywordDraft(query),
-    usage_intent: usageLabels.length > 0 ? "검색 조건과 동일한 사용 목적 검토" : "",
+    usage_context: usageLabels.length > 0 ? `검색 조건과 동일한 사용 조건 검토: ${usageLabels.join(", ")}` : "",
     sourcing_purposes: sourcingPurposesFromParams(params),
   };
 }

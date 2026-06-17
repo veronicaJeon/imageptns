@@ -11,6 +11,8 @@ export interface PhotoRequestInviteEmailPayload {
   requestId: string;
   requestTitle: string;
   locationLabel: string | null;
+  usageProject?: string | null;
+  usageContext?: string | null;
   deadlineAt: string | null;
   budgetLabel: string | null;
 }

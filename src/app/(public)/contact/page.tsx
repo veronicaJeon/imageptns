@@ -9,42 +9,14 @@ import { validatePhotoRequestBuyerFields } from "@/lib/contact/request-fields";
 import { cn } from "@/lib/utils/cn";
 
 type ContactMode = "general" | "photo";
-type SourcingPurpose = "rights_check" | "similar_search" | "supply_check";
-
-const CATEGORY_OPTIONS = [
-  { value: "editorial", label: "에디토리얼" },
-  { value: "people", label: "인물" },
-  { value: "urban", label: "도시/공간" },
-  { value: "architecture", label: "건축" },
-  { value: "nature", label: "자연" },
-  { value: "abstract", label: "추상/그래픽" },
-];
-
-const LICENSE_OPTIONS = [
-  { value: "editorial", label: "에디토리얼" },
-  { value: "commercial", label: "커머셜" },
-  { value: "extended", label: "익스텐디드" },
-  { value: "not_sure", label: "상담 필요" },
-];
+type SourcingPurpose = "rights_check" | "similar_search" | "supply_check" | "context_reference" | "shooting_request";
 
 const SOURCING_PURPOSE_OPTIONS: Array<{ value: SourcingPurpose; label: string }> = [
-  { value: "rights_check", label: "권리 확인" },
-  { value: "similar_search", label: "유사 이미지 탐색" },
-  { value: "supply_check", label: "신규 촬영/보유 이미지 확인" },
+  { value: "rights_check", label: "이 이미지와 완전히 같은 사진의 권리 확인이 필요합니다" },
+  { value: "similar_search", label: "이 이미지와 유사한 사진이 필요합니다" },
+  { value: "context_reference", label: "이 자료는 설명을 위한 참고일 뿐입니다" },
+  { value: "shooting_request", label: "필요한 경우 신규 촬영 의뢰도 검토하고 싶습니다" },
 ];
-
-function splitList(value: string) {
-  return value
-    .split(/[,\n]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function numericOrNull(value: string) {
-  if (!value.trim()) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : null;
-}
 
 function dateInputValue(daysFromToday: number) {
   const date = new Date();
@@ -67,21 +39,21 @@ function ContactPageContent() {
   const [photoForm, setPhotoForm] = useState({
     title: "",
     brief: "",
-    location_label: "",
-    target_regions: "",
-    category: "editorial",
-    tags: "",
-    usage_intent: "",
-    license_intent: "not_sure",
-    budget_min_krw: "",
-    budget_max_krw: "",
+    requester_organization: "",
+    usage_project: "",
+    usage_context: "",
     deadline_at: "",
     reference_url: "",
     reference_note: "",
     sourcing_purposes: ["similar_search"] as SourcingPurpose[],
-    non_copying_attested: false,
   });
-  const [draftLocationGuidance, setDraftLocationGuidance] = useState("");
+  const [showAdvancedUsage, setShowAdvancedUsage] = useState(false);
+  const [advancedUsage, setAdvancedUsage] = useState({
+    publication_type: "",
+    territory: "",
+    digital_use: "",
+    reuse_intent: "",
+  });
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -95,6 +67,10 @@ function ContactPageContent() {
         ...prev,
         name:  prev.name  || user.full_name || "",
         email: prev.email || user.email     || "",
+      }));
+      setPhotoForm((prev) => ({
+        ...prev,
+        requester_organization: prev.requester_organization || user.organization || "",
       }));
     }
   }, [user]);
@@ -114,14 +90,11 @@ function ContactPageContent() {
     if (draft.mode !== "photo") return;
 
     setMode("photo");
-    setDraftLocationGuidance(draft.location_guidance);
     setPhotoForm((prev) => ({
       ...prev,
       title: prev.title || draft.title,
       brief: prev.brief || draft.brief,
-      category: draft.category,
-      tags: prev.tags || draft.tags,
-      usage_intent: prev.usage_intent || draft.usage_intent,
+      usage_context: prev.usage_context || draft.usage_context,
       sourcing_purposes: draft.sourcing_purposes.length > 0 ? draft.sourcing_purposes : prev.sourcing_purposes,
     }));
   }, [searchParams]);
@@ -154,41 +127,28 @@ function ContactPageContent() {
     setError("");
 
     if (!user) {
-      window.location.href = "/login?next=/contact";
+      setError("이미지 소싱 요청은 로그인 후 접수할 수 있습니다.");
+      setLoading(false);
       return;
     }
 
-    const budgetMin = numericOrNull(photoForm.budget_min_krw);
-    const budgetMax = numericOrNull(photoForm.budget_max_krw);
-
     if (!photoForm.title.trim()) {
-      setError("요청 제목을 입력해주세요. 예: 성수동 카페 외관 및 실내 컷");
+      setError("요청 제목을 입력해주세요. 예: 백제 금동대향로 사진 후보 요청");
       setLoading(false);
       return;
     }
     if (!photoForm.brief.trim()) {
-      setError("상세 브리프를 입력해주세요. 필요한 장면, 분위기, 납품 형태를 간단히 적어도 괜찮습니다.");
-      setLoading(false);
-      return;
-    }
-    if (!photoForm.location_label.trim()) {
-      setError("촬영 위치를 입력해주세요. 정확한 주소가 아니어도 지역명이나 랜드마크면 됩니다.");
-      setLoading(false);
-      return;
-    }
-    if (splitList(photoForm.target_regions).length === 0) {
-      setError("대상 지역을 입력해주세요. 작가를 찾을 시/군/구나 권역을 쉼표로 구분해 적어주세요.");
+      setError("찾고 있는 이미지 설명을 입력해주세요. 필요한 장면, 대상, 피해야 할 요소를 편하게 적어도 괜찮습니다.");
       setLoading(false);
       return;
     }
 
     const buyerValidationError = validatePhotoRequestBuyerFields({
-      usage_intent: photoForm.usage_intent,
-      budget_min_krw: budgetMin,
-      budget_max_krw: budgetMax,
+      requester_organization: photoForm.requester_organization,
+      usage_project: photoForm.usage_project,
+      usage_context: photoForm.usage_context,
       deadline_at: photoForm.deadline_at ? `${photoForm.deadline_at}T23:59:59.000Z` : "",
       reference_url: photoForm.reference_url,
-      non_copying_attested: photoForm.non_copying_attested,
     });
     if (buyerValidationError) {
       setError(buyerValidationError);
@@ -211,19 +171,19 @@ function ContactPageContent() {
           subject: photoForm.title,
           message: photoForm.brief,
           inquiry_type: "photo_request",
-          location_label: photoForm.location_label,
-          target_regions: splitList(photoForm.target_regions),
-          category: photoForm.category,
-          tags: splitList(photoForm.tags),
-          usage_intent: photoForm.usage_intent,
-          license_intent: photoForm.license_intent,
-          budget_min_krw: budgetMin,
-          budget_max_krw: budgetMax,
+          requester_organization: photoForm.requester_organization,
+          usage_project: photoForm.usage_project,
+          usage_context: photoForm.usage_context,
           deadline_at: photoForm.deadline_at ? `${photoForm.deadline_at}T23:59:59.000Z` : null,
           reference_url: photoForm.reference_url.trim() || null,
-          reference_note: photoForm.reference_note.trim() || null,
+          reference_note: [
+            photoForm.reference_note.trim(),
+            advancedUsage.publication_type ? `발행 형태: ${advancedUsage.publication_type}` : "",
+            advancedUsage.territory ? `사용 범위: ${advancedUsage.territory}` : "",
+            advancedUsage.digital_use ? `전자책/온라인 포함: ${advancedUsage.digital_use}` : "",
+            advancedUsage.reuse_intent ? `반복 사용: ${advancedUsage.reuse_intent}` : "",
+          ].filter(Boolean).join("\n") || null,
           sourcing_purposes: photoForm.sourcing_purposes,
-          non_copying_attested: photoForm.non_copying_attested,
         }),
       });
       if (!res.ok) {
@@ -377,6 +337,17 @@ function ContactPageContent() {
               </form>
             ) : (
               <form onSubmit={handlePhotoSubmit} noValidate className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                {!isLoggedIn && (
+                  <div className="md:col-span-2 rounded-lg border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-on-surface">
+                    <p className="font-semibold text-primary">이미지 소싱 요청은 로그인 후 접수할 수 있습니다.</p>
+                    <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                      출판 프로젝트 정보와 요청 이력을 안전하게 관리하기 위해 회원 로그인 후 요청을 받을게요.
+                    </p>
+                    <a href="/login?next=/contact?mode=photo" className="mt-3 inline-flex text-xs font-bold text-primary hover:underline">
+                      로그인하러 가기
+                    </a>
+                  </div>
+                )}
                 {error && (
                   <div className="rounded-lg border border-error/20 bg-error/10 px-4 py-3 text-sm text-error md:col-span-2">
                     {error}
@@ -384,141 +355,72 @@ function ContactPageContent() {
                 )}
 
                 <div className="md:col-span-2 rounded-lg bg-surface-container-lowest p-4 ring-1 ring-outline-variant">
-                  <p className="text-sm font-semibold text-on-surface">필요한 이미지를 자연어로 요청할 수 있습니다.</p>
+                  <p className="text-sm font-semibold text-on-surface">필요한 이미지를 편하게 설명해주세요.</p>
                   <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-                    권리 확인, 유사 이미지 탐색, 내부 보유 이미지 확인이 함께 필요할 수 있습니다. 답변과 후보 이미지는 담당자가 검토 후 발송합니다.
+                    담당자가 후보 이미지, 권리 확인 가능성, 필요한 경우 촬영 의뢰 가능성을 검토해 답변합니다.
                   </p>
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">요청 제목</label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">요청 제목 <span className="text-error">*</span></label>
                   <input
                     type="text"
                     value={photoForm.title}
                     onChange={setPhoto("title")}
-                    placeholder="예: 성수동 카페 외관 및 실내 컷"
+                    placeholder="예: 백제 금동대향로 사진 후보 요청"
                     className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                   />
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">필요한 이미지 설명</label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">찾고 있는 이미지 설명 <span className="text-error">*</span></label>
                   <textarea
                     value={photoForm.brief}
                     onChange={setPhoto("brief")}
                     rows={5}
-                    placeholder="필요한 장면, 분위기, 촬영 대상, 납품 형태를 적어주세요."
+                    placeholder="예: 한국사 교재 백제 파트에 넣을 금동대향로 사진이 필요합니다. 유물 전체가 잘 보이고 배경이 너무 복잡하지 않았으면 합니다."
                     className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-y min-h-32 transition-all"
                   />
                   <p className="text-xs leading-relaxed text-on-surface-variant">
-                    문장으로 길게 쓰지 않아도 됩니다. 필요한 컷, 분위기, 피해야 할 요소만 적어도 충분합니다.
+                    문장으로 길게 써도 좋고, 필요한 컷·분위기·피해야 할 요소를 짧게 적어도 충분합니다.
                   </p>
                 </div>
 
-                {draftLocationGuidance && (
-                  <div className="md:col-span-2 rounded-lg bg-primary/5 px-4 py-3 text-xs leading-relaxed text-primary ring-1 ring-primary/15">
-                    {draftLocationGuidance}
-                  </div>
-                )}
-
-                <div className="md:col-span-2 flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">요청 유형</label>
-                  <div className="flex flex-wrap gap-2">
-                    {SOURCING_PURPOSE_OPTIONS.map((option) => (
-                      <label
-                        key={option.value}
-                        className="flex items-center gap-2 rounded-full border border-outline-variant px-3 py-2 text-xs font-bold text-on-surface-variant"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={photoForm.sourcing_purposes.includes(option.value)}
-                          onChange={(event) => toggleSourcingPurpose(option.value, event.target.checked)}
-                          className="h-4 w-4 accent-primary"
-                        />
-                        {option.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">촬영 위치</label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">요청자 소속 <span className="text-error">*</span></label>
                   <input
                     type="text"
-                    value={photoForm.location_label}
-                    onChange={setPhoto("location_label")}
-                    placeholder="서울 성동구 성수동"
+                    value={photoForm.requester_organization}
+                    onChange={setPhoto("requester_organization")}
+                    placeholder="예: ○○출판사, 국립○○박물관, 프리랜서"
                     className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                   />
-                  <p className="text-xs leading-relaxed text-on-surface-variant">
-                    정확한 주소가 없어도 됩니다. 지역명, 랜드마크, 촬영 장소 성격을 적어주세요.
-                  </p>
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">대상 지역</label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">사용 프로젝트 <span className="text-error">*</span></label>
                   <input
                     type="text"
-                    value={photoForm.target_regions}
-                    onChange={setPhoto("target_regions")}
-                    placeholder="서울, 성수, 수도권"
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
-                  />
-                  <p className="text-xs leading-relaxed text-on-surface-variant">
-                    작가를 찾을 지역입니다. 여러 곳이면 쉼표로 구분해주세요.
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">카테고리</label>
-                  <select
-                    value={photoForm.category}
-                    onChange={setPhoto("category")}
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface outline-none transition-all"
-                  >
-                    {CATEGORY_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">태그</label>
-                  <input
-                    type="text"
-                    value={photoForm.tags}
-                    onChange={setPhoto("tags")}
-                    placeholder="카페, 라이프스타일, 인테리어"
+                    value={photoForm.usage_project}
+                    onChange={setPhoto("usage_project")}
+                    placeholder="예: 중학교 한국사 보조교재"
                     className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                   />
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">사용 목적</label>
-                  <input
-                    type="text"
-                    value={photoForm.usage_intent}
-                    onChange={setPhoto("usage_intent")}
-                    placeholder="기사, 캠페인, 웹사이트, 인쇄물 등"
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">사용 맥락 <span className="text-error">*</span></label>
+                  <textarea
+                    value={photoForm.usage_context}
+                    onChange={setPhoto("usage_context")}
+                    rows={4}
+                    placeholder="예: 백제 문화의 공예 수준을 설명하는 본문 옆 삽입 이미지로 사용합니다."
+                    className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-y min-h-28 transition-all"
                   />
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">라이선스 의도</label>
-                  <select
-                    value={photoForm.license_intent}
-                    onChange={setPhoto("license_intent")}
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface outline-none transition-all"
-                  >
-                    {LICENSE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">희망 마감일</label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">희망 회신일 <span className="text-error">*</span></label>
                   <input
                     type="date"
                     value={photoForm.deadline_at}
@@ -527,41 +429,12 @@ function ContactPageContent() {
                     className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface outline-none transition-all"
                   />
                   <p className="text-xs leading-relaxed text-on-surface-variant">
-                    기본값은 2주 뒤입니다. 더 급한 일정이면 담당자가 가능 여부를 확인합니다.
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">최소 예산</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1000"
-                    value={photoForm.budget_min_krw}
-                    onChange={setPhoto("budget_min_krw")}
-                    placeholder="500000"
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">최대 예산</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1000"
-                    value={photoForm.budget_max_krw}
-                    onChange={setPhoto("budget_max_krw")}
-                    placeholder="1200000"
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
-                  />
-                  <p className="text-xs leading-relaxed text-on-surface-variant">
-                    정확한 견적이 아니어도 됩니다. 최종 가격은 작가 조건과 사용 범위를 보고 검토합니다.
+                    기본값은 2주 뒤입니다. 합리적인 검토 일정을 기준으로 먼저 제안합니다.
                   </p>
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">참고 URL</label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">참고 URL / 샘플 이미지 URL</label>
                   <input
                     type="url"
                     value={photoForm.reference_url}
@@ -572,31 +445,74 @@ function ContactPageContent() {
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">참고 메모</label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">참고 설명</label>
                   <textarea
                     value={photoForm.reference_note}
                     onChange={setPhoto("reference_note")}
                     rows={3}
-                    placeholder="참고자료에서 필요한 방향과 피해야 할 점을 적어주세요."
+                    placeholder="예: 이 링크의 구도만 참고해주세요. / 이 이미지는 너무 어둡고 색감만 참고해주세요."
                     className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-y min-h-24 transition-all"
                   />
+                  <p className="text-xs leading-relaxed text-on-surface-variant">
+                    참고자료에서 따라가야 할 점과 피해야 할 점을 적어주세요.
+                  </p>
                 </div>
 
-                <label className="md:col-span-2 flex items-start gap-3 rounded-lg bg-surface-container-lowest p-4 ring-1 ring-outline-variant">
-                  <input
-                    type="checkbox"
-                    checked={photoForm.non_copying_attested}
-                    onChange={setPhoto("non_copying_attested")}
-                    className="mt-1 h-4 w-4 accent-primary"
-                  />
-                  <span className="text-sm leading-relaxed text-on-surface-variant">
-                    참고 이미지는 방향성 공유용이며, 타인의 저작물을 그대로 복제하거나 혼동될 정도로 유사한 결과물을 요구하지 않습니다.
-                  </span>
-                </label>
+                <div className="md:col-span-2 flex flex-col gap-2">
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">참고자료를 어떻게 활용하면 될까요?</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {SOURCING_PURPOSE_OPTIONS.map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex items-start gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-sm text-on-surface-variant"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={photoForm.sourcing_purposes.includes(option.value)}
+                          onChange={(event) => toggleSourcingPurpose(option.value, event.target.checked)}
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 rounded-lg bg-surface-container-lowest ring-1 ring-outline-variant">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedUsage((value) => !value)}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-on-surface"
+                  >
+                    알고 있다면 추가 입력
+                    <span className="material-symbols-outlined text-lg">{showAdvancedUsage ? "expand_less" : "expand_more"}</span>
+                  </button>
+                  {showAdvancedUsage && (
+                    <div className="grid grid-cols-1 gap-4 border-t border-outline-variant p-4 md:grid-cols-2">
+                      {([
+                        ["publication_type", "발행 형태", "예: 단행본, 교재, 잡지, 전시, 웹"],
+                        ["territory", "사용 범위", "예: 국내, 해외 포함, 미정"],
+                        ["digital_use", "전자책/온라인 포함 여부", "예: 포함, 미포함, 미정"],
+                        ["reuse_intent", "반복 사용 희망 여부", "예: 이번 프로젝트만, 향후 재사용 가능성 있음"],
+                      ] as const).map(([key, label, placeholder]) => (
+                        <div key={key} className="flex flex-col gap-2">
+                          <label className="text-xs font-bold text-outline uppercase tracking-widest">{label}</label>
+                          <input
+                            type="text"
+                            value={advancedUsage[key]}
+                            onChange={(event) => setAdvancedUsage((prev) => ({ ...prev, [key]: event.target.value }))}
+                            placeholder={placeholder}
+                            className="h-11 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-3 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !isLoggedIn}
                   className="md:col-span-2 flex items-center justify-center gap-2 py-4 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   {loading

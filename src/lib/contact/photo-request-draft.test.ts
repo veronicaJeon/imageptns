@@ -34,11 +34,8 @@ describe("photo request draft helpers", () => {
     expect(draft.brief).toContain("교육용 무료 사용 가능");
     expect(draft.brief).toContain("상업 사용 가능");
     expect(draft.brief).toContain("원 저작물 변경 가능");
-    expect(draft.location_guidance).toContain("촬영 위치");
-    expect(draft.location_guidance).toContain("대상 지역");
-    expect(draft.category).toBe("architecture");
-    expect(draft.tags).toBe("전북, 익산, 석탑, 낮, 사진");
-    expect(draft.usage_intent).toBe("검색 조건과 동일한 사용 목적 검토");
+    expect(draft.brief).not.toContain("마감일, 예산");
+    expect(draft.usage_context).toBe("검색 조건과 동일한 사용 조건 검토: 교육용 무료 사용 가능, 상업 사용 가능, 원 저작물 변경 가능");
     expect(draft.sourcing_purposes).toEqual(["similar_search"]);
   });
 

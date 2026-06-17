@@ -129,6 +129,10 @@ interface PhotoRequestDetail {
   reference_url: string | null;
   reference_note: string | null;
   non_copying_attested: boolean | null;
+  requester_organization: string | null;
+  usage_project: string | null;
+  usage_context: string | null;
+  sourcing_purposes: string[] | null;
   matches: PhotoMatch[];
   answers?: SourcingAnswer[] | null;
 }
@@ -183,6 +187,14 @@ function formatBudget(request: PhotoRequestDetail) {
 function displayList(values?: string[] | null) {
   return (values ?? []).filter(Boolean);
 }
+
+const SOURCING_PURPOSE_LABELS: Record<string, string> = {
+  rights_check: "동일 사진 권리 확인",
+  similar_search: "유사 사진 탐색",
+  supply_check: "보유 이미지 확인",
+  context_reference: "설명 참고",
+  shooting_request: "신규 촬영 검토",
+};
 
 function shortId(value: string) {
   return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
@@ -590,56 +602,34 @@ export default function AdminSupportPage() {
 
                       <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">위치</p>
-                        <p className="mt-1 text-on-surface">{photoRequest.location_label ?? "-"}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">요청자 소속</p>
+                        <p className="mt-1 text-on-surface">{photoRequest.requester_organization ?? "-"}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">카테고리</p>
-                        <p className="mt-1 text-on-surface">{photoRequest.category ?? "-"}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 프로젝트</p>
+                        <p className="mt-1 text-on-surface">{photoRequest.usage_project ?? "-"}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">마감</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">희망 회신일</p>
                         <p className="mt-1 text-on-surface">{formatDate(photoRequest.deadline_at)}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">예산</p>
-                        <p className="mt-1 text-on-surface">{formatBudget(photoRequest)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 목적</p>
-                        <p className="mt-1 text-on-surface">{photoRequest.usage_intent ?? "-"}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">라이선스 의도</p>
-                        <p className="mt-1 text-on-surface">{photoRequest.license_intent ?? "-"}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">원본성 확인</p>
-                        <p className="mt-1 text-on-surface">{photoRequest.non_copying_attested ? "확인됨" : "-"}</p>
-                      </div>
-                      <div className="md:col-span-4">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">대상 지역</p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {displayList(photoRequest.target_regions).length > 0 ? displayList(photoRequest.target_regions).map((region) => (
-                            <span key={region} className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
-                              {region}
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">활용 방식</p>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {displayList(photoRequest.sourcing_purposes).length > 0 ? displayList(photoRequest.sourcing_purposes).map((purpose) => (
+                            <span key={purpose} className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                              {SOURCING_PURPOSE_LABELS[purpose] ?? purpose}
                             </span>
                           )) : <span className="text-xs text-outline">-</span>}
                         </div>
                       </div>
                       <div className="md:col-span-4">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">태그</p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {displayList(photoRequest.tags).length > 0 ? displayList(photoRequest.tags).map((tag) => (
-                            <span key={tag} className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
-                              #{tag}
-                            </span>
-                          )) : <span className="text-xs text-outline">-</span>}
-                        </div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 맥락</p>
+                        <p className="mt-1 whitespace-pre-wrap text-on-surface">{photoRequest.usage_context ?? "-"}</p>
                       </div>
                       {(photoRequest.reference_url || photoRequest.reference_note) ? (
                         <div className="md:col-span-4">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">참고 URL/메모</p>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">참고 URL/설명</p>
                           {photoRequest.reference_url && (
                             <a href={photoRequest.reference_url} target="_blank" rel="noreferrer" className="mt-1 block break-all text-primary hover:underline">
                               {photoRequest.reference_url}
@@ -651,8 +641,21 @@ export default function AdminSupportPage() {
                         </div>
                       ) : (
                         <div className="md:col-span-4">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">참고 URL/메모</p>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">참고 URL/설명</p>
                           <p className="mt-1 text-xs text-outline">-</p>
+                        </div>
+                      )}
+                      {(photoRequest.location_label || photoRequest.category || photoRequest.usage_intent || photoRequest.license_intent || formatBudget(photoRequest) !== "-" || displayList(photoRequest.target_regions).length > 0 || displayList(photoRequest.tags).length > 0) && (
+                        <div className="md:col-span-4 rounded-lg bg-surface-container-lowest p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">기존 보조정보</p>
+                          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                            위치 {photoRequest.location_label ?? "-"} · 카테고리 {photoRequest.category ?? "-"} · 예산 {formatBudget(photoRequest)} · 사용/라이선스 {[photoRequest.usage_intent, photoRequest.license_intent].filter(Boolean).join(" / ") || "-"}
+                          </p>
+                          {(displayList(photoRequest.target_regions).length > 0 || displayList(photoRequest.tags).length > 0) && (
+                            <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                              지역 {displayList(photoRequest.target_regions).join(", ") || "-"} · 태그 {displayList(photoRequest.tags).join(", ") || "-"}
+                            </p>
+                          )}
                         </div>
                       )}
                       </div>

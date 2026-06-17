@@ -18,13 +18,18 @@ export const PHOTO_REQUEST_MATCH_STATUSES = [
   "cancelled",
 ] as const;
 
-export const SOURCING_PURPOSES = ["rights_check", "similar_search", "supply_check"] as const;
+export const SOURCING_PURPOSES = [
+  "rights_check",
+  "similar_search",
+  "supply_check",
+  "context_reference",
+  "shooting_request",
+] as const;
 
 const MAX_REGIONS = 12;
 const MAX_REGION_LENGTH = 80;
 const MAX_TAGS = 20;
 const MAX_TAG_LENGTH = 48;
-const MAX_BUDGET_KRW = 1_000_000_000;
 const MAX_REFERENCE_URL_LENGTH = 2048;
 const MAX_DEADLINE_YEARS_AHEAD = 2;
 
@@ -51,6 +56,9 @@ export interface NormalizedContactSubmission {
   reference_url: string | null;
   reference_note: string | null;
   non_copying_attested: boolean;
+  requester_organization: string | null;
+  usage_project: string | null;
+  usage_context: string | null;
   buyer_id: string | null;
   sourcing_purposes: SourcingPurpose[];
   internal_sourcing_status: "submitted";
@@ -59,12 +67,11 @@ export interface NormalizedContactSubmission {
 }
 
 export interface PhotoRequestBuyerValidationFields {
-  usage_intent: unknown;
-  budget_min_krw: unknown;
-  budget_max_krw: unknown;
+  requester_organization: unknown;
+  usage_project: unknown;
+  usage_context: unknown;
   deadline_at: unknown;
   reference_url: unknown;
-  non_copying_attested: unknown;
 }
 
 function hasValue<T extends readonly string[]>(values: T, value: string): value is T[number] {
@@ -222,29 +229,6 @@ export function normalizeSourcingPurposes(value: unknown): SourcingPurpose[] {
   return purposes.length > 0 ? purposes : ["similar_search"];
 }
 
-function normalizeBudgetRange(minValue: unknown, maxValue: unknown): {
-  budget_min_krw: number;
-  budget_max_krw: number;
-} {
-  if (!Number.isInteger(minValue) || !Number.isInteger(maxValue)) {
-    throw new Error("budget_min_krw and budget_max_krw must be integer KRW amounts");
-  }
-
-  const budget_min_krw = minValue as number;
-  const budget_max_krw = maxValue as number;
-  if (budget_min_krw < 0 || budget_max_krw < 0) {
-    throw new Error("budget amounts must be zero or greater");
-  }
-  if (budget_min_krw > budget_max_krw) {
-    throw new Error("budget_min_krw must be less than or equal to budget_max_krw");
-  }
-  if (budget_max_krw > MAX_BUDGET_KRW) {
-    throw new Error(`budget_max_krw must be ${MAX_BUDGET_KRW} or less`);
-  }
-
-  return { budget_min_krw, budget_max_krw };
-}
-
 function normalizeDeadline(value: unknown, now: Date): string {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error("deadline_at is required");
@@ -297,27 +281,23 @@ export function validatePhotoRequestBuyerFields(
   input: PhotoRequestBuyerValidationFields,
   now: Date = new Date(),
 ): string | null {
-  let usageIntent: string | null;
   try {
-    usageIntent = normalizeOptionalText(input.usage_intent, "usage_intent", 500);
+    normalizeText(input.requester_organization, "requester_organization", 160);
   } catch {
-    return "사용 목적은 500자 이내로 입력해주세요.";
-  }
-  if (!usageIntent) {
-    return "사용 목적을 입력해주세요. 예: 웹사이트, 기사, 캠페인, 인쇄물, 내부 자료";
+    return "요청자 소속을 입력해주세요. 예: ○○출판사, 국립○○박물관, 프리랜서";
   }
 
   try {
-    normalizeBudgetRange(input.budget_min_krw, input.budget_max_krw);
+    normalizeText(input.usage_project, "usage_project", 240);
   } catch {
-    if (
-      Number.isInteger(input.budget_min_krw)
-      && Number.isInteger(input.budget_max_krw)
-      && (input.budget_min_krw as number) > (input.budget_max_krw as number)
-    ) {
-      return "최소 예산은 최대 예산보다 클 수 없습니다. 예산 범위를 다시 확인해주세요.";
-    }
-    return "예산 범위를 원화 숫자로 입력해주세요. 아직 정확하지 않아도 대략적인 최소/최대 금액이면 됩니다.";
+    return "사용 프로젝트를 입력해주세요. 예: 중학교 한국사 보조교재, 전시 리플렛, 단행본 개정판";
+  }
+
+  try {
+    normalizeText(input.usage_context, "usage_context", 1000);
+  } catch {
+    const value = typeof input.usage_context === "string" ? input.usage_context.trim() : "";
+    return value ? "사용 맥락은 1000자 이내로 입력해주세요." : "사용 맥락을 입력해주세요. 이미지가 어떤 내용 옆에서 어떤 역할로 쓰이는지 적어주세요.";
   }
 
   try {
@@ -330,10 +310,6 @@ export function validatePhotoRequestBuyerFields(
     normalizeReferenceUrl(input.reference_url);
   } catch {
     return "참고 URL은 http:// 또는 https://로 시작하는 웹 주소만 입력할 수 있습니다.";
-  }
-
-  if (input.non_copying_attested !== true) {
-    return "참고 이미지를 그대로 복제하거나 혼동될 정도로 유사한 결과물을 요구하지 않는다는 확인이 필요합니다.";
   }
 
   return null;
@@ -374,31 +350,33 @@ export function normalizeContactSubmissionInput(
       reference_url: null,
       reference_note: null,
       non_copying_attested: false,
+      requester_organization: null,
+      usage_project: null,
+      usage_context: null,
       sourcing_purposes: [],
       internal_sourcing_status: "submitted",
       buyer_sourcing_status: "received",
     };
   }
 
-  if (body.non_copying_attested !== true) {
-    throw new Error("non_copying_attested must be true for photo requests");
-  }
-
-  const budget = normalizeBudgetRange(body.budget_min_krw, body.budget_max_krw);
+  const deadline_at = normalizeDeadline(body.deadline_at, now);
   return {
     ...base,
-    location_label: normalizeText(body.location_label, "location_label", 160),
-    target_regions: normalizeTargetRegions(body.target_regions),
+    location_label: normalizeOptionalText(body.location_label, "location_label", 160),
+    target_regions: body.target_regions === undefined || body.target_regions === null ? [] : normalizeTargetRegions(body.target_regions),
     category: normalizeOptionalText(body.category, "category", 80),
     tags: normalizeTags(body.tags),
-    usage_intent: normalizeText(body.usage_intent, "usage_intent", 500),
-    license_intent: normalizeText(body.license_intent, "license_intent", 240),
-    budget_min_krw: budget.budget_min_krw,
-    budget_max_krw: budget.budget_max_krw,
-    deadline_at: normalizeDeadline(body.deadline_at, now),
+    usage_intent: normalizeOptionalText(body.usage_intent, "usage_intent", 500),
+    license_intent: normalizeOptionalText(body.license_intent, "license_intent", 240),
+    budget_min_krw: null,
+    budget_max_krw: null,
+    deadline_at,
     reference_url: normalizeReferenceUrl(body.reference_url),
     reference_note: normalizeOptionalText(body.reference_note, "reference_note", 1000),
-    non_copying_attested: true,
+    non_copying_attested: body.non_copying_attested === true,
+    requester_organization: normalizeText(body.requester_organization, "requester_organization", 160),
+    usage_project: normalizeText(body.usage_project, "usage_project", 240),
+    usage_context: normalizeText(body.usage_context, "usage_context", 1000),
     sourcing_purposes: normalizeSourcingPurposes(body.sourcing_purposes),
     internal_sourcing_status: "submitted",
     buyer_sourcing_status: "received",
