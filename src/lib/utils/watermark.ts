@@ -94,3 +94,11 @@ export async function createWatermarkedThumbnail(input: Buffer, width = 320, hei
     .jpeg({ quality: 74 })
     .toBuffer();
 }
+
+export async function resizeWatermarkedPreview(input: Buffer, width = 320, height = 240): Promise<Buffer> {
+  return sharp(input)
+    .rotate()
+    .resize(width, height, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 74 })
+    .toBuffer();
+}

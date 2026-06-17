@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createWatermarkedThumbnail } from "@/lib/utils/watermark";
+import { resizeWatermarkedPreview } from "@/lib/utils/watermark";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   }
 
   const input = Buffer.from(await response.arrayBuffer());
-  const output = await createWatermarkedThumbnail(input, width, height);
+  const output = await resizeWatermarkedPreview(input, width, height);
 
   return new NextResponse(new Uint8Array(output), {
     headers: {

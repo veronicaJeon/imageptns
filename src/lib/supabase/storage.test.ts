@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { thumbnailUrlFromPreviewUrl } from "./storage";
 
 describe("thumbnailUrlFromPreviewUrl", () => {
-  it("routes public preview images through a versioned watermarked thumbnail proxy", () => {
+  it("routes public preview images through the thumbnail proxy", () => {
     const src = "https://example.supabase.co/storage/v1/object/public/images-preview/user/photo.jpg";
     const url = thumbnailUrlFromPreviewUrl(src, 640, 480);
     const parsed = new URL(url, "https://imagepartners.kr");
