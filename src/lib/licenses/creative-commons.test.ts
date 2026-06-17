@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buyerUsageConditions,
-  creditLineForPhotographerId,
+  creditLineForName,
   getCopyrightLicense,
   getFreeUsagePolicy,
   normalizeCopyrightLicenseCode,
@@ -41,12 +41,12 @@ describe("creative commons metadata", () => {
     expect(normalizeFreeUsagePolicy("bad-value")).toBe("none");
   });
 
-  it("builds the platform credit line from immutable photographer id", () => {
-    expect(creditLineForPhotographerId("jiri_mountain_01")).toBe("jiri_mountain_01 / Image Partners");
+  it("builds the platform credit line from the photographer display name", () => {
+    expect(creditLineForName("김지리")).toBe("김지리 / Image Partners");
   });
 
-  it("uses an unassigned credit line fallback when photographer id is missing", () => {
-    expect(creditLineForPhotographerId(null)).toBe("unassigned / Image Partners");
+  it("uses an unassigned credit line fallback when photographer name is missing", () => {
+    expect(creditLineForName(null)).toBe("unassigned / Image Partners");
   });
 
   it("maps backend license fields into buyer-friendly usage conditions", () => {

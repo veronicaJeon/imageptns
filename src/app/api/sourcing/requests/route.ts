@@ -12,6 +12,7 @@ interface CandidateImage {
   width: number | null;
   height: number | null;
   photographer_id: string | null;
+  photographer_name?: string | null;
   copyright_license: string | null;
   free_usage_policy: string | null;
 }
@@ -138,9 +139,29 @@ export async function GET() {
   if (revisionsError) return NextResponse.json({ error: revisionsError.message }, { status: 500 });
 
   const imagesById = new Map(((imageData ?? []) as CandidateImage[]).map((image) => [image.id, image]));
+  const photographerIds = Array.from(new Set(
+    ((imageData ?? []) as CandidateImage[])
+      .map((image) => image.photographer_id)
+      .filter((id): id is string => Boolean(id)),
+  ));
+  const { data: photographerData, error: photographerError } = photographerIds.length > 0
+    ? await admin
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", photographerIds)
+    : { data: [], error: null };
+
+  if (photographerError) return NextResponse.json({ error: photographerError.message }, { status: 500 });
+
+  const photographerNamesById = new Map(
+    ((photographerData ?? []) as Array<{ id: string; full_name: string | null }>).map((profile) => [profile.id, profile.full_name]),
+  );
   const candidatesByAnswerId = new Map<string, CandidateRow[]>();
   for (const candidate of candidateRows) {
-    const image = imagesById.get(candidate.image_id) ?? null;
+    const rawImage = imagesById.get(candidate.image_id) ?? null;
+    const image = rawImage
+      ? { ...rawImage, photographer_name: rawImage.photographer_id ? photographerNamesById.get(rawImage.photographer_id) ?? null : null }
+      : null;
     const row: CandidateRow = { ...candidate, image };
     candidatesByAnswerId.set(candidate.answer_id, [...(candidatesByAnswerId.get(candidate.answer_id) ?? []), row]);
   }

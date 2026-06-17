@@ -167,10 +167,12 @@ export interface BuyerUsageCondition {
   allowed: boolean;
 }
 
-export function creditLineForPhotographerId(photographerId: string | null | undefined): string {
-  const normalized = (photographerId ?? "").trim();
+export function creditLineForName(name: string | null | undefined): string {
+  const normalized = (name ?? "").trim();
   return `${normalized || "unassigned"} / Image Partners`;
 }
+
+export const creditLineForPhotographerId = creditLineForName;
 
 export function buyerUsageConditions(input: {
   copyrightLicense: unknown;

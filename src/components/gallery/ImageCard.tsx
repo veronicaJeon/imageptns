@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useCart } from "@/lib/store/cart";
 import { useRouter } from "next/navigation";
 import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
-import { buyerUsageConditions, creditLineForPhotographerId, getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
+import { buyerUsageConditions, creditLineForName, getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 
 export interface ImageCardData {
   id: string;
@@ -79,7 +79,7 @@ export function ImageCard({
       src: image.src,
       category: image.category,
       license: "editorial",
-      creditLine: creditLineForPhotographerId(image.photographerId ?? image.photographer),
+      creditLine: creditLineForName(image.photographer),
       usageConditions: usageConditions.map((condition) => condition.label),
     });
     onAddToCart?.(image.id);

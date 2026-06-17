@@ -8,8 +8,7 @@ import { useLang } from "@/lib/i18n/store";
 import { useCart } from "@/lib/store/cart";
 import { cn } from "@/lib/utils/cn";
 import { ImageCard, ImageCardData } from "@/components/gallery/ImageCard";
-import { buyerUsageConditions, creditLineForPhotographerId, getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
-import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
+import { buyerUsageConditions, creditLineForName, getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 
 const LICENSE_PRICES: Record<string, number> = {
   editorial:  15000,
@@ -177,8 +176,8 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   const photographerId = imageData.photographer?.id ?? null;
-  const photographer = photographerId ?? "unknown";
-  const creditLine = creditLineForPhotographerId(photographerId);
+  const photographerName = imageData.photographer?.display_name ?? imageData.photographer?.full_name ?? "Unknown";
+  const creditLine = creditLineForName(photographerName);
   const copyrightLicense = getCopyrightLicense(imageData.copyright_license);
   const freeUsagePolicy = getFreeUsagePolicy(imageData.free_usage_policy);
   const usageConditions = buyerUsageConditions({
@@ -237,11 +236,11 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
               {imageData.storage_path_preview ? (
                 <>
                   <Image
-                    src={thumbnailUrlFromPreviewUrl(imageData.storage_path_preview, 1200, 900)}
+                    src={imageData.storage_path_preview}
                     alt={imageData.title}
                     width={imageData.width ?? 1200}
                     height={imageData.height ?? 800}
-                    className="w-full h-auto object-cover"
+                    className="mx-auto max-h-[78vh] w-auto max-w-full object-contain"
                     unoptimized
                   />
                   <div className="pointer-events-none absolute bottom-4 right-4 rounded bg-black/55 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white">
@@ -274,10 +273,10 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                     href={`/photographer/${photographerId}`}
                     className="text-on-surface font-semibold hover:text-primary transition-colors underline-offset-2 hover:underline"
                   >
-                    {photographer}
+                    {photographerName}
                   </Link>
                 ) : (
-                  <span className="text-on-surface font-semibold">{photographer}</span>
+                  <span className="text-on-surface font-semibold">{photographerName}</span>
                 )}
               </p>
               {imageData.description && (

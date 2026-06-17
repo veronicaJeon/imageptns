@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buyerUsageConditions, creditLineForPhotographerId } from "@/lib/licenses/creative-commons";
+import { buyerUsageConditions, creditLineForName } from "@/lib/licenses/creative-commons";
 import { useCart } from "@/lib/store/cart";
 import { revisionLimitNotice } from "@/lib/sourcing/status";
 
@@ -40,6 +40,7 @@ interface CandidateImage {
   width: number | null;
   height: number | null;
   photographer_id: string | null;
+  photographer_name?: string | null;
   copyright_license: string | null;
   free_usage_policy: string | null;
 }
@@ -114,11 +115,11 @@ export default function BuyerSourcingPage() {
       id: image.id,
       assetId: image.asset_id ?? undefined,
       title: image.title ?? "Untitled",
-      photographer: image.photographer_id ?? "",
+      photographer: image.photographer_name ?? "",
       src: image.storage_path_preview ?? "",
       category: image.category ?? "",
       license: "editorial",
-      creditLine: creditLineForPhotographerId(image.photographer_id),
+      creditLine: creditLineForName(image.photographer_name),
       usageConditions: usageConditions.map((condition) => condition.label),
     });
     setCartAdded(image.id);
