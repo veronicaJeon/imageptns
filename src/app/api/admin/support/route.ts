@@ -80,6 +80,7 @@ interface SourcingCandidateImageRow {
 
 interface SourcingCandidateRow {
   id: string;
+  answer_id?: string;
   image_id: string;
   sort_order: number;
   is_visible: boolean;
@@ -89,6 +90,7 @@ interface SourcingCandidateRow {
 
 interface SourcingAnswerRow {
   id: string;
+  contact_submission_id?: string;
   answer_text: string | null;
   rights_result: string | null;
   rights_explanation: string | null;
@@ -240,6 +242,67 @@ function mapPhotoSubmission(submission: ContactSubmissionRow) {
   };
 }
 
+async function hydrateSourcingAnswers(
+  admin: ReturnType<typeof createAdminClient>,
+  submissions: ContactSubmissionRow[],
+) {
+  const requestIds = submissions.map((submission) => submission.id);
+  if (requestIds.length === 0) return submissions;
+
+  const { data: answerData, error: answerError } = await admin
+    .from("sourcing_request_answers")
+    .select("id, contact_submission_id, answer_text, rights_result, rights_explanation, status, revision_round, published_at, created_at, updated_at")
+    .in("contact_submission_id", requestIds)
+    .order("created_at", { ascending: false });
+
+  if (answerError) throw answerError;
+
+  const answers = (answerData ?? []) as SourcingAnswerRow[];
+  const answerIds = answers.map((answer) => answer.id);
+  const { data: candidateData, error: candidateError } = answerIds.length > 0
+    ? await admin
+      .from("sourcing_request_candidates")
+      .select("id, answer_id, image_id, sort_order, is_visible, note")
+      .in("answer_id", answerIds)
+      .order("sort_order", { ascending: true })
+    : { data: [], error: null };
+
+  if (candidateError) throw candidateError;
+
+  const candidates = (candidateData ?? []) as SourcingCandidateRow[];
+  const imageIds = Array.from(new Set(candidates.map((candidate) => candidate.image_id).filter(Boolean)));
+  const { data: imageData, error: imageError } = imageIds.length > 0
+    ? await admin
+      .from("images")
+      .select("id, asset_id, title, storage_path_preview, status, lifecycle_status, is_published, copyright_license, free_usage_policy, photographer_id")
+      .in("id", imageIds)
+    : { data: [], error: null };
+
+  if (imageError) throw imageError;
+
+  const imagesById = new Map(((imageData ?? []) as SourcingCandidateImageRow[]).map((image) => [image.id, image]));
+  const candidatesByAnswerId = new Map<string, SourcingCandidateRow[]>();
+  for (const candidate of candidates) {
+    candidatesByAnswerId.set(candidate.answer_id ?? "", [
+      ...(candidatesByAnswerId.get(candidate.answer_id ?? "") ?? []),
+      { ...candidate, image: imagesById.get(candidate.image_id) ?? null },
+    ]);
+  }
+
+  const answersByRequestId = new Map<string, SourcingAnswerRow[]>();
+  for (const answer of answers) {
+    answersByRequestId.set(answer.contact_submission_id ?? "", [
+      ...(answersByRequestId.get(answer.contact_submission_id ?? "") ?? []),
+      { ...answer, candidates: candidatesByAnswerId.get(answer.id) ?? [] },
+    ]);
+  }
+
+  return submissions.map((submission) => ({
+    ...submission,
+    answers: answersByRequestId.get(submission.id) ?? [],
+  }));
+}
+
 export async function GET(req: NextRequest) {
   const adminUser = await requireAdminUser();
   if (!adminUser) return forbidden();
@@ -274,14 +337,7 @@ export async function GET(req: NextRequest) {
         category, tags, usage_intent, license_intent, budget_min_krw, budget_max_krw,
         deadline_at, reference_url, reference_note, non_copying_attested, request_status,
         assignee:profiles!contact_submissions_assigned_to_fkey(id, full_name),
-        matches:photo_request_matches(id, photographer_id, status, score, reason, created_at, updated_at),
-        answers:sourcing_request_answers(
-          id, answer_text, rights_result, rights_explanation, status, revision_round, published_at, created_at, updated_at,
-          candidates:sourcing_request_candidates(
-            id, image_id, sort_order, is_visible, note,
-            image:images(id, asset_id, title, storage_path_preview, status, lifecycle_status, is_published, copyright_license, free_usage_policy, photographer_id)
-          )
-        )
+        matches:photo_request_matches(id, photographer_id, status, score, reason, created_at, updated_at)
       `)
       .eq("inquiry_type", "photo_request")
       .order("created_at", { ascending: false })
@@ -293,7 +349,13 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    submissions.push(...((data ?? []) as ContactSubmissionRow[]).map(mapPhotoSubmission));
+    try {
+      const hydrated = await hydrateSourcingAnswers(admin, (data ?? []) as ContactSubmissionRow[]);
+      submissions.push(...hydrated.map(mapPhotoSubmission));
+    } catch (hydrateError) {
+      const message = hydrateError instanceof Error ? hydrateError.message : "Failed to load sourcing answers";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
   }
 
   submissions.sort((a, b) =>
@@ -640,7 +702,7 @@ async function publishSourcingAnswer(body: SupportPostBody, adminUserId: string)
   const admin = createAdminClient();
   const { data: answer, error: answerError } = await admin
     .from("sourcing_request_answers")
-    .select("id, contact_submission_id, answer_text, rights_result, status, candidates:sourcing_request_candidates(id)")
+    .select("id, contact_submission_id, answer_text, rights_result, status")
     .eq("id", answerId)
     .single();
 
@@ -649,7 +711,14 @@ async function publishSourcingAnswer(body: SupportPostBody, adminUserId: string)
     return NextResponse.json({ error: "Only draft answers can be published" }, { status: 409 });
   }
 
-  const candidates = Array.isArray(answer.candidates) ? answer.candidates : [];
+  const { data: candidateData, error: candidateLoadError } = await admin
+    .from("sourcing_request_candidates")
+    .select("id")
+    .eq("answer_id", answerId);
+
+  if (candidateLoadError) return NextResponse.json({ error: candidateLoadError.message }, { status: 500 });
+
+  const candidates = candidateData ?? [];
   if (!answer.answer_text && !answer.rights_result && candidates.length === 0) {
     return NextResponse.json({ error: "답변 내용, 권리 확인 결과, 후보 이미지 중 하나 이상이 필요합니다." }, { status: 400 });
   }
