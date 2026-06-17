@@ -70,6 +70,7 @@ export default function LibraryPage() {
   const [liveStats, setLiveStats]     = useState<{ images: number; photographers: number; orders: number } | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const blurTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sentinelRef   = useRef<HTMLDivElement | null>(null);
@@ -194,6 +195,19 @@ export default function LibraryPage() {
     commercialOnly,
     derivativesOnly,
   });
+  const activeFilterCount = [
+    category !== "all",
+    freeOnly,
+    educationFreeOnly,
+    commercialOnly,
+    derivativesOnly,
+  ].filter(Boolean).length;
+  const usageFilters = [
+    { label: usageLabels.free, checked: freeOnly, onChange: setFreeOnly, icon: "redeem" },
+    { label: usageLabels.educationFree, checked: educationFreeOnly, onChange: setEducationFreeOnly, icon: "school" },
+    { label: usageLabels.commercial, checked: commercialOnly, onChange: setCommercialOnly, icon: "business_center" },
+    { label: usageLabels.derivatives, checked: derivativesOnly, onChange: setDerivativesOnly, icon: "edit" },
+  ];
 
   return (
     <>
@@ -271,77 +285,113 @@ export default function LibraryPage() {
       </section>
 
       {/* ── Filter Bar ────────────────────────────── */}
-      <div className="sticky top-20 z-40 bg-surface/80 backdrop-blur-md border-b border-outline-variant/20">
-        <div className="max-w-7xl mx-auto px-6 md:px-8 py-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            {/* Category pills */}
-            <div className="flex flex-wrap gap-2">
-              {CATEGORY_KEYS.map((key) => (
-                <CategoryPill
-                  key={key}
-                  label={l.categories[key]}
-                  active={category === key}
-                  onClick={() => handleCategoryChange(key)}
-                />
-              ))}
-            </div>
-
-            {/* Sort + request + result count */}
-            <div className="flex items-center gap-3 shrink-0">
-              <span className="text-xs text-outline font-medium">
-                {loading ? "…" : `${images.length}${hasMore ? "+" : ""}`} {l.results}
-              </span>
+      <div className="sticky top-20 z-40 border-b border-outline-variant/20 bg-surface/95 backdrop-blur-md md:bg-surface/80">
+        <div className="max-w-7xl mx-auto px-4 py-3 md:px-8 md:py-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2 md:hidden">
+            <span className="text-xs font-medium text-outline">
+              {loading ? "…" : `${images.length}${hasMore ? "+" : ""}`} {l.results}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen((value) => !value)}
+                className={[
+                  "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors",
+                  mobileFiltersOpen || activeFilterCount > 0
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-outline-variant bg-surface-container-lowest text-on-surface-variant",
+                ].join(" ")}
+                aria-expanded={mobileFiltersOpen}
+              >
+                <span className="material-symbols-outlined text-base">tune</span>
+                필터{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
+              </button>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                className="h-9 rounded-full bg-surface-container-low px-3 text-xs font-bold text-on-surface outline-none"
+                aria-label={l.sort.label}
+              >
+                {SORT_KEYS.map((k) => (
+                  <option key={k} value={k}>{l.sort[k]}</option>
+                ))}
+              </select>
               <Link
                 href={photoRequestHref}
-                className="flex h-9 items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3 text-xs font-bold text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface-variant"
+                aria-label="사진 요청"
               >
                 <span className="material-symbols-outlined text-base">add_photo_alternate</span>
-                사진 요청
               </Link>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-outline uppercase tracking-widest hidden sm:inline">
-                  {l.sort.label}
-                </span>
-                <select
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value as SortKey)}
-                  className="text-xs font-bold bg-surface-container-low text-on-surface px-3 py-2 rounded-full outline-none cursor-pointer border-none"
-                >
-                  {SORT_KEYS.map((k) => (
-                    <option key={k} value={k}>{l.sort[k]}</option>
-                  ))}
-                </select>
-              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-outline-variant/20 pt-3">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-outline">{usageLabels.title}</span>
-            {[
-              { label: usageLabels.free, checked: freeOnly, onChange: setFreeOnly, icon: "redeem" },
-              { label: usageLabels.educationFree, checked: educationFreeOnly, onChange: setEducationFreeOnly, icon: "school" },
-              { label: usageLabels.commercial, checked: commercialOnly, onChange: setCommercialOnly, icon: "business_center" },
-              { label: usageLabels.derivatives, checked: derivativesOnly, onChange: setDerivativesOnly, icon: "edit" },
-            ].map((filter) => (
-              <label
-                key={filter.label}
-                className={[
-                  "flex h-8 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors",
-                  filter.checked
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-outline-variant bg-surface-container-low text-on-surface-variant hover:border-outline",
-                ].join(" ")}
-              >
-                <input
-                  type="checkbox"
-                  checked={filter.checked}
-                  onChange={(event) => filter.onChange(event.target.checked)}
-                  className="sr-only"
-                />
-                <span className="material-symbols-outlined text-sm">{filter.icon}</span>
-                {filter.label}
-              </label>
-            ))}
+          <div className={`${mobileFiltersOpen ? "flex" : "hidden"} flex-col gap-3 md:flex`}>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+            {/* Category pills */}
+              <div className="flex max-h-24 flex-wrap gap-2 overflow-y-auto pr-1 md:max-h-none md:overflow-visible">
+                {CATEGORY_KEYS.map((key) => (
+                  <CategoryPill
+                    key={key}
+                    label={l.categories[key]}
+                    active={category === key}
+                    onClick={() => handleCategoryChange(key)}
+                  />
+                ))}
+              </div>
+
+            {/* Sort + request + result count */}
+              <div className="hidden items-center gap-3 shrink-0 md:flex">
+                <span className="text-xs text-outline font-medium">
+                  {loading ? "…" : `${images.length}${hasMore ? "+" : ""}`} {l.results}
+                </span>
+                <Link
+                  href={photoRequestHref}
+                  className="flex h-9 items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3 text-xs font-bold text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
+                >
+                  <span className="material-symbols-outlined text-base">add_photo_alternate</span>
+                  사진 요청
+                </Link>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-outline uppercase tracking-widest hidden sm:inline">
+                    {l.sort.label}
+                  </span>
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as SortKey)}
+                    className="text-xs font-bold bg-surface-container-low text-on-surface px-3 py-2 rounded-full outline-none cursor-pointer border-none"
+                  >
+                    {SORT_KEYS.map((k) => (
+                      <option key={k} value={k}>{l.sort[k]}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex max-h-24 flex-wrap items-center gap-2 overflow-y-auto border-t border-outline-variant/20 pt-3 pr-1 md:max-h-none md:overflow-visible">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-outline">{usageLabels.title}</span>
+              {usageFilters.map((filter) => (
+                <label
+                  key={filter.label}
+                  className={[
+                    "flex h-8 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors",
+                    filter.checked
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-outline-variant bg-surface-container-low text-on-surface-variant hover:border-outline",
+                  ].join(" ")}
+                >
+                  <input
+                    type="checkbox"
+                    checked={filter.checked}
+                    onChange={(event) => filter.onChange(event.target.checked)}
+                    className="sr-only"
+                  />
+                  <span className="material-symbols-outlined text-sm">{filter.icon}</span>
+                  {filter.label}
+                </label>
+              ))}
+            </div>
           </div>
         </div>
       </div>

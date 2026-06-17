@@ -316,26 +316,26 @@ export default function AdminImagesPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto bg-surface-container-lowest shadow-ghost">
-        <table className="w-full min-w-[1080px] text-sm">
+      <div className="overflow-x-auto rounded-xl bg-surface-container-lowest shadow-ghost">
+        <table className="w-full min-w-[920px] text-sm">
           <thead>
             <tr className="border-b border-outline-variant/20">
-              <th className="w-12 px-4 py-4 text-left">
+              <th className="w-12 px-5 py-4 text-left">
                 <input type="checkbox" checked={allPageSelected} onChange={toggleAllPage} aria-label="현재 페이지 전체 선택" />
               </th>
-              {["이미지", "에셋ID", "상태", "키워드", "크기", "성과", "등록일", "사진가"].map((head) => (
-                <th key={head} className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">{head}</th>
+              {["이미지 정보", "상태", "성과", "등록 정보"].map((head) => (
+                <th key={head} className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">{head}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/20">
             {loading ? (
-              <tr><td colSpan={9} className="px-5 py-20 text-center text-outline">이미지 목록을 불러오는 중...</td></tr>
+              <tr><td colSpan={5} className="px-5 py-20 text-center text-outline">이미지 목록을 불러오는 중...</td></tr>
             ) : images.length === 0 ? (
-              <tr><td colSpan={9} className="px-5 py-20 text-center text-outline">조건에 맞는 이미지가 없습니다.</td></tr>
+              <tr><td colSpan={5} className="px-5 py-20 text-center text-outline">조건에 맞는 이미지가 없습니다.</td></tr>
             ) : images.map((image) => (
               <tr key={image.id} className="hover:bg-surface-container-low">
-                <td className="px-4 py-4">
+                <td className="px-5 py-5 align-top">
                   <input
                     type="checkbox"
                     checked={selectedSet.has(image.id)}
@@ -343,57 +343,70 @@ export default function AdminImagesPage() {
                     aria-label={`${image.title} 선택`}
                   />
                 </td>
-                <td className="px-4 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded bg-surface-container-low">
+                <td className="px-5 py-5 align-top">
+                  <div className="flex items-start gap-4">
+                    <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-lg bg-surface-container-low">
                       {image.storage_path_preview ? (
-                        <Image src={image.storage_path_preview} alt="" fill sizes="80px" className="object-cover" />
+                        <Image src={image.storage_path_preview} alt="" fill sizes="112px" className="object-cover" />
                       ) : (
                         <span className="material-symbols-outlined absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-outline">image</span>
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="max-w-72 truncate font-semibold text-on-surface">{image.title}</p>
-                      <p className="mt-1 text-xs text-outline">{image.category}</p>
+                      <p className="max-w-[360px] truncate font-semibold text-on-surface">{image.title}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-outline">
+                        <span>{image.category}</span>
+                        <span className="font-mono">{image.asset_id ?? "-"}</span>
+                      </div>
+                      <div className="mt-3 flex max-w-[420px] flex-wrap gap-1">
+                        {(image.tags ?? []).slice(0, 5).map((tag) => (
+                          <span key={tag} className="rounded-full bg-primary/8 px-2 py-0.5 text-[10px] font-semibold text-primary">#{tag}</span>
+                        ))}
+                        {(image.tags?.length ?? 0) > 5 && <span className="text-[10px] text-outline">+{(image.tags?.length ?? 0) - 5}</span>}
+                      </div>
+                      <p className="mt-3 text-xs text-on-surface-variant">
+                        {image.width && image.height ? `${image.width} x ${image.height}` : "크기 미기록"}
+                        <span className="mx-1 text-outline">·</span>
+                        {image.file_format ?? "포맷 미기록"}
+                        <span className="mx-1 text-outline">·</span>
+                        {formatSize(image.file_size_mb)}
+                      </p>
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-4 font-mono text-xs font-semibold text-on-surface">{image.asset_id ?? "-"}</td>
-                <td className="px-4 py-4">
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${STATUS_CLASSES[image.status] ?? "bg-surface-container-high text-outline"}`}>
-                    {STATUS_LABELS[image.status] ?? image.status}
-                  </span>
-                  {image.lifecycle_status && image.lifecycle_status !== "active" && (
-                    <p className="mt-2 rounded-full bg-error/10 px-2.5 py-1 text-[10px] font-bold text-error">
-                      {image.lifecycle_status === "deletion_requested" ? "삭제요청" : image.lifecycle_status}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => togglePublished(image)}
-                    className={`mt-2 rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                      image.is_published ? "bg-primary/10 text-primary" : "bg-error/10 text-error"
-                    }`}
-                    title={image.unpublished_reason ?? undefined}
-                  >
-                    {image.is_published ? "게시 ON" : "게시 OFF"}
-                  </button>
-                </td>
-                <td className="px-4 py-4">
-                  <div className="flex max-w-64 flex-wrap gap-1">
-                    {(image.tags ?? []).slice(0, 4).map((tag) => (
-                      <span key={tag} className="rounded-full bg-primary/8 px-2 py-0.5 text-[10px] font-semibold text-primary">#{tag}</span>
-                    ))}
-                    {(image.tags?.length ?? 0) > 4 && <span className="text-[10px] text-outline">+{(image.tags?.length ?? 0) - 4}</span>}
+                <td className="px-5 py-5 align-top">
+                  <div className="flex w-32 flex-col items-start gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${STATUS_CLASSES[image.status] ?? "bg-surface-container-high text-outline"}`}>
+                      {STATUS_LABELS[image.status] ?? image.status}
+                    </span>
+                    {image.lifecycle_status && image.lifecycle_status !== "active" && (
+                      <span className="rounded-full bg-error/10 px-2.5 py-1 text-[10px] font-bold text-error">
+                        {image.lifecycle_status === "deletion_requested" ? "삭제요청" : image.lifecycle_status}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => togglePublished(image)}
+                      className={`inline-flex h-8 items-center rounded-full px-3 text-[10px] font-bold ${
+                        image.is_published ? "bg-primary/10 text-primary" : "bg-error/10 text-error"
+                      }`}
+                      title={image.unpublished_reason ?? undefined}
+                    >
+                      {image.is_published ? "게시 ON" : "게시 OFF"}
+                    </button>
                   </div>
                 </td>
-                <td className="px-4 py-4 text-xs text-on-surface-variant">
-                  <p>{image.width && image.height ? `${image.width} x ${image.height}` : "-"}</p>
-                  <p className="mt-1 text-outline">{image.file_format ?? "-"} · {formatSize(image.file_size_mb)}</p>
-                </td>
-                <td className="px-4 py-4 text-xs text-on-surface-variant">
-                  <p>조회 {image.views_count ?? 0}</p>
-                  <p className="mt-1">판매 {image.sales_count ?? 0}</p>
+                <td className="px-5 py-5 align-top text-xs text-on-surface-variant">
+                  <div className="grid w-32 grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-surface-container-low p-2">
+                      <p className="text-[10px] text-outline">조회</p>
+                      <p className="font-semibold text-on-surface">{(image.views_count ?? 0).toLocaleString("ko-KR")}</p>
+                    </div>
+                    <div className="rounded-lg bg-surface-container-low p-2">
+                      <p className="text-[10px] text-outline">판매</p>
+                      <p className="font-semibold text-on-surface">{(image.sales_count ?? 0).toLocaleString("ko-KR")}</p>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => openTransactions(image)}
@@ -403,8 +416,10 @@ export default function AdminImagesPage() {
                     {transactionLoadingId === image.id ? "로딩" : "거래내역"}
                   </button>
                 </td>
-                <td className="px-4 py-4 text-xs text-on-surface-variant">{formatDate(image.created_at)}</td>
-                <td className="px-4 py-4 text-xs text-on-surface-variant">{image.photographer?.full_name ?? "-"}</td>
+                <td className="px-5 py-5 align-top text-xs text-on-surface-variant">
+                  <p className="max-w-40 truncate font-medium text-on-surface">{image.photographer?.full_name ?? "-"}</p>
+                  <p className="mt-1 text-outline">{formatDate(image.created_at)}</p>
+                </td>
               </tr>
             ))}
           </tbody>
