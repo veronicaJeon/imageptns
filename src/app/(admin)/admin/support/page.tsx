@@ -71,12 +71,46 @@ const MATCH_STATUS_LABELS: Record<string, string> = {
   declined: "거절",
 };
 
+const RIGHTS_RESULT_LABELS: Record<string, string> = {
+  usable: "사용 가능",
+  conditional: "조건부 가능",
+  unverified: "확인 불가",
+  not_recommended: "사용 비권장",
+};
+
 interface PhotoMatch {
   id: string;
   photographer_id: string;
   status: string;
   score: number | null;
   reason: string | null;
+}
+
+interface SourcingCandidate {
+  id: string;
+  image_id: string;
+  sort_order: number;
+  is_visible: boolean;
+  note: string | null;
+  image?: {
+    id: string;
+    asset_id: string | null;
+    title: string | null;
+    storage_path_preview: string | null;
+    is_published?: boolean | null;
+  } | null;
+}
+
+interface SourcingAnswer {
+  id: string;
+  answer_text: string | null;
+  rights_result: string | null;
+  rights_explanation: string | null;
+  status: "draft" | "published" | string;
+  revision_round: number;
+  published_at: string | null;
+  created_at: string;
+  candidates?: SourcingCandidate[] | null;
 }
 
 interface PhotoRequestDetail {
@@ -96,6 +130,7 @@ interface PhotoRequestDetail {
   reference_note: string | null;
   non_copying_attested: boolean | null;
   matches: PhotoMatch[];
+  answers?: SourcingAnswer[] | null;
 }
 
 interface SupportSubmission {
@@ -159,6 +194,12 @@ function candidateMatchIds(matches?: PhotoMatch[] | null) {
     .map((match) => match.id);
 }
 
+function latestSourcingAnswer(answers?: SourcingAnswer[] | null) {
+  return [...(answers ?? [])].sort((a, b) =>
+    String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))
+  )[0] ?? null;
+}
+
 export default function AdminSupportPage() {
   const [tab, setTab] = useState<SupportTab>("pending");
   const [kind, setKind] = useState<SupportKind>("all");
@@ -167,6 +208,12 @@ export default function AdminSupportPage() {
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [actioning, setActioning] = useState<string | null>(null);
+  const [answerDrafts, setAnswerDrafts] = useState<Record<string, {
+    answerText: string;
+    rightsResult: string;
+    rightsExplanation: string;
+    imageIds: string;
+  }>>({});
 
   const fetchSubmissions = useCallback(async (status: SupportTab, selectedKind: SupportKind) => {
     setLoading(true);
@@ -185,6 +232,15 @@ export default function AdminSupportPage() {
       const nextRows = rows ?? [];
       setSubmissions(nextRows);
       setNotes(Object.fromEntries(nextRows.map((row) => [row.id, row.admin_note ?? ""])));
+      setAnswerDrafts(Object.fromEntries(nextRows.map((row) => {
+        const latest = latestSourcingAnswer(row.photo_request?.answers);
+        return [row.id, {
+          answerText: latest?.answer_text ?? "",
+          rightsResult: latest?.rights_result ?? "",
+          rightsExplanation: latest?.rights_explanation ?? "",
+          imageIds: (latest?.candidates ?? []).map((candidate) => candidate.image_id).join(", "),
+        }];
+      })));
     } catch (error) {
       alert(error instanceof Error ? error.message : "문의 내역을 불러오지 못했습니다.");
     } finally {
@@ -292,6 +348,84 @@ export default function AdminSupportPage() {
       await fetchSubmissions(tab, kind);
     } catch (error) {
       alert(error instanceof Error ? error.message : "사진가 초대 메일 발송에 실패했습니다.");
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  async function saveSourcingDraft(submission: SupportSubmission) {
+    if (submission.kind !== "photo_request") return;
+    const draft = answerDrafts[submission.id] ?? {
+      answerText: "",
+      rightsResult: "",
+      rightsExplanation: "",
+      imageIds: "",
+    };
+
+    setActioning(submission.id);
+    try {
+      const saveRes = await fetch("/api/admin/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_sourcing_answer_draft",
+          requestId: submission.id,
+          answerText: draft.answerText,
+          rightsResult: draft.rightsResult || null,
+          rightsExplanation: draft.rightsExplanation || null,
+        }),
+      });
+      const saveBody = await saveRes.json().catch(() => null) as { answer?: SourcingAnswer; error?: string } | null;
+      if (!saveRes.ok || !saveBody?.answer?.id) {
+        throw new Error(saveBody?.error ?? "답변 초안을 저장하지 못했습니다.");
+      }
+
+      const imageIds = draft.imageIds.split(",").map((id) => id.trim()).filter(Boolean);
+      const candidateRes = await fetch("/api/admin/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "set_sourcing_candidates",
+          answerId: saveBody.answer.id,
+          imageIds,
+        }),
+      });
+      const candidateBody = await candidateRes.json().catch(() => null) as { error?: string } | null;
+      if (!candidateRes.ok) {
+        throw new Error(candidateBody?.error ?? "후보 이미지를 저장하지 못했습니다.");
+      }
+
+      await fetchSubmissions(tab, kind);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "답변 초안을 저장하지 못했습니다.");
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  async function publishLatestSourcingAnswer(submission: SupportSubmission) {
+    if (submission.kind !== "photo_request") return;
+    const latest = latestSourcingAnswer(submission.photo_request?.answers);
+    if (!latest || latest.status !== "draft") {
+      alert("발송할 답변 초안이 없습니다. 먼저 초안을 저장해주세요.");
+      return;
+    }
+
+    setActioning(submission.id);
+    try {
+      const res = await fetch("/api/admin/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "publish_sourcing_answer",
+          answerId: latest.id,
+        }),
+      });
+      const body = await res.json().catch(() => null) as { error?: string } | null;
+      if (!res.ok) throw new Error(body?.error ?? "답변을 발송하지 못했습니다.");
+      await fetchSubmissions(tab, kind);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "답변을 발송하지 못했습니다.");
     } finally {
       setActioning(null);
     }
@@ -521,6 +655,122 @@ export default function AdminSupportPage() {
                           <p className="mt-1 text-xs text-outline">-</p>
                         </div>
                       )}
+                      </div>
+                    </div>
+                  )}
+
+                  {isPhotoRequest && photoRequest && (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-primary">구매자 답변 초안</p>
+                          <p className="mt-1 text-xs text-on-surface-variant">
+                            후보 이미지는 등록 완료된 이미지 ID를 쉼표로 입력합니다. 답변 발송 전까지 구매자에게 공개되지 않습니다.
+                          </p>
+                        </div>
+                        {latestSourcingAnswer(photoRequest.answers) && (
+                          <span className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
+                            최근 답변 {latestSourcingAnswer(photoRequest.answers)?.status === "published" ? "발송됨" : "초안"}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="md:col-span-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-outline">답변 내용</label>
+                          <textarea
+                            value={answerDrafts[submission.id]?.answerText ?? ""}
+                            onChange={(event) => setAnswerDrafts((prev) => ({
+                              ...prev,
+                              [submission.id]: {
+                                answerText: event.target.value,
+                                rightsResult: prev[submission.id]?.rightsResult ?? "",
+                                rightsExplanation: prev[submission.id]?.rightsExplanation ?? "",
+                                imageIds: prev[submission.id]?.imageIds ?? "",
+                              },
+                            }))}
+                            rows={4}
+                            placeholder="구매자에게 전달할 답변을 입력하세요."
+                            className="mt-2 w-full rounded-lg bg-surface-container-lowest px-3 py-2 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-outline">권리 확인 결과</label>
+                          <select
+                            value={answerDrafts[submission.id]?.rightsResult ?? ""}
+                            onChange={(event) => setAnswerDrafts((prev) => ({
+                              ...prev,
+                              [submission.id]: {
+                                answerText: prev[submission.id]?.answerText ?? "",
+                                rightsResult: event.target.value,
+                                rightsExplanation: prev[submission.id]?.rightsExplanation ?? "",
+                                imageIds: prev[submission.id]?.imageIds ?? "",
+                              },
+                            }))}
+                            className="mt-2 h-10 w-full rounded-lg bg-surface-container-lowest px-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                          >
+                            <option value="">권리 확인 결과 없음</option>
+                            {Object.entries(RIGHTS_RESULT_LABELS).map(([value, label]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-outline">후보 이미지 ID</label>
+                          <input
+                            value={answerDrafts[submission.id]?.imageIds ?? ""}
+                            onChange={(event) => setAnswerDrafts((prev) => ({
+                              ...prev,
+                              [submission.id]: {
+                                answerText: prev[submission.id]?.answerText ?? "",
+                                rightsResult: prev[submission.id]?.rightsResult ?? "",
+                                rightsExplanation: prev[submission.id]?.rightsExplanation ?? "",
+                                imageIds: event.target.value,
+                              },
+                            }))}
+                            placeholder="uuid-1, uuid-2"
+                            className="mt-2 h-10 w-full rounded-lg bg-surface-container-lowest px-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-outline">권리 확인 설명</label>
+                          <textarea
+                            value={answerDrafts[submission.id]?.rightsExplanation ?? ""}
+                            onChange={(event) => setAnswerDrafts((prev) => ({
+                              ...prev,
+                              [submission.id]: {
+                                answerText: prev[submission.id]?.answerText ?? "",
+                                rightsResult: prev[submission.id]?.rightsResult ?? "",
+                                rightsExplanation: event.target.value,
+                                imageIds: prev[submission.id]?.imageIds ?? "",
+                              },
+                            }))}
+                            rows={2}
+                            placeholder="조건부 사용 가능 사유, 출처 표기 조건, 추가 허가 필요 여부 등을 입력하세요."
+                            className="mt-2 w-full rounded-lg bg-surface-container-lowest px-3 py-2 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => saveSourcingDraft(submission)}
+                          disabled={isBusy}
+                          className="flex items-center gap-1.5 rounded border border-primary/40 bg-surface-container-lowest px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+                        >
+                          <span className="material-symbols-outlined text-sm">save</span>
+                          초안 저장
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => publishLatestSourcingAnswer(submission)}
+                          disabled={isBusy}
+                          className="flex items-center gap-1.5 rounded bg-primary px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                        >
+                          <span className="material-symbols-outlined text-sm">send</span>
+                          답변 발송
+                        </button>
                       </div>
                     </div>
                   )}
