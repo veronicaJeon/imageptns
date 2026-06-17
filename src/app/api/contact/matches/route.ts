@@ -73,6 +73,7 @@ export async function PATCH(req: NextRequest) {
     .update({ status, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("photographer_id", user.id)
+    .in("status", ["candidate", "invited", "interested", "declined"])
     .select(MATCH_SELECT)
     .single();
 

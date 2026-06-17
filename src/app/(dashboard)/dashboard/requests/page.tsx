@@ -44,10 +44,10 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  candidate: "응답 대기",
-  invited: "초대됨",
-  interested: "관심 있음",
-  declined: "거절",
+  candidate: "검토 대기",
+  invited: "확인 요청",
+  interested: "가능",
+  declined: "불가",
 };
 
 function first<T>(value: T | T[] | null): T | null {
@@ -93,10 +93,10 @@ export default function DashboardRequestsPage() {
         return;
       }
       const body = await res.json().catch(() => null) as { matches?: PhotoRequestMatch[]; error?: string } | null;
-      if (!res.ok) throw new Error(body?.error ?? "사진 의뢰를 불러오지 못했습니다.");
+      if (!res.ok) throw new Error(body?.error ?? "운영팀 요청을 불러오지 못했습니다.");
       setMatches(body?.matches ?? []);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "사진 의뢰를 불러오지 못했습니다.");
+      alert(error instanceof Error ? error.message : "운영팀 요청을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
@@ -129,7 +129,7 @@ export default function DashboardRequestsPage() {
       <div className="p-6 md:p-10 flex flex-col items-center justify-center min-h-[60vh] gap-4 text-outline">
         <span className="material-symbols-outlined text-6xl text-error">lock</span>
         <h1 className="font-headline text-xl font-extrabold text-on-surface">사진가 전용 메뉴입니다</h1>
-        <p className="text-sm">사진 의뢰 매칭은 사진가 계정에서 확인할 수 있습니다.</p>
+        <p className="text-sm">운영팀 요청은 사진가 계정에서 확인할 수 있습니다.</p>
       </div>
     );
   }
@@ -137,10 +137,10 @@ export default function DashboardRequestsPage() {
   return (
     <div className="p-6 md:p-10 max-w-6xl">
       <div className="mb-8">
-        <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Photo Requests</p>
-        <h1 className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">사진 의뢰</h1>
+        <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Image Partners Ops</p>
+        <h1 className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">운영팀 요청</h1>
         <p className="mt-2 text-sm text-outline">
-          관리자 매칭을 받은 의뢰를 검토하고 진행 의사를 표시하세요.
+          Image Partners 운영팀이 이미지 보유 여부나 촬영 가능성을 확인하기 위해 보낸 요청입니다. 구매자와 직접 연결되는 매칭이 아닙니다.
         </p>
       </div>
 
@@ -151,7 +151,7 @@ export default function DashboardRequestsPage() {
       ) : matches.length === 0 ? (
         <div className="flex flex-col items-center py-32 gap-4 text-outline bg-surface-container-lowest shadow-ghost">
           <span className="material-symbols-outlined text-6xl">assignment</span>
-          <p className="text-base">매칭된 사진 의뢰가 없습니다.</p>
+          <p className="text-base">운영팀 요청이 없습니다.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -167,7 +167,7 @@ export default function DashboardRequestsPage() {
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="material-symbols-outlined text-primary text-xl">add_photo_alternate</span>
-                        <h2 className="font-headline text-lg font-bold text-on-surface">{request.subject ?? "사진 의뢰"}</h2>
+                        <h2 className="font-headline text-lg font-bold text-on-surface">{request.subject ?? "운영팀 요청"}</h2>
                         <span className={cn("rounded-full px-3 py-1 text-[10px] font-bold", STATUS_STYLES[match.status] ?? "bg-surface-container text-outline")}>
                           {STATUS_LABELS[match.status] ?? match.status}
                         </span>
@@ -177,7 +177,7 @@ export default function DashboardRequestsPage() {
                       </p>
                     </div>
                     <div className="shrink-0 rounded-lg bg-surface-container-low px-4 py-3 text-xs text-on-surface-variant">
-                      <p className="font-bold text-on-surface">매칭 점수 {match.score ?? "-"}</p>
+                      <p className="font-bold text-on-surface">지역 적합도 {match.score ?? "-"}</p>
                       {match.reason && <p className="mt-1 max-w-56">{match.reason}</p>}
                     </div>
                   </div>
@@ -248,7 +248,7 @@ export default function DashboardRequestsPage() {
                         ) : (
                           <span className="material-symbols-outlined text-sm">check_circle</span>
                         )}
-                        관심 있음
+                        가능
                       </button>
                     )}
                     {match.status !== "declined" && (
@@ -262,7 +262,7 @@ export default function DashboardRequestsPage() {
                         ) : (
                           <span className="material-symbols-outlined text-sm">cancel</span>
                         )}
-                        거절
+                        불가
                       </button>
                     )}
                   </div>

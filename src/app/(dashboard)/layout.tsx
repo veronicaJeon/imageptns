@@ -22,7 +22,7 @@ const NAV_ITEMS_BUYER: NavItem[] = [
 const NAV_ITEMS_PHOTOGRAPHER: NavItem[] = [
   { href: "/dashboard",           icon: "grid_view",        key: "overview"   },
   { href: "/dashboard/uploads",   icon: "cloud_upload",     key: "uploads"    },
-  { href: "/dashboard/requests",  icon: "assignment",       key: "requests", label: "사진 의뢰" },
+  { href: "/dashboard/requests",  icon: "assignment",       key: "requests", label: "운영팀 요청" },
   { href: "/dashboard/blockchain", icon: "verified",         key: "blockchain" },
   { href: "/dashboard/earnings",  icon: "payments",         key: "earnings"   },
   { href: "/dashboard/settings",  icon: "settings",         key: "settings"   },
