@@ -71,8 +71,129 @@ interface SubscriptionEntitlement {
   downloadAccessDays: number;
 }
 
-function formatKRW(n: number) {
-  return "₩" + n.toLocaleString("ko-KR");
+const CHECKOUT_PAGE_COPY = {
+  ko: {
+    locale: "ko-KR",
+    errors: {
+      unsupportedBase: "지원하지 않는 Base 네트워크입니다.",
+      walletDisconnected: "지갑 연결이 해제되었습니다. 다시 연결해주세요.",
+      walletChanged: "결제 중 지갑 계정이 변경되었습니다. 주문을 생성한 지갑으로 다시 시도해주세요.",
+      orderCreate: "주문 생성 실패",
+      paymentStart: "결제를 시작하지 못했습니다.",
+      freeOrderCreate: "무료 주문 생성 실패",
+      freeCheckout: "무료 구매를 완료하지 못했습니다.",
+      passProcess: "결제 우회 처리 실패",
+      passCheckout: "결제 우회를 완료하지 못했습니다.",
+      walletMissing: "브라우저 지갑을 찾을 수 없습니다. MetaMask 또는 Base 호환 지갑을 설치해주세요.",
+      connectorMissing: "사용 가능한 지갑 커넥터가 없습니다.",
+      connectWallet: "지갑 연결을 완료해주세요.",
+      baseOrderCreate: "Base USDC 주문 생성 실패",
+      quoteExpired: "USDC 견적이 만료되었습니다. 결제를 다시 시작해주세요.",
+      approveFailed: "USDC 승인 트랜잭션이 실패했습니다. 지갑에서 상태를 확인한 뒤 다시 시도해주세요.",
+      quoteExpiredProtection: "USDC 견적이 만료되었습니다. 주문 금액 보호를 위해 결제를 다시 시작해주세요.",
+      purchaseFailed: "구매 트랜잭션이 실패했습니다. 지갑에서 상태를 확인한 뒤 다시 시도해주세요.",
+      baseConfirm: "Base USDC 결제 확인 실패",
+      baseCheckout: "Base USDC 결제를 완료하지 못했습니다.",
+      baseRetry: "Base USDC 결제 확인을 다시 완료하지 못했습니다.",
+    },
+    steps: [
+      { icon: "receipt_long", title: "주문 확인", body: "라이선스와 결제 금액을 확정합니다." },
+      { icon: "payments", title: "결제 진행", body: "카드 또는 Base USDC로 구매를 완료합니다." },
+      { icon: "download", title: "원본 다운로드", body: "결제 완료 즉시 다운로드 권한이 열립니다." },
+    ],
+    freeOrderTitle: "무료 라이선스 주문",
+    subscriptionFreeOrderTitle: "구독 무료다운 주문",
+    freeOrderBody: "결제 수단 입력 없이 구매가 확정되고 원본 다운로드 권한이 즉시 생성됩니다.",
+    tossDescription: "카드 및 국내 간편결제",
+    baseDescription: "Base 지갑으로 온체인 결제",
+    widgetLoading: "결제 위젯 로딩 중...",
+    baseTitle: "Base USDC 결제",
+    baseBody: "지갑 연결 후 Base 네트워크에서 USDC 승인과 구매 트랜잭션을 순서대로 진행합니다.",
+    baseQuote: "최종 USDC 금액은 주문 생성 시점에 15분 유효한 견적으로 고정됩니다.",
+    approveBody: "USDC 사용 권한을 승인합니다.",
+    purchaseBody: "Base에서 구매 트랜잭션을 전송합니다.",
+    confirmBody: "서버가 tx를 검증해 다운로드 권한을 엽니다.",
+    recoveryHelp: "purchase가 성공했는데 화면이 멈추면 아래 재확인 버튼이나 주문 내역의 tx 정보를 사용해 복구할 수 있습니다.",
+    recoveryTitle: "Base 결제 확인 재시도가 필요합니다",
+    recoveryBody: "구매 tx는 감지됐지만 서버 확인이 끝나지 않았습니다.",
+    retryConfirm: "결제 확인 다시 시도",
+    viewOrders: "주문 내역 보기",
+    confirmFree: "무료 구매 확정",
+    passTitle: "결제 우회 (테스트 전용)",
+    passBody: "Toss 유료결제 연동 전 임시 기능입니다. 실제 결제 없이 주문을 완료하고 다운로드/정산 흐름을 점검합니다.",
+    passButton: "결제 없이 주문 완료",
+    downloadAccess: "결제가 승인되면 구매한 이미지의 원본 파일 다운로드 권한이 자동으로 생성됩니다. 완료 화면 또는 대시보드의 주문 내역에서 다시 다운로드할 수 있습니다.",
+    subscriptionApplied: "구독 무료다운 적용",
+    subscriptionActive: "구독 활성",
+    remaining: "잔여",
+    countSuffix: "개",
+    subscriptionBody: (covered: string, days: string) => `이번 주문에서 ${covered}개가 무료다운으로 적용됩니다. 다운로드 권한은 구매 확정일부터 ${days}일간 유지됩니다.`,
+    subscriptionDiscount: "구독 무료다운 할인",
+    baseMvpNote: "Base USDC MVP는 라이선스 금액만 온체인 escrow로 결제합니다.",
+  },
+  en: {
+    locale: "en-US",
+    errors: {
+      unsupportedBase: "Unsupported Base network.",
+      walletDisconnected: "Wallet connection was lost. Please reconnect.",
+      walletChanged: "The wallet account changed during checkout. Please retry with the wallet that created the order.",
+      orderCreate: "Could not create the order.",
+      paymentStart: "Could not start payment.",
+      freeOrderCreate: "Could not create the free order.",
+      freeCheckout: "Could not complete the free purchase.",
+      passProcess: "Could not process the payment pass.",
+      passCheckout: "Could not complete the payment pass.",
+      walletMissing: "Browser wallet not found. Please install MetaMask or a Base-compatible wallet.",
+      connectorMissing: "No wallet connector is available.",
+      connectWallet: "Please complete wallet connection.",
+      baseOrderCreate: "Could not create the Base USDC order.",
+      quoteExpired: "The USDC quote expired. Please restart checkout.",
+      approveFailed: "The USDC approval transaction failed. Check your wallet and try again.",
+      quoteExpiredProtection: "The USDC quote expired. Please restart checkout to protect the order amount.",
+      purchaseFailed: "The purchase transaction failed. Check your wallet and try again.",
+      baseConfirm: "Could not confirm the Base USDC payment.",
+      baseCheckout: "Could not complete the Base USDC payment.",
+      baseRetry: "Could not retry Base USDC payment confirmation.",
+    },
+    steps: [
+      { icon: "receipt_long", title: "Review order", body: "Confirm licenses and payment amount." },
+      { icon: "payments", title: "Pay", body: "Complete purchase by card or Base USDC." },
+      { icon: "download", title: "Download originals", body: "Download access opens immediately after payment." },
+    ],
+    freeOrderTitle: "Free license order",
+    subscriptionFreeOrderTitle: "Subscription free-download order",
+    freeOrderBody: "The purchase will be confirmed without payment details and original download access will be created immediately.",
+    tossDescription: "Cards and local quick payments",
+    baseDescription: "Onchain payment with a Base wallet",
+    widgetLoading: "Loading payment widget...",
+    baseTitle: "Base USDC payment",
+    baseBody: "After connecting your wallet, approve USDC and send the purchase transaction on Base.",
+    baseQuote: "The final USDC amount is locked by a 15-minute quote when the order is created.",
+    approveBody: "Approve USDC spending.",
+    purchaseBody: "Send the purchase transaction on Base.",
+    confirmBody: "The server verifies the tx and opens download access.",
+    recoveryHelp: "If purchase succeeds but the page stalls, use the retry button below or the tx information in your order history to recover.",
+    recoveryTitle: "Base payment confirmation needs a retry",
+    recoveryBody: "The purchase tx was detected, but server confirmation did not finish.",
+    retryConfirm: "Retry confirmation",
+    viewOrders: "View orders",
+    confirmFree: "Confirm free purchase",
+    passTitle: "Payment pass (test only)",
+    passBody: "Temporary test flow before paid Toss integration. It completes the order without real payment so downloads and settlement can be checked.",
+    passButton: "Complete order without payment",
+    downloadAccess: "Once payment is approved, original file download access is created automatically. You can download again from the completion page or Dashboard → Orders.",
+    subscriptionApplied: "Subscription free download applied",
+    subscriptionActive: "Subscription active",
+    remaining: "Remaining",
+    countSuffix: "",
+    subscriptionBody: (covered: string, days: string) => `${covered} item(s) in this order are covered by free downloads. Download access remains available for ${days} days from purchase confirmation.`,
+    subscriptionDiscount: "Subscription free-download discount",
+    baseMvpNote: "The Base USDC MVP pays only the license amount into onchain escrow.",
+  },
+} as const;
+
+function formatKRW(n: number, locale: string) {
+  return "₩" + n.toLocaleString(locale);
 }
 
 function checkoutErrorMessage(error: unknown, fallback: string) {
@@ -80,16 +201,16 @@ function checkoutErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-function ensureBaseChainId(chainId: number): OnchainPrepareResponse["chainId"] {
+function ensureBaseChainId(chainId: number, errorMessage: string): OnchainPrepareResponse["chainId"] {
   if (chainId === base.id || chainId === baseSepolia.id) return chainId;
-  throw new Error("지원하지 않는 Base 네트워크입니다.");
+  throw new Error(errorMessage);
 }
 
-function ensureCurrentBuyerWallet(buyerWalletAddress: Address) {
+function ensureCurrentBuyerWallet(buyerWalletAddress: Address, messages: { walletDisconnected: string; walletChanged: string }) {
   const currentAddress = getAccount(wagmiConfig).address;
-  if (!currentAddress) throw new Error("지갑 연결이 해제되었습니다. 다시 연결해주세요.");
+  if (!currentAddress) throw new Error(messages.walletDisconnected);
   if (getAddress(currentAddress) !== getAddress(buyerWalletAddress)) {
-    throw new Error("결제 중 지갑 계정이 변경되었습니다. 주문을 생성한 지갑으로 다시 시도해주세요.");
+    throw new Error(messages.walletChanged);
   }
   return getAddress(currentAddress);
 }
@@ -104,8 +225,9 @@ async function readApiError(response: Response, fallback: string) {
 }
 
 function CheckoutContent() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const ch = t.checkout;
+  const copy = CHECKOUT_PAGE_COPY[lang];
   const { items } = useCart();
   const { user, loading: authLoading, init } = useAuth();
   const router = useRouter();
@@ -262,7 +384,7 @@ function CheckoutContent() {
           billing,
         }),
       });
-      if (!prepRes.ok) throw new Error("주문 생성 실패");
+      if (!prepRes.ok) throw new Error(copy.errors.orderCreate);
       const { orderId, orderName } = await prepRes.json() as CheckoutPrepareResponse;
 
       // 2. Launch Toss payment (widget handles payment UI)
@@ -276,7 +398,7 @@ function CheckoutContent() {
       });
     } catch (err) {
       console.error(err);
-      alert(checkoutErrorMessage(err, "결제를 시작하지 못했습니다."));
+      alert(checkoutErrorMessage(err, copy.errors.paymentStart));
       setLoading(false);
     }
   }
@@ -292,13 +414,13 @@ function CheckoutContent() {
           billing,
         }),
       });
-      if (!prepRes.ok) throw new Error(await readApiError(prepRes, "무료 주문 생성 실패"));
+      if (!prepRes.ok) throw new Error(await readApiError(prepRes, copy.errors.freeOrderCreate));
 
       const { orderNumber } = await prepRes.json() as CheckoutPrepareResponse;
       router.push(`/checkout/success?order=${encodeURIComponent(orderNumber ?? "")}`);
     } catch (err) {
       console.error(err);
-      alert(checkoutErrorMessage(err, "무료 구매를 완료하지 못했습니다."));
+      alert(checkoutErrorMessage(err, copy.errors.freeCheckout));
       setLoading(false);
     }
   }
@@ -315,7 +437,7 @@ function CheckoutContent() {
           billing,
         }),
       });
-      if (!prepRes.ok) throw new Error(await readApiError(prepRes, "주문 생성 실패"));
+      if (!prepRes.ok) throw new Error(await readApiError(prepRes, copy.errors.orderCreate));
       const prepared = await prepRes.json() as CheckoutPrepareResponse;
 
       // ₩0 주문은 prepare 단계에서 이미 완료됨
@@ -329,13 +451,13 @@ function CheckoutContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderDbId: prepared.orderDbId }),
       });
-      if (!passRes.ok) throw new Error(await readApiError(passRes, "결제 우회 처리 실패"));
+      if (!passRes.ok) throw new Error(await readApiError(passRes, copy.errors.passProcess));
 
       const { orderNumber } = await passRes.json() as { orderNumber?: string };
       router.push(`/checkout/success?order=${encodeURIComponent(orderNumber ?? "")}`);
     } catch (err) {
       console.error(err);
-      alert(checkoutErrorMessage(err, "결제 우회를 완료하지 못했습니다."));
+      alert(checkoutErrorMessage(err, copy.errors.passCheckout));
       setLoading(false);
     }
   }
@@ -347,11 +469,11 @@ function CheckoutContent() {
 
     try {
       if (typeof window === "undefined" || !("ethereum" in window)) {
-        throw new Error("브라우저 지갑을 찾을 수 없습니다. MetaMask 또는 Base 호환 지갑을 설치해주세요.");
+        throw new Error(copy.errors.walletMissing);
       }
 
       const connector = wagmiConfig.connectors[0];
-      if (!connector) throw new Error("사용 가능한 지갑 커넥터가 없습니다.");
+      if (!connector) throw new Error(copy.errors.connectorMissing);
 
       let account = getAccount(wagmiConfig);
       if (!account.address) {
@@ -359,7 +481,7 @@ function CheckoutContent() {
         account = getAccount(wagmiConfig);
       }
 
-      if (!account.address) throw new Error("지갑 연결을 완료해주세요.");
+      if (!account.address) throw new Error(copy.errors.connectWallet);
       const buyerWalletAddress = account.address;
 
       const prepRes = await fetch("/api/onchain/checkout/prepare", {
@@ -371,20 +493,20 @@ function CheckoutContent() {
           buyerWalletAddress,
         }),
       });
-      if (!prepRes.ok) throw new Error(await readApiError(prepRes, "Base USDC 주문 생성 실패"));
+      if (!prepRes.ok) throw new Error(await readApiError(prepRes, copy.errors.baseOrderCreate));
 
       const prepared = await prepRes.json() as OnchainPrepareResponse;
       preparedForRecovery = prepared;
       if (isQuoteExpired(prepared.quote.expiresAt)) {
-        throw new Error("USDC 견적이 만료되었습니다. 결제를 다시 시작해주세요.");
+        throw new Error(copy.errors.quoteExpired);
       }
-      const targetChainId = ensureBaseChainId(prepared.chainId);
+      const targetChainId = ensureBaseChainId(prepared.chainId, copy.errors.unsupportedBase);
 
       account = getAccount(wagmiConfig);
       if (account.chainId !== targetChainId) {
         await switchChain(wagmiConfig, { chainId: targetChainId });
       }
-      ensureCurrentBuyerWallet(buyerWalletAddress);
+      ensureCurrentBuyerWallet(buyerWalletAddress, copy.errors);
 
       const cryptoAmount = BigInt(prepared.cryptoAmount);
       const grossAmounts = prepared.grossAmounts.map((amount) => BigInt(amount));
@@ -397,7 +519,7 @@ function CheckoutContent() {
       });
 
       if (currentAllowance < cryptoAmount) {
-        const approvalAccount = ensureCurrentBuyerWallet(buyerWalletAddress);
+        const approvalAccount = ensureCurrentBuyerWallet(buyerWalletAddress, copy.errors);
         const approveHash = await writeContract(wagmiConfig, {
           address: prepared.usdcAddress,
           abi: ERC20_ABI,
@@ -408,15 +530,15 @@ function CheckoutContent() {
         });
         const approvalReceipt = await waitForTransactionReceipt(wagmiConfig, { hash: approveHash, chainId: targetChainId });
         if (approvalReceipt.status !== "success") {
-          throw new Error("USDC 승인 트랜잭션이 실패했습니다. 지갑에서 상태를 확인한 뒤 다시 시도해주세요.");
+          throw new Error(copy.errors.approveFailed);
         }
       }
 
       if (isQuoteExpired(prepared.quote.expiresAt)) {
-        throw new Error("USDC 견적이 만료되었습니다. 주문 금액 보호를 위해 결제를 다시 시작해주세요.");
+        throw new Error(copy.errors.quoteExpiredProtection);
       }
 
-      const purchaseAccount = ensureCurrentBuyerWallet(buyerWalletAddress);
+      const purchaseAccount = ensureCurrentBuyerWallet(buyerWalletAddress, copy.errors);
       const purchaseHash = await writeContract(wagmiConfig, {
         address: prepared.escrowAddress,
         abi: IMAGE_PARTNERS_ESCROW_ABI,
@@ -427,7 +549,7 @@ function CheckoutContent() {
       });
       const purchaseReceipt = await waitForTransactionReceipt(wagmiConfig, { hash: purchaseHash, chainId: targetChainId });
       if (purchaseReceipt.status !== "success") {
-        throw new Error("구매 트랜잭션이 실패했습니다. 지갑에서 상태를 확인한 뒤 다시 시도해주세요.");
+        throw new Error(copy.errors.purchaseFailed);
       }
       purchaseTxHash = purchaseReceipt.transactionHash;
       persistBaseRecovery({
@@ -445,7 +567,7 @@ function CheckoutContent() {
           confirmToken: prepared.confirmToken,
         }),
       });
-      if (!confirmRes.ok) throw new Error(await readApiError(confirmRes, "Base USDC 결제 확인 실패"));
+      if (!confirmRes.ok) throw new Error(await readApiError(confirmRes, copy.errors.baseConfirm));
 
       const { orderNumber } = await confirmRes.json() as { orderNumber?: string };
       persistBaseRecovery(null);
@@ -459,7 +581,7 @@ function CheckoutContent() {
           confirmToken: preparedForRecovery.confirmToken,
         });
       }
-      alert(checkoutErrorMessage(err, "Base USDC 결제를 완료하지 못했습니다."));
+      alert(checkoutErrorMessage(err, copy.errors.baseCheckout));
       setLoading(false);
     }
   }
@@ -473,14 +595,14 @@ function CheckoutContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(baseRecovery),
       });
-      if (!confirmRes.ok) throw new Error(await readApiError(confirmRes, "Base USDC 결제 확인 실패"));
+      if (!confirmRes.ok) throw new Error(await readApiError(confirmRes, copy.errors.baseConfirm));
 
       const { orderNumber } = await confirmRes.json() as { orderNumber?: string };
       persistBaseRecovery(null);
       router.push(`/checkout/success?order=${encodeURIComponent(orderNumber ?? "")}`);
     } catch (err) {
       console.error(err);
-      alert(checkoutErrorMessage(err, "Base USDC 결제 확인을 다시 완료하지 못했습니다."));
+      alert(checkoutErrorMessage(err, copy.errors.baseRetry));
     } finally {
       setLoading(false);
     }
@@ -510,11 +632,7 @@ function CheckoutContent() {
         <h1 className="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-10">{ch.title}</h1>
 
         <div className="mb-10 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {[
-            { icon: "receipt_long", title: "주문 확인", body: "라이선스와 결제 금액을 확정합니다." },
-            { icon: "payments", title: "결제 진행", body: "카드 또는 Base USDC로 구매를 완료합니다." },
-            { icon: "download", title: "원본 다운로드", body: "결제 완료 즉시 다운로드 권한이 열립니다." },
-          ].map((step, index) => (
+          {copy.steps.map((step, index) => (
             <div key={step.title} className="bg-surface-container-lowest px-4 py-4 shadow-ghost">
               <div className="flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-black text-on-primary">
@@ -562,9 +680,9 @@ function CheckoutContent() {
               <h2 className="text-xs font-bold text-outline uppercase tracking-widest mb-5">{ch.paymentMethod}</h2>
               {isFreeCheckout ? (
                 <div className="mb-5 rounded-lg bg-green-50 p-4 text-sm text-green-800 ring-1 ring-green-200 dark:bg-green-900/20 dark:text-green-200 dark:ring-green-900/50">
-                  <p className="font-bold">{subscriptionCoveredCount > 0 ? "구독 무료다운 주문" : "무료 라이선스 주문"}</p>
+                  <p className="font-bold">{subscriptionCoveredCount > 0 ? copy.subscriptionFreeOrderTitle : copy.freeOrderTitle}</p>
                   <p className="mt-1 text-xs leading-relaxed">
-                    결제 수단 입력 없이 구매가 확정되고 원본 다운로드 권한이 즉시 생성됩니다.
+                    {copy.freeOrderBody}
                   </p>
                 </div>
               ) : (
@@ -583,7 +701,7 @@ function CheckoutContent() {
                     Toss Payments
                   </span>
                   <span className="block mt-2 text-[11px] leading-relaxed text-outline">
-                    카드 및 국내 간편결제
+                    {copy.tossDescription}
                   </span>
                 </button>
                 <button
@@ -600,7 +718,7 @@ function CheckoutContent() {
                     USDC on Base
                   </span>
                   <span className="block mt-2 text-[11px] leading-relaxed text-outline">
-                    Base 지갑으로 온체인 결제
+                    {copy.baseDescription}
                   </span>
                 </button>
               </div>
@@ -612,7 +730,7 @@ function CheckoutContent() {
                 {!widgetReady && (
                   <div className="flex items-center justify-center py-8 text-outline gap-2">
                     <span className="w-5 h-5 border-2 border-outline border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs">결제 위젯 로딩 중...</span>
+                    <span className="text-xs">{copy.widgetLoading}</span>
                   </div>
                 )}
               </div>
@@ -622,33 +740,33 @@ function CheckoutContent() {
                   <div className="flex items-start gap-3">
                     <span className="material-symbols-outlined text-primary text-xl mt-0.5">currency_exchange</span>
                     <div>
-                      <p className="text-sm font-bold text-on-surface">Base USDC 결제</p>
+                      <p className="text-sm font-bold text-on-surface">{copy.baseTitle}</p>
                       <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-                        지갑 연결 후 Base 네트워크에서 USDC 승인과 구매 트랜잭션을 순서대로 진행합니다.
+                        {copy.baseBody}
                       </p>
                       <p className="text-[11px] text-outline mt-3">
-                        최종 USDC 금액은 주문 생성 시점에 15분 유효한 견적으로 고정됩니다.
+                        {copy.baseQuote}
                       </p>
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-on-surface-variant">
                     <div className="bg-surface-container-low px-3 py-2">
                       <p className="font-bold text-on-surface">1. Approve</p>
-                      <p className="mt-1">USDC 사용 권한을 승인합니다.</p>
+                      <p className="mt-1">{copy.approveBody}</p>
                     </div>
                     <div className="bg-surface-container-low px-3 py-2">
                       <p className="font-bold text-on-surface">2. Purchase</p>
-                      <p className="mt-1">Base에서 구매 트랜잭션을 전송합니다.</p>
+                      <p className="mt-1">{copy.purchaseBody}</p>
                     </div>
                     <div className="bg-surface-container-low px-3 py-2">
                       <p className="font-bold text-on-surface">3. Confirm</p>
-                      <p className="mt-1">서버가 tx를 검증해 다운로드 권한을 엽니다.</p>
+                      <p className="mt-1">{copy.confirmBody}</p>
                     </div>
                   </div>
                   <div className="mt-4 flex items-start gap-2 text-[11px] leading-relaxed text-outline">
                     <span className="material-symbols-outlined text-sm text-amber-500 mt-0.5">info</span>
                     <p>
-                      purchase가 성공했는데 화면이 멈추면 아래 재확인 버튼이나 주문 내역의 tx 정보를 사용해 복구할 수 있습니다.
+                      {copy.recoveryHelp}
                     </p>
                   </div>
                 </div>
@@ -660,9 +778,9 @@ function CheckoutContent() {
                 <div className="flex items-start gap-3">
                   <span className="material-symbols-outlined text-amber-600 text-xl mt-0.5">sync</span>
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-on-surface">Base 결제 확인 재시도가 필요합니다</p>
+                    <p className="text-sm font-bold text-on-surface">{copy.recoveryTitle}</p>
                     <p className="text-xs text-on-surface-variant mt-1">
-                      구매 tx는 감지됐지만 서버 확인이 끝나지 않았습니다.
+                      {copy.recoveryBody}
                     </p>
                     <p className="text-[10px] font-mono text-outline mt-2 truncate">tx {baseRecovery.txHash}</p>
                   </div>
@@ -674,10 +792,10 @@ function CheckoutContent() {
                     disabled={loading}
                     className="px-4 py-2 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
                   >
-                    결제 확인 다시 시도
+                    {copy.retryConfirm}
                   </button>
                   <Link href="/dashboard/orders" className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:text-primary">
-                    주문 내역 보기
+                    {copy.viewOrders}
                   </Link>
                 </div>
               </div>
@@ -696,7 +814,7 @@ function CheckoutContent() {
                     <span className="material-symbols-outlined text-base">
                       {isFreeCheckout ? "redeem" : paymentMethod === "base_usdc" ? "account_balance_wallet" : "lock"}
                     </span>
-                    {isFreeCheckout ? "무료 구매 확정" : paymentMethod === "base_usdc" ? "Pay with USDC" : ch.submitBtn} · {formatKRW(displayTotal)}
+                    {isFreeCheckout ? copy.confirmFree : paymentMethod === "base_usdc" ? "Pay with USDC" : ch.submitBtn} · {formatKRW(displayTotal, copy.locale)}
                   </>
                 )
               }
@@ -708,9 +826,9 @@ function CheckoutContent() {
                 <div className="flex items-start gap-2">
                   <span className="material-symbols-outlined text-amber-600 text-base mt-0.5">science</span>
                   <div className="flex-1">
-                    <p className="text-xs font-bold text-on-surface">결제 우회 (테스트 전용)</p>
+                    <p className="text-xs font-bold text-on-surface">{copy.passTitle}</p>
                     <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
-                      Toss 유료결제 연동 전 임시 기능입니다. 실제 결제 없이 주문을 완료하고 다운로드/정산 흐름을 점검합니다.
+                      {copy.passBody}
                     </p>
                   </div>
                 </div>
@@ -721,15 +839,14 @@ function CheckoutContent() {
                   className="mt-3 w-full py-3 bg-amber-500 text-white font-bold text-xs uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <span className="material-symbols-outlined text-base">bolt</span>
-                  결제 없이 주문 완료 · {formatKRW(displayTotal)}
+                  {copy.passButton} · {formatKRW(displayTotal, copy.locale)}
                 </button>
               </div>
             )}
 
             <p className="text-[10px] text-outline text-center">{ch.secureNote}</p>
             <p className="text-center text-[11px] leading-relaxed text-on-surface-variant">
-              결제가 승인되면 구매한 이미지의 원본 파일 다운로드 권한이 자동으로 생성됩니다.
-              완료 화면 또는 대시보드의 주문 내역에서 다시 다운로드할 수 있습니다.
+              {copy.downloadAccess}
             </p>
           </form>
 
@@ -754,14 +871,14 @@ function CheckoutContent() {
                       <p className="text-[10px] text-outline capitalize">{item.license}</p>
                       {item.subscriptionCovered && (
                         <p className="mt-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary w-fit">
-                          구독 무료다운 적용
+                          {copy.subscriptionApplied}
                         </p>
                       )}
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-xs font-bold text-on-surface">{formatKRW(item.effectivePrice)}</p>
+                      <p className="text-xs font-bold text-on-surface">{formatKRW(item.effectivePrice, copy.locale)}</p>
                       {item.subscriptionCovered && (
-                        <p className="text-[10px] text-outline line-through">{formatKRW(item.originalPrice)}</p>
+                        <p className="text-[10px] text-outline line-through">{formatKRW(item.originalPrice, copy.locale)}</p>
                       )}
                     </div>
                   </div>
@@ -771,14 +888,13 @@ function CheckoutContent() {
               {subscriptionEntitlement?.active && (
                 <div className="mb-4 rounded-lg bg-primary/8 px-4 py-3 text-xs text-on-surface-variant">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-bold text-on-surface">구독 활성</span>
+                    <span className="font-bold text-on-surface">{copy.subscriptionActive}</span>
                     <span className="text-primary font-bold">
-                      잔여 {subscriptionEntitlement.remaining.toLocaleString("ko-KR")} / {subscriptionEntitlement.quota.toLocaleString("ko-KR")}개
+                      {copy.remaining} {subscriptionEntitlement.remaining.toLocaleString(copy.locale)} / {subscriptionEntitlement.quota.toLocaleString(copy.locale)}{copy.countSuffix}
                     </span>
                   </div>
                   <p className="mt-1 leading-relaxed">
-                    이번 주문에서 {subscriptionCoveredCount.toLocaleString("ko-KR")}개가 무료다운으로 적용됩니다.
-                    다운로드 권한은 구매 확정일부터 {subscriptionEntitlement.downloadAccessDays.toLocaleString("ko-KR")}일간 유지됩니다.
+                    {copy.subscriptionBody(subscriptionCoveredCount.toLocaleString(copy.locale), subscriptionEntitlement.downloadAccessDays.toLocaleString(copy.locale))}
                   </p>
                 </div>
               )}
@@ -786,23 +902,23 @@ function CheckoutContent() {
               <div className="border-t border-outline-variant/20 pt-4 flex flex-col gap-2 text-sm">
                 {subscriptionDiscount > 0 && (
                   <div className="flex justify-between text-primary">
-                    <span>구독 무료다운 할인</span><span>-{formatKRW(subscriptionDiscount)}</span>
+                    <span>{copy.subscriptionDiscount}</span><span>-{formatKRW(subscriptionDiscount, copy.locale)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-on-surface-variant">
-                  <span>{t.cart.subtotal}</span><span>{formatKRW(subtotal)}</span>
+                  <span>{t.cart.subtotal}</span><span>{formatKRW(subtotal, copy.locale)}</span>
                 </div>
                 <div className="flex justify-between text-on-surface-variant">
-                  <span>{t.cart.vat}</span><span>{formatKRW(displayVat)}</span>
+                  <span>{t.cart.vat}</span><span>{formatKRW(displayVat, copy.locale)}</span>
                 </div>
                 {paymentMethod === "base_usdc" && (
                   <p className="text-[11px] leading-relaxed text-outline">
-                    Base USDC MVP는 라이선스 금액만 온체인 escrow로 결제합니다.
+                    {copy.baseMvpNote}
                   </p>
                 )}
                 <div className="flex justify-between font-bold text-base pt-2 border-t border-outline-variant/20">
                   <span className="text-on-surface">{t.cart.total}</span>
-                  <span className="text-primary">{formatKRW(displayTotal)}</span>
+                  <span className="text-primary">{formatKRW(displayTotal, copy.locale)}</span>
                 </div>
               </div>
             </div>

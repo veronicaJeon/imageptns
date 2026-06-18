@@ -10,21 +10,53 @@ import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 
 const LICENSE_KEYS: LicenseType[] = ["editorial", "commercial", "extended"];
 
-function formatKRW(n: number) {
-  return "₩" + n.toLocaleString("ko-KR");
+const CART_PAGE_COPY = {
+  ko: {
+    locale: "ko-KR",
+    defaultUsageCondition: "저작자 표시 필요",
+    statementTitle: "장바구니 내역서",
+    quoteNumber: "견적번호",
+    issuedAt: "발행일",
+    itemCount: "항목",
+    itemCountSuffix: "건",
+    statementHeaders: ["No.", "이미지", "상품명 / 에셋 ID", "저작자 표시", "사용 조건", "금액"],
+    statementNotice: "본 내역서는 장바구니 기준 견적용 문서입니다. 실제 결제 금액과 라이선스 조건은 결제 시점의 상품 가격정책 및 저작권 정책을 기준으로 확정됩니다.",
+    printStatement: "PDF 내역서 인쇄",
+    creditLine: "저작자 표시",
+    purchaseOptions: "구매 옵션",
+  },
+  en: {
+    locale: "en-US",
+    defaultUsageCondition: "Credit required",
+    statementTitle: "Cart statement",
+    quoteNumber: "Quote no.",
+    issuedAt: "Issued",
+    itemCount: "Items",
+    itemCountSuffix: "",
+    statementHeaders: ["No.", "Image", "Product / Asset ID", "Credit line", "Usage terms", "Amount"],
+    statementNotice: "This statement is an estimate based on the current cart. Final pricing and license terms are confirmed at checkout according to the active product and copyright policies.",
+    printStatement: "Print PDF statement",
+    creditLine: "Credit line",
+    purchaseOptions: "Purchase option",
+  },
+} as const;
+
+function formatKRW(n: number, locale: string) {
+  return "₩" + n.toLocaleString(locale);
 }
 
 function itemCreditLine(item: { creditLine?: string; photographer?: string }) {
   return item.creditLine || `${item.photographer || "unassigned"} / Image Partners`;
 }
 
-function itemUsageConditions(item: { usageConditions?: string[] }) {
-  return item.usageConditions?.length ? item.usageConditions : ["저작자 표시 필요"];
+function itemUsageConditions(item: { usageConditions?: string[] }, fallback: string) {
+  return item.usageConditions?.length ? item.usageConditions : [fallback];
 }
 
 export default function CartPage() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const c = t.cart;
+  const copy = CART_PAGE_COPY[lang];
   const { items, removeItem, updateLicense } = useCart();
   const [licensePrices, setLicensePrices] = useState<Partial<Record<LicenseType, number>>>({});
 
@@ -75,19 +107,19 @@ export default function CartPage() {
         <div className="mb-8 flex items-start justify-between gap-8 border-b border-zinc-300 pb-6">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.25em] text-zinc-500">Image Partners</p>
-            <h1 className="mt-2 text-2xl font-black tracking-tight">장바구니 내역서</h1>
-            <p className="mt-2 text-sm text-zinc-600">견적번호 {quoteNumber}</p>
+            <h1 className="mt-2 text-2xl font-black tracking-tight">{copy.statementTitle}</h1>
+            <p className="mt-2 text-sm text-zinc-600">{copy.quoteNumber} {quoteNumber}</p>
           </div>
           <div className="text-right text-sm text-zinc-600">
-            <p>발행일 {issuedAt.toLocaleDateString("ko-KR")}</p>
-            <p>항목 {items.length.toLocaleString("ko-KR")}건</p>
+            <p>{copy.issuedAt} {issuedAt.toLocaleDateString(copy.locale)}</p>
+            <p>{copy.itemCount} {items.length.toLocaleString(copy.locale)}{copy.itemCountSuffix}</p>
           </div>
         </div>
 
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b-2 border-zinc-900">
-              {["No.", "이미지", "상품명 / 에셋 ID", "저작자 표시", "사용 조건", "금액"].map((header) => (
+              {copy.statementHeaders.map((header) => (
                 <th key={header} className="py-3 text-left text-xs font-bold uppercase tracking-widest text-zinc-600">
                   {header}
                 </th>
@@ -120,8 +152,8 @@ export default function CartPage() {
                   <p className="text-xs font-mono text-zinc-500">{item.assetId ?? item.id}</p>
                 </td>
                 <td className="py-3 pr-3 text-zinc-700">{itemCreditLine(item)}</td>
-                <td className="py-3 pr-3 text-zinc-700">{itemUsageConditions(item).join(", ")}</td>
-                <td className="py-3 text-right font-semibold text-zinc-950">{formatKRW(displayPrice(item.license))}</td>
+                <td className="py-3 pr-3 text-zinc-700">{itemUsageConditions(item, copy.defaultUsageCondition).join(", ")}</td>
+                <td className="py-3 text-right font-semibold text-zinc-950">{formatKRW(displayPrice(item.license), copy.locale)}</td>
               </tr>
             ))}
           </tbody>
@@ -130,20 +162,20 @@ export default function CartPage() {
         <div className="ml-auto mt-8 w-72 text-sm">
           <div className="flex justify-between border-b border-zinc-200 py-2">
             <span className="text-zinc-600">{c.subtotal}</span>
-            <span className="font-semibold">{formatKRW(subtotal)}</span>
+            <span className="font-semibold">{formatKRW(subtotal, copy.locale)}</span>
           </div>
           <div className="flex justify-between border-b border-zinc-200 py-2">
             <span className="text-zinc-600">{c.vat}</span>
-            <span className="font-semibold">{formatKRW(vat)}</span>
+            <span className="font-semibold">{formatKRW(vat, copy.locale)}</span>
           </div>
           <div className="flex justify-between py-3 text-lg font-black">
             <span>{c.total}</span>
-            <span>{formatKRW(total)}</span>
+            <span>{formatKRW(total, copy.locale)}</span>
           </div>
         </div>
 
         <p className="mt-10 text-xs leading-relaxed text-zinc-500">
-          본 내역서는 장바구니 기준 견적용 문서입니다. 실제 결제 금액과 라이선스 조건은 결제 시점의 상품 가격정책 및 저작권 정책을 기준으로 확정됩니다.
+          {copy.statementNotice}
         </p>
       </div>
 
@@ -160,7 +192,7 @@ export default function CartPage() {
               className="flex w-fit items-center gap-2 rounded bg-surface-container-lowest px-4 py-3 text-xs font-bold uppercase tracking-widest text-on-surface shadow-ghost transition-colors hover:text-primary"
             >
               <span className="material-symbols-outlined text-base">print</span>
-              PDF 내역서 인쇄
+              {copy.printStatement}
             </button>
           )}
         </div>
@@ -200,10 +232,10 @@ export default function CartPage() {
                       <p className="text-xs text-outline mt-0.5">{item.photographer}</p>
                     )}
                     <p className="mt-2 text-xs text-on-surface-variant">
-                      저작자 표시: <span className="font-semibold text-on-surface">{itemCreditLine(item)}</span>
+                      {copy.creditLine}: <span className="font-semibold text-on-surface">{itemCreditLine(item)}</span>
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {itemUsageConditions(item).map((condition) => (
+                      {itemUsageConditions(item, copy.defaultUsageCondition).map((condition) => (
                         <span key={condition} className="rounded-full bg-surface-container-low px-2 py-1 text-[10px] font-bold text-on-surface-variant">
                           {condition}
                         </span>
@@ -211,7 +243,7 @@ export default function CartPage() {
                     </div>
 
                     {/* License selector */}
-                    <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-outline">구매 옵션</p>
+                    <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-outline">{copy.purchaseOptions}</p>
                     <div className="flex gap-2 mt-3 flex-wrap">
                       {LICENSE_KEYS.map((key) => (
                         <button
@@ -224,7 +256,7 @@ export default function CartPage() {
                               : "border-outline-variant text-on-surface-variant hover:border-outline",
                           ].join(" ")}
                         >
-                          {c.licenseTypes[key]} · {formatKRW(displayPrice(key))}
+                          {c.licenseTypes[key]} · {formatKRW(displayPrice(key), copy.locale)}
                         </button>
                       ))}
                     </div>
@@ -238,7 +270,7 @@ export default function CartPage() {
                     >
                       <span className="material-symbols-outlined text-xl">close</span>
                     </button>
-                    <p className="font-headline font-bold text-on-surface">{formatKRW(displayPrice(item.license))}</p>
+                    <p className="font-headline font-bold text-on-surface">{formatKRW(displayPrice(item.license), copy.locale)}</p>
                   </div>
                 </div>
               ))}
@@ -257,15 +289,15 @@ export default function CartPage() {
                 <div className="flex flex-col gap-3 text-sm mb-6">
                   <div className="flex justify-between">
                     <span className="text-on-surface-variant">{c.subtotal}</span>
-                    <span className="text-on-surface font-medium">{formatKRW(subtotal)}</span>
+                    <span className="text-on-surface font-medium">{formatKRW(subtotal, copy.locale)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-on-surface-variant">{c.vat}</span>
-                    <span className="text-on-surface font-medium">{formatKRW(vat)}</span>
+                    <span className="text-on-surface font-medium">{formatKRW(vat, copy.locale)}</span>
                   </div>
                   <div className="border-t border-outline-variant/20 pt-3 flex justify-between font-bold text-base">
                     <span className="text-on-surface">{c.total}</span>
-                    <span className="text-primary">{formatKRW(total)}</span>
+                    <span className="text-primary">{formatKRW(total, copy.locale)}</span>
                   </div>
                 </div>
 

@@ -16,6 +16,33 @@ const LICENSE_PRICES: Record<string, number> = {
   extended:  180000,
 };
 
+const IMAGE_DETAIL_COPY = {
+  ko: {
+    locale: "ko-KR",
+    unknown: "미상",
+    copyLinkPrompt: "링크를 복사하세요:",
+    usageConditions: "사용 조건",
+    creditLine: "저작자 표시",
+    copy: "복사",
+    creditHelp: "모든 사용에는 위 저작자 표시가 필요합니다. 사용상 주의사항이 있는 이미지는 이 영역에 별도로 표시됩니다.",
+    licenseDetails: "라이선스 세부 정보",
+    ccOriginal: "Creative Commons 원문 보기",
+    buyNow: "바로 구매하고 원본 다운로드",
+  },
+  en: {
+    locale: "en-US",
+    unknown: "Unknown",
+    copyLinkPrompt: "Copy this link:",
+    usageConditions: "Usage terms",
+    creditLine: "Credit line",
+    copy: "Copy",
+    creditHelp: "All uses require the credit line above. Any image-specific usage notes will appear in this area.",
+    licenseDetails: "License details",
+    ccOriginal: "View Creative Commons deed",
+    buyNow: "Buy now and download original",
+  },
+} as const;
+
 type LicenseKey = "editorial" | "commercial" | "extended";
 
 interface ImageDetailData {
@@ -46,8 +73,9 @@ interface ImageDetailData {
 
 export default function ImageDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const d = t.imageDetail;
+  const copy = IMAGE_DETAIL_COPY[lang];
   const router = useRouter();
 
   const [imageData, setImageData]     = useState<ImageDetailData | null>(null);
@@ -186,15 +214,15 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   });
 
   const uploadedDate = new Date(imageData.approved_at ?? imageData.created_at)
-    .toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
+    .toLocaleDateString(copy.locale, { year: "numeric", month: "2-digit", day: "2-digit" });
 
   const shotAtDate = imageData.exif_taken_at
-    ? new Date(imageData.exif_taken_at).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })
+    ? new Date(imageData.exif_taken_at).toLocaleDateString(copy.locale, { year: "numeric", month: "2-digit", day: "2-digit" })
     : null;
 
   const shotLocation = (imageData.exif_location && imageData.exif_location !== "unknown")
     ? imageData.exif_location
-    : imageData.exif_location === "unknown" ? "미상" : null;
+    : imageData.exif_location === "unknown" ? copy.unknown : null;
 
   const resolutionStr = imageData.width && imageData.height
     ? `${Number(imageData.width).toLocaleString()} × ${Number(imageData.height).toLocaleString()} px`
@@ -209,9 +237,9 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
       });
 
     if (navigator.clipboard) {
-      tryClipboard().catch(() => prompt("링크를 복사하세요:", url));
+      tryClipboard().catch(() => prompt(copy.copyLinkPrompt, url));
     } else {
-      prompt("링크를 복사하세요:", url);
+      prompt(copy.copyLinkPrompt, url);
     }
   }
 
@@ -288,7 +316,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
             <div>
               <p className="text-xs font-bold text-outline uppercase tracking-widest mb-4">{d.license}</p>
               <div className="mb-4 rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-4">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 조건</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.usageConditions}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {usageConditions.map((condition) => (
                     <span
@@ -305,7 +333,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                   ))}
                 </div>
                 <div className="mt-4 rounded-md bg-surface-container-low px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-outline">저작자 표시</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.creditLine}</p>
                   <div className="mt-1 flex items-center justify-between gap-3">
                     <code className="break-all text-xs font-bold text-on-surface">{creditLine}</code>
                     <button
@@ -313,17 +341,17 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                       onClick={() => navigator.clipboard?.writeText(creditLine)}
                       className="shrink-0 rounded bg-on-surface px-2.5 py-1 text-[10px] font-bold text-surface"
                     >
-                      복사
+                      {copy.copy}
                     </button>
                   </div>
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-on-surface-variant">
-                  모든 사용에는 위 저작자 표시가 필요합니다. 사용상 주의사항이 있는 이미지는 이 영역에 별도로 표시됩니다.
+                  {copy.creditHelp}
                 </p>
               </div>
               {(copyrightLicense.url || freeUsagePolicy.code !== "none") && (
                 <details className="mb-4 text-xs text-on-surface-variant">
-                  <summary className="cursor-pointer font-bold text-outline">라이선스 세부 정보</summary>
+                  <summary className="cursor-pointer font-bold text-outline">{copy.licenseDetails}</summary>
                   <div className="mt-2 space-y-1 leading-relaxed">
                     <p>{copyrightLicense.label}: {copyrightLicense.summary}</p>
                     {freeUsagePolicy.code !== "none" && (
@@ -336,7 +364,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 font-bold text-primary hover:opacity-70"
                       >
-                        Creative Commons 원문 보기
+                        {copy.ccOriginal}
                         <span className="material-symbols-outlined text-sm">open_in_new</span>
                       </a>
                     )}
@@ -372,7 +400,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                       <span className="text-sm font-semibold text-on-surface">{d.licenseTypes[key]}</span>
                     </div>
                     <span className="text-sm font-bold text-primary">
-                      ₩{displayPrice(key).toLocaleString("ko-KR")}
+                      ₩{displayPrice(key).toLocaleString(copy.locale)}
                     </span>
                   </label>
                 ))}
@@ -386,7 +414,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                 className="w-full py-4 bg-on-surface text-surface font-bold text-xs uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 hover:opacity-90"
               >
                 <span className="material-symbols-outlined text-base">shopping_bag</span>
-                바로 구매하고 원본 다운로드
+                {copy.buyNow}
               </button>
               <button
                 onClick={handleAddToCart}

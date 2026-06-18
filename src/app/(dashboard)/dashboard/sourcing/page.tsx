@@ -6,30 +6,88 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { buyerUsageConditions, creditLineForName } from "@/lib/licenses/creative-commons";
 import { useCart } from "@/lib/store/cart";
 import { revisionLimitNotice } from "@/lib/sourcing/status";
+import { useLang } from "@/lib/i18n/store";
 
-const STATUS_LABELS: Record<string, string> = {
-  received: "접수됨",
-  under_review: "검토 중",
-  answer_ready: "후보 제안됨",
-  closed: "종료",
-};
-
-const RIGHTS_LABELS: Record<string, string> = {
-  usable: "사용 가능",
-  conditional: "조건부 가능",
-  unverified: "확인 불가",
-  not_recommended: "사용 비권장",
-};
-
-const REVISION_REASONS = [
-  { value: "wrong_location", label: "장소가 다름" },
-  { value: "wrong_season_or_time", label: "계절/시간대가 다름" },
-  { value: "wrong_composition", label: "구도/거리감이 다름" },
-  { value: "usage_terms_do_not_fit", label: "상업 사용 조건이 맞지 않음" },
-  { value: "price_does_not_fit", label: "가격이 맞지 않음" },
-  { value: "need_more_candidates", label: "더 많은 후보가 필요함" },
-  { value: "other", label: "기타" },
-] as const;
+const BUYER_SOURCING_COPY = {
+  ko: {
+    locale: "ko-KR",
+    statuses: { received: "접수됨", under_review: "검토 중", answer_ready: "후보 제안됨", closed: "종료" },
+    rights: { usable: "사용 가능", conditional: "조건부 가능", unverified: "확인 불가", not_recommended: "사용 비권장" },
+    revisionReasons: [
+      { value: "wrong_location", label: "장소가 다름" },
+      { value: "wrong_season_or_time", label: "계절/시간대가 다름" },
+      { value: "wrong_composition", label: "구도/거리감이 다름" },
+      { value: "usage_terms_do_not_fit", label: "상업 사용 조건이 맞지 않음" },
+      { value: "price_does_not_fit", label: "가격이 맞지 않음" },
+      { value: "need_more_candidates", label: "더 많은 후보가 필요함" },
+      { value: "other", label: "기타" },
+    ],
+    fetchError: "소싱 요청을 불러오지 못했습니다.",
+    revisionError: "수정요청을 보내지 못했습니다.",
+    title: "내 소싱 요청",
+    description: (count: string) => `Image Partners에 접수한 이미지 소싱 요청과 답변을 확인합니다. 총 ${count}건`,
+    descriptionLoading: "Image Partners에 접수한 이미지 소싱 요청과 답변을 확인합니다.",
+    empty: "아직 소싱 요청이 없습니다.",
+    requestCta: "이미지 소싱 요청하기",
+    untitled: "제목 없음",
+    receivedAt: "접수일",
+    noMessage: "요청 내용 없음",
+    organization: "요청자 소속",
+    project: "사용 프로젝트",
+    deadline: "희망 회신일",
+    context: "사용 맥락",
+    answerTitle: "Image Partners 답변",
+    rightsResult: "권리 확인 결과",
+    pending: "담당자가 요청을 검토 중입니다. 답변이 준비되면 이 화면에 표시됩니다.",
+    details: "상세 보기",
+    added: "담김",
+    cart: "장바구니",
+    revisionNotice: revisionLimitNotice,
+    revisionPlaceholder: "원하는 수정 방향을 적어주세요.",
+    sending: "전송 중",
+    sendRevision: (count: number) => `수정요청 보내기 (${count}/3)`,
+    cannotRevise: "현재 수정요청을 보낼 수 없습니다. 답변 공개 전이거나 수정요청 한도에 도달했습니다.",
+  },
+  en: {
+    locale: "en-US",
+    statuses: { received: "Received", under_review: "Under review", answer_ready: "Candidates ready", closed: "Closed" },
+    rights: { usable: "Usable", conditional: "Conditional", unverified: "Unverified", not_recommended: "Not recommended" },
+    revisionReasons: [
+      { value: "wrong_location", label: "Wrong location" },
+      { value: "wrong_season_or_time", label: "Wrong season or time" },
+      { value: "wrong_composition", label: "Wrong composition or distance" },
+      { value: "usage_terms_do_not_fit", label: "Usage terms do not fit" },
+      { value: "price_does_not_fit", label: "Price does not fit" },
+      { value: "need_more_candidates", label: "Need more candidates" },
+      { value: "other", label: "Other" },
+    ],
+    fetchError: "Could not load sourcing requests.",
+    revisionError: "Could not send the revision request.",
+    title: "My sourcing requests",
+    description: (count: string) => `Review image sourcing requests and answers submitted to Image Partners. ${count} total`,
+    descriptionLoading: "Review image sourcing requests and answers submitted to Image Partners.",
+    empty: "No sourcing requests yet.",
+    requestCta: "Request image sourcing",
+    untitled: "Untitled",
+    receivedAt: "Received",
+    noMessage: "No request details",
+    organization: "Requester organization",
+    project: "Usage project",
+    deadline: "Preferred response date",
+    context: "Usage context",
+    answerTitle: "Image Partners answer",
+    rightsResult: "Rights result",
+    pending: "Our team is reviewing your request. The answer will appear here when ready.",
+    details: "View details",
+    added: "Added",
+    cart: "Cart",
+    revisionNotice: "You can request candidate revisions up to 3 times for this request. If the scope changes substantially, please submit a new request.",
+    revisionPlaceholder: "Describe the revision direction you want.",
+    sending: "Sending",
+    sendRevision: (count: number) => `Send revision request (${count}/3)`,
+    cannotRevise: "Revision requests are currently unavailable. The answer may not be published yet, or the revision limit has been reached.",
+  },
+} as const;
 
 interface CandidateImage {
   id: string;
@@ -81,6 +139,8 @@ function latestAnswer(answers?: SourcingAnswer[] | null) {
 }
 
 export default function BuyerSourcingPage() {
+  const { lang } = useLang();
+  const copy = BUYER_SOURCING_COPY[lang];
   const [requests, setRequests] = useState<SourcingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -94,17 +154,17 @@ export default function BuyerSourcingPage() {
     fetch("/api/sourcing/requests")
       .then(async (res) => {
         const body = await res.json().catch(() => null) as { requests?: SourcingRequest[]; error?: string } | null;
-        if (!res.ok) throw new Error(body?.error ?? "소싱 요청을 불러오지 못했습니다.");
+        if (!res.ok) throw new Error(body?.error ?? copy.fetchError);
         if (mounted) setRequests(body?.requests ?? []);
       })
       .catch((fetchError) => {
-        if (mounted) setError(fetchError instanceof Error ? fetchError.message : "소싱 요청을 불러오지 못했습니다.");
+        if (mounted) setError(fetchError instanceof Error ? fetchError.message : copy.fetchError);
       })
       .finally(() => {
         if (mounted) setLoading(false);
       });
     return () => { mounted = false; };
-  }, []);
+  }, [copy.fetchError]);
 
   useEffect(() => loadRequests(), [loadRequests]);
 
@@ -150,12 +210,12 @@ export default function BuyerSourcingPage() {
         body: JSON.stringify(draft),
       });
       const body = await res.json().catch(() => null) as { error?: string } | null;
-      if (!res.ok) throw new Error(body?.error ?? "수정요청을 보내지 못했습니다.");
+      if (!res.ok) throw new Error(body?.error ?? copy.revisionError);
       setRevisionDrafts((prev) => ({ ...prev, [request.id]: { reasons: [], message: "" } }));
       setLoading(true);
       loadRequests();
     } catch (submitError) {
-      alert(submitError instanceof Error ? submitError.message : "수정요청을 보내지 못했습니다.");
+      alert(submitError instanceof Error ? submitError.message : copy.revisionError);
     } finally {
       setSubmittingRevisionId(null);
     }
@@ -164,10 +224,9 @@ export default function BuyerSourcingPage() {
   return (
     <div className="p-6 md:p-10">
       <div className="mb-8">
-        <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">내 소싱 요청</h1>
+        <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">{copy.title}</h1>
         <p className="mt-1 text-sm text-outline">
-          Image Partners에 접수한 이미지 소싱 요청과 답변을 확인합니다.
-          {!loading && ` 총 ${requestCount.toLocaleString("ko-KR")}건`}
+          {loading ? copy.descriptionLoading : copy.description(requestCount.toLocaleString(copy.locale))}
         </p>
       </div>
 
@@ -180,9 +239,9 @@ export default function BuyerSourcingPage() {
       ) : requests.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-xl bg-surface-container-lowest px-6 py-24 text-center shadow-ghost">
           <span className="material-symbols-outlined text-6xl text-outline">travel_explore</span>
-          <p className="font-semibold text-on-surface">아직 소싱 요청이 없습니다.</p>
+          <p className="font-semibold text-on-surface">{copy.empty}</p>
           <Link href="/contact?mode=photo" className="rounded-lg bg-primary px-5 py-3 text-xs font-bold uppercase tracking-widest text-white">
-            이미지 소싱 요청하기
+            {copy.requestCta}
           </Link>
         </div>
       ) : (
@@ -198,43 +257,43 @@ export default function BuyerSourcingPage() {
               <article key={request.id} className="rounded-xl bg-surface-container-lowest p-5 shadow-ghost">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
-                    <h2 className="font-headline text-lg font-bold text-on-surface">{request.subject ?? "제목 없음"}</h2>
-                    <p className="mt-1 text-xs text-outline">접수일 {new Date(request.created_at).toLocaleString("ko-KR")}</p>
+                    <h2 className="font-headline text-lg font-bold text-on-surface">{request.subject ?? copy.untitled}</h2>
+                    <p className="mt-1 text-xs text-outline">{copy.receivedAt} {new Date(request.created_at).toLocaleString(copy.locale)}</p>
                   </div>
                   <span className="w-fit rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold text-primary">
-                    {STATUS_LABELS[status] ?? status}
+                    {copy.statuses[status as keyof typeof copy.statuses] ?? status}
                   </span>
                 </div>
 
                 <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-on-surface-variant">
-                  {request.message ?? "요청 내용 없음"}
+                  {request.message ?? copy.noMessage}
                 </p>
 
                 <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-surface-container-low p-4 text-sm md:grid-cols-3">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">요청자 소속</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.organization}</p>
                     <p className="mt-1 text-on-surface">{request.requester_organization ?? "-"}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 프로젝트</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.project}</p>
                     <p className="mt-1 text-on-surface">{request.usage_project ?? "-"}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">희망 회신일</p>
-                    <p className="mt-1 text-on-surface">{request.deadline_at ? new Date(request.deadline_at).toLocaleDateString("ko-KR") : "-"}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.deadline}</p>
+                    <p className="mt-1 text-on-surface">{request.deadline_at ? new Date(request.deadline_at).toLocaleDateString(copy.locale) : "-"}</p>
                   </div>
                   <div className="md:col-span-3">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 맥락</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.context}</p>
                     <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{request.usage_context ?? "-"}</p>
                   </div>
                 </div>
 
                 {answer ? (
                   <section className="mt-5 rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
-                    <p className="font-bold text-on-surface">Image Partners 답변</p>
+                    <p className="font-bold text-on-surface">{copy.answerTitle}</p>
                     {answer.rights_result && (
                       <p className="mt-2 text-xs font-bold text-primary">
-                        권리 확인 결과: {RIGHTS_LABELS[answer.rights_result] ?? answer.rights_result}
+                        {copy.rightsResult}: {copy.rights[answer.rights_result as keyof typeof copy.rights] ?? answer.rights_result}
                       </p>
                     )}
                     {answer.answer_text && (
@@ -246,7 +305,7 @@ export default function BuyerSourcingPage() {
                   </section>
                 ) : (
                   <p className="mt-5 rounded-lg bg-surface-container-low p-4 text-sm text-outline">
-                    담당자가 요청을 검토 중입니다. 답변이 준비되면 이 화면에 표시됩니다.
+                    {copy.pending}
                   </p>
                 )}
 
@@ -278,14 +337,14 @@ export default function BuyerSourcingPage() {
                                 href={`/library/${image.id}`}
                                 className="flex-1 rounded border border-outline-variant px-3 py-2 text-center text-[10px] font-bold text-on-surface-variant hover:border-primary hover:text-primary"
                               >
-                                상세 보기
+                                {copy.details}
                               </Link>
                               <button
                                 type="button"
                                 onClick={() => addCandidateToCart(image)}
                                 className="flex-1 rounded bg-primary px-3 py-2 text-[10px] font-bold text-white"
                               >
-                                {cartAdded === image.id ? "담김" : "장바구니"}
+                                {cartAdded === image.id ? copy.added : copy.cart}
                               </button>
                             </div>
                           </div>
@@ -296,11 +355,11 @@ export default function BuyerSourcingPage() {
                 )}
 
                 <div className="mt-5 rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
-                  <p className="text-xs text-outline">{revisionLimitNotice}</p>
+                  <p className="text-xs text-outline">{copy.revisionNotice}</p>
                   {canRevise ? (
                     <div className="mt-3 flex flex-col gap-3">
                       <div className="flex flex-wrap gap-2">
-                        {REVISION_REASONS.map((reason) => (
+                        {copy.revisionReasons.map((reason) => (
                           <label key={reason.value} className="flex items-center gap-2 rounded-full bg-surface-container-lowest px-3 py-2 text-[10px] font-bold text-on-surface-variant">
                             <input
                               type="checkbox"
@@ -319,7 +378,7 @@ export default function BuyerSourcingPage() {
                           [request.id]: { reasons: revisionDraft.reasons, message: event.target.value },
                         }))}
                         rows={3}
-                        placeholder="원하는 수정 방향을 적어주세요."
+                        placeholder={copy.revisionPlaceholder}
                         className="rounded-lg bg-surface-container-lowest px-3 py-2 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
                       />
                       <div className="flex justify-end">
@@ -329,13 +388,13 @@ export default function BuyerSourcingPage() {
                           disabled={submittingRevisionId === request.id}
                           className="rounded bg-primary px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-50"
                         >
-                          {submittingRevisionId === request.id ? "전송 중" : `수정요청 보내기 (${revisionCount}/3)`}
+                          {submittingRevisionId === request.id ? copy.sending : copy.sendRevision(revisionCount)}
                         </button>
                       </div>
                     </div>
                   ) : (
                     <p className="mt-2 text-xs text-outline">
-                      현재 수정요청을 보낼 수 없습니다. 답변 공개 전이거나 수정요청 한도에 도달했습니다.
+                      {copy.cannotRevise}
                     </p>
                   )}
                 </div>

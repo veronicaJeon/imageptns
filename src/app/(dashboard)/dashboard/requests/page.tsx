@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils/cn";
+import { useLang } from "@/lib/i18n/store";
 
 type MatchDecision = "interested" | "declined";
 
@@ -46,42 +47,98 @@ const STATUS_STYLES: Record<string, string> = {
   declined: "bg-surface-container text-outline",
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  candidate: "검토 대기",
-  invited: "확인 요청",
-  interested: "가능",
-  declined: "불가",
-};
+const PHOTOGRAPHER_REQUESTS_COPY = {
+  ko: {
+    locale: "ko-KR",
+    statuses: { candidate: "검토 대기", invited: "확인 요청", interested: "가능", declined: "불가" },
+    fetchError: "운영팀 요청을 불러오지 못했습니다.",
+    saveError: "응답을 저장하지 못했습니다.",
+    onlyPhotographerTitle: "사진가 전용 메뉴입니다",
+    onlyPhotographerBody: "운영팀 요청은 사진가 계정에서 확인할 수 있습니다.",
+    title: "운영팀 요청",
+    intro: "Image Partners 운영팀이 이미지 보유 여부나 촬영 가능성을 확인하기 위해 보낸 요청입니다. 구매자와 직접 연결되는 매칭이 아닙니다.",
+    empty: "운영팀 요청이 없습니다.",
+    fallbackTitle: "운영팀 요청",
+    noBrief: "상세 브리프 없음",
+    fitScore: "지역 적합도",
+    organization: "요청자 소속",
+    project: "사용 프로젝트",
+    deadline: "희망 회신일",
+    context: "사용 맥락",
+    legacyInfo: "기존 보조정보",
+    location: "위치",
+    category: "카테고리",
+    budget: "예산",
+    region: "지역",
+    tags: "태그",
+    reference: "참고 자료",
+    interested: "가능",
+    declined: "불가",
+    minBudget: (value: string) => `${value} 이상`,
+    maxBudget: (value: string) => `${value} 이하`,
+  },
+  en: {
+    locale: "en-US",
+    statuses: { candidate: "Pending review", invited: "Response requested", interested: "Available", declined: "Unavailable" },
+    fetchError: "Could not load team requests.",
+    saveError: "Could not save your response.",
+    onlyPhotographerTitle: "Photographer-only menu",
+    onlyPhotographerBody: "Team requests are available only to photographer accounts.",
+    title: "Team requests",
+    intro: "Requests from the Image Partners operations team to check whether you may have relevant images or shooting availability. This is an internal process, not a direct buyer match.",
+    empty: "No team requests.",
+    fallbackTitle: "Team request",
+    noBrief: "No detailed brief",
+    fitScore: "Region fit score",
+    organization: "Requester organization",
+    project: "Usage project",
+    deadline: "Preferred response date",
+    context: "Usage context",
+    legacyInfo: "Additional legacy info",
+    location: "Location",
+    category: "Category",
+    budget: "Budget",
+    region: "Regions",
+    tags: "Tags",
+    reference: "Reference material",
+    interested: "Available",
+    declined: "Unavailable",
+    minBudget: (value: string) => `${value} or more`,
+    maxBudget: (value: string) => `${value} or less`,
+  },
+} as const;
 
 function first<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
-function formatDate(iso?: string | null) {
+function formatDate(iso: string | null | undefined, locale: string) {
   if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("ko-KR", {
+  return new Date(iso).toLocaleDateString(locale, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
 }
 
-function formatKRW(value?: number | null) {
+function formatKRW(value: number | null | undefined, locale: string) {
   if (value == null) return "-";
-  return "₩" + value.toLocaleString("ko-KR");
+  return "₩" + value.toLocaleString(locale);
 }
 
-function formatBudget(request: ContactPhotoRequest) {
+function formatBudget(request: ContactPhotoRequest, locale: string, copy: typeof PHOTOGRAPHER_REQUESTS_COPY.ko | typeof PHOTOGRAPHER_REQUESTS_COPY.en) {
   if (request.budget_min_krw == null && request.budget_max_krw == null) return "-";
   if (request.budget_min_krw != null && request.budget_max_krw != null) {
-    return `${formatKRW(request.budget_min_krw)} - ${formatKRW(request.budget_max_krw)}`;
+    return `${formatKRW(request.budget_min_krw, locale)} - ${formatKRW(request.budget_max_krw, locale)}`;
   }
   return request.budget_min_krw != null
-    ? `${formatKRW(request.budget_min_krw)} 이상`
-    : `${formatKRW(request.budget_max_krw)} 이하`;
+    ? copy.minBudget(formatKRW(request.budget_min_krw, locale))
+    : copy.maxBudget(formatKRW(request.budget_max_krw, locale));
 }
 
 export default function DashboardRequestsPage() {
+  const { lang } = useLang();
+  const copy = PHOTOGRAPHER_REQUESTS_COPY[lang];
   const [matches, setMatches] = useState<PhotoRequestMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -96,14 +153,14 @@ export default function DashboardRequestsPage() {
         return;
       }
       const body = await res.json().catch(() => null) as { matches?: PhotoRequestMatch[]; error?: string } | null;
-      if (!res.ok) throw new Error(body?.error ?? "운영팀 요청을 불러오지 못했습니다.");
+      if (!res.ok) throw new Error(body?.error ?? copy.fetchError);
       setMatches(body?.matches ?? []);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "운영팀 요청을 불러오지 못했습니다.");
+      alert(error instanceof Error ? error.message : copy.fetchError);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [copy.fetchError]);
 
   useEffect(() => { loadMatches(); }, [loadMatches]);
 
@@ -116,12 +173,12 @@ export default function DashboardRequestsPage() {
         body: JSON.stringify({ id: match.id, status }),
       });
       const body = await res.json().catch(() => null) as { match?: PhotoRequestMatch; error?: string } | null;
-      if (!res.ok) throw new Error(body?.error ?? "응답을 저장하지 못했습니다.");
+      if (!res.ok) throw new Error(body?.error ?? copy.saveError);
       if (body?.match) {
         setMatches((prev) => prev.map((row) => row.id === match.id ? body.match! : row));
       }
     } catch (error) {
-      alert(error instanceof Error ? error.message : "응답을 저장하지 못했습니다.");
+      alert(error instanceof Error ? error.message : copy.saveError);
     } finally {
       setActioning(null);
     }
@@ -131,8 +188,8 @@ export default function DashboardRequestsPage() {
     return (
       <div className="p-6 md:p-10 flex flex-col items-center justify-center min-h-[60vh] gap-4 text-outline">
         <span className="material-symbols-outlined text-6xl text-error">lock</span>
-        <h1 className="font-headline text-xl font-extrabold text-on-surface">사진가 전용 메뉴입니다</h1>
-        <p className="text-sm">운영팀 요청은 사진가 계정에서 확인할 수 있습니다.</p>
+        <h1 className="font-headline text-xl font-extrabold text-on-surface">{copy.onlyPhotographerTitle}</h1>
+        <p className="text-sm">{copy.onlyPhotographerBody}</p>
       </div>
     );
   }
@@ -141,9 +198,9 @@ export default function DashboardRequestsPage() {
     <div className="p-6 md:p-10 max-w-6xl">
       <div className="mb-8">
         <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Image Partners Ops</p>
-        <h1 className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">운영팀 요청</h1>
+        <h1 className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">{copy.title}</h1>
         <p className="mt-2 text-sm text-outline">
-          Image Partners 운영팀이 이미지 보유 여부나 촬영 가능성을 확인하기 위해 보낸 요청입니다. 구매자와 직접 연결되는 매칭이 아닙니다.
+          {copy.intro}
         </p>
       </div>
 
@@ -154,7 +211,7 @@ export default function DashboardRequestsPage() {
       ) : matches.length === 0 ? (
         <div className="flex flex-col items-center py-32 gap-4 text-outline bg-surface-container-lowest shadow-ghost">
           <span className="material-symbols-outlined text-6xl">assignment</span>
-          <p className="text-base">운영팀 요청이 없습니다.</p>
+          <p className="text-base">{copy.empty}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -170,56 +227,56 @@ export default function DashboardRequestsPage() {
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="material-symbols-outlined text-primary text-xl">add_photo_alternate</span>
-                        <h2 className="font-headline text-lg font-bold text-on-surface">{request.subject ?? "운영팀 요청"}</h2>
+                        <h2 className="font-headline text-lg font-bold text-on-surface">{request.subject ?? copy.fallbackTitle}</h2>
                         <span className={cn("rounded-full px-3 py-1 text-[10px] font-bold", STATUS_STYLES[match.status] ?? "bg-surface-container text-outline")}>
-                          {STATUS_LABELS[match.status] ?? match.status}
+                          {copy.statuses[match.status as keyof typeof copy.statuses] ?? match.status}
                         </span>
                       </div>
                       <p className="mt-2 text-sm leading-relaxed text-on-surface-variant whitespace-pre-wrap">
-                        {request.message ?? "상세 브리프 없음"}
+                        {request.message ?? copy.noBrief}
                       </p>
                     </div>
                     <div className="shrink-0 rounded-lg bg-surface-container-low px-4 py-3 text-xs text-on-surface-variant">
-                      <p className="font-bold text-on-surface">지역 적합도 {match.score ?? "-"}</p>
+                      <p className="font-bold text-on-surface">{copy.fitScore} {match.score ?? "-"}</p>
                       {match.reason && <p className="mt-1 max-w-56">{match.reason}</p>}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-low p-4 text-sm md:grid-cols-4">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">요청자 소속</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.organization}</p>
                       <p className="mt-1 text-on-surface">{request.requester_organization ?? "-"}</p>
                     </div>
                     <div className="md:col-span-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 프로젝트</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.project}</p>
                       <p className="mt-1 text-on-surface">{request.usage_project ?? "-"}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">희망 회신일</p>
-                      <p className="mt-1 text-on-surface">{formatDate(request.deadline_at)}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.deadline}</p>
+                      <p className="mt-1 text-on-surface">{formatDate(request.deadline_at, copy.locale)}</p>
                     </div>
                     <div className="md:col-span-4">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 맥락</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.context}</p>
                       <p className="mt-1 text-on-surface-variant">
                         {request.usage_context ?? "-"}
                       </p>
                     </div>
-                    {(request.location_label || request.category || formatBudget(request) !== "-" || (request.target_regions ?? []).length > 0 || (request.tags ?? []).length > 0) && (
+                    {(request.location_label || request.category || formatBudget(request, copy.locale, copy) !== "-" || (request.target_regions ?? []).length > 0 || (request.tags ?? []).length > 0) && (
                       <div className="md:col-span-4">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">기존 보조정보</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.legacyInfo}</p>
                         <p className="mt-1 text-on-surface-variant">
-                          위치 {request.location_label ?? "-"} · 카테고리 {request.category ?? "-"} · 예산 {formatBudget(request)}
+                          {copy.location} {request.location_label ?? "-"} · {copy.category} {request.category ?? "-"} · {copy.budget} {formatBudget(request, copy.locale, copy)}
                         </p>
                         {((request.target_regions ?? []).length > 0 || (request.tags ?? []).length > 0) && (
                           <p className="mt-1 text-on-surface-variant">
-                            지역 {request.target_regions?.join(", ") || "-"} · 태그 {request.tags?.join(", ") || "-"}
+                            {copy.region} {request.target_regions?.join(", ") || "-"} · {copy.tags} {request.tags?.join(", ") || "-"}
                           </p>
                         )}
                       </div>
                     )}
                     {(request.reference_url || request.reference_note) && (
                       <div className="md:col-span-4">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">참고 자료</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.reference}</p>
                         {request.reference_url && (
                           <a href={request.reference_url} target="_blank" rel="noreferrer" className="mt-1 block text-primary hover:underline">
                             {request.reference_url}
@@ -244,7 +301,7 @@ export default function DashboardRequestsPage() {
                         ) : (
                           <span className="material-symbols-outlined text-sm">check_circle</span>
                         )}
-                        가능
+                        {copy.interested}
                       </button>
                     )}
                     {match.status !== "declined" && (
@@ -258,7 +315,7 @@ export default function DashboardRequestsPage() {
                         ) : (
                           <span className="material-symbols-outlined text-sm">cancel</span>
                         )}
-                        불가
+                        {copy.declined}
                       </button>
                     )}
                   </div>

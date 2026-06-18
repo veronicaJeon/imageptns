@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, Suspense, useMemo, useState } from "react";
 import { useCart } from "@/lib/store/cart";
 import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
+import { useLang } from "@/lib/i18n/store";
 
 interface SuccessOrderItem {
   id: string;
@@ -24,7 +25,36 @@ interface SuccessOrder {
   order_items: SuccessOrderItem[] | null;
 }
 
+const CHECKOUT_SUCCESS_COPY = {
+  ko: {
+    downloadError: "원본 파일 다운로드 링크를 만들지 못했습니다.",
+    title: "결제가 완료되었습니다",
+    orderNumber: "주문번호",
+    body: "구매하신 이미지는 지금 바로 다운로드할 수 있고, 대시보드 → 주문 내역에서도 다시 받을 수 있습니다.",
+    originalsTitle: "구매한 원본 파일",
+    originalsHelp: "다운로드 링크는 서버에서 안전하게 서명되어 새 창으로 열립니다.",
+    empty: "결제는 완료됐지만 이 화면에서 주문 항목을 불러오지 못했습니다. 주문 내역에서 다운로드를 확인해주세요.",
+    downloadOriginal: "원본 다운로드",
+    orders: "주문 내역 보기",
+    library: "라이브러리로",
+  },
+  en: {
+    downloadError: "Could not generate the original file download link.",
+    title: "Payment complete",
+    orderNumber: "Order no.",
+    body: "Your purchased images are ready to download now. You can also download them again from Dashboard → Orders.",
+    originalsTitle: "Purchased original files",
+    originalsHelp: "Download links are securely signed by the server and open in a new window.",
+    empty: "Payment is complete, but we could not load the order items on this page. Please check downloads from your order history.",
+    downloadOriginal: "Download original",
+    orders: "View orders",
+    library: "Back to library",
+  },
+} as const;
+
 function SuccessContent() {
+  const { lang } = useLang();
+  const copy = CHECKOUT_SUCCESS_COPY[lang];
   const searchParams = useSearchParams();
   const orderNumber  = searchParams.get("order") ?? "";
   const { clear }    = useCart();
@@ -58,7 +88,7 @@ function SuccessContent() {
       const res = await fetch(`/api/download/${orderItemId}`);
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        alert(data?.error ?? "원본 파일 다운로드 링크를 만들지 못했습니다.");
+        alert(data?.error ?? copy.downloadError);
         return;
       }
       const { url } = await res.json() as { url: string };
@@ -77,27 +107,27 @@ function SuccessContent() {
           <span className="material-symbols-outlined text-5xl text-primary">check_circle</span>
         </div>
         <h1 className="font-headline text-3xl font-extrabold text-on-surface mb-3 tracking-tight">
-          결제가 완료되었습니다
+          {copy.title}
         </h1>
         {orderNumber && (
-          <p className="text-outline text-sm mb-2">주문번호: <span className="font-mono font-bold text-on-surface">{orderNumber}</span></p>
+          <p className="text-outline text-sm mb-2">{copy.orderNumber}: <span className="font-mono font-bold text-on-surface">{orderNumber}</span></p>
         )}
         <p className="text-on-surface-variant text-sm mb-10 leading-relaxed">
-          구매하신 이미지는 지금 바로 다운로드할 수 있고, 대시보드 &rarr; 주문 내역에서도 다시 받을 수 있습니다.
+          {copy.body}
         </p>
 
         <div className="mb-10 bg-surface-container-lowest text-left shadow-ghost">
           <div className="flex items-center justify-between gap-4 border-b border-outline-variant/20 px-5 py-4">
             <div>
-              <p className="text-sm font-bold text-on-surface">구매한 원본 파일</p>
-              <p className="mt-1 text-xs text-outline">다운로드 링크는 서버에서 안전하게 서명되어 새 창으로 열립니다.</p>
+              <p className="text-sm font-bold text-on-surface">{copy.originalsTitle}</p>
+              <p className="mt-1 text-xs text-outline">{copy.originalsHelp}</p>
             </div>
             {loadingOrder && <span className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
           </div>
 
           {!loadingOrder && purchasedItems.length === 0 ? (
             <div className="px-5 py-8 text-center text-sm text-outline">
-              결제는 완료됐지만 이 화면에서 주문 항목을 불러오지 못했습니다. 주문 내역에서 다운로드를 확인해주세요.
+              {copy.empty}
             </div>
           ) : (
             <div className="divide-y divide-outline-variant/20">
@@ -137,7 +167,7 @@ function SuccessContent() {
                     ) : (
                       <span className="material-symbols-outlined text-base">download</span>
                     )}
-                    원본 다운로드
+                    {copy.downloadOriginal}
                   </button>
                 </div>
               ))}
@@ -150,13 +180,13 @@ function SuccessContent() {
             href="/dashboard/orders"
             className="px-8 py-4 bg-primary text-white font-bold text-xs uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
           >
-            주문 내역 보기
+            {copy.orders}
           </Link>
           <Link
             href="/library"
             className="px-8 py-4 border border-outline-variant text-on-surface font-bold text-xs uppercase tracking-widest rounded hover:bg-surface-container-low transition-colors"
           >
-            라이브러리로
+            {copy.library}
           </Link>
         </div>
       </div>

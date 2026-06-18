@@ -3,8 +3,28 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { useLang } from "@/lib/i18n/store";
+
+const CHECKOUT_FAIL_COPY = {
+  ko: {
+    title: "결제에 실패했습니다",
+    code: "오류 코드",
+    body: "결제가 처리되지 않았습니다. 카드 정보를 확인하거나 다시 시도해 주세요.",
+    retry: "다시 시도",
+    support: "고객 지원",
+  },
+  en: {
+    title: "Payment failed",
+    code: "Error code",
+    body: "Your payment was not processed. Please check your payment details or try again.",
+    retry: "Try again",
+    support: "Support",
+  },
+} as const;
 
 function FailContent() {
+  const { lang } = useLang();
+  const copy = CHECKOUT_FAIL_COPY[lang];
   const searchParams = useSearchParams();
   const code         = searchParams.get("code") ?? "UNKNOWN";
 
@@ -15,24 +35,24 @@ function FailContent() {
           <span className="material-symbols-outlined text-5xl text-error">cancel</span>
         </div>
         <h1 className="font-headline text-3xl font-extrabold text-on-surface mb-3 tracking-tight">
-          결제에 실패했습니다
+          {copy.title}
         </h1>
-        <p className="text-outline text-xs mb-2 font-mono">오류 코드: {code}</p>
+        <p className="text-outline text-xs mb-2 font-mono">{copy.code}: {code}</p>
         <p className="text-on-surface-variant text-sm mb-10 leading-relaxed">
-          결제가 처리되지 않았습니다. 카드 정보를 확인하거나 다시 시도해 주세요.
+          {copy.body}
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/checkout"
             className="px-8 py-4 bg-primary text-white font-bold text-xs uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
           >
-            다시 시도
+            {copy.retry}
           </Link>
           <Link
             href="/support"
             className="px-8 py-4 border border-outline-variant text-on-surface font-bold text-xs uppercase tracking-widest rounded hover:bg-surface-container-low transition-colors"
           >
-            고객 지원
+            {copy.support}
           </Link>
         </div>
       </div>
