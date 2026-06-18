@@ -4,7 +4,7 @@ import { Fragment, useState, useEffect } from "react";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n/store";
 import { buildUploadProofSteps, type TimelineState } from "@/lib/ux/status";
-import { COPYRIGHT_LICENSES, FREE_USAGE_POLICIES, getCopyrightLicense, getFreeUsagePolicy, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
+import { getCopyrightLicense, getFreeUsagePolicy, getLocalizedCopyrightLicense, getLocalizedFreeUsagePolicy, localizedCopyrightLicenses, localizedFreeUsagePolicies, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
 const CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
@@ -12,19 +12,100 @@ type Category = typeof CATEGORIES[number];
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 
-const FILTER_TABS: { key: StatusFilter; label: string }[] = [
-  { key: "all",      label: "전체" },
-  { key: "pending",  label: "검토 중" },
-  { key: "approved", label: "승인됨" },
-  { key: "rejected", label: "반려됨" },
-];
-
-const EMPTY_MESSAGES: Record<StatusFilter, string> = {
-  all:      "업로드한 이미지가 없습니다. 작품을 공유해보세요.",
-  pending:  "검토 대기 중인 이미지가 없습니다.",
-  approved: "승인된 이미지가 없습니다. 더 업로드해보세요.",
-  rejected: "거절된 이미지가 없습니다 🎉",
-};
+const UPLOADS_PAGE_COPY = {
+  ko: {
+    locale: "ko-KR",
+    filterTabs: { all: "전체", pending: "검토 중", approved: "승인됨", rejected: "반려됨" },
+    empty: {
+      all: "업로드한 이미지가 없습니다. 작품을 공유해보세요.",
+      pending: "검토 대기 중인 이미지가 없습니다.",
+      approved: "승인된 이미지가 없습니다. 더 업로드해보세요.",
+      rejected: "거절된 이미지가 없습니다.",
+    },
+    proof: { not_registered: "증명 전", available: "등록가능", requested: "요청됨", pending: "Arweave 등록 중", registered: "증명 완료", failed: "증명 실패" },
+    alreadyDeleting: "이미 삭제 절차가 진행 중이거나 완료된 이미지입니다.",
+    deleteReasonPrompt: "관리자에게 전달할 삭제 요청 사유를 입력하세요.",
+    deleteReasonDefault: "포트폴리오 정리",
+    deleteRequestFailed: "삭제 요청을 생성하지 못했습니다.",
+    deleteRequestAccepted: (fee: string) => `삭제 요청이 접수되었습니다. 예상 삭제 수수료: ₩${fee}`,
+    deleteConfirm: "미공개 이미지를 완전삭제하시겠습니까?",
+    latestSort: "최신순 정렬",
+    deletionRequested: (fee: string) => `삭제 요청됨 · 수수료 ₩${fee}`,
+    aiImage: "AI 이미지",
+    original: "오리지널 보증",
+    arweaveOriginal: "Arweave 원본",
+    metadata: "메타데이터",
+    editTitle: "편집",
+    deleteRequestTitle: "삭제 요청",
+    deleteTitle: "삭제",
+    editMeta: "메타데이터 편집",
+    title: "제목 *",
+    description: "설명",
+    authorship: "AI / 오리지널리티 선언",
+    humanOriginal: "AI 이미지가 아니며, 본인의 오리지널리티 보증",
+    aiGenerated: "AI 생성 이미지",
+    copyright: "저작권 등급",
+    freeUse: "무료 사용",
+    attributionName: "출처 표기명",
+    attributionPlaceholder: "작가명 또는 스튜디오명",
+    attributionUrl: "출처 URL",
+    category: "카테고리",
+    tags: "태그",
+    tagsPlaceholder: "쉼표로 구분",
+    shotAt: "촬영일시",
+    shotLocation: "촬영장소",
+    unknown: "미상",
+    save: "저장",
+    saveAndResubmit: "저장 및 재검토 요청",
+    cancel: "취소",
+  },
+  en: {
+    locale: "en-US",
+    filterTabs: { all: "All", pending: "Pending", approved: "Approved", rejected: "Rejected" },
+    empty: {
+      all: "No uploaded images yet. Start sharing your work.",
+      pending: "No images are pending review.",
+      approved: "No approved images yet. Upload more work.",
+      rejected: "No rejected images.",
+    },
+    proof: { not_registered: "Not proven", available: "Eligible", requested: "Requested", pending: "Arweave registering", registered: "Proof complete", failed: "Proof failed" },
+    alreadyDeleting: "This image is already in or past the deletion process.",
+    deleteReasonPrompt: "Enter the deletion request reason for the admin team.",
+    deleteReasonDefault: "Portfolio cleanup",
+    deleteRequestFailed: "Could not create the deletion request.",
+    deleteRequestAccepted: (fee: string) => `Deletion request submitted. Estimated deletion fee: ₩${fee}`,
+    deleteConfirm: "Permanently delete this unpublished image?",
+    latestSort: "Newest first",
+    deletionRequested: (fee: string) => `Deletion requested · fee ₩${fee}`,
+    aiImage: "AI image",
+    original: "Originality attested",
+    arweaveOriginal: "Arweave original",
+    metadata: "Metadata",
+    editTitle: "Edit",
+    deleteRequestTitle: "Request deletion",
+    deleteTitle: "Delete",
+    editMeta: "Edit metadata",
+    title: "Title *",
+    description: "Description",
+    authorship: "AI / originality declaration",
+    humanOriginal: "Not AI-generated; I attest to my originality",
+    aiGenerated: "AI-generated image",
+    copyright: "Copyright license",
+    freeUse: "Free use",
+    attributionName: "Credit name",
+    attributionPlaceholder: "Photographer or studio name",
+    attributionUrl: "Credit URL",
+    category: "Category",
+    tags: "Tags",
+    tagsPlaceholder: "Separated by commas",
+    shotAt: "Date taken",
+    shotLocation: "Location taken",
+    unknown: "Unknown",
+    save: "Save",
+    saveAndResubmit: "Save and request re-review",
+    cancel: "Cancel",
+  },
+} as const;
 
 const STATUS_STYLES: Record<string, string> = {
   approved: "bg-primary/10 text-primary",
@@ -85,15 +166,6 @@ interface UploadRow {
   authorship_declaration: AuthorshipDeclaration | null;
 }
 
-const PROOF_STATUS_LABELS: Record<string, string> = {
-  not_registered: "증명 전",
-  available: "등록가능",
-  requested: "요청됨",
-  pending: "Arweave 등록 중",
-  registered: "증명 완료",
-  failed: "증명 실패",
-};
-
 const TIMELINE_STYLES: Record<TimelineState, string> = {
   done: "bg-primary text-on-primary",
   current: "bg-amber-400 text-black",
@@ -128,7 +200,10 @@ function UploadTimeline({ img }: { img: UploadRow }) {
 }
 
 export default function UploadsPage() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const copy = UPLOADS_PAGE_COPY[lang];
+  const copyrightLicenses = localizedCopyrightLicenses(lang);
+  const freeUsagePolicies = localizedFreeUsagePolicies(lang);
   const up = t.dashboard.uploads;
   const c  = up.cols;
 
@@ -157,14 +232,14 @@ export default function UploadsPage() {
 
   async function handleDelete(img: UploadRow) {
     if (img.lifecycle_status && img.lifecycle_status !== "active") {
-      alert("이미 삭제 절차가 진행 중이거나 완료된 이미지입니다.");
+      alert(copy.alreadyDeleting);
       return;
     }
 
     setDeleting(img.id);
     try {
       if (requiresAdminDeletionRequest(img)) {
-        const reason = prompt("관리자에게 전달할 삭제 요청 사유를 입력하세요.", "포트폴리오 정리");
+        const reason = prompt(copy.deleteReasonPrompt, copy.deleteReasonDefault);
         if (reason === null) return;
         const res = await fetch(`/api/images/${img.id}/deletion-request`, {
           method: "POST",
@@ -177,18 +252,18 @@ export default function UploadsPage() {
           error?: string;
         } | null;
         if (!res.ok) {
-          alert(data?.error ?? "삭제 요청을 생성하지 못했습니다.");
+          alert(data?.error ?? copy.deleteRequestFailed);
           return;
         }
         const fee = data?.impact?.estimatedFeeKrw ?? data?.request?.estimated_fee_krw ?? 0;
-        alert(`삭제 요청이 접수되었습니다. 예상 삭제 수수료: ₩${fee.toLocaleString("ko-KR")}`);
+        alert(copy.deleteRequestAccepted(fee.toLocaleString(copy.locale)));
         setUploads((prev) => prev.map((u) => u.id === img.id
           ? { ...u, lifecycle_status: "deletion_requested", deletion_fee_krw: fee, deletion_fee_status: fee > 0 ? "quoted" : "waived" }
           : u));
         return;
       }
 
-      if (!confirm("미공개 이미지를 완전삭제하시겠습니까?")) return;
+      if (!confirm(copy.deleteConfirm)) return;
       const res = await fetch(`/api/uploads/${img.id}`, { method: "DELETE" });
       if (!res.ok) {
         const { error } = await res.json();
@@ -290,7 +365,8 @@ export default function UploadsPage() {
         <>
           {/* Status filter tabs */}
           <div className="flex gap-1 mb-4 border-b border-outline-variant/20">
-            {FILTER_TABS.map((tab) => {
+            {(Object.keys(copy.filterTabs) as StatusFilter[]).map((key) => {
+              const tab = { key, label: copy.filterTabs[key] };
               const count =
                 tab.key === "all"
                   ? uploads.length
@@ -327,7 +403,7 @@ export default function UploadsPage() {
               <span className="material-symbols-outlined text-5xl">
                 {activeFilter === "approved" ? "check_circle" : activeFilter === "rejected" ? "celebration" : "hourglass_empty"}
               </span>
-              <p className="text-sm">{EMPTY_MESSAGES[activeFilter]}</p>
+              <p className="text-sm">{copy.empty[activeFilter]}</p>
             </div>
           ) : (
             <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
@@ -341,7 +417,7 @@ export default function UploadsPage() {
                     <th className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">
                       <span className="flex items-center gap-1">
                         {c.uploaded}
-                        <span className="material-symbols-outlined text-[12px] text-primary" title="최신순 정렬">
+                        <span className="material-symbols-outlined text-[12px] text-primary" title={copy.latestSort}>
                           arrow_downward
                         </span>
                       </span>
@@ -385,25 +461,25 @@ export default function UploadsPage() {
                         )}
                         <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold">
                           <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                            {getCopyrightLicense(img.copyright_license).label}
+                            {getLocalizedCopyrightLicense(img.copyright_license, lang).label}
                           </span>
-                          {getFreeUsagePolicy(img.free_usage_policy).code !== "none" && (
+                          {getLocalizedFreeUsagePolicy(img.free_usage_policy, lang).code !== "none" && (
                             <span className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-200 px-2 py-0.5 rounded-full">
-                              {getFreeUsagePolicy(img.free_usage_policy).label}
+                              {getLocalizedFreeUsagePolicy(img.free_usage_policy, lang).label}
                             </span>
                           )}
                           <span className="bg-surface-container-low text-on-surface-variant px-2 py-0.5 rounded-full">
-                            {PROOF_STATUS_LABELS[img.proof_status ?? "not_registered"] ?? img.proof_status}
+                            {copy.proof[(img.proof_status ?? "not_registered") as keyof typeof copy.proof] ?? img.proof_status}
                           </span>
                           {img.lifecycle_status && img.lifecycle_status !== "active" && (
                             <span className="bg-error/10 text-error px-2 py-0.5 rounded-full">
                               {deletionPending
-                                ? `삭제 요청됨 · 수수료 ₩${(img.deletion_fee_krw ?? 0).toLocaleString("ko-KR")}`
+                                ? copy.deletionRequested((img.deletion_fee_krw ?? 0).toLocaleString(copy.locale))
                                 : img.lifecycle_status}
                             </span>
                           )}
                           <span className="bg-surface-container-low text-on-surface-variant px-2 py-0.5 rounded-full">
-                            {img.authorship_declaration === "ai_generated" ? "AI 이미지" : "오리지널 보증"}
+                            {img.authorship_declaration === "ai_generated" ? copy.aiImage : copy.original}
                           </span>
                           {img.proof_arweave_original_tx_id && (
                             <a
@@ -412,7 +488,7 @@ export default function UploadsPage() {
                               rel="noreferrer"
                               className="bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:opacity-70"
                             >
-                              Arweave 원본
+                              {copy.arweaveOriginal}
                             </a>
                           )}
                           {img.proof_arweave_metadata_tx_id && (
@@ -422,7 +498,7 @@ export default function UploadsPage() {
                               rel="noreferrer"
                               className="bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:opacity-70"
                             >
-                              메타데이터
+                              {copy.metadata}
                             </a>
                           )}
                           {img.proof_tx_hash && (
@@ -447,7 +523,7 @@ export default function UploadsPage() {
                             <button
                               onClick={() => isEditing ? setEditing(null) : openEdit(img)}
                               className={`transition-colors ${isEditing ? "text-primary" : "text-outline hover:text-primary"}`}
-                              title="편집"
+                              title={copy.editTitle}
                             >
                               <span className="material-symbols-outlined text-base">
                                 {isEditing ? "close" : "edit"}
@@ -459,7 +535,7 @@ export default function UploadsPage() {
                               onClick={() => handleDelete(img)}
                               disabled={deleting === img.id}
                               className="text-outline hover:text-error transition-colors disabled:opacity-50"
-                              title={requiresAdminDeletionRequest(img) ? "삭제 요청" : "삭제"}
+                              title={requiresAdminDeletionRequest(img) ? copy.deleteRequestTitle : copy.deleteTitle}
                             >
                               {deleting === img.id
                                 ? <span className="w-4 h-4 border-2 border-error border-t-transparent rounded-full animate-spin inline-block" />
@@ -476,11 +552,11 @@ export default function UploadsPage() {
                       <tr>
                         <td colSpan={6} className="px-6 pb-6 pt-2 bg-surface-container-low border-b border-outline-variant/20">
                           <div className="max-w-2xl flex flex-col gap-4">
-                            <p className="text-xs font-bold text-outline uppercase tracking-widest">메타데이터 편집</p>
+                            <p className="text-xs font-bold text-outline uppercase tracking-widest">{copy.editMeta}</p>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div className="flex flex-col gap-1.5 sm:col-span-2">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">제목 *</label>
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.title}</label>
                                 <input
                                   type="text"
                                   value={editing.title}
@@ -490,7 +566,7 @@ export default function UploadsPage() {
                               </div>
 
                               <div className="flex flex-col gap-1.5 sm:col-span-2">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">설명</label>
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.description}</label>
                                 <textarea
                                   value={editing.description}
                                   onChange={(e) => setEditing({ ...editing, description: e.target.value })}
@@ -500,56 +576,56 @@ export default function UploadsPage() {
                               </div>
 
                               <div className="flex flex-col gap-1.5 sm:col-span-2">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">AI / 오리지널리티 선언</label>
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.authorship}</label>
                                 <select
                                   value={editing.authorship_declaration}
                                   onChange={(e) => setEditing({ ...editing, authorship_declaration: e.target.value as AuthorshipDeclaration })}
                                   className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all"
                                 >
-                                  <option value="human_original">AI 이미지가 아니며, 본인의 오리지널리티 보증</option>
-                                  <option value="ai_generated">AI 생성 이미지</option>
+                                  <option value="human_original">{copy.humanOriginal}</option>
+                                  <option value="ai_generated">{copy.aiGenerated}</option>
                                 </select>
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">저작권 등급</label>
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.copyright}</label>
                                 <select
                                   value={editing.copyright_license}
                                   onChange={(e) => setEditing({ ...editing, copyright_license: e.target.value as CopyrightLicenseCode })}
                                   className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all"
                                 >
-                                  {COPYRIGHT_LICENSES.map((license) => (
+                                  {copyrightLicenses.map((license) => (
                                     <option key={license.code} value={license.code}>{license.label}</option>
                                   ))}
                                 </select>
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">무료 사용</label>
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.freeUse}</label>
                                 <select
                                   value={editing.free_usage_policy}
                                   onChange={(e) => setEditing({ ...editing, free_usage_policy: e.target.value as FreeUsagePolicyCode })}
                                   className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all"
                                 >
-                                  {FREE_USAGE_POLICIES.map((policy) => (
+                                  {freeUsagePolicies.map((policy) => (
                                     <option key={policy.code} value={policy.code}>{policy.label}</option>
                                   ))}
                                 </select>
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">출처 표기명</label>
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.attributionName}</label>
                                 <input
                                   type="text"
                                   value={editing.attribution_name}
                                   onChange={(e) => setEditing({ ...editing, attribution_name: e.target.value })}
-                                  placeholder="작가명 또는 스튜디오명"
+                                  placeholder={copy.attributionPlaceholder}
                                   className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                                 />
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">출처 URL</label>
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.attributionUrl}</label>
                                 <input
                                   type="url"
                                   value={editing.attribution_url}
@@ -560,7 +636,7 @@ export default function UploadsPage() {
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">카테고리</label>
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.category}</label>
                                 <select
                                   value={editing.category}
                                   onChange={(e) => setEditing({ ...editing, category: e.target.value as Category })}
@@ -573,18 +649,18 @@ export default function UploadsPage() {
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">태그</label>
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.tags}</label>
                                 <input
                                   type="text"
                                   value={editing.tags}
                                   onChange={(e) => setEditing({ ...editing, tags: e.target.value })}
-                                  placeholder="쉼표로 구분"
+                                  placeholder={copy.tagsPlaceholder}
                                   className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                                 />
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">촬영일시</label>
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.shotAt}</label>
                                 <div className="flex gap-2">
                                   <input
                                     type="date"
@@ -598,20 +674,20 @@ export default function UploadsPage() {
                                     onClick={() => setEditing({ ...editing, exif_taken_at: editing.exif_taken_at === "unknown" ? "" : "unknown" })}
                                     className={`h-10 px-3 text-xs rounded border transition-colors ${editing.exif_taken_at === "unknown" ? "border-primary text-primary bg-primary/5" : "border-outline-variant text-outline hover:text-on-surface"}`}
                                   >
-                                    미상
+                                    {copy.unknown}
                                   </button>
                                 </div>
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">촬영장소</label>
+                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.shotLocation}</label>
                                 <div className="flex gap-2">
                                   <input
                                     type="text"
                                     value={editing.exif_location === "unknown" ? "" : editing.exif_location}
                                     disabled={editing.exif_location === "unknown"}
                                     onChange={(e) => setEditing({ ...editing, exif_location: e.target.value })}
-                                    placeholder="예: Seoul, Korea"
+                                    placeholder="Example: Seoul, Korea"
                                     className="flex-1 h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface placeholder:text-outline outline-none transition-all disabled:opacity-50"
                                   />
                                   <button
@@ -619,7 +695,7 @@ export default function UploadsPage() {
                                     onClick={() => setEditing({ ...editing, exif_location: editing.exif_location === "unknown" ? "" : "unknown" })}
                                     className={`h-10 px-3 text-xs rounded border transition-colors ${editing.exif_location === "unknown" ? "border-primary text-primary bg-primary/5" : "border-outline-variant text-outline hover:text-on-surface"}`}
                                   >
-                                    미상
+                                    {copy.unknown}
                                   </button>
                                 </div>
                               </div>
@@ -632,7 +708,7 @@ export default function UploadsPage() {
                                 className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
                               >
                                 {saving ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
-                                저장
+                                {copy.save}
                               </button>
 
                               {img.status === "rejected" && (
@@ -642,7 +718,7 @@ export default function UploadsPage() {
                                   className="flex items-center gap-1.5 px-5 py-2.5 border border-primary text-primary text-xs font-bold uppercase tracking-widest rounded hover:bg-primary/5 transition-colors disabled:opacity-50"
                                 >
                                   <span className="material-symbols-outlined text-sm">send</span>
-                                  저장 및 재검토 요청
+                                  {copy.saveAndResubmit}
                                 </button>
                               )}
 
@@ -650,7 +726,7 @@ export default function UploadsPage() {
                                 onClick={() => setEditing(null)}
                                 className="px-4 py-2.5 text-xs text-outline hover:text-on-surface transition-colors"
                               >
-                                취소
+                                {copy.cancel}
                               </button>
                             </div>
                           </div>

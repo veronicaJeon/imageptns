@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { ImageWithRelations } from '@/types/image'
+import { useLang } from '@/lib/i18n/store'
 
 interface ImageCardProps {
   image: ImageWithRelations
@@ -9,11 +10,12 @@ interface ImageCardProps {
 }
 
 export default function ImageCard({ image, supabaseUrl }: ImageCardProps) {
+  const { lang } = useLang()
   const imageUrl = `${supabaseUrl}/storage/v1/object/public/images/${image.storage_path}`
   const width = image.width ?? 800
   const height = image.height ?? 600
   const uploaderName =
-    image.profiles?.display_name ?? image.profiles?.username ?? '알 수 없음'
+    image.profiles?.display_name ?? image.profiles?.username ?? (lang === 'ko' ? '알 수 없음' : 'Unknown')
   const uploaderUsername = image.profiles?.username ?? ''
   const tags = image.image_tags
     .map((t) => t.tags?.name)
@@ -31,7 +33,7 @@ export default function ImageCard({ image, supabaseUrl }: ImageCardProps) {
       >
         <Image
           src={imageUrl}
-          alt={image.title || '이미지'}
+          alt={image.title || (lang === 'ko' ? '이미지' : 'Image')}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
           className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useCart } from "@/lib/store/cart";
 import { useRouter } from "next/navigation";
 import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
-import { buyerUsageConditions, creditLineForName, getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
+import { buyerUsageConditions, creditLineForName, getLocalizedCopyrightLicense, getLocalizedFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 import { useLang } from "@/lib/i18n/store";
 
 export interface ImageCardData {
@@ -41,7 +41,7 @@ export function ImageCard({
   onQuickView,
   className,
 }: ImageCardProps) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [isFavorited, setIsFavorited] = useState(initialFavorited);
   const [favoriting, setFavoriting] = useState(false);
   const [cartAdded, setCartAdded] = useState(false);
@@ -89,11 +89,12 @@ export function ImageCard({
     setTimeout(() => setCartAdded(false), 1500);
   }
 
-  const copyrightLicense = getCopyrightLicense(image.copyrightLicense);
-  const freeUsagePolicy = getFreeUsagePolicy(image.freeUsagePolicy);
+  const copyrightLicense = getLocalizedCopyrightLicense(image.copyrightLicense, lang);
+  const freeUsagePolicy = getLocalizedFreeUsagePolicy(image.freeUsagePolicy, lang);
   const usageConditions = buyerUsageConditions({
     copyrightLicense: image.copyrightLicense,
     freeUsagePolicy: image.freeUsagePolicy,
+    lang,
   });
 
   return (

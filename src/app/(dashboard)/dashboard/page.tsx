@@ -125,8 +125,45 @@ function isPhotographerStats(stats: DashboardStats | null): stats is Photographe
 }
 
 export default function DashboardPage() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const d = t.dashboard.overview;
+  const copy = lang === "ko"
+    ? {
+        basePending: "확인 대기",
+        baseConfirmed: "완료",
+        baseFailed: "실패",
+        basePendingTitle: "Base 결제 확인이 필요한 주문이 있습니다",
+        basePendingBody: "구매 트랜잭션이 완료됐는데 화면 확인 단계에서 멈춘 주문은 주문 내역에서 tx 상태를 확인하세요.",
+        viewOrders: "주문 내역 보기",
+        baseWallet: "Base 지갑",
+        walletReady: "등록됨",
+        walletMissing: "미등록",
+        proofRegistered: "증명 등록",
+        proofProgress: "등록가능/진행",
+        claimReady: "Claim 대기",
+        walletRequiredBody: "Base 정산을 받으려면 지갑 주소를 등록해야 합니다.",
+        credentialReadyBody: (count: number) => `첫 판매가 완료된 사진 ${count}개를 Arweave 등록 요청할 수 있습니다.`,
+        proofAttentionBody: "증명 등록 실패 이미지가 있어 관리자 재처리가 필요할 수 있습니다.",
+        claimReadyBody: (amount: string) => `${amount}를 Base에서 claim할 수 있습니다.`,
+      }
+    : {
+        basePending: "Pending",
+        baseConfirmed: "Confirmed",
+        baseFailed: "Failed",
+        basePendingTitle: "Some Base payments need confirmation",
+        basePendingBody: "If a purchase transaction completed but the screen stopped during confirmation, check the tx status in your order history.",
+        viewOrders: "View orders",
+        baseWallet: "Base wallet",
+        walletReady: "Connected",
+        walletMissing: "Missing",
+        proofRegistered: "Proof registered",
+        proofProgress: "Ready / in progress",
+        claimReady: "Claim ready",
+        walletRequiredBody: "Add a wallet address to receive Base settlements.",
+        credentialReadyBody: (count: number) => `${count} sold image${count === 1 ? "" : "s"} can be requested for Arweave registration.`,
+        proofAttentionBody: "Some proof registrations failed and may need operations review.",
+        claimReadyBody: (amount: string) => `${amount} is available to claim on Base.`,
+      };
   const { user, init } = useAuth();
   const cartCount = useCart((s) => s.items.length);
 
@@ -181,9 +218,9 @@ export default function DashboardPage() {
 
           <p className="text-xs text-outline uppercase tracking-widest font-bold mb-4">Base USDC Payments</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-            <StatCard icon="pending_actions" label="확인 대기" value={String(buyerOnchain.pending)} color="bg-amber-50 text-amber-500 dark:bg-amber-900/20" href="/dashboard/orders" />
-            <StatCard icon="verified" label="완료" value={String(buyerOnchain.confirmed)} color="bg-blue-50 text-blue-500 dark:bg-blue-900/20" href="/dashboard/orders" />
-            <StatCard icon="error" label="실패" value={String(buyerOnchain.failed)} color="bg-error/10 text-error" href="/dashboard/orders" />
+            <StatCard icon="pending_actions" label={copy.basePending} value={String(buyerOnchain.pending)} color="bg-amber-50 text-amber-500 dark:bg-amber-900/20" href="/dashboard/orders" />
+            <StatCard icon="verified" label={copy.baseConfirmed} value={String(buyerOnchain.confirmed)} color="bg-blue-50 text-blue-500 dark:bg-blue-900/20" href="/dashboard/orders" />
+            <StatCard icon="error" label={copy.baseFailed} value={String(buyerOnchain.failed)} color="bg-error/10 text-error" href="/dashboard/orders" />
           </div>
 
           {buyerOnchain.pending > 0 && (
@@ -191,11 +228,11 @@ export default function DashboardPage() {
               <div className="flex items-start gap-3">
                 <span className="material-symbols-outlined text-amber-500 text-xl mt-0.5">hourglass_top</span>
                 <div>
-                  <p className="text-sm font-bold text-on-surface">Base 결제 확인이 필요한 주문이 있습니다</p>
-                  <p className="text-xs text-on-surface-variant mt-1">구매 트랜잭션이 완료됐는데 화면 확인 단계에서 멈춘 주문은 주문 내역에서 tx 상태를 확인하세요.</p>
+                  <p className="text-sm font-bold text-on-surface">{copy.basePendingTitle}</p>
+                  <p className="text-xs text-on-surface-variant mt-1">{copy.basePendingBody}</p>
                 </div>
               </div>
-              <Link href="/dashboard/orders" className="text-xs font-bold uppercase tracking-widest text-primary hover:opacity-70">주문 내역 보기</Link>
+              <Link href="/dashboard/orders" className="text-xs font-bold uppercase tracking-widest text-primary hover:opacity-70">{copy.viewOrders}</Link>
             </div>
           )}
 
@@ -249,14 +286,14 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
             <StatCard
               icon={photographerWalletReady ? "account_balance_wallet" : "wallet"}
-              label="Base 지갑"
-              value={photographerWalletReady ? "등록됨" : "미등록"}
+              label={copy.baseWallet}
+              value={photographerWalletReady ? copy.walletReady : copy.walletMissing}
               color={photographerWalletReady ? "bg-blue-50 text-blue-500 dark:bg-blue-900/20" : "bg-error/10 text-error"}
               href="/dashboard/settings"
             />
-            <StatCard icon="verified" label="증명 등록" value={String(photographerProof.registered)} color="bg-primary/10 text-primary" href="/dashboard/blockchain" />
-            <StatCard icon="sync_problem" label="등록가능/진행" value={`${photographerProof.available}/${photographerProof.requested + photographerProof.pending}`} color="bg-amber-50 text-amber-500 dark:bg-amber-900/20" href="/dashboard/blockchain" />
-            <StatCard icon="savings" label="Claim 대기" value={formatUSDC(photographerClaims.claimableUsdc)} color="bg-green-50 text-green-500 dark:bg-green-900/20" href="/dashboard/earnings" />
+            <StatCard icon="verified" label={copy.proofRegistered} value={String(photographerProof.registered)} color="bg-primary/10 text-primary" href="/dashboard/blockchain" />
+            <StatCard icon="sync_problem" label={copy.proofProgress} value={`${photographerProof.available}/${photographerProof.requested + photographerProof.pending}`} color="bg-amber-50 text-amber-500 dark:bg-amber-900/20" href="/dashboard/blockchain" />
+            <StatCard icon="savings" label={copy.claimReady} value={formatUSDC(photographerClaims.claimableUsdc)} color="bg-green-50 text-green-500 dark:bg-green-900/20" href="/dashboard/earnings" />
           </div>
 
           {(!photographerWalletReady || photographerProof.available > 0 || photographerProof.failed > 0 || photographerClaims.claimableUsdc > 0) && (
@@ -264,25 +301,25 @@ export default function DashboardPage() {
               {!photographerWalletReady && (
                 <Link href="/dashboard/settings" className="bg-surface-container-lowest border border-error/20 p-4 hover:bg-surface-container-low transition-colors">
                   <p className="text-xs font-bold uppercase tracking-widest text-error">Wallet Required</p>
-                  <p className="text-sm text-on-surface-variant mt-2">Base 정산을 받으려면 지갑 주소를 등록해야 합니다.</p>
+                  <p className="text-sm text-on-surface-variant mt-2">{copy.walletRequiredBody}</p>
                 </Link>
               )}
               {photographerProof.available > 0 && (
                 <Link href="/dashboard/blockchain" className="bg-surface-container-lowest border border-primary/20 p-4 hover:bg-surface-container-low transition-colors">
                   <p className="text-xs font-bold uppercase tracking-widest text-primary">Credential Ready</p>
-                  <p className="text-sm text-on-surface-variant mt-2">첫 판매가 완료된 사진 {photographerProof.available}개를 Arweave 등록 요청할 수 있습니다.</p>
+                  <p className="text-sm text-on-surface-variant mt-2">{copy.credentialReadyBody(photographerProof.available)}</p>
                 </Link>
               )}
               {photographerProof.failed > 0 && (
                 <Link href="/dashboard/blockchain" className="bg-surface-container-lowest border border-amber-300/40 p-4 hover:bg-surface-container-low transition-colors">
                   <p className="text-xs font-bold uppercase tracking-widest text-amber-600">Proof Attention</p>
-                  <p className="text-sm text-on-surface-variant mt-2">증명 등록 실패 이미지가 있어 관리자 재처리가 필요할 수 있습니다.</p>
+                  <p className="text-sm text-on-surface-variant mt-2">{copy.proofAttentionBody}</p>
                 </Link>
               )}
               {photographerClaims.claimableUsdc > 0 && (
                 <Link href="/dashboard/earnings" className="bg-surface-container-lowest border border-primary/20 p-4 hover:bg-surface-container-low transition-colors">
                   <p className="text-xs font-bold uppercase tracking-widest text-primary">Claim Ready</p>
-                  <p className="text-sm text-on-surface-variant mt-2">{formatUSDC(photographerClaims.claimableUsdc)}를 Base에서 claim할 수 있습니다.</p>
+                  <p className="text-sm text-on-surface-variant mt-2">{copy.claimReadyBody(formatUSDC(photographerClaims.claimableUsdc))}</p>
                 </Link>
               )}
             </div>

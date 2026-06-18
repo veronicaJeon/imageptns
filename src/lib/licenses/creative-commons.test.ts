@@ -4,6 +4,8 @@ import {
   creditLineForName,
   getCopyrightLicense,
   getFreeUsagePolicy,
+  getLocalizedCopyrightLicense,
+  getLocalizedFreeUsagePolicy,
   normalizeCopyrightLicenseCode,
   normalizeFreeUsagePolicy,
 } from "./creative-commons";
@@ -39,6 +41,17 @@ describe("creative commons metadata", () => {
   it("normalizes free usage policies", () => {
     expect(getFreeUsagePolicy("education").label).toBe("교육용 무료");
     expect(normalizeFreeUsagePolicy("bad-value")).toBe("none");
+  });
+
+  it("returns localized English license metadata for public UI", () => {
+    expect(getLocalizedCopyrightLicense("cc_by_nc", "en")).toMatchObject({
+      label: "CC BY-NC 4.0",
+      summary: "Non-commercial use and modifications are allowed with attribution.",
+    });
+    expect(getLocalizedFreeUsagePolicy("education", "en")).toMatchObject({
+      label: "Free for education",
+      summary: "Shown as free for educational uses such as classes, research, and non-commercial learning materials.",
+    });
   });
 
   it("builds the platform credit line from the photographer display name", () => {
@@ -87,6 +100,21 @@ describe("creative commons metadata", () => {
       { key: "commercial", label: "상업 사용 가능", allowed: true },
       { key: "derivatives", label: "원 저작물 변경 가능", allowed: true },
       { key: "attribution", label: "저작자 표시 필요", allowed: true },
+    ]);
+  });
+
+  it("maps buyer usage conditions into English labels", () => {
+    const conditions = buyerUsageConditions({
+      copyrightLicense: "cc_by_nc_nd",
+      freeUsagePolicy: "education",
+      lang: "en",
+    });
+
+    expect(conditions).toEqual([
+      { key: "education_free", label: "Free for educational use", allowed: true },
+      { key: "commercial", label: "Commercial use restricted", allowed: false },
+      { key: "derivatives", label: "Modifications restricted", allowed: false },
+      { key: "attribution", label: "Credit required", allowed: true },
     ]);
   });
 });

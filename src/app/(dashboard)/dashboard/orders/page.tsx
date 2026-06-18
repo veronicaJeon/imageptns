@@ -98,10 +98,17 @@ interface OrderRow {
   isFirstItemInOrder: boolean;
 }
 
-const LICENSE_SUMMARY: Record<string, string> = {
-  editorial: "뉴스, 기사, 교육 목적 사용",
-  commercial: "광고, 마케팅, 상업 목적 사용",
-  extended: "확장 인쇄, 상품화, 전 매체 사용",
+const LICENSE_SUMMARY: Record<"ko" | "en", Record<string, string>> = {
+  ko: {
+    editorial: "뉴스, 기사, 교육 목적 사용",
+    commercial: "광고, 마케팅, 상업 목적 사용",
+    extended: "확장 인쇄, 상품화, 전 매체 사용",
+  },
+  en: {
+    editorial: "News, article, and educational use",
+    commercial: "Advertising, marketing, and commercial use",
+    extended: "Extended print, merchandise, and all-media use",
+  },
 };
 
 const TIMELINE_STYLES: Record<TimelineState, string> = {
@@ -160,10 +167,31 @@ function receiptOrderFromOrder(order: Order): ReceiptOrder {
 }
 
 export default function OrdersPage() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const ord = t.dashboard.orders;
   const recovery = ord.recovery;
   const c   = ord.cols;
+  const copy = lang === "ko"
+    ? {
+        popupBlocked: "팝업이 차단되어 영수증 창을 열지 못했습니다.",
+        stoppedNotice: "판매중지/삭제 고지",
+        subscriptionDownload: "무료다운",
+        recoveryHelp: "지갑 결제를 완료했는데 다운로드가 열리지 않으면, 지갑의 트랜잭션 해시를 오른쪽 복구 입력창에 붙여넣어 구매 확정을 다시 요청하세요.",
+        license: "라이선스:",
+        licenseFallback: "구매한 라이선스 조건에 따라 사용 가능합니다.",
+        downloadExpires: "다운로드 만료:",
+        receiptPdf: "영수증 PDF",
+      }
+    : {
+        popupBlocked: "The receipt popup was blocked.",
+        stoppedNotice: "Sale stopped / deletion notice",
+        subscriptionDownload: "free download",
+        recoveryHelp: "If you completed the wallet payment but downloads are still locked, paste the transaction hash into the recovery field on the right and request confirmation again.",
+        license: "License:",
+        licenseFallback: "Use is allowed according to the purchased license terms.",
+        downloadExpires: "Download expires:",
+        receiptPdf: "Receipt PDF",
+      };
 
   const [orders, setOrders]       = useState<Order[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -205,7 +233,7 @@ export default function OrdersPage() {
   function handlePrintReceipt(order: Order) {
     const popup = window.open("", "_blank", "noopener,noreferrer,width=960,height=720");
     if (!popup) {
-      alert("팝업이 차단되어 영수증 창을 열지 못했습니다.");
+      alert(copy.popupBlocked);
       return;
     }
 
@@ -272,7 +300,7 @@ export default function OrdersPage() {
       orderId:     order.id,
       orderNumber: order.order_number,
       status:      order.status,
-      date:        new Date(order.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      date:        new Date(order.created_at).toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", { month: "short", day: "numeric", year: "numeric" }),
       totalKrw:    order.total_krw,
       itemId:      item.id,
       license:     item.license_code,
@@ -353,7 +381,7 @@ export default function OrdersPage() {
                         <p className="text-xs text-outline">{row.orderNumber}</p>
                         {imageUnavailable && (
                           <p className="mt-1 rounded bg-error/10 px-2 py-1 text-[10px] font-bold text-error">
-                            판매중지/삭제 고지
+                            {copy.stoppedNotice}
                           </p>
                         )}
                         {row.paymentProvider === "base_usdc" && (
@@ -381,7 +409,7 @@ export default function OrdersPage() {
                     </p>
                     {row.subscriptionCovered && (
                       <p className="mt-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                        {row.subscriptionPlan ?? "subscription"} 무료다운
+                        {row.subscriptionPlan ?? "subscription"} {copy.subscriptionDownload}
                       </p>
                     )}
                   </td>
@@ -415,17 +443,17 @@ export default function OrdersPage() {
                     {row.isFirstItemInOrder && <OrderTimeline row={row} />}
                     {row.isFirstItemInOrder && row.paymentProvider === "base_usdc" && row.cryptoStatus === "pending" && (
                       <div className="mt-3 max-w-md rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-                        지갑 결제를 완료했는데 다운로드가 열리지 않으면, 지갑의 트랜잭션 해시를 오른쪽 복구 입력창에 붙여넣어 구매 확정을 다시 요청하세요.
+                        {copy.recoveryHelp}
                       </div>
                     )}
                     {row.status === "completed" && (
                       <div className="mt-3 max-w-md rounded-lg bg-surface-container-low px-3 py-2 text-[11px] leading-relaxed text-on-surface-variant">
-                        <span className="font-bold text-on-surface">라이선스:</span>{" "}
-                        {LICENSE_SUMMARY[row.license] ?? "구매한 라이선스 조건에 따라 사용 가능합니다."}
+                        <span className="font-bold text-on-surface">{copy.license}</span>{" "}
+                        {LICENSE_SUMMARY[lang][row.license] ?? copy.licenseFallback}
                         {row.downloadExpiresAt && (
                           <p className="mt-1">
-                            <span className="font-bold text-on-surface">다운로드 만료:</span>{" "}
-                            {new Date(row.downloadExpiresAt).toLocaleDateString("ko-KR", { year: "numeric", month: "short", day: "numeric" })}
+                            <span className="font-bold text-on-surface">{copy.downloadExpires}</span>{" "}
+                            {new Date(row.downloadExpiresAt).toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", { year: "numeric", month: "short", day: "numeric" })}
                           </p>
                         )}
                       </div>
@@ -457,7 +485,7 @@ export default function OrdersPage() {
                             className="flex items-center gap-1 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors"
                           >
                             <span className="material-symbols-outlined text-base">print</span>
-                            영수증 PDF
+                            {copy.receiptPdf}
                           </button>
                         )}
                       </div>

@@ -27,8 +27,9 @@ function photographerName(image: FavoriteImage | null) {
 }
 
 export default function FavoritesPage() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const fav = t.dashboard.favorites;
+  const deletedImageLabel = lang === "ko" ? "삭제된 이미지" : "Deleted image";
   const [items, setItems]   = useState<FavoriteItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,7 +74,7 @@ export default function FavoritesPage() {
             const img  = item.image;
             const id   = img?.id ?? item.image_id;
             const isDeleted = !img || (img.status && img.status !== "approved") || (img.lifecycle_status && img.lifecycle_status !== "active");
-            const title = img?.title ?? "삭제된 이미지";
+            const title = img?.title ?? deletedImageLabel;
             const category = img?.category ?? "";
             const photographer = photographerName(img);
             const src   = img?.storage_path_preview ?? "";
@@ -86,7 +87,7 @@ export default function FavoritesPage() {
                 {isDeleted ? (
                   <div className="aspect-[4/3] bg-surface-container-low flex flex-col items-center justify-center gap-2">
                     <span className="material-symbols-outlined text-3xl text-outline">hide_image</span>
-                    <span className="text-xs text-outline">삭제된 이미지</span>
+                    <span className="text-xs text-outline">{deletedImageLabel}</span>
                   </div>
                 ) : (
                   <Link href={`/library/${id}`}>
@@ -108,7 +109,7 @@ export default function FavoritesPage() {
                   <div className="min-w-0">
                     {category && <p className="text-[10px] font-bold uppercase tracking-widest text-outline mb-1">{category}</p>}
                     {isDeleted ? (
-                      <p className="text-sm font-semibold text-outline line-through truncate">삭제된 이미지</p>
+                      <p className="text-sm font-semibold text-outline line-through truncate">{deletedImageLabel}</p>
                     ) : (
                       <Link href={`/library/${id}`}>
                         <p className="text-sm font-semibold text-on-surface truncate hover:text-primary transition-colors">{title}</p>

@@ -174,6 +174,7 @@ export default function BuyerSourcingPage() {
     const usageConditions = buyerUsageConditions({
       copyrightLicense: image.copyright_license,
       freeUsagePolicy: image.free_usage_policy,
+      lang,
     });
     addItem({
       id: image.id,

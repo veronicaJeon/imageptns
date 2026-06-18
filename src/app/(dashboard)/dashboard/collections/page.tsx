@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useLang } from "@/lib/i18n/store";
 
 type CollectionItem = {
   id: string;
@@ -27,6 +28,48 @@ type Collection = {
 };
 
 export default function CollectionsPage() {
+  const { lang } = useLang();
+  const copy = lang === "ko"
+    ? {
+        title: "컬렉션",
+        newCollection: "새 컬렉션 만들기",
+        namePlaceholder: "컬렉션 이름",
+        saving: "저장 중…",
+        create: "만들기",
+        cancel: "취소",
+        emptyTitle: "아직 컬렉션이 없습니다",
+        emptyBody: "이미지를 그룹으로 정리해 보세요.",
+        firstCollection: "첫 컬렉션 만들기",
+        itemCount: (count: number) => `${count}개 이미지`,
+        confirmDelete: "삭제할까요?",
+        delete: "삭제",
+        deleteAria: "컬렉션 삭제",
+        emptyCollection: "이 컬렉션에 이미지가 없습니다",
+        addFromLibrary: "라이브러리에서 추가하기",
+        deletedImage: "삭제된 이미지",
+        deletedShort: "삭제됨",
+        removeAria: "컬렉션에서 제거",
+      }
+    : {
+        title: "Collections",
+        newCollection: "New collection",
+        namePlaceholder: "Collection name",
+        saving: "Saving…",
+        create: "Create",
+        cancel: "Cancel",
+        emptyTitle: "No collections yet",
+        emptyBody: "Organize images into groups.",
+        firstCollection: "Create first collection",
+        itemCount: (count: number) => `${count} image${count === 1 ? "" : "s"}`,
+        confirmDelete: "Delete?",
+        delete: "Delete",
+        deleteAria: "Delete collection",
+        emptyCollection: "This collection has no images",
+        addFromLibrary: "Add from library",
+        deletedImage: "Deleted image",
+        deletedShort: "Deleted",
+        removeAria: "Remove from collection",
+      };
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -115,7 +158,7 @@ export default function CollectionsPage() {
     <div className="p-6 md:p-10">
       <div className="flex items-center justify-between mb-8">
         <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">
-          컬렉션
+          {copy.title}
           <span className="ml-3 text-sm font-body font-normal text-outline">({collections.length})</span>
         </h1>
         {!creating && (
@@ -124,7 +167,7 @@ export default function CollectionsPage() {
             className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
           >
             <span className="material-symbols-outlined text-base">add</span>
-            새 컬렉션 만들기
+            {copy.newCollection}
           </button>
         )}
       </div>
@@ -138,7 +181,7 @@ export default function CollectionsPage() {
             ref={inputRef}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="컬렉션 이름"
+            placeholder={copy.namePlaceholder}
             maxLength={80}
             className="flex-1 bg-transparent text-sm text-on-surface placeholder:text-outline outline-none border-b border-outline-variant focus:border-primary transition-colors pb-0.5"
           />
@@ -147,14 +190,14 @@ export default function CollectionsPage() {
             disabled={saving || !newName.trim()}
             className="px-4 py-1.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-40"
           >
-            {saving ? "저장 중…" : "만들기"}
+            {saving ? copy.saving : copy.create}
           </button>
           <button
             type="button"
             onClick={() => { setCreating(false); setNewName(""); }}
             className="px-3 py-1.5 text-xs text-outline hover:text-on-surface transition-colors"
           >
-            취소
+            {copy.cancel}
           </button>
         </form>
       )}
@@ -162,13 +205,13 @@ export default function CollectionsPage() {
       {collections.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 gap-4 text-outline">
           <span className="material-symbols-outlined text-6xl">collections_bookmark</span>
-          <p className="text-base">아직 컬렉션이 없습니다</p>
-          <p className="text-sm text-outline">이미지를 그룹으로 정리해 보세요.</p>
+          <p className="text-base">{copy.emptyTitle}</p>
+          <p className="text-sm text-outline">{copy.emptyBody}</p>
           <button
             onClick={() => setCreating(true)}
             className="mt-2 px-6 py-3 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
           >
-            첫 컬렉션 만들기
+            {copy.firstCollection}
           </button>
         </div>
       ) : (
@@ -177,7 +220,7 @@ export default function CollectionsPage() {
             const isExpanded = expanded === col.id;
             const items = expandedItems[col.id] ?? [];
             const isLoadingItems = expandedLoading === col.id;
-            const createdAt = new Date(col.created_at).toLocaleDateString("ko-KR", {
+            const createdAt = new Date(col.created_at).toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", {
               year: "numeric", month: "long", day: "numeric",
             });
 
@@ -207,7 +250,7 @@ export default function CollectionsPage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-on-surface truncate">{col.name}</p>
                       <p className="text-xs text-outline mt-0.5">
-                        {col.item_count}개 이미지 · {createdAt}
+                        {copy.itemCount(col.item_count)} · {createdAt}
                       </p>
                     </div>
                     <span className="material-symbols-outlined text-outline text-xl shrink-0 transition-transform" style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
@@ -217,25 +260,25 @@ export default function CollectionsPage() {
 
                   {deleteTarget === col.id ? (
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-outline">삭제할까요?</span>
+                      <span className="text-xs text-outline">{copy.confirmDelete}</span>
                       <button
                         onClick={() => handleDelete(col.id)}
                         className="px-3 py-1 text-xs font-bold text-white bg-error rounded hover:opacity-90 transition-opacity"
                       >
-                        삭제
+                        {copy.delete}
                       </button>
                       <button
                         onClick={() => setDeleteTarget(null)}
                         className="px-3 py-1 text-xs text-outline hover:text-on-surface transition-colors"
                       >
-                        취소
+                        {copy.cancel}
                       </button>
                     </div>
                   ) : (
                     <button
                       onClick={() => setDeleteTarget(col.id)}
                       className="shrink-0 w-8 h-8 rounded-full hover:bg-surface-container-high flex items-center justify-center transition-colors"
-                      aria-label="컬렉션 삭제"
+                      aria-label={copy.deleteAria}
                     >
                       <span className="material-symbols-outlined text-xl text-outline">delete</span>
                     </button>
@@ -251,12 +294,12 @@ export default function CollectionsPage() {
                     ) : items.length === 0 ? (
                       <div className="flex flex-col items-center py-10 gap-3 text-outline">
                         <span className="material-symbols-outlined text-4xl">image_not_supported</span>
-                        <p className="text-sm">이 컬렉션에 이미지가 없습니다</p>
+                        <p className="text-sm">{copy.emptyCollection}</p>
                         <Link
                           href="/library"
                           className="text-xs text-primary hover:underline"
                         >
-                          라이브러리에서 추가하기
+                          {copy.addFromLibrary}
                         </Link>
                       </div>
                     ) : (
@@ -264,14 +307,14 @@ export default function CollectionsPage() {
                         {items.map((item) => {
                           const img = item.image;
                           const isDeleted = !img || (img.status && img.status !== "approved") || (img.lifecycle_status && img.lifecycle_status !== "active");
-                          const title = img?.title ?? "삭제된 이미지";
+                          const title = img?.title ?? copy.deletedImage;
                           const src = img?.storage_path_preview ?? "";
                           return (
                             <div key={item.id} className="group relative overflow-hidden rounded bg-surface-container-low aspect-square">
                               {isDeleted ? (
                                 <div className="w-full h-full flex flex-col items-center justify-center gap-1">
                                   <span className="material-symbols-outlined text-2xl text-outline">hide_image</span>
-                                  <span className="text-xs text-outline">삭제됨</span>
+                                  <span className="text-xs text-outline">{copy.deletedShort}</span>
                                 </div>
                               ) : (
                                 <>
@@ -292,7 +335,7 @@ export default function CollectionsPage() {
                                   <button
                                     onClick={() => handleRemoveItem(col.id, item.image_id)}
                                     className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
-                                    aria-label="컬렉션에서 제거"
+                                    aria-label={copy.removeAria}
                                   >
                                     <span className="material-symbols-outlined text-sm">close</span>
                                   </button>

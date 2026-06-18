@@ -8,7 +8,7 @@ import { useLang } from "@/lib/i18n/store";
 import { useCart } from "@/lib/store/cart";
 import { cn } from "@/lib/utils/cn";
 import { ImageCard, ImageCardData } from "@/components/gallery/ImageCard";
-import { buyerUsageConditions, creditLineForName, getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
+import { buyerUsageConditions, creditLineForName, getLocalizedCopyrightLicense, getLocalizedFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 
 const LICENSE_PRICES: Record<string, number> = {
   editorial:  15000,
@@ -206,11 +206,12 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   const photographerId = imageData.photographer?.id ?? null;
   const photographerName = imageData.photographer?.display_name ?? imageData.photographer?.full_name ?? "Unknown";
   const creditLine = creditLineForName(photographerName);
-  const copyrightLicense = getCopyrightLicense(imageData.copyright_license);
-  const freeUsagePolicy = getFreeUsagePolicy(imageData.free_usage_policy);
+  const copyrightLicense = getLocalizedCopyrightLicense(imageData.copyright_license, lang);
+  const freeUsagePolicy = getLocalizedFreeUsagePolicy(imageData.free_usage_policy, lang);
   const usageConditions = buyerUsageConditions({
     copyrightLicense: imageData.copyright_license,
     freeUsagePolicy: imageData.free_usage_policy,
+    lang,
   });
 
   const uploadedDate = new Date(imageData.approved_at ?? imageData.created_at)
