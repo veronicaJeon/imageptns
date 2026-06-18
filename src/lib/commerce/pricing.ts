@@ -3,6 +3,12 @@ export interface LicensePriceRow {
   price_krw: number;
 }
 
+export interface ImagePriceOverrideRow {
+  image_id: string;
+  license_code: string;
+  price_krw: number;
+}
+
 export interface CartItemPriceInput {
   id: string;
   license: string;
@@ -34,11 +40,18 @@ export function normalizeLicensePrice(value: unknown) {
 export function priceCartItemsFromLicenses(
   items: CartItemPriceInput[],
   licenses: LicensePriceRow[],
+  overrides: ImagePriceOverrideRow[] = [],
 ): PricedCartItem[] {
   const priceMap = new Map(licenses.map((license) => [license.code, normalizeLicensePrice(license.price_krw)]));
+  const overrideMap = new Map(
+    overrides.map((override) => [
+      `${override.image_id}:${override.license_code}`,
+      normalizeLicensePrice(override.price_krw),
+    ]),
+  );
 
   return items.map((item) => {
-    const priceKrw = priceMap.get(item.license);
+    const priceKrw = overrideMap.get(`${item.id}:${item.license}`) ?? priceMap.get(item.license);
     if (priceKrw == null) throw new Error(`Invalid license: ${item.license}`);
 
     return {

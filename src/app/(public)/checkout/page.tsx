@@ -28,7 +28,7 @@ const wagmiConfig = createConfig({
 
 const queryClient = new QueryClient();
 
-type PaymentMethod = "toss" | "base_usdc";
+type PaymentMethod = "toss" | "base_usdc" | "bank_transfer";
 
 interface OnchainPrepareResponse {
   orderDbId: string;
@@ -58,6 +58,28 @@ interface CheckoutPrepareResponse {
   orderName: string;
   orderNumber?: string;
   free?: boolean;
+  amount?: number;
+  bankTransfer?: {
+    status: "requested";
+    account: {
+      label: string;
+      bankName: string;
+      accountNumber: string;
+      accountHolder: string;
+      notice: string;
+    };
+  };
+}
+
+interface LicensePriceOverrideResponse {
+  licenses?: { code: LicenseType; price_krw: number }[];
+  overrides?: { image_id: string; license_code: LicenseType; price_krw: number }[];
+}
+
+interface BankTransferRequestState {
+  orderNumber: string;
+  amount: number;
+  account: NonNullable<CheckoutPrepareResponse["bankTransfer"]>["account"];
 }
 
 // TEMPORARY: Toss 유료결제 우회(결제 pass). Toss live 연동 완료 시 이 플래그/관련 블록 제거.
@@ -84,6 +106,8 @@ const CHECKOUT_PAGE_COPY = {
       freeCheckout: "무료 구매를 완료하지 못했습니다.",
       passProcess: "결제 우회 처리 실패",
       passCheckout: "결제 우회를 완료하지 못했습니다.",
+      bankTransferCreate: "계좌결제 요청을 생성하지 못했습니다.",
+      bankTransferCheckout: "계좌결제 요청을 완료하지 못했습니다.",
       walletMissing: "브라우저 지갑을 찾을 수 없습니다. MetaMask 또는 Base 호환 지갑을 설치해주세요.",
       connectorMissing: "사용 가능한 지갑 커넥터가 없습니다.",
       connectWallet: "지갑 연결을 완료해주세요.",
@@ -106,6 +130,16 @@ const CHECKOUT_PAGE_COPY = {
     freeOrderBody: "결제 수단 입력 없이 구매가 확정되고 원본 다운로드 권한이 즉시 생성됩니다.",
     tossDescription: "카드 및 국내 간편결제",
     baseDescription: "Base 지갑으로 온체인 결제",
+    bankTransferTitle: "계좌결제",
+    bankTransferDescription: "입금 확인 후 관리자가 구매확정 처리합니다.",
+    bankTransferBody: "계좌 입금 요청을 남기면 운영팀이 입금 확인 후 다운로드 권한을 열어드립니다.",
+    bankTransferModalTitle: "계좌결제 요청이 접수되었습니다",
+    bankTransferOrder: "주문번호",
+    bankTransferAmount: "입금 금액",
+    bankTransferBank: "은행",
+    bankTransferAccount: "계좌번호",
+    bankTransferHolder: "예금주",
+    bankTransferConfirm: "확인했습니다",
     widgetLoading: "결제 위젯 로딩 중...",
     baseTitle: "Base USDC 결제",
     baseBody: "지갑 연결 후 Base 네트워크에서 USDC 승인과 구매 트랜잭션을 순서대로 진행합니다.",
@@ -143,6 +177,8 @@ const CHECKOUT_PAGE_COPY = {
       freeCheckout: "Could not complete the free purchase.",
       passProcess: "Could not process the payment pass.",
       passCheckout: "Could not complete the payment pass.",
+      bankTransferCreate: "Could not create the bank-transfer request.",
+      bankTransferCheckout: "Could not complete the bank-transfer request.",
       walletMissing: "Browser wallet not found. Please install MetaMask or a Base-compatible wallet.",
       connectorMissing: "No wallet connector is available.",
       connectWallet: "Please complete wallet connection.",
@@ -165,6 +201,16 @@ const CHECKOUT_PAGE_COPY = {
     freeOrderBody: "The purchase will be confirmed without payment details and original download access will be created immediately.",
     tossDescription: "Cards and local quick payments",
     baseDescription: "Onchain payment with a Base wallet",
+    bankTransferTitle: "Bank transfer",
+    bankTransferDescription: "Operations confirms the purchase after deposit verification.",
+    bankTransferBody: "Submit a bank-transfer request and the operations team will open download access after confirming the deposit.",
+    bankTransferModalTitle: "Bank-transfer request received",
+    bankTransferOrder: "Order number",
+    bankTransferAmount: "Amount to deposit",
+    bankTransferBank: "Bank",
+    bankTransferAccount: "Account number",
+    bankTransferHolder: "Account holder",
+    bankTransferConfirm: "Got it",
     widgetLoading: "Loading payment widget...",
     baseTitle: "Base USDC payment",
     baseBody: "After connecting your wallet, approve USDC and send the purchase transaction on Base.",
@@ -232,6 +278,7 @@ function CheckoutContent() {
   const { user, loading: authLoading, init } = useAuth();
   const router = useRouter();
   const [licensePrices, setLicensePrices] = useState<Partial<Record<LicenseType, number>>>({});
+  const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
   const [subscriptionEntitlement, setSubscriptionEntitlement] = useState<SubscriptionEntitlement | null>(null);
 
   useEffect(() => { init(); }, [init]);
@@ -243,15 +290,20 @@ function CheckoutContent() {
     }
   }, [authLoading, user, router]);
 
+  const cartImageIds = items.map((item) => item.id).join(",");
+
   useEffect(() => {
-    fetch("/api/license-types")
+    const params = new URLSearchParams();
+    if (cartImageIds) params.set("imageIds", cartImageIds);
+    fetch(`/api/license-types?${params.toString()}`)
       .then((res) => res.ok ? res.json() : null)
-      .then((data: { licenses?: { code: LicenseType; price_krw: number }[] } | null) => {
+      .then((data: LicensePriceOverrideResponse | null) => {
         if (!data?.licenses) return;
         setLicensePrices(Object.fromEntries(data.licenses.map((license) => [license.code, license.price_krw])));
+        setPriceOverrides(Object.fromEntries((data.overrides ?? []).map((override) => [`${override.image_id}:${override.license_code}`, override.price_krw])));
       })
       .catch(() => {});
-  }, []);
+  }, [cartImageIds]);
 
   useEffect(() => {
     if (!user) return;
@@ -263,13 +315,13 @@ function CheckoutContent() {
       .catch(() => setSubscriptionEntitlement(null));
   }, [user]);
 
-  function displayPrice(license: LicenseType) {
-    return licensePrices[license] ?? getLicensePrice(license);
+  function displayPrice(imageId: string, license: LicenseType) {
+    return priceOverrides[`${imageId}:${license}`] ?? licensePrices[license] ?? getLicensePrice(license);
   }
 
   let remainingSubscriptionDownloads = subscriptionEntitlement?.active ? subscriptionEntitlement.remaining : 0;
   const pricedCartItems = items.map((item) => {
-    const originalPrice = displayPrice(item.license);
+    const originalPrice = displayPrice(item.id, item.license);
     const subscriptionCovered = originalPrice > 0 && remainingSubscriptionDownloads > 0;
     if (subscriptionCovered) remainingSubscriptionDownloads -= 1;
     return {
@@ -291,6 +343,7 @@ function CheckoutContent() {
   const [widgetReady, setWidgetReady] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("toss");
   const [baseRecovery, setBaseRecovery] = useState<BasePaymentRecovery | null>(null);
+  const [bankTransferRequest, setBankTransferRequest] = useState<BankTransferRequestState | null>(null);
   const widgetRef = useRef<PaymentWidgetInstance | null>(null);
   const displayVat = paymentMethod === "base_usdc" ? 0 : vat;
   const displayTotal = subtotal + displayVat;
@@ -365,6 +418,11 @@ function CheckoutContent() {
       return;
     }
 
+    if (paymentMethod === "bank_transfer") {
+      await handleBankTransferCheckout();
+      return;
+    }
+
     await handleBaseUsdcPayment();
   }
 
@@ -421,6 +479,34 @@ function CheckoutContent() {
     } catch (err) {
       console.error(err);
       alert(checkoutErrorMessage(err, copy.errors.freeCheckout));
+      setLoading(false);
+    }
+  }
+
+  async function handleBankTransferCheckout() {
+    setLoading(true);
+    try {
+      const prepRes = await fetch("/api/checkout/prepare", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((i) => ({ id: i.id, license: i.license, price: i.price })),
+          billing,
+          paymentProvider: "bank_transfer",
+        }),
+      });
+      if (!prepRes.ok) throw new Error(await readApiError(prepRes, copy.errors.bankTransferCreate));
+      const prepared = await prepRes.json() as CheckoutPrepareResponse;
+      if (!prepared.bankTransfer?.account) throw new Error(copy.errors.bankTransferCreate);
+      setBankTransferRequest({
+        orderNumber: prepared.orderNumber ?? prepared.orderDbId,
+        amount: prepared.amount ?? displayTotal,
+        account: prepared.bankTransfer.account,
+      });
+    } catch (err) {
+      console.error(err);
+      alert(checkoutErrorMessage(err, copy.errors.bankTransferCheckout));
+    } finally {
       setLoading(false);
     }
   }
@@ -686,7 +772,7 @@ function CheckoutContent() {
                   </p>
                 </div>
               ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("toss")}
@@ -702,6 +788,23 @@ function CheckoutContent() {
                   </span>
                   <span className="block mt-2 text-[11px] leading-relaxed text-outline">
                     {copy.tossDescription}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("bank_transfer")}
+                  className={`p-4 ring-1 rounded-lg text-left transition-all ${
+                    paymentMethod === "bank_transfer"
+                      ? "bg-primary/5 ring-primary"
+                      : "bg-surface-container-lowest ring-outline-variant hover:ring-outline"
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-sm font-bold text-on-surface">
+                    <span className="material-symbols-outlined text-base">account_balance</span>
+                    {copy.bankTransferTitle}
+                  </span>
+                  <span className="block mt-2 text-[11px] leading-relaxed text-outline">
+                    {copy.bankTransferDescription}
                   </span>
                 </button>
                 <button
@@ -771,6 +874,19 @@ function CheckoutContent() {
                   </div>
                 </div>
               )}
+              {!isFreeCheckout && paymentMethod === "bank_transfer" && (
+                <div className="bg-surface-container-lowest ring-1 ring-outline-variant rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="material-symbols-outlined text-primary text-xl mt-0.5">account_balance</span>
+                    <div>
+                      <p className="text-sm font-bold text-on-surface">{copy.bankTransferTitle}</p>
+                      <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                        {copy.bankTransferBody}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {baseRecovery && (
@@ -814,7 +930,7 @@ function CheckoutContent() {
                     <span className="material-symbols-outlined text-base">
                       {isFreeCheckout ? "redeem" : paymentMethod === "base_usdc" ? "account_balance_wallet" : "lock"}
                     </span>
-                    {isFreeCheckout ? copy.confirmFree : paymentMethod === "base_usdc" ? "Pay with USDC" : ch.submitBtn} · {formatKRW(displayTotal, copy.locale)}
+                    {isFreeCheckout ? copy.confirmFree : paymentMethod === "base_usdc" ? "Pay with USDC" : paymentMethod === "bank_transfer" ? copy.bankTransferTitle : ch.submitBtn} · {formatKRW(displayTotal, copy.locale)}
                   </>
                 )
               }
@@ -925,6 +1041,48 @@ function CheckoutContent() {
           </div>
         </div>
       </div>
+      {bankTransferRequest && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-xl bg-surface-container-lowest p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-2xl text-primary">account_balance</span>
+              <div>
+                <h2 className="text-lg font-headline font-extrabold text-on-surface">{copy.bankTransferModalTitle}</h2>
+                <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">{bankTransferRequest.account.notice}</p>
+              </div>
+            </div>
+            <dl className="mt-5 grid gap-3 rounded-lg bg-surface-container-low p-4 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-outline">{copy.bankTransferOrder}</dt>
+                <dd className="font-bold text-on-surface">{bankTransferRequest.orderNumber}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-outline">{copy.bankTransferAmount}</dt>
+                <dd className="font-bold text-primary">{formatKRW(bankTransferRequest.amount, copy.locale)}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-outline">{copy.bankTransferBank}</dt>
+                <dd className="font-bold text-on-surface text-right">{bankTransferRequest.account.bankName}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-outline">{copy.bankTransferAccount}</dt>
+                <dd className="font-mono font-bold text-on-surface text-right">{bankTransferRequest.account.accountNumber}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-outline">{copy.bankTransferHolder}</dt>
+                <dd className="font-bold text-on-surface text-right">{bankTransferRequest.account.accountHolder}</dd>
+              </div>
+            </dl>
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard/orders")}
+              className="mt-5 w-full rounded-lg bg-primary px-5 py-3 text-xs font-bold uppercase tracking-widest text-white hover:opacity-90"
+            >
+              {copy.bankTransferConfirm}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

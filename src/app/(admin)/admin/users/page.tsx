@@ -239,18 +239,18 @@ export default function AdminUsersPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="overflow-x-auto bg-surface-container-lowest shadow-ghost">
-          <table className="w-full text-sm">
+        <div className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-ghost">
+          <table className="w-full table-fixed text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
-                {["회원", "역할", "최종 로그인", "로그인 수", "결제 수", "구매 이미지", "누적 결제"].map((head) => (
+                {["회원", "역할", "최근 활동", "거래 요약"].map((head) => (
                   <th key={head} className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">{head}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20">
               {loading ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center text-outline">불러오는 중...</td></tr>
+                <tr><td colSpan={4} className="px-5 py-12 text-center text-outline">불러오는 중...</td></tr>
               ) : users.map((user) => (
                 <tr
                   key={user.id}
@@ -268,12 +268,19 @@ export default function AdminUsersPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-on-surface-variant">{user.role === "photographer" ? "사진작가" : "바이어"}</td>
-                  <td className="px-5 py-4 text-on-surface-variant">{formatDate(user.last_login_at ?? user.authLastSignInAt)}</td>
-                  <td className="px-5 py-4 font-semibold text-on-surface">{user.login_count ?? 0}</td>
-                  <td className="px-5 py-4 font-semibold text-on-surface">{user.paymentCount}</td>
-                  <td className="px-5 py-4 font-semibold text-on-surface">{user.purchaseCount}</td>
-                  <td className="px-5 py-4 font-semibold text-primary">{formatKRW(user.totalPaidKrw)}</td>
+                  <td className="px-5 py-4">
+                    <span className="rounded-full bg-surface-container-low px-2.5 py-1 text-xs font-bold text-on-surface-variant">
+                      {user.role === "photographer" ? "사진작가" : "바이어"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4 text-on-surface-variant">
+                    <p className="text-xs">{formatDate(user.last_login_at ?? user.authLastSignInAt)}</p>
+                    <p className="mt-1 text-[10px] text-outline">로그인 {user.login_count ?? 0}회</p>
+                  </td>
+                  <td className="px-5 py-4">
+                    <p className="font-semibold text-primary">{formatKRW(user.totalPaidKrw)}</p>
+                    <p className="mt-1 text-[10px] text-outline">결제 {user.paymentCount}회 · 이미지 {user.purchaseCount}개</p>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -345,7 +345,110 @@ export default function OrdersPage() {
           <p>{ord.empty}</p>
         </div>
       ) : (
-        <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
+        <>
+        <div className="grid gap-4 xl:hidden">
+          {rows.map((row) => {
+            const imageUnavailable = row.imageLifecycleStatus && row.imageLifecycleStatus !== "active";
+            const canRecoverBaseUsdc = row.isFirstItemInOrder && row.paymentProvider === "base_usdc" && row.cryptoStatus === "pending";
+            const isConfirming = Boolean(confirmingOrderIds[row.orderId]);
+            const order = orders.find((item) => item.id === row.orderId);
+            return (
+              <article key={row.itemId} className="rounded-xl bg-surface-container-lowest p-4 shadow-ghost">
+                <div className="flex gap-3">
+                  {row.src ? (
+                    <Image src={row.src} alt={row.title} width={88} height={64} className="h-16 w-24 shrink-0 rounded object-cover" />
+                  ) : (
+                    <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded bg-surface-container-low">
+                      <span className="material-symbols-outlined text-outline text-sm">image</span>
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    {row.imageId && !imageUnavailable ? (
+                      <Link href={`/library/${row.imageId}`} className="block truncate text-sm font-bold text-on-surface">{row.title}</Link>
+                    ) : (
+                      <p className="truncate text-sm font-bold text-on-surface">{row.title}</p>
+                    )}
+                    <p className="mt-1 font-mono text-[11px] text-outline">{row.orderNumber}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLES[row.status] ?? ""}`}>
+                        {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
+                      </span>
+                      <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-[10px] font-bold text-on-surface-variant">
+                        {row.license}
+                      </span>
+                      {row.paymentProvider === "bank_transfer" && (
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">계좌결제</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-surface-container-low p-3 text-xs">
+                  <div>
+                    <p className="text-outline">{c.date}</p>
+                    <p className="mt-1 font-semibold text-on-surface">{row.date}</p>
+                  </div>
+                  <div>
+                    <p className="text-outline">{c.amount}</p>
+                    <p className="mt-1 font-semibold text-primary">{formatKRW(row.totalKrw)}</p>
+                  </div>
+                  {row.downloadExpiresAt && (
+                    <div className="col-span-2">
+                      <p className="text-outline">{copy.downloadExpires}</p>
+                      <p className="mt-1 font-semibold text-on-surface">{new Date(row.downloadExpiresAt).toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", { year: "numeric", month: "short", day: "numeric" })}</p>
+                    </div>
+                  )}
+                </div>
+                {row.imageDeletionNotice && (
+                  <p className="mt-3 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-[11px] leading-relaxed text-error">{row.imageDeletionNotice}</p>
+                )}
+                {row.status === "completed" && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleDownload(row.itemId)}
+                      disabled={downloading === row.itemId}
+                      className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-base">download</span>
+                      {ord.download}
+                    </button>
+                    {row.isFirstItemInOrder && order && (
+                      <button
+                        type="button"
+                        onClick={() => handlePrintReceipt(order)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-outline-variant px-3 py-2 text-xs font-bold text-on-surface-variant"
+                      >
+                        <span className="material-symbols-outlined text-base">print</span>
+                        {copy.receiptPdf}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {canRecoverBaseUsdc && (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void handleConfirmOnchain(row.orderId);
+                    }}
+                    className="mt-4 flex gap-2"
+                  >
+                    <input
+                      type="text"
+                      value={recoveryTxHashes[row.orderId] ?? ""}
+                      onChange={(event) => handleRecoveryTxHashChange(row.orderId, event.target.value)}
+                      placeholder={recovery.txPlaceholder}
+                      disabled={isConfirming}
+                      className="min-w-0 flex-1 rounded-md border border-outline-variant/50 bg-surface-container-lowest px-2 py-1.5 text-xs text-on-surface outline-none"
+                    />
+                    <button type="submit" disabled={isConfirming} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary disabled:opacity-50">
+                      {isConfirming ? recovery.retrying : recovery.retry}
+                    </button>
+                  </form>
+                )}
+              </article>
+            );
+          })}
+        </div>
+        <div className="hidden bg-surface-container-lowest shadow-ghost overflow-x-auto xl:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
@@ -527,6 +630,7 @@ export default function OrdersPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

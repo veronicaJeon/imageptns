@@ -10,6 +10,7 @@ interface AdminImage {
   id: string;
   asset_id: string | null;
   title: string;
+  description: string | null;
   category: string;
   tags: string[] | null;
   status: string;
@@ -29,6 +30,16 @@ interface AdminImage {
   views_count: number | null;
   created_at: string;
   photographer: { id: string; full_name: string | null; avatar_url: string | null } | null;
+}
+
+interface ImageEditState {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  tags: string;
+  is_published: boolean;
+  priceOverrides: Record<string, string>;
 }
 
 interface Pagination {
@@ -67,6 +78,7 @@ interface ImageTransactionResponse {
 }
 
 const PAGE_SIZE = 50;
+const LICENSE_CODES = ["editorial", "commercial", "extended"] as const;
 
 const STATUS_LABELS: Record<string, string> = {
   all: "전체",
@@ -105,6 +117,9 @@ export default function AdminImagesPage() {
   const [deleting, setDeleting] = useState(false);
   const [transactionLoadingId, setTransactionLoadingId] = useState<string | null>(null);
   const [transactionModal, setTransactionModal] = useState<ImageTransactionResponse | null>(null);
+  const [editLoadingId, setEditLoadingId] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editState, setEditState] = useState<ImageEditState | null>(null);
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const allPageSelected = images.length > 0 && images.every((image) => selectedSet.has(image.id));
@@ -260,6 +275,71 @@ export default function AdminImagesPage() {
     }
   }
 
+  async function openEdit(image: AdminImage) {
+    setEditLoadingId(image.id);
+    try {
+      const res = await fetch(`/api/admin/images/${image.id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "이미지 정보를 불러오지 못했습니다.");
+      const detail = data.image as AdminImage & { price_overrides?: { license_code: string; price_krw: number }[] };
+      setEditState({
+        id: image.id,
+        title: detail.title ?? "",
+        description: detail.description ?? "",
+        category: detail.category ?? "",
+        tags: (detail.tags ?? []).join(", "),
+        is_published: Boolean(detail.is_published),
+        priceOverrides: Object.fromEntries((detail.price_overrides ?? []).map((row) => [row.license_code, String(row.price_krw)])),
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "이미지 정보를 불러오지 못했습니다.");
+    } finally {
+      setEditLoadingId(null);
+    }
+  }
+
+  function updateEdit<K extends keyof ImageEditState>(key: K, value: ImageEditState[K]) {
+    setEditState((current) => current ? { ...current, [key]: value } : current);
+  }
+
+  function updateEditPrice(licenseCode: string, value: string) {
+    setEditState((current) => current
+      ? { ...current, priceOverrides: { ...current.priceOverrides, [licenseCode]: value } }
+      : current);
+  }
+
+  async function saveEdit() {
+    if (!editState) return;
+    setEditSaving(true);
+    try {
+      const priceOverrides = Object.fromEntries(
+        Object.entries(editState.priceOverrides)
+          .filter(([, value]) => value.trim() !== "")
+          .map(([licenseCode, value]) => [licenseCode, Number(value)]),
+      );
+      const res = await fetch(`/api/admin/images/${editState.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editState.title,
+          description: editState.description,
+          category: editState.category,
+          tags: editState.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+          is_published: editState.is_published,
+          priceOverrides,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "이미지 정보를 저장하지 못했습니다.");
+      setEditState(null);
+      await loadImages();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "이미지 정보를 저장하지 못했습니다.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   return (
     <div className="p-6 md:p-10">
       <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -371,6 +451,15 @@ export default function AdminImagesPage() {
                         <span className="mx-1 text-outline">·</span>
                         {formatSize(image.file_size_mb)}
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(image)}
+                        disabled={editLoadingId === image.id}
+                        className="mt-3 inline-flex items-center gap-1 rounded border border-outline-variant px-2 py-1 text-[10px] font-bold text-on-surface-variant hover:border-primary hover:text-primary disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                        {editLoadingId === image.id ? "로딩" : "상세 편집"}
+                      </button>
                     </div>
                   </div>
                 </td>
@@ -505,6 +594,115 @@ export default function AdminImagesPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[88vh] w-full max-w-2xl overflow-hidden rounded-xl bg-surface-container-lowest shadow-ghost">
+            <div className="flex items-center justify-between border-b border-outline-variant/20 p-5">
+              <div>
+                <h2 className="font-headline text-lg font-extrabold text-on-surface">이미지 상세 편집</h2>
+                <p className="mt-1 text-xs text-outline">설명, 게시여부, 이미지별 가격을 조정합니다.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditState(null)}
+                className="rounded-lg p-2 text-outline hover:bg-surface-container-low hover:text-on-surface"
+                aria-label="닫기"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="max-h-[68vh] overflow-y-auto p-5">
+              <div className="grid gap-4">
+                <label className="grid gap-2">
+                  <span className="text-xs font-bold uppercase tracking-widest text-outline">제목</span>
+                  <input
+                    value={editState.title}
+                    onChange={(event) => updateEdit("title", event.target.value)}
+                    className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-xs font-bold uppercase tracking-widest text-outline">설명</span>
+                  <textarea
+                    value={editState.description}
+                    onChange={(event) => updateEdit("description", event.target.value)}
+                    rows={4}
+                    className="rounded-lg bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                  />
+                </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-outline">카테고리</span>
+                    <input
+                      value={editState.category}
+                      onChange={(event) => updateEdit("category", event.target.value)}
+                      className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                    />
+                  </label>
+                  <label className="grid gap-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-outline">게시여부</span>
+                    <select
+                      value={editState.is_published ? "true" : "false"}
+                      onChange={(event) => updateEdit("is_published", event.target.value === "true")}
+                      className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="true">게시 ON</option>
+                      <option value="false">게시 OFF</option>
+                    </select>
+                  </label>
+                </div>
+                <label className="grid gap-2">
+                  <span className="text-xs font-bold uppercase tracking-widest text-outline">태그</span>
+                  <input
+                    value={editState.tags}
+                    onChange={(event) => updateEdit("tags", event.target.value)}
+                    placeholder="쉼표로 구분"
+                    className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                  />
+                </label>
+                <div className="rounded-xl border border-outline-variant/40 p-4">
+                  <p className="text-xs font-bold uppercase tracking-widest text-outline">이미지별 가격</p>
+                  <p className="mt-1 text-xs text-on-surface-variant">비워두면 전역 상품 가격을 사용합니다. 0원 입력도 가능합니다.</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    {LICENSE_CODES.map((code) => (
+                      <label key={code} className="grid gap-2">
+                        <span className="text-xs font-bold text-on-surface">{code}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={10000000}
+                          value={editState.priceOverrides[code] ?? ""}
+                          onChange={(event) => updateEditPrice(code, event.target.value)}
+                          placeholder="전역가격"
+                          className="h-10 rounded-lg bg-surface-container-lowest px-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-outline-variant/20 p-5">
+              <button
+                type="button"
+                onClick={() => setEditState(null)}
+                className="rounded-lg border border-outline-variant px-4 py-2 text-xs font-bold uppercase tracking-widest text-on-surface"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={saveEdit}
+                disabled={editSaving}
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-bold uppercase tracking-widest text-white disabled:opacity-50"
+              >
+                {editSaving ? "저장 중..." : "저장"}
+              </button>
             </div>
           </div>
         </div>

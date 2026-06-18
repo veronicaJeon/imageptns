@@ -83,6 +83,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading]         = useState(true);
   const [notFound, setNotFound]       = useState(false);
   const [licensePrices, setLicensePrices] = useState<Partial<Record<LicenseKey, number>>>({});
+  const [priceOverrides, setPriceOverrides] = useState<Partial<Record<LicenseKey, number>>>({});
 
   const [license, setLicense]         = useState<LicenseKey>("editorial");
   const [isFavorited, setFavorited]   = useState(false);
@@ -103,14 +104,15 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   }, [id]);
 
   useEffect(() => {
-    fetch("/api/license-types")
+    fetch(`/api/license-types?imageIds=${encodeURIComponent(id)}`)
       .then((res) => res.ok ? res.json() : null)
-      .then((data: { licenses?: { code: LicenseKey; price_krw: number }[] } | null) => {
+      .then((data: { licenses?: { code: LicenseKey; price_krw: number }[]; overrides?: { image_id: string; license_code: LicenseKey; price_krw: number }[] } | null) => {
         if (!data?.licenses) return;
         setLicensePrices(Object.fromEntries(data.licenses.map((license) => [license.code, license.price_krw])));
+        setPriceOverrides(Object.fromEntries((data.overrides ?? []).filter((override) => override.image_id === id).map((override) => [override.license_code, override.price_krw])));
       })
       .catch(() => {});
-  }, []);
+  }, [id]);
 
   // Check favorite status
   useEffect(() => {
@@ -183,7 +185,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   const licenseKeys: LicenseKey[] = ["editorial", "commercial", "extended"];
-  const displayPrice = (key: LicenseKey) => licensePrices[key] ?? LICENSE_PRICES[key];
+  const displayPrice = (key: LicenseKey) => priceOverrides[key] ?? licensePrices[key] ?? LICENSE_PRICES[key];
 
   if (loading) {
     return (

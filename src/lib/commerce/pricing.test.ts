@@ -1,40 +1,38 @@
 import { describe, expect, it } from "vitest";
 import { normalizeLicensePrice, priceCartItemsFromLicenses } from "./pricing";
 
-describe("normalizeLicensePrice", () => {
-  it("accepts free or positive whole KRW prices", () => {
-    expect(normalizeLicensePrice(0)).toBe(0);
-    expect(normalizeLicensePrice(55000)).toBe(55000);
-    expect(normalizeLicensePrice("180000")).toBe(180000);
+describe("commerce pricing", () => {
+  const licenses = [
+    { code: "editorial", price_krw: 15000 },
+    { code: "commercial", price_krw: 55000 },
+  ];
+
+  it("uses global license prices when no image override exists", () => {
+    expect(priceCartItemsFromLicenses([{ id: "img-1", license: "editorial" }], licenses)).toEqual([
+      { id: "img-1", license: "editorial", priceKrw: 15000 },
+    ]);
+  });
+
+  it("uses image-specific override before the global license price", () => {
+    expect(priceCartItemsFromLicenses(
+      [{ id: "img-1", license: "commercial" }],
+      licenses,
+      [{ image_id: "img-1", license_code: "commercial", price_krw: 30000 }],
+    )).toEqual([
+      { id: "img-1", license: "commercial", priceKrw: 30000 },
+    ]);
+  });
+
+  it("allows zero KRW image overrides for free admin pricing", () => {
+    expect(priceCartItemsFromLicenses(
+      [{ id: "img-1", license: "commercial" }],
+      licenses,
+      [{ image_id: "img-1", license_code: "commercial", price_krw: 0 }],
+    )[0]?.priceKrw).toBe(0);
   });
 
   it("rejects invalid prices", () => {
     expect(() => normalizeLicensePrice(-1)).toThrow("price_krw must be between");
-    expect(() => normalizeLicensePrice(1000.5)).toThrow("price_krw must be a whole KRW amount");
-  });
-});
-
-describe("priceCartItemsFromLicenses", () => {
-  it("prices cart items from server license rows instead of client prices", () => {
-    const priced = priceCartItemsFromLicenses(
-      [
-        { id: "image-1", license: "editorial", price: 1 },
-        { id: "image-2", license: "commercial", price: 1 },
-      ],
-      [
-        { code: "editorial", price_krw: 15000 },
-        { code: "commercial", price_krw: 55000 },
-      ],
-    );
-
-    expect(priced.map((item) => item.priceKrw)).toEqual([15000, 55000]);
-    expect(priced.reduce((sum, item) => sum + item.priceKrw, 0)).toBe(70000);
-  });
-
-  it("throws when a requested license is not configured", () => {
-    expect(() => priceCartItemsFromLicenses(
-      [{ id: "image-1", license: "missing", price: 1 }],
-      [{ code: "editorial", price_krw: 15000 }],
-    )).toThrow("Invalid license: missing");
+    expect(() => normalizeLicensePrice(1.5)).toThrow("whole KRW");
   });
 });

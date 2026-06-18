@@ -59,22 +59,27 @@ export default function CartPage() {
   const copy = CART_PAGE_COPY[lang];
   const { items, removeItem, updateLicense } = useCart();
   const [licensePrices, setLicensePrices] = useState<Partial<Record<LicenseType, number>>>({});
+  const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
+  const cartImageIds = items.map((item) => item.id).join(",");
 
   useEffect(() => {
-    fetch("/api/license-types")
+    const params = new URLSearchParams();
+    if (cartImageIds) params.set("imageIds", cartImageIds);
+    fetch(`/api/license-types?${params.toString()}`)
       .then((res) => res.ok ? res.json() : null)
-      .then((data: { licenses?: { code: LicenseType; price_krw: number }[] } | null) => {
+      .then((data: { licenses?: { code: LicenseType; price_krw: number }[]; overrides?: { image_id: string; license_code: LicenseType; price_krw: number }[] } | null) => {
         if (!data?.licenses) return;
         setLicensePrices(Object.fromEntries(data.licenses.map((license) => [license.code, license.price_krw])));
+        setPriceOverrides(Object.fromEntries((data.overrides ?? []).map((override) => [`${override.image_id}:${override.license_code}`, override.price_krw])));
       })
       .catch(() => {});
-  }, []);
+  }, [cartImageIds]);
 
-  function displayPrice(license: LicenseType) {
-    return licensePrices[license] ?? getLicensePrice(license);
+  function displayPrice(license: LicenseType, imageId?: string) {
+    return (imageId ? priceOverrides[`${imageId}:${license}`] : undefined) ?? licensePrices[license] ?? getLicensePrice(license);
   }
 
-  const subtotal = items.reduce((s, i) => s + displayPrice(i.license), 0);
+  const subtotal = items.reduce((s, i) => s + displayPrice(i.license, i.id), 0);
   const vat      = Math.round(subtotal * 0.1);
   const total    = subtotal + vat;
   const issuedAt = new Date();
@@ -153,7 +158,7 @@ export default function CartPage() {
                 </td>
                 <td className="py-3 pr-3 text-zinc-700">{itemCreditLine(item)}</td>
                 <td className="py-3 pr-3 text-zinc-700">{itemUsageConditions(item, copy.defaultUsageCondition).join(", ")}</td>
-                <td className="py-3 text-right font-semibold text-zinc-950">{formatKRW(displayPrice(item.license), copy.locale)}</td>
+                <td className="py-3 text-right font-semibold text-zinc-950">{formatKRW(displayPrice(item.license, item.id), copy.locale)}</td>
               </tr>
             ))}
           </tbody>
@@ -256,7 +261,7 @@ export default function CartPage() {
                               : "border-outline-variant text-on-surface-variant hover:border-outline",
                           ].join(" ")}
                         >
-                          {c.licenseTypes[key]} · {formatKRW(displayPrice(key), copy.locale)}
+                          {c.licenseTypes[key]} · {formatKRW(displayPrice(key, item.id), copy.locale)}
                         </button>
                       ))}
                     </div>
@@ -270,7 +275,7 @@ export default function CartPage() {
                     >
                       <span className="material-symbols-outlined text-xl">close</span>
                     </button>
-                    <p className="font-headline font-bold text-on-surface">{formatKRW(displayPrice(item.license), copy.locale)}</p>
+                    <p className="font-headline font-bold text-on-surface">{formatKRW(displayPrice(item.license, item.id), copy.locale)}</p>
                   </div>
                 </div>
               ))}
