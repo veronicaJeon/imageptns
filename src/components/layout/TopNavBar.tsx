@@ -9,12 +9,32 @@ import { useLang } from "@/lib/i18n/store";
 import { useCart } from "@/lib/store/cart";
 import { useAuth } from "@/lib/store/auth";
 
+const TOP_NAV_COPY = {
+  ko: {
+    notices: "공지사항",
+    language: "언어 변경",
+    lightMode: "라이트 모드",
+    darkMode: "다크 모드",
+    mobileMenu: "모바일 메뉴",
+    logout: "로그아웃",
+  },
+  en: {
+    notices: "Notices",
+    language: "Change language",
+    lightMode: "Light mode",
+    darkMode: "Dark mode",
+    mobileMenu: "Mobile menu",
+    logout: "Log out",
+  },
+} as const;
+
 export function TopNavBar() {
   const pathname = usePathname();
   const [isDark, setIsDark] = useState(() =>
     typeof window !== "undefined" ? localStorage.getItem("theme") === "dark" : false,
   );
   const { lang, t, toggle } = useLang();
+  const copy = TOP_NAV_COPY[lang];
   const cartCount = useCart((s) => s.items.length);
   const { user, loading, init, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -53,7 +73,7 @@ export function TopNavBar() {
 
   const NAV_LINKS = [
     { href: "/library", label: t.nav.library },
-    { href: "/notices", label: "공지사항" },
+    { href: "/notices", label: copy.notices },
     { href: "/about",   label: t.nav.company },
   ];
 
@@ -103,7 +123,7 @@ export function TopNavBar() {
           <button
             onClick={toggle}
             className="inline-flex items-center justify-center gap-1 h-9 w-9 rounded-lg text-xs font-bold tracking-widest text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200 sm:w-auto sm:px-3"
-            aria-label="언어 변경"
+            aria-label={copy.language}
           >
             <span className="material-symbols-outlined text-base leading-none">language</span>
             <span className="hidden sm:inline">{lang === "ko" ? "KO" : "EN"}</span>
@@ -113,7 +133,7 @@ export function TopNavBar() {
           <button
             onClick={toggleDark}
             className="inline-flex items-center justify-center h-9 w-9 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200"
-            aria-label={isDark ? "라이트 모드" : "다크 모드"}
+            aria-label={isDark ? copy.lightMode : copy.darkMode}
           >
             <span className="material-symbols-outlined text-xl leading-none">
               {isDark ? "light_mode" : "dark_mode"}
@@ -188,7 +208,7 @@ export function TopNavBar() {
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-surface-container-low transition-colors"
                   >
                     <span className="material-symbols-outlined text-base text-outline">logout</span>
-                    로그아웃
+                    {copy.logout}
                   </button>
                 </div>
               )}
@@ -209,7 +229,7 @@ export function TopNavBar() {
             type="button"
             onClick={() => setMobileMenuOpen((value) => !value)}
             className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface md:hidden"
-            aria-label="모바일 메뉴"
+            aria-label={copy.mobileMenu}
             aria-expanded={mobileMenuOpen}
           >
             <span className="material-symbols-outlined text-xl">{mobileMenuOpen ? "close" : "menu"}</span>
@@ -268,7 +288,7 @@ export function TopNavBar() {
                   className="flex h-11 items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-on-surface hover:bg-surface-container-low"
                 >
                   <span className="material-symbols-outlined text-base text-outline">logout</span>
-                  로그아웃
+                  {copy.logout}
                 </button>
               </>
             ) : (

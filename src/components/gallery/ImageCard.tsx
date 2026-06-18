@@ -7,6 +7,7 @@ import { useCart } from "@/lib/store/cart";
 import { useRouter } from "next/navigation";
 import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 import { buyerUsageConditions, creditLineForName, getCopyrightLicense, getFreeUsagePolicy } from "@/lib/licenses/creative-commons";
+import { useLang } from "@/lib/i18n/store";
 
 export interface ImageCardData {
   id: string;
@@ -40,6 +41,7 @@ export function ImageCard({
   onQuickView,
   className,
 }: ImageCardProps) {
+  const { t } = useLang();
   const [isFavorited, setIsFavorited] = useState(initialFavorited);
   const [favoriting, setFavoriting] = useState(false);
   const [cartAdded, setCartAdded] = useState(false);
@@ -148,7 +150,7 @@ export function ImageCard({
               onClick={handleFavorite}
               disabled={favoriting}
               className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/30 transition-colors flex items-center justify-center disabled:opacity-50"
-              aria-label="즐겨찾기"
+              aria-label={t.library.favorite}
             >
               <span
                 className="material-symbols-outlined text-lg"
@@ -169,7 +171,7 @@ export function ImageCard({
                   ? "bg-primary-container text-on-primary-container scale-110"
                   : "bg-primary-container text-on-primary-container hover:opacity-90"
               )}
-              aria-label="장바구니 추가"
+              aria-label={t.library.addToCart}
             >
               <span className="material-symbols-outlined text-lg">
                 {cartAdded ? "check" : "add_shopping_cart"}

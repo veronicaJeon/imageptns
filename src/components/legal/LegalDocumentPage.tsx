@@ -6,8 +6,8 @@ interface LegalDocumentPageProps {
 }
 
 function formatDate(value: string | null) {
-  if (!value) return "초기 고지";
-  return new Date(value).toLocaleDateString("ko-KR", {
+  if (!value) return "Initial notice";
+  return new Date(value).toLocaleDateString("en-US", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -25,7 +25,7 @@ export async function LegalDocumentPage({ slug }: LegalDocumentPageProps) {
           {document.title}
         </h1>
         <p className="mt-4 border-b border-outline-variant/30 pb-6 text-sm text-outline">
-          최종 업데이트: {formatDate(document.updatedAt ?? document.publishedAt)}
+          Last updated: {formatDate(document.updatedAt ?? document.publishedAt)}
         </p>
         <div className="mt-10 whitespace-pre-wrap text-sm leading-8 text-on-surface-variant md:text-base">
           {document.body}

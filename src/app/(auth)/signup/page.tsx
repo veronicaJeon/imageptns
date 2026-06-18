@@ -12,9 +12,29 @@ import { RadioCard } from "@/components/ui/RadioCard";
 
 type Role = "buyer" | "photographer";
 
+const SIGNUP_EXTRA_COPY = {
+  ko: {
+    emailSentTitle: "이메일을 확인해주세요",
+    emailSentBodyBefore: "",
+    emailSentBodyAfter: "로\n인증 링크를 발송했습니다.\n이메일의 링크를 클릭하면 가입이 완료됩니다.",
+    loginPage: "로그인 페이지로",
+    organizationLabel: "소속(기관/업체/개인 활동명)",
+    organizationPlaceholder: "예: ○○출판사, 국립○○박물관, 프리랜서",
+  },
+  en: {
+    emailSentTitle: "Check your email",
+    emailSentBodyBefore: "We sent a verification link to",
+    emailSentBodyAfter: "Click the link in the email to complete your signup.",
+    loginPage: "Go to login",
+    organizationLabel: "Organization",
+    organizationPlaceholder: "Example: publisher, museum, agency, or freelancer",
+  },
+} as const;
+
 export default function SignupPage() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const a = t.auth.signup;
+  const extra = SIGNUP_EXTRA_COPY[lang];
 
   const [role, setRole]           = useState<Role>("buyer");
   const [name, setName]           = useState("");
@@ -109,14 +129,22 @@ export default function SignupPage() {
           {emailSent && (
             <div className="flex flex-col items-center py-12 gap-4 text-center">
               <span className="material-symbols-outlined text-6xl text-primary">mark_email_read</span>
-              <h2 className="font-headline text-xl font-extrabold text-on-surface">이메일을 확인해주세요</h2>
-              <p className="text-sm text-on-surface-variant leading-relaxed">
-                <strong className="text-on-surface">{email}</strong>로<br />
-                인증 링크를 발송했습니다.<br />
-                이메일의 링크를 클릭하면 가입이 완료됩니다.
-              </p>
+              <h2 className="font-headline text-xl font-extrabold text-on-surface">{extra.emailSentTitle}</h2>
+              {lang === "ko" ? (
+                <p className="text-sm text-on-surface-variant leading-relaxed">
+                  <strong className="text-on-surface">{email}</strong>{extra.emailSentBodyAfter.split("\n")[0]}<br />
+                  {extra.emailSentBodyAfter.split("\n")[1]}<br />
+                  {extra.emailSentBodyAfter.split("\n")[2]}
+                </p>
+              ) : (
+                <p className="text-sm text-on-surface-variant leading-relaxed">
+                  {extra.emailSentBodyBefore}<br />
+                  <strong className="text-on-surface">{email}</strong>.<br />
+                  {extra.emailSentBodyAfter}
+                </p>
+              )}
               <Link href="/login" className="mt-4 px-6 py-3 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity">
-                로그인 페이지로
+                {extra.loginPage}
               </Link>
             </div>
           )}
@@ -194,9 +222,9 @@ export default function SignupPage() {
                   autoComplete="name"
                 />
                 <Input
-                  label="소속(기관/업체/개인 활동명)"
+                  label={extra.organizationLabel}
                   type="text"
-                  placeholder="예: ○○출판사, 국립○○박물관, 프리랜서"
+                  placeholder={extra.organizationPlaceholder}
                   value={organization}
                   onChange={(e) => setOrganization(e.target.value)}
                   icon="business"

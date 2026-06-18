@@ -1,12 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useLang } from "@/lib/i18n/store";
 
 interface Notice {
   id: string;
   title: string;
   body: string;
 }
+
+const NOTICE_POPUP_COPY = {
+  ko: { title: "공지사항", hideToday: "하루동안 안보기", confirm: "확인" },
+  en: { title: "Notices", hideToday: "Do not show again today", confirm: "OK" },
+} as const;
 
 function isDismissedToday(noticeId: string): boolean {
   try {
@@ -22,6 +28,8 @@ function isDismissedToday(noticeId: string): boolean {
 }
 
 export function NoticePopup() {
+  const { lang } = useLang();
+  const copy = NOTICE_POPUP_COPY[lang];
   const [notice, setNotice] = useState<Notice | null>(null);
   const [visible, setVisible] = useState(false);
   const [hideForDay, setHideForDay] = useState(false);
@@ -60,7 +68,7 @@ export function NoticePopup() {
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-xl text-primary">campaign</span>
-            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">공지사항</span>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{copy.title}</span>
           </div>
           <button type="button" onClick={dismiss} className="text-outline hover:text-on-surface transition-colors">
             <span className="material-symbols-outlined text-xl">close</span>
@@ -82,14 +90,14 @@ export function NoticePopup() {
               onChange={(e) => setHideForDay(e.target.checked)}
               className="w-4 h-4 accent-primary rounded"
             />
-            <span className="text-xs text-on-surface-variant">하루동안 안보기</span>
+            <span className="text-xs text-on-surface-variant">{copy.hideToday}</span>
           </label>
           <button
             type="button"
             onClick={dismiss}
             className="px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
           >
-            확인
+            {copy.confirm}
           </button>
         </div>
       </div>

@@ -3,10 +3,40 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useLang } from "@/lib/i18n/store";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
+const UPDATE_PASSWORD_COPY = {
+  ko: {
+    doneTitle: "비밀번호가 변경되었습니다",
+    doneBody: "새 비밀번호로 로그인해 주세요.",
+    login: "로그인",
+    title: "새 비밀번호 설정",
+    subtitle: "8자 이상의 새 비밀번호를 입력해 주세요.",
+    passwordLabel: "새 비밀번호",
+    passwordPlaceholder: "8자 이상",
+    confirmLabel: "비밀번호 확인",
+    confirmPlaceholder: "동일하게 입력",
+    submit: "비밀번호 변경",
+  },
+  en: {
+    doneTitle: "Your password has been updated",
+    doneBody: "Please log in with your new password.",
+    login: "Log in",
+    title: "Set a new password",
+    subtitle: "Enter a new password with at least 8 characters.",
+    passwordLabel: "New password",
+    passwordPlaceholder: "At least 8 characters",
+    confirmLabel: "Confirm password",
+    confirmPlaceholder: "Enter it again",
+    submit: "Update password",
+  },
+} as const;
+
 export default function UpdatePasswordPage() {
+  const { lang } = useLang();
+  const copy = UPDATE_PASSWORD_COPY[lang];
   const [password, setPassword]   = useState("");
   const [confirm, setConfirm]     = useState("");
   const [loading, setLoading]     = useState(false);
@@ -39,18 +69,18 @@ export default function UpdatePasswordPage() {
         {done ? (
           <div className="text-center">
             <span className="material-symbols-outlined text-5xl text-primary mb-4 block">check_circle</span>
-            <h1 className="font-headline text-2xl font-extrabold text-on-surface mb-3">비밀번호가 변경되었습니다</h1>
-            <p className="text-on-surface-variant text-sm mb-8">새 비밀번호로 로그인해 주세요.</p>
+            <h1 className="font-headline text-2xl font-extrabold text-on-surface mb-3">{copy.doneTitle}</h1>
+            <p className="text-on-surface-variant text-sm mb-8">{copy.doneBody}</p>
             <Link href="/login" className="inline-block px-8 py-4 bg-primary text-white font-bold text-xs uppercase tracking-widest rounded hover:opacity-90 transition-opacity">
-              로그인
+              {copy.login}
             </Link>
           </div>
         ) : (
           <>
             <h1 className="font-headline text-3xl font-extrabold text-on-surface mb-2 tracking-tight">
-              새 비밀번호 설정
+              {copy.title}
             </h1>
-            <p className="text-on-surface-variant text-sm mb-8">8자 이상의 새 비밀번호를 입력해 주세요.</p>
+            <p className="text-on-surface-variant text-sm mb-8">{copy.subtitle}</p>
 
             {error && (
               <div className="mb-6 px-4 py-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm flex items-center gap-2">
@@ -61,9 +91,9 @@ export default function UpdatePasswordPage() {
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <Input
-                label="새 비밀번호"
+                label={copy.passwordLabel}
                 type="password"
-                placeholder="8자 이상"
+                placeholder={copy.passwordPlaceholder}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 icon="lock"
@@ -72,9 +102,9 @@ export default function UpdatePasswordPage() {
                 autoComplete="new-password"
               />
               <Input
-                label="비밀번호 확인"
+                label={copy.confirmLabel}
                 type="password"
-                placeholder="동일하게 입력"
+                placeholder={copy.confirmPlaceholder}
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 icon="lock_reset"
@@ -83,7 +113,7 @@ export default function UpdatePasswordPage() {
                 autoComplete="new-password"
               />
               <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full mt-2">
-                비밀번호 변경
+                {copy.submit}
               </Button>
             </form>
           </>

@@ -250,4 +250,16 @@ describe("validatePhotoRequestBuyerFields", () => {
       reference_url: "ftp://example.com/reference",
     }, NOW)).toBe("참고 URL은 http:// 또는 https://로 시작하는 웹 주소만 입력할 수 있습니다.");
   });
+
+  it("explains buyer-facing validation in English", () => {
+    expect(validatePhotoRequestBuyerFields({
+      ...base,
+      usage_context: "",
+    }, NOW, "en")).toBe("Enter the usage context. Explain what content the image will appear next to and what role it should play.");
+
+    expect(validatePhotoRequestBuyerFields({
+      ...base,
+      reference_url: "ftp://example.com/reference",
+    }, NOW, "en")).toBe("Reference URL must be a web address starting with http:// or https://.");
+  });
 });

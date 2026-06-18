@@ -74,6 +74,27 @@ export interface PhotoRequestBuyerValidationFields {
   reference_url: unknown;
 }
 
+type BuyerValidationLocale = "ko" | "en";
+
+const BUYER_VALIDATION_MESSAGES = {
+  ko: {
+    requesterOrganization: "요청자 소속을 입력해주세요. 예: ○○출판사, 국립○○박물관, 프리랜서",
+    usageProject: "사용 프로젝트를 입력해주세요. 예: 중학교 한국사 보조교재, 전시 리플렛, 단행본 개정판",
+    usageContextTooLong: "사용 맥락은 1000자 이내로 입력해주세요.",
+    usageContextRequired: "사용 맥락을 입력해주세요. 이미지가 어떤 내용 옆에서 어떤 역할로 쓰이는지 적어주세요.",
+    deadline: "희망 마감일은 오늘 이후 날짜로 선택해주세요.",
+    referenceUrl: "참고 URL은 http:// 또는 https://로 시작하는 웹 주소만 입력할 수 있습니다.",
+  },
+  en: {
+    requesterOrganization: "Enter your organization. For example: a publisher, museum, agency, or freelance practice.",
+    usageProject: "Enter the project where this image will be used. For example: a textbook, exhibition leaflet, or revised book edition.",
+    usageContextTooLong: "Usage context must be 1,000 characters or fewer.",
+    usageContextRequired: "Enter the usage context. Explain what content the image will appear next to and what role it should play.",
+    deadline: "Choose a response date after today.",
+    referenceUrl: "Reference URL must be a web address starting with http:// or https://.",
+  },
+} as const;
+
 function hasValue<T extends readonly string[]>(values: T, value: string): value is T[number] {
   return values.includes(value as T[number]);
 }
@@ -280,36 +301,38 @@ export function normalizeReferenceUrl(value: unknown): string | null {
 export function validatePhotoRequestBuyerFields(
   input: PhotoRequestBuyerValidationFields,
   now: Date = new Date(),
+  locale: BuyerValidationLocale = "ko",
 ): string | null {
+  const messages = BUYER_VALIDATION_MESSAGES[locale];
   try {
     normalizeText(input.requester_organization, "requester_organization", 160);
   } catch {
-    return "요청자 소속을 입력해주세요. 예: ○○출판사, 국립○○박물관, 프리랜서";
+    return messages.requesterOrganization;
   }
 
   try {
     normalizeText(input.usage_project, "usage_project", 240);
   } catch {
-    return "사용 프로젝트를 입력해주세요. 예: 중학교 한국사 보조교재, 전시 리플렛, 단행본 개정판";
+    return messages.usageProject;
   }
 
   try {
     normalizeText(input.usage_context, "usage_context", 1000);
   } catch {
     const value = typeof input.usage_context === "string" ? input.usage_context.trim() : "";
-    return value ? "사용 맥락은 1000자 이내로 입력해주세요." : "사용 맥락을 입력해주세요. 이미지가 어떤 내용 옆에서 어떤 역할로 쓰이는지 적어주세요.";
+    return value ? messages.usageContextTooLong : messages.usageContextRequired;
   }
 
   try {
     normalizeDeadline(input.deadline_at, now);
   } catch {
-    return "희망 마감일은 오늘 이후 날짜로 선택해주세요.";
+    return messages.deadline;
   }
 
   try {
     normalizeReferenceUrl(input.reference_url);
   } catch {
-    return "참고 URL은 http:// 또는 https://로 시작하는 웹 주소만 입력할 수 있습니다.";
+    return messages.referenceUrl;
   }
 
   return null;

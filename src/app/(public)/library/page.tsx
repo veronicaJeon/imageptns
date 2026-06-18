@@ -33,6 +33,21 @@ const USAGE_FILTER_LABELS = {
   },
 } as const;
 
+const LIBRARY_PAGE_COPY = {
+  ko: {
+    locale: "ko-KR",
+    filter: "필터",
+    photoRequest: "사진 요청",
+    requestWithConditions: "이 조건으로 사진 요청",
+  },
+  en: {
+    locale: "en-US",
+    filter: "Filters",
+    photoRequest: "Request an image",
+    requestWithConditions: "Request an image with these criteria",
+  },
+} as const;
+
 function AdRail({ side }: { side: "left" | "right" }) {
   return (
     <aside className="hidden 2xl:block">
@@ -53,6 +68,7 @@ export default function LibraryPage() {
   const { t, lang } = useLang();
   const l = t.library;
   const usageLabels = USAGE_FILTER_LABELS[lang];
+  const copy = LIBRARY_PAGE_COPY[lang];
 
   const [query, setQuery]             = useState("");
   const [category, setCategory]       = useState<CategoryKey>("all");
@@ -271,8 +287,8 @@ export default function LibraryPage() {
           <div className="flex justify-center gap-10 mt-8 text-xs font-bold uppercase tracking-widest text-outline">
             {liveStats ? (
               <>
-                <span>{liveStats.images.toLocaleString("ko-KR")}+ {l.stats.assets.split("+").slice(-1)[0].trim()}</span>
-                <span>{liveStats.photographers.toLocaleString("ko-KR")}+ {l.stats.photographers.split("+").slice(-1)[0].trim()}</span>
+                <span>{liveStats.images.toLocaleString(copy.locale)}+ {l.stats.assets.split("+").slice(-1)[0].trim()}</span>
+                <span>{liveStats.photographers.toLocaleString(copy.locale)}+ {l.stats.photographers.split("+").slice(-1)[0].trim()}</span>
                 <span>{l.stats.countries}</span>
               </>
             ) : (
@@ -304,7 +320,7 @@ export default function LibraryPage() {
                 aria-expanded={mobileFiltersOpen}
               >
                 <span className="material-symbols-outlined text-base">tune</span>
-                필터{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
+                {copy.filter}{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
               </button>
               <select
                 value={sort}
@@ -319,7 +335,7 @@ export default function LibraryPage() {
               <Link
                 href={photoRequestHref}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface-variant"
-                aria-label="사진 요청"
+                aria-label={copy.photoRequest}
               >
                 <span className="material-symbols-outlined text-base">add_photo_alternate</span>
               </Link>
@@ -350,7 +366,7 @@ export default function LibraryPage() {
                   className="flex h-9 items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3 text-xs font-bold text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
                 >
                   <span className="material-symbols-outlined text-base">add_photo_alternate</span>
-                  사진 요청
+                  {copy.photoRequest}
                 </Link>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-outline uppercase tracking-widest hidden sm:inline">
@@ -414,7 +430,7 @@ export default function LibraryPage() {
                   className="mt-2 flex h-11 items-center gap-2 rounded bg-primary px-5 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90"
                 >
                   <span className="material-symbols-outlined text-base">assignment_add</span>
-                  이 조건으로 사진 요청
+                  {copy.requestWithConditions}
                 </Link>
               </div>
             ) : (

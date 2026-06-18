@@ -59,7 +59,7 @@ export interface Translations {
     noResults: string;
   };
   dashboard: {
-    nav: { overview: string; favorites: string; orders: string; uploads: string; blockchain: string; earnings: string; settings: string };
+    nav: { overview: string; sourcing: string; favorites: string; orders: string; uploads: string; requests: string; blockchain: string; earnings: string; settings: string };
     role: { buyer: string; photographer: string };
     overview: {
       greeting: string;
@@ -306,7 +306,7 @@ export const en: Translations = {
     noResults: "No articles found for that search.",
   },
   dashboard: {
-    nav: { overview: "Overview", favorites: "Favorites", orders: "Orders", uploads: "Uploads", blockchain: "Blockchain", earnings: "Earnings", settings: "Settings" },
+    nav: { overview: "Overview", sourcing: "My sourcing requests", favorites: "Favorites", orders: "Orders", uploads: "Uploads", requests: "Team requests", blockchain: "Blockchain", earnings: "Earnings", settings: "Settings" },
     role: { buyer: "Image Buyer", photographer: "Photographer" },
     overview: {
       greeting: "Good to see you",

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useLang } from "@/lib/i18n/store";
 
 interface Notice {
   id: string;
@@ -12,7 +13,14 @@ interface Notice {
   created_at: string;
 }
 
+const NOTICES_COPY = {
+  ko: { title: "공지사항", empty: "등록된 공지사항이 없습니다.", important: "중요", locale: "ko-KR" },
+  en: { title: "Notices", empty: "No notices have been published yet.", important: "Important", locale: "en-US" },
+} as const;
+
 export default function NoticesPage() {
+  const { lang } = useLang();
+  const copy = NOTICES_COPY[lang];
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -30,9 +38,9 @@ export default function NoticesPage() {
         <nav className="flex items-center gap-2 text-xs text-outline mb-6">
           <Link href="/" className="hover:text-primary transition-colors">Home</Link>
           <span className="material-symbols-outlined text-sm">chevron_right</span>
-          <span className="text-on-surface-variant">공지사항</span>
+          <span className="text-on-surface-variant">{copy.title}</span>
         </nav>
-        <h1 className="font-headline text-3xl font-extrabold text-on-surface tracking-tight">공지사항</h1>
+        <h1 className="font-headline text-3xl font-extrabold text-on-surface tracking-tight">{copy.title}</h1>
       </div>
 
       <section className="px-6 md:px-12 pb-24 bg-surface">
@@ -46,7 +54,7 @@ export default function NoticesPage() {
           {!loading && notices.length === 0 && (
             <div className="flex flex-col items-center py-24 gap-3 text-outline">
               <span className="material-symbols-outlined text-5xl">campaign</span>
-              <p className="text-sm">등록된 공지사항이 없습니다.</p>
+              <p className="text-sm">{copy.empty}</p>
             </div>
           )}
 
@@ -66,11 +74,11 @@ export default function NoticesPage() {
                         </span>
                         {n.is_popup && (
                           <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                            중요
+                            {copy.important}
                           </span>
                         )}
                         <span className="text-[10px] text-outline">
-                          {new Date(n.published_at ?? n.created_at).toLocaleDateString("ko-KR", {
+                          {new Date(n.published_at ?? n.created_at).toLocaleDateString(copy.locale, {
                             year: "numeric", month: "2-digit", day: "2-digit",
                           })}
                         </span>

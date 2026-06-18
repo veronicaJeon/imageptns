@@ -39,6 +39,23 @@ describe("photo request draft helpers", () => {
     expect(draft.sourcing_purposes).toEqual(["similar_search"]);
   });
 
+  it("creates English photo request defaults when requested", () => {
+    const draft = draftPhotoRequestFromSearchParams(new URLSearchParams({
+      mode: "photo",
+      query: "winter landscape of Jirisan Cheonwangbong",
+      educationFree: "true",
+      commercial: "true",
+    }), "en");
+
+    expect(draft.mode).toBe("photo");
+    expect(draft.title).toBe("winter landscape of Jirisan Cheonwangbong image sourcing request");
+    expect(draft.brief).toContain("Requested image: winter landscape of Jirisan Cheonwangbong");
+    expect(draft.brief).toContain("Free for education");
+    expect(draft.brief).toContain("Commercial use");
+    expect(draft.brief).not.toContain("이미지 소싱 요청");
+    expect(draft.usage_context).toBe("Review the same usage terms as the search filters: Free for education, Commercial use");
+  });
+
   it("keeps multiple sourcing purpose hints from search params", () => {
     const draft = draftPhotoRequestFromSearchParams(new URLSearchParams({
       mode: "photo",
