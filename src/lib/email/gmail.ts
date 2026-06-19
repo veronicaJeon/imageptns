@@ -7,6 +7,21 @@ import { escapeHtml } from "./html";
 const SMTP_USER = process.env.GMAIL_SMTP_USER ?? "";
 const SMTP_PASS = process.env.GMAIL_SMTP_PASS ?? "";
 
+class MissingSmtpCredentialsError extends Error {
+  code = "SMTP_CREDENTIALS_MISSING";
+
+  constructor() {
+    super("GMAIL_SMTP_USER and GMAIL_SMTP_PASS must be set before sending email");
+    this.name = "MissingSmtpCredentialsError";
+  }
+}
+
+function assertSmtpCredentials() {
+  if (!SMTP_USER || !SMTP_PASS) {
+    throw new MissingSmtpCredentialsError();
+  }
+}
+
 function createTransport() {
   return nodemailer.createTransport({
     host: "smtp.gmail.com",
@@ -16,13 +31,24 @@ function createTransport() {
   });
 }
 
-export function safeEmailErrorDetails(error: unknown) {
+export interface SafeEmailErrorDetails {
+  name?: string;
+  message: string;
+  code?: string;
+  command?: string;
+  responseCode?: number;
+  response?: string;
+  errors?: SafeEmailErrorDetails[];
+}
+
+export function safeEmailErrorDetails(error: unknown): SafeEmailErrorDetails {
   if (!(error instanceof Error)) return { message: String(error) };
   const details = error as Error & {
     code?: string;
     command?: string;
     responseCode?: number;
     response?: string;
+    errors?: unknown[];
   };
   return {
     name: details.name,
@@ -31,6 +57,9 @@ export function safeEmailErrorDetails(error: unknown) {
     command: details.command,
     responseCode: details.responseCode,
     response: details.response ? details.response.slice(0, 500) : undefined,
+    errors: Array.isArray(details.errors)
+      ? details.errors.map((innerError) => safeEmailErrorDetails(innerError))
+      : undefined,
   };
 }
 
@@ -52,10 +81,7 @@ export async function sendContactConfirmation(opts: {
   email:   string;
   subject: string;
 }) {
-  if (!SMTP_USER || !SMTP_PASS) {
-    console.warn("[gmail-smtp] credentials not set — skipping confirmation email");
-    return;
-  }
+  assertSmtpCredentials();
   const name = escapeHtml(opts.name);
   const subject = escapeHtml(opts.subject);
   const transport = createTransport();
@@ -78,10 +104,7 @@ export async function notifyOpsContact(opts: {
   subject: string;
   message: string;
 }) {
-  if (!SMTP_USER || !SMTP_PASS) {
-    console.warn("[gmail-smtp] credentials not set — skipping ops notification");
-    return;
-  }
+  assertSmtpCredentials();
   const name = escapeHtml(opts.name);
   const email = escapeHtml(opts.email);
   const subject = escapeHtml(opts.subject);
