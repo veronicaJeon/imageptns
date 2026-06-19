@@ -16,6 +16,37 @@ function createTransport() {
   });
 }
 
+export function safeEmailErrorDetails(error: unknown) {
+  if (!(error instanceof Error)) return { message: String(error) };
+  const details = error as Error & {
+    code?: string;
+    command?: string;
+    responseCode?: number;
+    response?: string;
+  };
+  return {
+    name: details.name,
+    message: details.message,
+    code: details.code,
+    command: details.command,
+    responseCode: details.responseCode,
+    response: details.response ? details.response.slice(0, 500) : undefined,
+  };
+}
+
+export async function verifyGmailSmtp() {
+  if (!SMTP_USER || !SMTP_PASS) {
+    return { ok: false, reason: "credentials_not_set" as const };
+  }
+  const transport = createTransport();
+  try {
+    await transport.verify();
+    return { ok: true as const, user: SMTP_USER };
+  } catch (error) {
+    return { ok: false as const, user: SMTP_USER, error: safeEmailErrorDetails(error) };
+  }
+}
+
 export async function sendContactConfirmation(opts: {
   name:    string;
   email:   string;

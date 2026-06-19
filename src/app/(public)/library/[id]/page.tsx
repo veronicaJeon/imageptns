@@ -48,7 +48,11 @@ type LicenseKey = "editorial" | "commercial" | "extended";
 interface ImageDetailData {
   id: string;
   title: string;
+  title_ko: string | null;
+  title_en: string | null;
   description: string | null;
+  description_ko: string | null;
+  description_en: string | null;
   category: string;
   storage_path_preview: string | null;
   file_format: string | null;
@@ -155,13 +159,14 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
     addItem({
       id,
       assetId:      imageData.asset_id ?? undefined,
-      title:        imageData.title,
+      title:        displayTitle,
       photographer,
       src:          imageData.storage_path_preview ?? "",
       category:     imageData.category,
       license,
       creditLine,
       usageConditions: usageConditions.map((condition) => condition.label),
+      freeUsagePolicy: imageData.free_usage_policy,
     });
     setCartFeedback("added");
     setTimeout(() => setCartFeedback("idle"), 2000);
@@ -173,19 +178,24 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
     addItem({
       id,
       assetId:      imageData.asset_id ?? undefined,
-      title:        imageData.title,
+      title:        displayTitle,
       photographer,
       src:          imageData.storage_path_preview ?? "",
       category:     imageData.category,
       license,
       creditLine,
       usageConditions: usageConditions.map((condition) => condition.label),
+      freeUsagePolicy: imageData.free_usage_policy,
     });
     router.push("/checkout");
   }
 
   const licenseKeys: LicenseKey[] = ["editorial", "commercial", "extended"];
-  const displayPrice = (key: LicenseKey) => priceOverrides[key] ?? licensePrices[key] ?? LICENSE_PRICES[key];
+  const displayPrice = (key: LicenseKey) => {
+    if (imageData?.free_usage_policy === "all") return 0;
+    if (imageData?.free_usage_policy === "education" && key === "editorial") return 0;
+    return priceOverrides[key] ?? licensePrices[key] ?? LICENSE_PRICES[key];
+  };
 
   if (loading) {
     return (
@@ -210,6 +220,13 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   const creditLine = creditLineForName(photographerName);
   const copyrightLicense = getLocalizedCopyrightLicense(imageData.copyright_license, lang);
   const freeUsagePolicy = getLocalizedFreeUsagePolicy(imageData.free_usage_policy, lang);
+  const displayTitle = lang === "ko"
+    ? imageData.title_ko || imageData.title
+    : imageData.title_en || imageData.title;
+  const displayDescription = lang === "ko"
+    ? imageData.description_ko || imageData.description
+    : imageData.description_en || imageData.description;
+  const isFullyFree = imageData.free_usage_policy === "all";
   const usageConditions = buyerUsageConditions({
     copyrightLicense: imageData.copyright_license,
     freeUsagePolicy: imageData.free_usage_policy,
@@ -253,7 +270,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
         <nav className="flex items-center gap-2 text-xs text-outline">
           <Link href="/library" className="hover:text-primary transition-colors">Library</Link>
           <span className="material-symbols-outlined text-sm">chevron_right</span>
-          <span className="text-on-surface-variant">{imageData.title}</span>
+          <span className="text-on-surface-variant">{displayTitle}</span>
         </nav>
       </div>
 
@@ -268,7 +285,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                 <>
                   <Image
                     src={imageData.storage_path_preview}
-                    alt={imageData.title}
+                    alt={displayTitle}
                     width={imageData.width ?? 1200}
                     height={imageData.height ?? 800}
                     className="mx-auto max-h-[78vh] w-auto max-w-full object-contain"
@@ -295,7 +312,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                 {imageData.category}
               </p>
               <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface mb-2">
-                {imageData.title}
+                {displayTitle}
               </h1>
               <p className="text-on-surface-variant text-sm">
                 {d.by}{" "}
@@ -310,8 +327,8 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                   <span className="text-on-surface font-semibold">{photographerName}</span>
                 )}
               </p>
-              {imageData.description && (
-                <p className="text-on-surface-variant text-sm mt-3 leading-relaxed">{imageData.description}</p>
+              {displayDescription && (
+                <p className="text-on-surface-variant text-sm mt-3 leading-relaxed">{displayDescription}</p>
               )}
             </div>
 
@@ -374,6 +391,15 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                 </details>
               )}
+              {isFullyFree ? (
+                <div className="rounded-lg border-2 border-primary bg-primary/5 px-5 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-on-surface">{freeUsagePolicy.label}</span>
+                    <span className="text-sm font-bold text-primary">₩0</span>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">{freeUsagePolicy.summary}</p>
+                </div>
+              ) : (
               <div className="flex flex-col gap-3">
                 {licenseKeys.map((key) => (
                   <label
@@ -408,6 +434,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                   </label>
                 ))}
               </div>
+              )}
             </div>
 
             {/* Actions */}

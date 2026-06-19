@@ -237,8 +237,8 @@ export default function LibraryPage() {
 
           {/* Search bar */}
           <div className="relative">
-            <div className="flex items-center bg-surface-container-lowest shadow-ghost rounded-lg overflow-hidden">
-              <span className="material-symbols-outlined flex h-14 w-14 shrink-0 items-center justify-center text-2xl text-outline">
+            <div className="relative bg-surface-container-lowest shadow-ghost rounded-lg overflow-hidden">
+              <span className="material-symbols-outlined pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-2xl leading-none text-outline">
                 search
               </span>
               <input
@@ -246,7 +246,7 @@ export default function LibraryPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={l.hero.searchPlaceholder}
-                className="flex-1 py-5 pr-5 bg-transparent text-on-surface placeholder:text-outline text-base outline-none"
+                className="h-16 w-full bg-transparent pl-14 pr-12 text-base text-on-surface placeholder:text-outline outline-none"
                 onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
                 onBlur={() => {
                   blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 150);
@@ -256,7 +256,7 @@ export default function LibraryPage() {
               {query && (
                 <button
                   onClick={() => { setQuery(""); setSuggestions([]); setShowSuggestions(false); }}
-                  className="px-4 text-outline hover:text-on-surface transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-outline transition-colors hover:text-on-surface"
                   aria-label="Clear search"
                 >
                   <span className="material-symbols-outlined text-xl">close</span>

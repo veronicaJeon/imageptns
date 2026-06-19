@@ -10,9 +10,15 @@ interface AdminImage {
   id: string;
   asset_id: string | null;
   title: string;
+  title_ko: string | null;
+  title_en: string | null;
   description: string | null;
+  description_ko: string | null;
+  description_en: string | null;
   category: string;
   tags: string[] | null;
+  tags_ko: string[] | null;
+  tags_en: string[] | null;
   status: string;
   is_published: boolean;
   unpublished_at: string | null;
@@ -35,9 +41,15 @@ interface AdminImage {
 interface ImageEditState {
   id: string;
   title: string;
+  titleKo: string;
+  titleEn: string;
   description: string;
+  descriptionKo: string;
+  descriptionEn: string;
   category: string;
   tags: string;
+  tagsKo: string;
+  tagsEn: string;
   is_published: boolean;
   priceOverrides: Record<string, string>;
 }
@@ -285,9 +297,15 @@ export default function AdminImagesPage() {
       setEditState({
         id: image.id,
         title: detail.title ?? "",
+        titleKo: detail.title_ko ?? detail.title ?? "",
+        titleEn: detail.title_en ?? detail.title ?? "",
         description: detail.description ?? "",
+        descriptionKo: detail.description_ko ?? detail.description ?? "",
+        descriptionEn: detail.description_en ?? detail.description ?? "",
         category: detail.category ?? "",
         tags: (detail.tags ?? []).join(", "),
+        tagsKo: (detail.tags_ko ?? detail.tags ?? []).join(", "),
+        tagsEn: (detail.tags_en ?? detail.tags ?? []).join(", "),
         is_published: Boolean(detail.is_published),
         priceOverrides: Object.fromEntries((detail.price_overrides ?? []).map((row) => [row.license_code, String(row.price_krw)])),
       });
@@ -322,9 +340,15 @@ export default function AdminImagesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: editState.title,
+          title_ko: editState.titleKo,
+          title_en: editState.titleEn,
           description: editState.description,
+          description_ko: editState.descriptionKo,
+          description_en: editState.descriptionEn,
           category: editState.category,
           tags: editState.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+          tags_ko: editState.tagsKo.split(",").map((tag) => tag.trim()).filter(Boolean),
+          tags_en: editState.tagsEn.split(",").map((tag) => tag.trim()).filter(Boolean),
           is_published: editState.is_published,
           priceOverrides,
         }),
@@ -626,15 +650,53 @@ export default function AdminImagesPage() {
                     className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
                   />
                 </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-outline">한글 제목</span>
+                    <input
+                      value={editState.titleKo}
+                      onChange={(event) => updateEdit("titleKo", event.target.value)}
+                      className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                    />
+                  </label>
+                  <label className="grid gap-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-outline">영문 제목</span>
+                    <input
+                      value={editState.titleEn}
+                      onChange={(event) => updateEdit("titleEn", event.target.value)}
+                      className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                    />
+                  </label>
+                </div>
                 <label className="grid gap-2">
-                  <span className="text-xs font-bold uppercase tracking-widest text-outline">설명</span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-outline">대표 설명</span>
                   <textarea
                     value={editState.description}
                     onChange={(event) => updateEdit("description", event.target.value)}
-                    rows={4}
+                    rows={3}
                     className="rounded-lg bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
                   />
                 </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-outline">한글 설명</span>
+                    <textarea
+                      value={editState.descriptionKo}
+                      onChange={(event) => updateEdit("descriptionKo", event.target.value)}
+                      rows={4}
+                      className="rounded-lg bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                    />
+                  </label>
+                  <label className="grid gap-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-outline">영문 설명</span>
+                    <textarea
+                      value={editState.descriptionEn}
+                      onChange={(event) => updateEdit("descriptionEn", event.target.value)}
+                      rows={4}
+                      className="rounded-lg bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                    />
+                  </label>
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="grid gap-2">
                     <span className="text-xs font-bold uppercase tracking-widest text-outline">카테고리</span>
@@ -665,6 +727,26 @@ export default function AdminImagesPage() {
                     className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
                   />
                 </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-outline">한글 태그</span>
+                    <input
+                      value={editState.tagsKo}
+                      onChange={(event) => updateEdit("tagsKo", event.target.value)}
+                      placeholder="쉼표로 구분"
+                      className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                    />
+                  </label>
+                  <label className="grid gap-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-outline">영문 태그</span>
+                    <input
+                      value={editState.tagsEn}
+                      onChange={(event) => updateEdit("tagsEn", event.target.value)}
+                      placeholder="comma separated"
+                      className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                    />
+                  </label>
+                </div>
                 <div className="rounded-xl border border-outline-variant/40 p-4">
                   <p className="text-xs font-bold uppercase tracking-widest text-outline">이미지별 가격</p>
                   <p className="mt-1 text-xs text-on-surface-variant">비워두면 전역 상품 가격을 사용합니다. 0원 입력도 가능합니다.</p>

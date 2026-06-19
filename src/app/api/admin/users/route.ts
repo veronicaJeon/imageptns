@@ -6,6 +6,7 @@ interface ProfileRow {
   id: string;
   full_name: string | null;
   role: "buyer" | "photographer";
+  roles: Array<"buyer" | "photographer"> | null;
   avatar_url: string | null;
   is_admin: boolean;
   wallet_address: string | null;
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient();
   let profileQuery = admin
     .from("profiles")
-    .select("id, full_name, role, avatar_url, is_admin, wallet_address, phone_number, primary_activity_regions, created_at, updated_at, last_login_at, login_count, deleted_at")
+    .select("id, full_name, role, roles, avatar_url, is_admin, wallet_address, phone_number, primary_activity_regions, created_at, updated_at, last_login_at, login_count, deleted_at")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(300);
@@ -102,6 +103,7 @@ export async function GET(req: NextRequest) {
       const auth = authById.get(profile.id);
       return {
         ...profile,
+        roles: Array.isArray(profile.roles) && profile.roles.length > 0 ? profile.roles : [profile.role],
         email: auth?.email ?? "",
         authCreatedAt: auth?.created_at ?? null,
         authLastSignInAt: auth?.last_sign_in_at ?? null,

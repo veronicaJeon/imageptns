@@ -6,9 +6,15 @@ interface ImageDetailRow {
   id: string;
   asset_id: string | null;
   title: string;
+  title_ko: string | null;
+  title_en: string | null;
   description: string | null;
+  description_ko: string | null;
+  description_en: string | null;
   category: string;
   tags: string[] | null;
+  tags_ko: string[] | null;
+  tags_en: string[] | null;
   storage_path_preview: string | null;
   storage_path_full: string | null;
   width: number | null;
@@ -36,6 +42,8 @@ interface ImageDetailRow {
 interface SimilarImageRow {
   id: string;
   title: string;
+  title_ko?: string | null;
+  title_en?: string | null;
   category: string;
   storage_path_preview: string | null;
   width: number | null;
@@ -64,7 +72,7 @@ export async function GET(
   const { data: img, error } = await admin
     .from("images")
     .select(
-      `id, asset_id, title, description, category, tags,
+      `id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en,
        storage_path_preview, storage_path_full,
        width, height, resolution_mp, file_format, file_size_mb,
        exif_taken_at, exif_location,
@@ -108,7 +116,7 @@ export async function GET(
   // Similar images (same category, excluding this one)
   const { data: similar } = await admin
     .from("images")
-    .select("id, title, category, storage_path_preview, width, height, photographer_id, photographer:profiles!photographer_id(full_name)")
+    .select("id, title, title_ko, title_en, category, storage_path_preview, width, height, photographer_id, photographer:profiles!photographer_id(full_name)")
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
     .eq("is_published", true)

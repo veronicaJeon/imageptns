@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeContactSubmissionInput } from "@/lib/contact/request-fields";
 import { sendContactEmails } from "@/lib/email/contact";
-import { sendContactConfirmation, notifyOpsContact } from "@/lib/email/gmail";
+import { notifyOpsContact, safeEmailErrorDetails, sendContactConfirmation } from "@/lib/email/gmail";
 import { checkRateLimit, requestIp } from "@/lib/security/rate-limit";
 
 export async function POST(req: NextRequest) {
@@ -69,12 +69,13 @@ export async function POST(req: NextRequest) {
       },
     );
   } catch (emailError) {
-    console.error("[contact] email delivery failed", emailError);
-    return NextResponse.json(
-      { error: "Contact was saved, but email delivery failed" },
-      { status: 502 },
-    );
+    console.error("[contact] email delivery failed", {
+      inquiryType: submission.inquiry_type,
+      recipientDomain: submission.email.split("@")[1] ?? null,
+      details: safeEmailErrorDetails(emailError),
+    });
+    return NextResponse.json({ ok: true, emailDelivery: "failed" }, { status: 201 });
   }
 
-  return NextResponse.json({ ok: true }, { status: 201 });
+  return NextResponse.json({ ok: true, emailDelivery: "sent" }, { status: 201 });
 }

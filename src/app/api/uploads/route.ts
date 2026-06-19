@@ -17,7 +17,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("images")
-    .select("id, asset_id, title, description, category, tags, status, rejection_reason, lifecycle_status, deletion_requested_at, deletion_fee_krw, deletion_fee_status, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at, chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at, proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
+    .select("id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, lifecycle_status, deletion_requested_at, deletion_fee_krw, deletion_fee_status, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at, chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at, proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
     .eq("photographer_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     title, description, category, tags,
+    title_ko, title_en, description_ko, description_en, tags_ko, tags_en,
     storage_path_original, original_filename,
     width, height, resolution_mp, file_format, file_size_mb,
     upload_rotation_degrees, upload_original_width, upload_original_height,
@@ -65,8 +66,14 @@ export async function POST(req: NextRequest) {
       photographer_id:      user.id,
       title,
       description:          description ?? null,
+      title_ko:             title_ko?.trim() || title,
+      title_en:             title_en?.trim() || title,
+      description_ko:       description_ko?.trim() || description || null,
+      description_en:       description_en?.trim() || description || null,
       category,
       tags:                 tags ?? [],
+      tags_ko:              Array.isArray(tags_ko) && tags_ko.length > 0 ? tags_ko : tags ?? [],
+      tags_en:              Array.isArray(tags_en) && tags_en.length > 0 ? tags_en : tags ?? [],
       storage_path_original,
       original_filename:    original_filename ?? null,
       // preview path same as original path, different bucket — filled by watermark step below

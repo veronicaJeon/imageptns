@@ -44,6 +44,7 @@ export default function SettingsPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [activityRegions, setActivityRegions] = useState("");
   const [role, setRole]   = useState<"buyer" | "photographer" | null>(null);
+  const [roles, setRoles] = useState<Array<"buyer" | "photographer">>([]);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -102,6 +103,7 @@ export default function SettingsPage() {
         setPhoneNumber(profile.phone_number ?? "");
         setActivityRegions((profile.primary_activity_regions ?? []).join("\n"));
         setRole(profile.role ?? null);
+        setRoles(Array.isArray(profile.roles) && profile.roles.length > 0 ? profile.roles : [profile.role ?? "buyer"]);
         setNotifications({
           sales:      profile.notif_sales      ?? true,
           reviews:    profile.notif_reviews    ?? true,
@@ -157,6 +159,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/profile/upgrade-to-photographer", { method: "POST" });
       if (res.ok) {
         setRole("photographer");
+        setRoles((current) => Array.from(new Set([...current, "buyer", "photographer"])));
         setUpgradeDone(true);
         await init();
       } else {
@@ -402,7 +405,7 @@ export default function SettingsPage() {
           계정 역할
         </h2>
 
-        {role === "photographer" || upgradeDone ? (
+        {roles.includes("photographer") || role === "photographer" || upgradeDone ? (
           <div className="flex items-center gap-3 px-5 py-4 bg-primary/5 border border-primary/20 rounded-lg">
             <span className="material-symbols-outlined text-xl text-primary">photo_camera</span>
             <div>

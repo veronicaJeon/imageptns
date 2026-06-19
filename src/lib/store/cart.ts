@@ -20,6 +20,7 @@ export interface CartItem {
   license: LicenseType;
   creditLine: string;
   usageConditions: string[];
+  freeUsagePolicy?: string | null;
   price: number; // KRW
 }
 

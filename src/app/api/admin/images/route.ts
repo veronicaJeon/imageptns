@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("images")
     .select(`
-    id, asset_id, title, description, category, tags,
+    id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en,
     status, rejection_reason, is_published, unpublished_at, unpublished_reason,
     lifecycle_status, deletion_requested_at, deletion_fee_krw, deletion_fee_status,
     chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at,

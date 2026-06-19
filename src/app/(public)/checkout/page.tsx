@@ -108,6 +108,7 @@ const CHECKOUT_PAGE_COPY = {
       passCheckout: "결제 우회를 완료하지 못했습니다.",
       bankTransferCreate: "계좌결제 요청을 생성하지 못했습니다.",
       bankTransferCheckout: "계좌결제 요청을 완료하지 못했습니다.",
+      usagePurposeRequired: "무료 에디토리얼/교육용 사용처를 입력해주세요.",
       walletMissing: "브라우저 지갑을 찾을 수 없습니다. MetaMask 또는 Base 호환 지갑을 설치해주세요.",
       connectorMissing: "사용 가능한 지갑 커넥터가 없습니다.",
       connectWallet: "지갑 연결을 완료해주세요.",
@@ -128,6 +129,9 @@ const CHECKOUT_PAGE_COPY = {
     freeOrderTitle: "무료 라이선스 주문",
     subscriptionFreeOrderTitle: "구독 무료다운 주문",
     freeOrderBody: "결제 수단 입력 없이 구매가 확정되고 원본 다운로드 권한이 즉시 생성됩니다.",
+    usagePurposeTitle: "무료 에디토리얼 사용처",
+    usagePurposeBody: "무료 에디토리얼/교육용 라이선스는 입력한 사용처에서만 사용할 수 있습니다.",
+    usagePurposePlaceholder: "예: 중학교 한국사 보조교재 백제 문화 단원 본문 삽입 이미지",
     tossDescription: "카드 및 국내 간편결제",
     baseDescription: "Base 지갑으로 온체인 결제",
     bankTransferTitle: "계좌결제",
@@ -179,6 +183,7 @@ const CHECKOUT_PAGE_COPY = {
       passCheckout: "Could not complete the payment pass.",
       bankTransferCreate: "Could not create the bank-transfer request.",
       bankTransferCheckout: "Could not complete the bank-transfer request.",
+      usagePurposeRequired: "Enter the usage purpose for free editorial/educational use.",
       walletMissing: "Browser wallet not found. Please install MetaMask or a Base-compatible wallet.",
       connectorMissing: "No wallet connector is available.",
       connectWallet: "Please complete wallet connection.",
@@ -199,6 +204,9 @@ const CHECKOUT_PAGE_COPY = {
     freeOrderTitle: "Free license order",
     subscriptionFreeOrderTitle: "Subscription free-download order",
     freeOrderBody: "The purchase will be confirmed without payment details and original download access will be created immediately.",
+    usagePurposeTitle: "Free editorial usage purpose",
+    usagePurposeBody: "Free editorial/educational licenses may be used only for the purpose entered here.",
+    usagePurposePlaceholder: "Example: image inserted beside a Baekje culture section in a Korean history textbook",
     tossDescription: "Cards and local quick payments",
     baseDescription: "Onchain payment with a Base wallet",
     bankTransferTitle: "Bank transfer",
@@ -319,9 +327,15 @@ function CheckoutContent() {
     return priceOverrides[`${imageId}:${license}`] ?? licensePrices[license] ?? getLicensePrice(license);
   }
 
+  function policyAdjustedPrice(item: typeof items[number]) {
+    if (item.freeUsagePolicy === "all") return 0;
+    if (item.freeUsagePolicy === "education" && item.license === "editorial") return 0;
+    return displayPrice(item.id, item.license);
+  }
+
   let remainingSubscriptionDownloads = subscriptionEntitlement?.active ? subscriptionEntitlement.remaining : 0;
   const pricedCartItems = items.map((item) => {
-    const originalPrice = displayPrice(item.id, item.license);
+    const originalPrice = policyAdjustedPrice(item);
     const subscriptionCovered = originalPrice > 0 && remainingSubscriptionDownloads > 0;
     if (subscriptionCovered) remainingSubscriptionDownloads -= 1;
     return {
@@ -337,8 +351,14 @@ function CheckoutContent() {
   const subscriptionDiscount = Math.max(0, originalSubtotal - subtotal);
   const vat      = Math.round(subtotal * 0.1);
   const total    = subtotal + vat;
+  const requiresUsagePurpose = pricedCartItems.some((item) =>
+    item.effectivePrice === 0 &&
+    item.license === "editorial" &&
+    (item.freeUsagePolicy === "all" || item.freeUsagePolicy === "education")
+  );
 
   const [billing, setBilling]   = useState({ name: "", email: "", company: "" });
+  const [usagePurposeNote, setUsagePurposeNote] = useState("");
   const [loading, setLoading]   = useState(false);
   const [widgetReady, setWidgetReady] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("toss");
@@ -406,6 +426,10 @@ function CheckoutContent() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!billing.name || !billing.email) return;
+    if (requiresUsagePurpose && !usagePurposeNote.trim()) {
+      alert(copy.errors.usagePurposeRequired);
+      return;
+    }
 
     if (isFreeCheckout) {
       await handleFreeCheckout();
@@ -440,6 +464,7 @@ function CheckoutContent() {
         body: JSON.stringify({
           items: items.map((i) => ({ id: i.id, license: i.license, price: i.price })),
           billing,
+          usagePurposeNote: usagePurposeNote.trim() || null,
         }),
       });
       if (!prepRes.ok) throw new Error(copy.errors.orderCreate);
@@ -470,6 +495,7 @@ function CheckoutContent() {
         body: JSON.stringify({
           items: items.map((i) => ({ id: i.id, license: i.license, price: i.price })),
           billing,
+          usagePurposeNote: usagePurposeNote.trim() || null,
         }),
       });
       if (!prepRes.ok) throw new Error(await readApiError(prepRes, copy.errors.freeOrderCreate));
@@ -492,6 +518,7 @@ function CheckoutContent() {
         body: JSON.stringify({
           items: items.map((i) => ({ id: i.id, license: i.license, price: i.price })),
           billing,
+          usagePurposeNote: usagePurposeNote.trim() || null,
           paymentProvider: "bank_transfer",
         }),
       });
@@ -521,6 +548,7 @@ function CheckoutContent() {
         body: JSON.stringify({
           items: items.map((i) => ({ id: i.id, license: i.license, price: i.price })),
           billing,
+          usagePurposeNote: usagePurposeNote.trim() || null,
         }),
       });
       if (!prepRes.ok) throw new Error(await readApiError(prepRes, copy.errors.orderCreate));
@@ -760,6 +788,23 @@ function CheckoutContent() {
                 ))}
               </div>
             </div>
+
+            {requiresUsagePurpose && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <label className="grid gap-2">
+                  <span className="text-xs font-bold uppercase tracking-widest text-primary">{copy.usagePurposeTitle}</span>
+                  <textarea
+                    value={usagePurposeNote}
+                    onChange={(event) => setUsagePurposeNote(event.target.value)}
+                    rows={3}
+                    required
+                    placeholder={copy.usagePurposePlaceholder}
+                    className="rounded-lg bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+                  />
+                </label>
+                <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">{copy.usagePurposeBody}</p>
+              </div>
+            )}
 
             {/* Payment method */}
             <div>

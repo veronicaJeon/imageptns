@@ -486,7 +486,7 @@ export async function POST(req: NextRequest) {
   const { data: photographerData, error: photographerError } = await admin
     .from("profiles")
     .select("id, full_name, primary_activity_regions")
-    .eq("role", "photographer")
+    .contains("roles", ["photographer"])
     .is("deleted_at", null);
 
   if (photographerError) return NextResponse.json({ error: photographerError.message }, { status: 500 });

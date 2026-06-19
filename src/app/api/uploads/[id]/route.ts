@@ -38,11 +38,17 @@ export async function PATCH(
   if (!img) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { title, description, category, tags, exif_location, exif_taken_at, resubmit, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration } = body as {
+  const { title, description, title_ko, title_en, description_ko, description_en, tags_ko, tags_en, category, tags, exif_location, exif_taken_at, resubmit, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration } = body as {
     title?: string;
     description?: string;
+    title_ko?: string;
+    title_en?: string;
+    description_ko?: string;
+    description_en?: string;
     category?: string;
     tags?: string[];
+    tags_ko?: string[];
+    tags_en?: string[];
     exif_location?: string;
     exif_taken_at?: string | null;
     resubmit?: boolean;
@@ -64,8 +70,14 @@ export async function PATCH(
   const update: Record<string, unknown> = {};
   if (title !== undefined) update.title = title.trim();
   if (description !== undefined) update.description = description || null;
+  if (title_ko !== undefined) update.title_ko = title_ko.trim() || title?.trim() || null;
+  if (title_en !== undefined) update.title_en = title_en.trim() || title?.trim() || null;
+  if (description_ko !== undefined) update.description_ko = description_ko || description || null;
+  if (description_en !== undefined) update.description_en = description_en || description || null;
   if (category !== undefined) update.category = category;
   if (Array.isArray(tags)) update.tags = tags.map((t) => t.trim().toLowerCase()).filter(Boolean);
+  if (Array.isArray(tags_ko)) update.tags_ko = tags_ko.map((t) => t.trim()).filter(Boolean);
+  if (Array.isArray(tags_en)) update.tags_en = tags_en.map((t) => t.trim().toLowerCase()).filter(Boolean);
   if (exif_location !== undefined) update.exif_location = exif_location || null;
   if (exif_taken_at !== undefined) update.exif_taken_at = exif_taken_at || null;
   if (copyright_license !== undefined) update.copyright_license = normalizeCopyrightLicenseCode(copyright_license);
@@ -91,7 +103,7 @@ export async function PATCH(
     .update(update)
     .eq("id", id)
     .eq("photographer_id", user.id)
-    .select("id, title, description, category, tags, status, rejection_reason, exif_location, exif_taken_at, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
+    .select("id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, exif_location, exif_taken_at, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -7,21 +7,43 @@ interface AnalyzeResponse {
   title: string;
   caption: string;
   tags: string[];
+  title_ko?: string;
+  title_en?: string;
+  caption_ko?: string;
+  caption_en?: string;
+  tags_ko?: string[];
+  tags_en?: string[];
   category: string;
 }
 
 const VALID_CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
 
-const VISION_PROMPT = `Analyze this stock photo. Respond with ONLY valid JSON — no markdown fences, no explanation.
+function visionPrompt(primaryLanguage: "ko" | "en") {
+  const primary = primaryLanguage === "ko" ? "Korean" : "English";
+  const secondary = primaryLanguage === "ko" ? "English" : "Korean";
+  return `Analyze this stock photo. Generate ${primary} first, then a faithful ${secondary} translation. Respond with ONLY valid JSON — no markdown fences, no explanation.
 
 {
-  "title": "<short evocative title for this photo, max 6 words, title case>",
-  "caption": "<one factual English sentence describing the photo, max 20 words>",
-  "tags": ["<up to 10 lowercase English keywords that describe the image content>"],
+  "title": "<primary-language title, short and factual>",
+  "caption": "<primary-language factual sentence describing the photo, max 25 words>",
+  "tags": ["<up to 10 primary-language keywords>"],
+  "title_ko": "<Korean title>",
+  "title_en": "<English title, max 6 words, title case>",
+  "caption_ko": "<one factual Korean sentence, max 25 words>",
+  "caption_en": "<one factual English sentence, max 20 words>",
+  "tags_ko": ["<up to 10 Korean keywords>"],
+  "tags_en": ["<up to 10 lowercase English keywords>"],
   "category": "<exactly one of: nature | people | editorial | urban | abstract | architecture>"
 }`;
+}
 
-function parseJsonResponse(raw: string): { title: string; caption: string; tags: string[]; category: string } | null {
+function normalizeTags(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((t: unknown) => typeof t === "string").map((t: string) => t.toLowerCase().trim()).filter(Boolean).slice(0, 10)
+    : [];
+}
+
+function parseJsonResponse(raw: string): AnalyzeResponse | null {
   try {
     const cleaned = raw.trim().startsWith("```")
       ? raw.trim().replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "")
@@ -29,18 +51,33 @@ function parseJsonResponse(raw: string): { title: string; caption: string; tags:
     const parsed = JSON.parse(cleaned);
     const title: string = typeof parsed.title === "string" ? parsed.title.trim() : "";
     const caption: string = typeof parsed.caption === "string" ? parsed.caption.trim() : "";
-    const tags: string[] = Array.isArray(parsed.tags)
-      ? parsed.tags.filter((t: unknown) => typeof t === "string").map((t: string) => t.toLowerCase().trim()).slice(0, 10)
-      : [];
+    const tags = normalizeTags(parsed.tags);
+    const title_ko = typeof parsed.title_ko === "string" ? parsed.title_ko.trim() : "";
+    const title_en = typeof parsed.title_en === "string" ? parsed.title_en.trim() : "";
+    const caption_ko = typeof parsed.caption_ko === "string" ? parsed.caption_ko.trim() : "";
+    const caption_en = typeof parsed.caption_en === "string" ? parsed.caption_en.trim() : "";
+    const tags_ko = normalizeTags(parsed.tags_ko);
+    const tags_en = normalizeTags(parsed.tags_en);
     const category: string = VALID_CATEGORIES.includes(parsed.category) ? parsed.category : "";
-    return { title, caption, tags, category };
+    return {
+      title: title || title_ko || title_en,
+      caption: caption || caption_ko || caption_en,
+      tags: tags.length > 0 ? tags : tags_ko.length > 0 ? tags_ko : tags_en,
+      title_ko: title_ko || title,
+      title_en: title_en || title,
+      caption_ko: caption_ko || caption,
+      caption_en: caption_en || caption,
+      tags_ko: tags_ko.length > 0 ? tags_ko : tags,
+      tags_en: tags_en.length > 0 ? tags_en : tags,
+      category,
+    };
   } catch {
     return null;
   }
 }
 
 // ── Vision: Mistral pixtral-12b ────────────────────────────────────────────
-async function analyzeWithMistral(dataUrl: string): Promise<AnalyzeResponse> {
+async function analyzeWithMistral(dataUrl: string, primaryLanguage: "ko" | "en"): Promise<AnalyzeResponse> {
   const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -54,7 +91,7 @@ async function analyzeWithMistral(dataUrl: string): Promise<AnalyzeResponse> {
           role: "user",
           content: [
             { type: "image_url", image_url: { url: dataUrl } },
-            { type: "text", text: VISION_PROMPT },
+            { type: "text", text: visionPrompt(primaryLanguage) },
           ],
         },
       ],
@@ -78,7 +115,7 @@ async function analyzeWithMistral(dataUrl: string): Promise<AnalyzeResponse> {
 }
 
 // ── Vision: Google Gemini flash-lite ──────────────────────────────────────
-async function analyzeWithGemini(base64Data: string, mimeType: string): Promise<AnalyzeResponse> {
+async function analyzeWithGemini(base64Data: string, mimeType: string, primaryLanguage: "ko" | "en"): Promise<AnalyzeResponse> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
     {
@@ -89,7 +126,7 @@ async function analyzeWithGemini(base64Data: string, mimeType: string): Promise<
           {
             parts: [
               { inline_data: { mime_type: mimeType, data: base64Data } },
-              { text: VISION_PROMPT },
+              { text: visionPrompt(primaryLanguage) },
             ],
           },
         ],
@@ -113,7 +150,7 @@ async function analyzeWithGemini(base64Data: string, mimeType: string): Promise<
 }
 
 // ── Vision: Groq llama-3.2-11b-vision ────────────────────────────────────────
-async function analyzeWithGroqVision(dataUrl: string): Promise<AnalyzeResponse> {
+async function analyzeWithGroqVision(dataUrl: string, primaryLanguage: "ko" | "en"): Promise<AnalyzeResponse> {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
@@ -124,7 +161,7 @@ async function analyzeWithGroqVision(dataUrl: string): Promise<AnalyzeResponse> 
           role: "user",
           content: [
             { type: "image_url", image_url: { url: dataUrl } },
-            { type: "text", text: VISION_PROMPT },
+            { type: "text", text: visionPrompt(primaryLanguage) },
           ],
         },
       ],
@@ -150,6 +187,7 @@ async function analyzeWithGroqVision(dataUrl: string): Promise<AnalyzeResponse> 
 async function analyzeWithGroqText(body: {
   filename?: string;
   exifData?: { locationLabel?: string; camera?: string; takenAt?: string };
+  primaryLanguage: "ko" | "en";
 }): Promise<AnalyzeResponse> {
   const fileBase = (body.filename ?? "")
     .replace(/\.[^/.]+$/, "")
@@ -168,16 +206,24 @@ async function analyzeWithGroqText(body: {
 
   if (parts.length === 0) throw new Error("No metadata to analyze");
 
-  const prompt = `You are a stock photo metadata specialist.
+  const primary = body.primaryLanguage === "ko" ? "Korean" : "English";
+  const secondary = body.primaryLanguage === "ko" ? "English" : "Korean";
+  const prompt = `You are a stock photo metadata specialist. Generate ${primary} first, then a faithful ${secondary} translation.
 
 Photo metadata:
 ${parts.join("\n")}
 
 Respond with ONLY valid JSON:
 {
-  "title": "<short evocative title, max 6 words, title case>",
-  "caption": "<one factual English sentence, max 20 words>",
-  "tags": ["<up to 10 lowercase English keywords>"],
+  "title": "<primary-language title>",
+  "caption": "<primary-language factual sentence>",
+  "tags": ["<up to 10 primary-language keywords>"],
+  "title_ko": "<Korean title>",
+  "title_en": "<English title, max 6 words, title case>",
+  "caption_ko": "<one factual Korean sentence>",
+  "caption_en": "<one factual English sentence, max 20 words>",
+  "tags_ko": ["<up to 10 Korean keywords>"],
+  "tags_en": ["<up to 10 lowercase English keywords>"],
   "category": "<one of: nature | people | editorial | urban | abstract | architecture>"
 }`;
 
@@ -209,6 +255,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
   let body: {
     imageBase64?: string;
     filename?: string;
+    language?: "ko" | "en";
     exifData?: { locationLabel?: string; camera?: string; takenAt?: string; lat?: number; lng?: number };
   };
 
@@ -219,6 +266,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
   }
 
   const { imageBase64, filename, exifData } = body;
+  const primaryLanguage = body.language === "en" ? "en" : "ko";
 
   // Parse data URL once (shared by vision providers)
   let dataUrl = "";
@@ -239,7 +287,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
   // 1. Try Groq vision (llama-3.2-11b-vision-preview) — free tier, primary
   if (process.env.GROQ_API_KEY && dataUrl) {
     try {
-      const result = await analyzeWithGroqVision(dataUrl);
+      const result = await analyzeWithGroqVision(dataUrl, primaryLanguage);
       return NextResponse.json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -251,7 +299,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
   // 2. Try Mistral vision (pixtral-12b) — backup
   if (process.env.MISTRAL_API_KEY && dataUrl) {
     try {
-      const result = await analyzeWithMistral(dataUrl);
+      const result = await analyzeWithMistral(dataUrl, primaryLanguage);
       return NextResponse.json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -263,7 +311,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
   // 3. Try Gemini vision (gemini-2.0-flash-lite)
   if (process.env.GEMINI_API_KEY && base64Data) {
     try {
-      const result = await analyzeWithGemini(base64Data, mimeType);
+      const result = await analyzeWithGemini(base64Data, mimeType, primaryLanguage);
       return NextResponse.json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -275,7 +323,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
   // 4. Last resort: Groq text + filename/EXIF (no vision)
   if (process.env.GROQ_API_KEY && (filename || exifData)) {
     try {
-      const result = await analyzeWithGroqText({ filename, exifData });
+      const result = await analyzeWithGroqText({ filename, exifData, primaryLanguage });
       return NextResponse.json(result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

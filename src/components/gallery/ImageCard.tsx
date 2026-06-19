@@ -13,6 +13,8 @@ export interface ImageCardData {
   id: string;
   assetId?: string;
   title: string;
+  titleKo?: string | null;
+  titleEn?: string | null;
   category: string;
   src: string;
   alt: string;
@@ -47,6 +49,9 @@ export function ImageCard({
   const [cartAdded, setCartAdded] = useState(false);
   const addItem = useCart((s) => s.addItem);
   const router = useRouter();
+  const displayTitle = lang === "ko"
+    ? image.titleKo || image.title
+    : image.titleEn || image.title;
 
   async function handleFavorite() {
     if (favoriting) return;
@@ -76,13 +81,14 @@ export function ImageCard({
     addItem({
       id: image.id,
       assetId: image.assetId,
-      title: image.title,
+      title: displayTitle,
       photographer: image.photographer ?? "",
       src: image.src,
       category: image.category,
       license: "editorial",
       creditLine: creditLineForName(image.photographer),
       usageConditions: usageConditions.map((condition) => condition.label),
+      freeUsagePolicy: image.freeUsagePolicy,
     });
     onAddToCart?.(image.id);
     setCartAdded(true);
@@ -126,7 +132,7 @@ export function ImageCard({
               {image.category}
             </p>
             <h3 className="font-headline font-bold text-sm tracking-tight truncate">
-              {image.title}
+              {displayTitle}
             </h3>
             {image.photographer && (
               <p className="text-[10px] opacity-60 mt-0.5 truncate">{image.photographer}</p>

@@ -30,7 +30,7 @@ export async function GET(
   const [{ data: image, error: imageError }, { data: overrides, error: overridesError }] = await Promise.all([
     admin
       .from("images")
-      .select("id, asset_id, title, description, category, tags, status, is_published, storage_path_preview")
+      .select("id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, is_published, storage_path_preview")
       .eq("id", id)
       .single(),
     admin
@@ -72,16 +72,22 @@ export async function PATCH(
     .from("images")
     .update({
       title,
+      title_ko: stringValue(body.title_ko, 200) || title,
+      title_en: stringValue(body.title_en, 200) || title,
       description: stringValue(body.description, 5000) || null,
+      description_ko: stringValue(body.description_ko, 5000) || stringValue(body.description, 5000) || null,
+      description_en: stringValue(body.description_en, 5000) || stringValue(body.description, 5000) || null,
       category,
       tags: normalizeTags(body.tags),
+      tags_ko: normalizeTags(body.tags_ko),
+      tags_en: normalizeTags(body.tags_en),
       is_published: isPublished,
       unpublished_at: isPublished ? null : new Date().toISOString(),
       unpublished_reason: isPublished ? null : "관리자 상세 편집",
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .select("id, asset_id, title, description, category, tags, status, is_published, storage_path_preview")
+    .select("id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, is_published, storage_path_preview")
     .single();
 
   if (imageError || !image) return NextResponse.json({ error: imageError?.message ?? "Image update failed" }, { status: 500 });

@@ -259,6 +259,14 @@ export default function NewUploadPage() {
   const [preview, setPreview]   = useState<string | null>(null);
   const [title, setTitle]       = useState("");
   const [description, setDesc]  = useState("");
+  const [localizedDraft, setLocalizedDraft] = useState({
+    title_ko: "",
+    title_en: "",
+    description_ko: "",
+    description_en: "",
+    tags_ko: [] as string[],
+    tags_en: [] as string[],
+  });
   const [category, setCategory] = useState<Category>("nature");
   const [tags, setTags]         = useState("");
   // 촬영일시: ISO date string | "unknown" | ""
@@ -343,6 +351,7 @@ export default function NewUploadPage() {
         body: JSON.stringify({
           imageBase64,
           filename: f.name,
+          language: lang,
           exifData: exif
             ? {
                 locationLabel: exif.locationLabel ?? undefined,
@@ -357,12 +366,31 @@ export default function NewUploadPage() {
 
       if (!aiRes.ok) { setAiStatus("failed"); return; }
 
-      const { title: aiTitle, caption, tags: aiTags, category: aiCategory } = await aiRes.json();
+      const {
+        title: aiTitle,
+        caption,
+        tags: aiTags,
+        category: aiCategory,
+        title_ko,
+        title_en,
+        caption_ko,
+        caption_en,
+        tags_ko,
+        tags_en,
+      } = await aiRes.json();
       const filled = !!(aiTitle || caption || (Array.isArray(aiTags) && aiTags.length > 0));
 
       if (aiTitle) setTitle(aiTitle);
       if (caption) setDesc(caption);
       if (Array.isArray(aiTags) && aiTags.length > 0) setTags(aiTags.join(", "));
+      setLocalizedDraft({
+        title_ko: title_ko || (lang === "ko" ? aiTitle : ""),
+        title_en: title_en || (lang === "en" ? aiTitle : ""),
+        description_ko: caption_ko || (lang === "ko" ? caption : ""),
+        description_en: caption_en || (lang === "en" ? caption : ""),
+        tags_ko: Array.isArray(tags_ko) ? tags_ko : lang === "ko" && Array.isArray(aiTags) ? aiTags : [],
+        tags_en: Array.isArray(tags_en) ? tags_en : lang === "en" && Array.isArray(aiTags) ? aiTags : [],
+      });
       if (aiCategory && CATEGORIES.includes(aiCategory as Category)) setCategory(aiCategory as Category);
 
       setAiStatus(filled ? "done" : "failed");
@@ -384,6 +412,9 @@ export default function NewUploadPage() {
     setErrorMsg("");
     setFile(f);
     setTitle("");     // clear title — will be filled by AI
+    setDesc("");
+    setTags("");
+    setLocalizedDraft({ title_ko: "", title_en: "", description_ko: "", description_en: "", tags_ko: [], tags_en: [] });
     setImgWidth(null); setImgHeight(null);
     setRotationDegrees(0);
     setFactualityAgreed(false);
@@ -466,6 +497,12 @@ export default function NewUploadPage() {
           original_filename: file!.name,
           title: title.trim(),
           description: description.trim(),
+          title_ko: lang === "ko" ? title.trim() : localizedDraft.title_ko,
+          title_en: lang === "en" ? title.trim() : localizedDraft.title_en,
+          description_ko: lang === "ko" ? description.trim() : localizedDraft.description_ko,
+          description_en: lang === "en" ? description.trim() : localizedDraft.description_en,
+          tags_ko: lang === "ko" ? tagList : localizedDraft.tags_ko,
+          tags_en: lang === "en" ? tagList : localizedDraft.tags_en,
           category,
           tags: tagList,
           storage_path_original: storagePath,

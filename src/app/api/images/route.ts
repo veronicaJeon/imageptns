@@ -7,6 +7,8 @@ interface ImageListRow {
   id: string;
   asset_id: string | null;
   title: string;
+  title_ko: string | null;
+  title_en: string | null;
   category: string;
   tags: string[] | null;
   storage_path_preview: string | null;
@@ -22,6 +24,8 @@ interface SearchImageRpcRow {
   id: string;
   asset_id: string | null;
   title: string;
+  title_ko?: string | null;
+  title_en?: string | null;
   category: string;
   storage_path_preview: string | null;
   width: number | null;
@@ -57,7 +61,7 @@ export async function GET(req: NextRequest) {
   let q = supabase
     .from("images")
     .select(
-      "id, asset_id, title, category, tags, storage_path_preview, width, height, photographer_id, copyright_license, free_usage_policy, photographer:profiles!photographer_id(full_name)"
+      "id, asset_id, title, title_ko, title_en, category, tags, storage_path_preview, width, height, photographer_id, copyright_license, free_usage_policy, photographer:profiles!photographer_id(full_name)"
     )
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
@@ -118,6 +122,8 @@ export async function GET(req: NextRequest) {
           id:           img.id,
           assetId:      img.asset_id,
           title:        img.title,
+          titleKo:      img.title_ko,
+          titleEn:      img.title_en,
           category:     img.category,
           photographerId: img.photographer_id ?? null,
           photographer: img.photographer_name ?? "",
@@ -163,6 +169,8 @@ export async function GET(req: NextRequest) {
       id:           img.id,
       assetId:      img.asset_id,
       title:        img.title,
+      titleKo:      img.title_ko,
+      titleEn:      img.title_en,
       category:     img.category,
       photographerId: img.photographer_id,
       photographer: firstPhotographer(img.photographer)?.full_name ?? "",

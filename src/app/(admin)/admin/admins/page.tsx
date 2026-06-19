@@ -7,11 +7,15 @@ interface AdminUserRow {
   full_name: string | null;
   email: string;
   role: "buyer" | "photographer";
+  roles?: Array<"buyer" | "photographer"> | null;
   is_admin: boolean;
   created_at: string;
   last_login_at: string | null;
   login_count: number | null;
 }
+
+type SortKey = "member" | "admin" | "lastLogin" | "loginCount";
+type SortDirection = "asc" | "desc";
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "-";
@@ -24,6 +28,7 @@ export default function AdminAccountsPage() {
   const [adminOnly, setAdminOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: "member", direction: "asc" });
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -64,6 +69,48 @@ export default function AdminAccountsPage() {
     }
   }
 
+  function userRoles(user: AdminUserRow) {
+    const roles = Array.isArray(user.roles) && user.roles.length > 0 ? user.roles : [user.role];
+    return Array.from(new Set(roles));
+  }
+
+  function toggleSort(key: SortKey) {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
+    }));
+  }
+
+  function sortIndicator(key: SortKey) {
+    if (sort.key !== key) return "unfold_more";
+    return sort.direction === "asc" ? "arrow_upward" : "arrow_downward";
+  }
+
+  const sortedUsers = [...users].sort((a, b) => {
+    const direction = sort.direction === "asc" ? 1 : -1;
+    if (sort.key === "member") {
+      const left = `${a.full_name ?? ""} ${a.email ?? ""}`.trim().toLowerCase();
+      const right = `${b.full_name ?? ""} ${b.email ?? ""}`.trim().toLowerCase();
+      return left.localeCompare(right, "ko") * direction;
+    }
+    if (sort.key === "admin") {
+      return (Number(a.is_admin) - Number(b.is_admin)) * direction;
+    }
+    if (sort.key === "lastLogin") {
+      const left = a.last_login_at ? new Date(a.last_login_at).getTime() : 0;
+      const right = b.last_login_at ? new Date(b.last_login_at).getTime() : 0;
+      return (left - right) * direction;
+    }
+    return ((a.login_count ?? 0) - (b.login_count ?? 0)) * direction;
+  });
+
+  const sortableHeaders: Array<{ key: SortKey; label: string }> = [
+    { key: "member", label: "회원" },
+    { key: "admin", label: "관리자" },
+    { key: "lastLogin", label: "최종 로그인" },
+    { key: "loginCount", label: "로그인 수" },
+  ];
+
   return (
     <div className="p-6 md:p-10">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -90,15 +137,26 @@ export default function AdminAccountsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-outline-variant/20">
-              {["회원", "역할", "관리자", "최종 로그인", "로그인 수", ""].map((head) => (
-                <th key={head} className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">{head}</th>
+              {sortableHeaders.map((head) => (
+                <th key={head.key} className="px-5 py-4 text-left">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort(head.key)}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-outline hover:text-on-surface"
+                  >
+                    {head.label}
+                    <span className="material-symbols-outlined text-sm">{sortIndicator(head.key)}</span>
+                  </button>
+                </th>
               ))}
+              <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">역할</th>
+              <th className="px-5 py-4" />
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/20">
             {loading ? (
               <tr><td colSpan={6} className="px-5 py-12 text-center text-outline">불러오는 중...</td></tr>
-            ) : users.map((user) => {
+            ) : sortedUsers.map((user) => {
               const isSaving = savingId === user.id;
               return (
                 <tr key={user.id} className="hover:bg-surface-container-low">
@@ -106,7 +164,6 @@ export default function AdminAccountsPage() {
                     <p className="font-semibold text-on-surface">{user.full_name || "이름 없음"}</p>
                     <p className="text-xs text-outline">{user.email || user.id}</p>
                   </td>
-                  <td className="px-5 py-4 text-on-surface-variant">{user.role === "photographer" ? "사진작가" : "바이어"}</td>
                   <td className="px-5 py-4">
                     <span className={`rounded-full px-3 py-1 text-xs font-bold ${user.is_admin ? "bg-primary/10 text-primary" : "bg-surface-container-low text-outline"}`}>
                       {user.is_admin ? "관리자" : "일반"}
@@ -114,6 +171,18 @@ export default function AdminAccountsPage() {
                   </td>
                   <td className="px-5 py-4 text-on-surface-variant">{formatDate(user.last_login_at)}</td>
                   <td className="px-5 py-4 font-semibold text-on-surface">{user.login_count ?? 0}</td>
+                  <td className="px-5 py-4">
+                    <div className="flex flex-wrap gap-1.5">
+                      {userRoles(user).map((role) => (
+                        <span
+                          key={role}
+                          className="rounded-full bg-surface-container-low px-2.5 py-1 text-[11px] font-bold text-on-surface-variant"
+                        >
+                          {role === "photographer" ? "사진작가" : "바이어"}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
                   <td className="px-5 py-4 text-right">
                     <button
                       onClick={() => setAdmin(user, !user.is_admin)}
@@ -134,4 +203,3 @@ export default function AdminAccountsPage() {
     </div>
   );
 }
-
