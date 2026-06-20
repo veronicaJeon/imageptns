@@ -58,6 +58,8 @@ export default function SettingsPage() {
   const [upgradeDone, setUpgradeDone] = useState(false);
   const [walletConnecting, setWalletConnecting] = useState(false);
   const [walletError, setWalletError] = useState("");
+  const [withdrawalLoading, setWithdrawalLoading] = useState(false);
+  const [withdrawalRequested, setWithdrawalRequested] = useState(false);
 
   // Load subscription
   useEffect(() => {
@@ -168,6 +170,23 @@ export default function SettingsPage() {
       }
     } finally {
       setUpgradeLoading(false);
+    }
+  }
+
+  async function handleRequestWithdrawal() {
+    if (!confirm("계정 삭제 요청을 접수하시겠습니까?\n구매, 판매, 정산, 온체인 증명 이력이 있는 경우 관리자가 정합성을 확인한 뒤 처리합니다.")) return;
+    setWithdrawalLoading(true);
+    try {
+      const res = await fetch("/api/profile/withdrawal-request", { method: "POST" });
+      const body = await res.json().catch(() => null) as { error?: string; alreadyExists?: boolean } | null;
+      if (!res.ok) {
+        alert(body?.error ?? "계정 삭제 요청을 접수하지 못했습니다.");
+        return;
+      }
+      setWithdrawalRequested(true);
+      alert(body?.alreadyExists ? "이미 접수된 계정 삭제 검토 요청이 있습니다." : "계정 삭제 검토 요청이 접수되었습니다.");
+    } finally {
+      setWithdrawalLoading(false);
     }
   }
 
@@ -418,10 +437,10 @@ export default function SettingsPage() {
             <div className="flex items-start gap-3">
               <span className="material-symbols-outlined text-xl text-outline mt-0.5">shopping_bag</span>
               <div>
-                <p className="text-sm font-bold text-on-surface">현재 역할: 이미지 바이어</p>
+                <p className="text-sm font-bold text-on-surface">현재 역할: 바이어</p>
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
                   사진가로 전환하면 이미지를 업로드하고 판매할 수 있습니다.<br />
-                  기존 이미지 바이어 기능(즐겨찾기, 주문 내역 등)은 그대로 유지됩니다.
+                  기존 바이어 기능(즐겨찾기, 주문 내역 등)은 그대로 유지됩니다.
                 </p>
               </div>
             </div>
@@ -546,10 +565,20 @@ export default function SettingsPage() {
         <h2 className="text-xs font-bold text-error uppercase tracking-widest mb-6 pb-3 border-b border-error/20">
           {s.sections.danger}
         </h2>
-        <div className="flex items-center justify-between gap-4 p-5 bg-error/5 rounded-lg border border-error/20">
-          <p className="text-sm text-on-surface-variant">{s.deleteAccount}</p>
-          <button className="shrink-0 px-4 py-2 text-xs font-bold uppercase tracking-widest text-error border border-error/30 rounded hover:bg-error hover:text-white transition-all">
-            {s.deleteBtn}
+        <div className="flex flex-col gap-4 rounded-lg border border-error/20 bg-error/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-on-surface-variant">{s.deleteAccount}</p>
+            {withdrawalRequested && (
+              <p className="mt-1 text-xs font-semibold text-error">계정 삭제 검토 요청이 접수되었습니다.</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleRequestWithdrawal}
+            disabled={withdrawalLoading || withdrawalRequested}
+            className="shrink-0 rounded border border-error/30 px-4 py-2 text-xs font-bold uppercase tracking-widest text-error transition-all hover:bg-error hover:text-white disabled:opacity-50"
+          >
+            {withdrawalLoading ? "요청 중…" : withdrawalRequested ? "요청 접수됨" : s.deleteBtn}
           </button>
         </div>
       </section>

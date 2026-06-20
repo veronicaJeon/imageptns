@@ -19,7 +19,7 @@ const CART_PAGE_COPY = {
     issuedAt: "발행일",
     itemCount: "항목",
     itemCountSuffix: "건",
-    statementHeaders: ["No.", "이미지", "상품명 / 에셋 ID", "저작자 표시", "사용 조건", "금액"],
+    statementHeaders: ["No.", "이미지", "상품명 / 에셋 ID", "저작자 표시", "선택 옵션", "금액"],
     statementNotice: "본 내역서는 장바구니 기준 견적용 문서입니다. 실제 결제 금액과 라이선스 조건은 결제 시점의 상품 가격정책 및 저작권 정책을 기준으로 확정됩니다.",
     printStatement: "PDF 내역서 인쇄",
     creditLine: "저작자 표시",
@@ -33,7 +33,7 @@ const CART_PAGE_COPY = {
     issuedAt: "Issued",
     itemCount: "Items",
     itemCountSuffix: "",
-    statementHeaders: ["No.", "Image", "Product / Asset ID", "Credit line", "Usage terms", "Amount"],
+    statementHeaders: ["No.", "Image", "Product / Asset ID", "Credit line", "Selected option", "Amount"],
     statementNotice: "This statement is an estimate based on the current cart. Final pricing and license terms are confirmed at checkout according to the active product and copyright policies.",
     printStatement: "Print PDF statement",
     creditLine: "Credit line",
@@ -108,6 +108,23 @@ export default function CartPage() {
 
   return (
     <div className="pt-32 pb-24 px-6 md:px-8 bg-surface min-h-screen">
+      <style>{`
+        @media print {
+          @page { margin: 14mm; }
+          body.printing-cart * { visibility: hidden !important; }
+          body.printing-cart .cart-print-document,
+          body.printing-cart .cart-print-document * { visibility: visible !important; }
+          body.printing-cart .cart-screen-content { display: none !important; }
+          body.printing-cart .cart-print-document {
+            display: block !important;
+            position: absolute !important;
+            inset: 0 auto auto 0 !important;
+            width: 100% !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
       <div className="cart-print-document hidden bg-white text-black">
         <div className="mb-8 flex items-start justify-between gap-8 border-b border-zinc-300 pb-6">
           <div>
@@ -157,7 +174,12 @@ export default function CartPage() {
                   <p className="text-xs font-mono text-zinc-500">{item.assetId ?? item.id}</p>
                 </td>
                 <td className="py-3 pr-3 text-zinc-700">{itemCreditLine(item)}</td>
-                <td className="py-3 pr-3 text-zinc-700">{itemUsageConditions(item, copy.defaultUsageCondition).join(", ")}</td>
+                <td className="py-3 pr-3 text-zinc-700">
+                  <p className="font-semibold text-zinc-950">{c.licenseTypes[item.license]}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                    {itemUsageConditions(item, copy.defaultUsageCondition).join(", ")}
+                  </p>
+                </td>
                 <td className="py-3 text-right font-semibold text-zinc-950">{formatKRW(displayPrice(item.license, item.id), copy.locale)}</td>
               </tr>
             ))}
@@ -216,7 +238,7 @@ export default function CartPage() {
             {/* Item list */}
             <div className="lg:col-span-8 flex flex-col gap-4">
               {items.map((item) => (
-                <div key={item.id} className="bg-surface-container-lowest shadow-ghost p-5 flex gap-5">
+                <div key={item.id} className="bg-surface-container-lowest shadow-ghost p-4 sm:p-5 flex flex-col gap-4 sm:flex-row sm:gap-5">
                   <Link href={`/library/${item.id}`} className="shrink-0">
                     <NextImage
                       src={thumbnailUrlFromPreviewUrl(item.src, 240, 180)}
@@ -249,25 +271,26 @@ export default function CartPage() {
 
                     {/* License selector */}
                     <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-outline">{copy.purchaseOptions}</p>
-                    <div className="flex gap-2 mt-3 flex-wrap">
+                    <div className="grid grid-cols-3 gap-1.5 mt-2 sm:flex sm:flex-wrap sm:gap-2 sm:mt-3">
                       {LICENSE_KEYS.map((key) => (
                         <button
                           key={key}
                           onClick={() => updateLicense(item.id, key)}
                           className={[
-                            "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
+                            "min-w-0 rounded-full border px-1.5 py-1.5 text-[9px] font-bold uppercase leading-tight transition-all sm:px-3 sm:py-1 sm:text-[10px] sm:tracking-widest",
                             item.license === key
                               ? "bg-primary text-white border-primary"
                               : "border-outline-variant text-on-surface-variant hover:border-outline",
                           ].join(" ")}
                         >
-                          {c.licenseTypes[key]} · {formatKRW(displayPrice(key, item.id), copy.locale)}
+                          <span className="block truncate">{c.licenseTypes[key]}</span>
+                          <span className="block text-[8px] font-semibold sm:inline sm:text-[10px]"> {formatKRW(displayPrice(key, item.id), copy.locale)}</span>
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end justify-between shrink-0">
+                  <div className="flex items-center justify-between sm:flex-col sm:items-end sm:shrink-0">
                     <button
                       onClick={() => removeItem(item.id)}
                       className="text-outline hover:text-error transition-colors"

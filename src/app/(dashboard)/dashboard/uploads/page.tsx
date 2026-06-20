@@ -344,12 +344,12 @@ export default function UploadsPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">{up.title}</h1>
+    <div className="p-4 md:p-10">
+      <div className="flex items-center justify-between gap-3 mb-6 md:mb-8">
+        <h1 className="font-headline text-xl font-extrabold text-on-surface tracking-tight md:text-2xl">{up.title}</h1>
         <a
           href="/dashboard/uploads/new"
-          className="flex items-center gap-2 px-5 py-3 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
+          className="flex shrink-0 items-center gap-1.5 rounded bg-primary px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 md:gap-2 md:px-5 md:py-3 md:text-xs"
         >
           <span className="material-symbols-outlined text-base">cloud_upload</span>
           {up.uploadBtn}
@@ -364,7 +364,7 @@ export default function UploadsPage() {
       ) : (
         <>
           {/* Status filter tabs */}
-          <div className="flex gap-1 mb-4 border-b border-outline-variant/20">
+          <div className="-mx-1 mb-4 flex gap-1 overflow-x-auto border-b border-outline-variant/20 px-1">
             {(Object.keys(copy.filterTabs) as StatusFilter[]).map((key) => {
               const tab = { key, label: copy.filterTabs[key] };
               const count =
@@ -379,7 +379,7 @@ export default function UploadsPage() {
                     setActiveFilter(tab.key);
                     setEditing(null);
                   }}
-                  className={`px-4 py-2.5 text-xs font-bold uppercase tracking-widest border-b-2 -mb-px transition-colors ${
+                  className={`shrink-0 whitespace-nowrap px-2.5 py-2 text-[11px] font-bold uppercase tracking-wide border-b-2 -mb-px transition-colors md:px-4 md:py-2.5 md:text-xs md:tracking-widest ${
                     isActive
                       ? "border-primary text-primary"
                       : "border-transparent text-outline hover:text-on-surface"
@@ -406,8 +406,8 @@ export default function UploadsPage() {
               <p className="text-sm">{copy.empty[activeFilter]}</p>
             </div>
           ) : (
-            <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="-mx-4 overflow-x-auto bg-surface-container-lowest shadow-ghost md:mx-0">
+              <table className="min-w-[820px] w-full text-sm">
                 <thead>
                   <tr className="border-b border-outline-variant/20">
                     <th className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">{c.image}</th>

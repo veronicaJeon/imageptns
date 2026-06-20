@@ -268,14 +268,14 @@ function EarningsInner() {
   const chartData = [...periods].reverse().slice(-5);
 
   return (
-    <div className="p-6 md:p-10">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">{e.title}</h1>
+    <div className="p-4 md:p-10">
+      <div className="flex items-center justify-between gap-3 mb-6 md:mb-8">
+        <h1 className="font-headline text-xl font-extrabold text-on-surface tracking-tight md:text-2xl">{e.title}</h1>
         {currentPeriodData && !currentPeriodData.paid && (
           <button
             onClick={() => requestPayout(currentPeriodData.period)}
             disabled={payoutLoading}
-            className="flex items-center gap-2 px-5 py-3 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="flex shrink-0 items-center gap-1.5 rounded bg-primary px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50 md:gap-2 md:px-5 md:py-3 md:text-xs"
           >
             <span className="material-symbols-outlined text-base">payments</span>
             {e.payoutBtn}
@@ -377,8 +377,8 @@ function EarningsInner() {
             </div>
           </div>
 
-          <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="-mx-4 overflow-x-auto bg-surface-container-lowest shadow-ghost md:mx-0">
+            <table className="min-w-[920px] w-full text-sm">
               <thead>
                 <tr className="border-b border-outline-variant/20">
                   {["Status", "Review", "Image", "Gross / Commission / Net", "Claimable", "Claim Tx", "Created"].map((h) => (
@@ -453,8 +453,8 @@ function EarningsInner() {
           <p>No earnings yet</p>
         </div>
       ) : (
-        <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="-mx-4 overflow-x-auto bg-surface-container-lowest shadow-ghost md:mx-0">
+          <table className="min-w-[720px] w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
                 {["Period", "Sales", "Gross", "Commission", "Net Payout", "Status"].map((h) => (

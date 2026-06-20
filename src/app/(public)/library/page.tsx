@@ -312,15 +312,21 @@ export default function LibraryPage() {
                 type="button"
                 onClick={() => setMobileFiltersOpen((value) => !value)}
                 className={[
-                  "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors",
+                  "relative inline-flex h-9 w-9 items-center justify-center rounded-full border text-xs font-bold transition-colors",
                   mobileFiltersOpen || activeFilterCount > 0
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-outline-variant bg-surface-container-lowest text-on-surface-variant",
                 ].join(" ")}
                 aria-expanded={mobileFiltersOpen}
+                aria-label={copy.filter}
+                title={copy.filter}
               >
                 <span className="material-symbols-outlined text-base">tune</span>
-                {copy.filter}{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
+                {activeFilterCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] leading-none text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
               </button>
               <select
                 value={sort}

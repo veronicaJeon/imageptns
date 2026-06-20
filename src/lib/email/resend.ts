@@ -109,7 +109,7 @@ export async function sendImageApproved(opts: {
       <p>제출하신 이미지가 검토를 통과하여 라이브러리에 게시되었습니다.</p>
       <p><strong>이미지:</strong> ${opts.imageTitle}</p>
       <p><strong>에셋 ID:</strong> ${opts.assetId}</p>
-      <p>이미지 바이어들이 이미지를 검색하고 라이선스를 구매할 수 있습니다.</p>
+      <p>바이어들이 이미지를 검색하고 라이선스를 구매할 수 있습니다.</p>
       <br><p>Image Partners 팀 드림</p>
     `,
   });
