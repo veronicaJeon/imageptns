@@ -1,0 +1,170 @@
+import "server-only";
+
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  assessHardDeleteEligibility,
+  emptyImageReferenceCounts,
+  type HardDeleteEligibility,
+  type HardDeleteImageInput,
+  type ImageReferenceCounts,
+} from "./hard-delete";
+
+export interface HardDeleteImageRow extends HardDeleteImageInput {
+  asset_id: string | null;
+  title: string;
+  photographer_id: string | null;
+  storage_path_preview: string | null;
+  storage_path_full: string | null;
+  storage_path_original: string | null;
+  original_filename: string | null;
+  file_size_mb: number | null;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+  photographer?: { full_name: string | null } | { full_name: string | null }[] | null;
+}
+
+export interface HardDeleteCandidate {
+  image: HardDeleteImageRow;
+  referenceCounts: ImageReferenceCounts;
+  eligibility: HardDeleteEligibility;
+}
+
+function first<T>(value: T | T[] | null | undefined): T | null {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+export function photographerName(image: HardDeleteImageRow) {
+  return first(image.photographer)?.full_name ?? null;
+}
+
+async function exactCount(
+  admin: ReturnType<typeof createAdminClient>,
+  table: string,
+  column: string,
+  imageId: string,
+) {
+  const { count, error } = await admin
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq(column, imageId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+async function countViaOrderItems(
+  admin: ReturnType<typeof createAdminClient>,
+  table: "downloads" | "earnings_ledger",
+  imageId: string,
+) {
+  const { count, error } = await admin
+    .from(table)
+    .select("id, order_items!inner(image_id)", { count: "exact", head: true })
+    .eq("order_items.image_id", imageId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function getImageReferenceCounts(
+  admin: ReturnType<typeof createAdminClient>,
+  imageId: string,
+): Promise<ImageReferenceCounts> {
+  const counts = emptyImageReferenceCounts();
+  const [
+    orderItems,
+    downloads,
+    earningsLedger,
+    deletionRequests,
+    sourcingResults,
+    subscriptionDownloads,
+    arweaveFeeOrderItems,
+    favorites,
+    collectionItems,
+    priceOverrides,
+  ] = await Promise.all([
+    exactCount(admin, "order_items", "image_id", imageId),
+    countViaOrderItems(admin, "downloads", imageId),
+    countViaOrderItems(admin, "earnings_ledger", imageId),
+    exactCount(admin, "image_deletion_requests", "image_id", imageId),
+    exactCount(admin, "sourcing_request_results", "image_id", imageId),
+    exactCount(admin, "subscription_downloads", "image_id", imageId),
+    exactCount(admin, "arweave_registration_fee_order_items", "image_id", imageId),
+    exactCount(admin, "favorites", "image_id", imageId),
+    exactCount(admin, "collection_items", "image_id", imageId),
+    exactCount(admin, "image_price_overrides", "image_id", imageId),
+  ]);
+
+  return {
+    ...counts,
+    orderItems,
+    downloads,
+    earningsLedger,
+    deletionRequests,
+    sourcingResults,
+    subscriptionDownloads,
+    arweaveFeeOrderItems,
+    favorites,
+    collectionItems,
+    priceOverrides,
+  };
+}
+
+export async function attachHardDeleteEligibility(
+  admin: ReturnType<typeof createAdminClient>,
+  image: HardDeleteImageRow,
+): Promise<HardDeleteCandidate> {
+  const referenceCounts = await getImageReferenceCounts(admin, image.id);
+  return {
+    image,
+    referenceCounts,
+    eligibility: assessHardDeleteEligibility(image, referenceCounts),
+  };
+}
+
+function uniqueStrings(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+}
+
+export function storagePathsForHardDelete(image: HardDeleteImageRow) {
+  return {
+    originals: uniqueStrings([image.storage_path_original, image.storage_path_full]),
+    previews: uniqueStrings([
+      image.storage_path_preview,
+      image.storage_path_preview ? `thumbs/${image.storage_path_preview}` : null,
+    ]),
+  };
+}
+
+export async function removeHardDeleteStorageFiles(
+  admin: ReturnType<typeof createAdminClient>,
+  image: HardDeleteImageRow,
+) {
+  const paths = storagePathsForHardDelete(image);
+  const errors: string[] = [];
+  let removed = 0;
+
+  if (paths.originals.length > 0) {
+    const { error } = await admin.storage.from("images-original").remove(paths.originals);
+    if (error) errors.push(`original: ${error.message}`);
+    else removed += paths.originals.length;
+  }
+
+  if (paths.previews.length > 0) {
+    const { error } = await admin.storage.from("images-preview").remove(paths.previews);
+    if (error) errors.push(`preview: ${error.message}`);
+    else removed += paths.previews.length;
+  }
+
+  return { paths, errors, removed };
+}
+
+export async function deleteSafeDependentRows(
+  admin: ReturnType<typeof createAdminClient>,
+  imageId: string,
+) {
+  await Promise.all([
+    admin.from("favorites").delete().eq("image_id", imageId),
+    admin.from("collection_items").delete().eq("image_id", imageId),
+    admin.from("image_price_overrides").delete().eq("image_id", imageId),
+  ]);
+}
