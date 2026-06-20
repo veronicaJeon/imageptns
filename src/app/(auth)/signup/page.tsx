@@ -63,21 +63,27 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: name, role, organization: organization.trim() },
-        emailRedirectTo: buildSiteUrl("/api/auth/callback"),
-      },
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, organization, email, password, role }),
     });
-    if (error) {
-      setError(error.message);
+
+    const result = await res.json().catch(() => null) as {
+      error?: string;
+      status?: "confirmation_sent" | "confirmation_resent" | "existing_account" | "signed_in";
+      message?: string;
+    } | null;
+
+    if (!res.ok || result?.error) {
+      setError(result?.error ?? "가입 요청을 처리하지 못했습니다.");
       setLoading(false);
-    } else if (data.session) {
+    } else if (result?.status === "signed_in") {
       // Email confirmations disabled — session issued immediately
       window.location.href = "/dashboard";
+    } else if (result?.status === "existing_account") {
+      setError(result.message ?? "가입 이력이 있는 이메일입니다. 로그인 또는 비밀번호 재설정을 이용해주세요.");
+      setLoading(false);
     } else {
       setEmailSent(true);
       setLoading(false);
