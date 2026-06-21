@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import NextImage from "next/image";
-import { CART_PRINT_CLASS, prepareCartPrint } from "@/lib/cart/print-lifecycle";
-import { cartStatementThumbnailUrl, collectCartStatementThumbnailUrls } from "@/lib/cart/print";
 import { useLang } from "@/lib/i18n/store";
 import { useCart, LicenseType, getLicensePrice } from "@/lib/store/cart";
 import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
@@ -15,13 +13,6 @@ const CART_PAGE_COPY = {
   ko: {
     locale: "ko-KR",
     defaultUsageCondition: "저작자 표시 필요",
-    statementTitle: "장바구니 내역서",
-    quoteNumber: "견적번호",
-    issuedAt: "발행일",
-    itemCount: "항목",
-    itemCountSuffix: "건",
-    statementHeaders: ["No.", "이미지", "상품명 / 에셋 ID", "저작자 표시", "선택 옵션", "금액"],
-    statementNotice: "본 내역서는 장바구니 기준 견적용 문서입니다. 실제 결제 금액과 라이선스 조건은 결제 시점의 상품 가격정책 및 저작권 정책을 기준으로 확정됩니다.",
     printStatement: "PDF 내역서 인쇄",
     creditLine: "저작자 표시",
     purchaseOptions: "구매 옵션",
@@ -29,13 +20,6 @@ const CART_PAGE_COPY = {
   en: {
     locale: "en-US",
     defaultUsageCondition: "Credit required",
-    statementTitle: "Cart statement",
-    quoteNumber: "Quote no.",
-    issuedAt: "Issued",
-    itemCount: "Items",
-    itemCountSuffix: "",
-    statementHeaders: ["No.", "Image", "Product / Asset ID", "Credit line", "Selected option", "Amount"],
-    statementNotice: "This statement is an estimate based on the current cart. Final pricing and license terms are confirmed at checkout according to the active product and copyright policies.",
     printStatement: "Print PDF statement",
     creditLine: "Credit line",
     purchaseOptions: "Purchase option",
@@ -83,147 +67,23 @@ export default function CartPage() {
   const subtotal = items.reduce((s, i) => s + displayPrice(i.license, i.id), 0);
   const vat      = Math.round(subtotal * 0.1);
   const total    = subtotal + vat;
-  const issuedAt = new Date();
-  const quoteNumber = `CART-${issuedAt.toISOString().slice(0, 10).replaceAll("-", "")}`;
-
-  async function preloadStatementThumbnails() {
-    const urls = collectCartStatementThumbnailUrls(items, window.location.origin);
-    await Promise.allSettled(
-      urls.map((url) => new Promise<void>((resolve) => {
-        const img = new window.Image();
-        img.onload = () => resolve();
-        img.onerror = () => resolve();
-        img.src = url;
-      })),
-    );
-  }
-
-  async function handlePrintStatement() {
-    await preloadStatementThumbnails();
-    const cleanup = prepareCartPrint(window);
-    try {
-      window.print();
-    } catch (error) {
-      cleanup();
-      throw error;
-    }
-  }
 
   return (
     <div className="pt-32 pb-24 px-6 md:px-8 bg-surface min-h-screen">
-      <style>{`
-        @media print {
-          @page { margin: 14mm; }
-          body.${CART_PRINT_CLASS} * { visibility: hidden !important; }
-          body.${CART_PRINT_CLASS} .cart-print-document,
-          body.${CART_PRINT_CLASS} .cart-print-document * { visibility: visible !important; }
-          body.${CART_PRINT_CLASS} .cart-screen-content { display: none !important; }
-          body.${CART_PRINT_CLASS} .cart-print-document {
-            display: block !important;
-            position: absolute !important;
-            inset: 0 auto auto 0 !important;
-            width: 100% !important;
-            padding: 0 !important;
-            box-shadow: none !important;
-          }
-        }
-      `}</style>
-      <div className="cart-print-document hidden bg-white text-black">
-        <div className="mb-8 flex items-start justify-between gap-8 border-b border-zinc-300 pb-6">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.25em] text-zinc-500">Image Partners</p>
-            <h1 className="mt-2 text-2xl font-black tracking-tight">{copy.statementTitle}</h1>
-            <p className="mt-2 text-sm text-zinc-600">{copy.quoteNumber} {quoteNumber}</p>
-          </div>
-          <div className="text-right text-sm text-zinc-600">
-            <p>{copy.issuedAt} {issuedAt.toLocaleDateString(copy.locale)}</p>
-            <p>{copy.itemCount} {items.length.toLocaleString(copy.locale)}{copy.itemCountSuffix}</p>
-          </div>
-        </div>
-
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b-2 border-zinc-900">
-              {copy.statementHeaders.map((header) => (
-                <th key={header} className="py-3 text-left text-xs font-bold uppercase tracking-widest text-zinc-600">
-                  {header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item, index) => (
-              <tr key={item.id} className="border-b border-zinc-200">
-                <td className="py-3 pr-3 text-zinc-500">{index + 1}</td>
-                <td className="py-3 pr-3">
-                  {item.src ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={cartStatementThumbnailUrl(item.src, "", 160, 120)}
-                      alt=""
-                      width="64"
-                      height="48"
-                      loading="eager"
-                      decoding="sync"
-                      className="h-12 w-16 rounded object-cover"
-                    />
-                  ) : (
-                    <div className="h-12 w-16 rounded bg-zinc-100" />
-                  )}
-                </td>
-                <td className="py-3 pr-3">
-                  <p className="font-semibold text-zinc-950">{item.title}</p>
-                  <p className="text-xs text-zinc-500">{item.category}</p>
-                  <p className="text-xs font-mono text-zinc-500">{item.assetId ?? item.id}</p>
-                </td>
-                <td className="py-3 pr-3 text-zinc-700">{itemCreditLine(item)}</td>
-                <td className="py-3 pr-3 text-zinc-700">
-                  <p className="font-semibold text-zinc-950">{c.licenseTypes[item.license]}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-                    {itemUsageConditions(item, copy.defaultUsageCondition).join(", ")}
-                  </p>
-                </td>
-                <td className="py-3 text-right font-semibold text-zinc-950">{formatKRW(displayPrice(item.license, item.id), copy.locale)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="ml-auto mt-8 w-72 text-sm">
-          <div className="flex justify-between border-b border-zinc-200 py-2">
-            <span className="text-zinc-600">{c.subtotal}</span>
-            <span className="font-semibold">{formatKRW(subtotal, copy.locale)}</span>
-          </div>
-          <div className="flex justify-between border-b border-zinc-200 py-2">
-            <span className="text-zinc-600">{c.vat}</span>
-            <span className="font-semibold">{formatKRW(vat, copy.locale)}</span>
-          </div>
-          <div className="flex justify-between py-3 text-lg font-black">
-            <span>{c.total}</span>
-            <span>{formatKRW(total, copy.locale)}</span>
-          </div>
-        </div>
-
-        <p className="mt-10 text-xs leading-relaxed text-zinc-500">
-          {copy.statementNotice}
-        </p>
-      </div>
-
-      <div className="max-w-5xl mx-auto cart-screen-content">
+      <div className="max-w-5xl mx-auto">
         <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="font-headline text-3xl font-extrabold text-on-surface tracking-tight">
             {c.title}
             {items.length > 0 && <span className="ml-3 text-sm font-body font-normal text-outline">({items.length})</span>}
           </h1>
           {items.length > 0 && (
-            <button
-              type="button"
-              onClick={handlePrintStatement}
+            <Link
+              href="/cart/statement?print=1"
               className="flex w-fit items-center gap-2 rounded bg-surface-container-lowest px-4 py-3 text-xs font-bold uppercase tracking-widest text-on-surface shadow-ghost transition-colors hover:text-primary"
             >
               <span className="material-symbols-outlined text-base">print</span>
               {copy.printStatement}
-            </button>
+            </Link>
           )}
         </div>
 
