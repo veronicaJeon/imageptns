@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import NextImage from "next/image";
+import { CART_PRINT_CLASS, prepareCartPrint } from "@/lib/cart/print-lifecycle";
 import { cartStatementThumbnailUrl, collectCartStatementThumbnailUrls } from "@/lib/cart/print";
 import { useLang } from "@/lib/i18n/store";
 import { useCart, LicenseType, getLicensePrice } from "@/lib/store/cart";
@@ -99,11 +100,13 @@ export default function CartPage() {
 
   async function handlePrintStatement() {
     await preloadStatementThumbnails();
-    document.body.classList.add("printing-cart");
-    const cleanup = () => document.body.classList.remove("printing-cart");
-    window.addEventListener("afterprint", cleanup, { once: true });
-    window.print();
-    window.setTimeout(cleanup, 1000);
+    const cleanup = prepareCartPrint(window);
+    try {
+      window.print();
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
   }
 
   return (
@@ -111,11 +114,11 @@ export default function CartPage() {
       <style>{`
         @media print {
           @page { margin: 14mm; }
-          body.printing-cart * { visibility: hidden !important; }
-          body.printing-cart .cart-print-document,
-          body.printing-cart .cart-print-document * { visibility: visible !important; }
-          body.printing-cart .cart-screen-content { display: none !important; }
-          body.printing-cart .cart-print-document {
+          body.${CART_PRINT_CLASS} * { visibility: hidden !important; }
+          body.${CART_PRINT_CLASS} .cart-print-document,
+          body.${CART_PRINT_CLASS} .cart-print-document * { visibility: visible !important; }
+          body.${CART_PRINT_CLASS} .cart-screen-content { display: none !important; }
+          body.${CART_PRINT_CLASS} .cart-print-document {
             display: block !important;
             position: absolute !important;
             inset: 0 auto auto 0 !important;
