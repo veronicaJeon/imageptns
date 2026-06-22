@@ -21,7 +21,7 @@ export default function AboutPage() {
     <>
       <NoticePopup />
 
-      <section className="relative flex min-h-[720px] w-full items-center overflow-hidden px-8 md:px-24">
+      <section className="relative flex min-h-[720px] w-full items-center overflow-hidden bg-on-surface px-8 md:px-24">
         <div className="absolute inset-0 z-0">
           <Image
             src={IMAGES.hero}

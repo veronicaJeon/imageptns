@@ -5,7 +5,6 @@ import Image from "next/image";
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/i18n/store";
-import { buildSiteUrl } from "@/lib/routing/canonical";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -23,20 +22,6 @@ function LoginForm() {
   const queryError =
     !hideQueryError && searchParams.get("error") === "oauth" ? a.errorOAuth : null;
   const displayedError = error ?? queryError;
-
-  async function handleGoogleLogin() {
-    setLoading(true);
-    setHideQueryError(true);
-    setError(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: buildSiteUrl("/api/auth/callback"),
-      },
-    });
-    if (error) { setError(a.errorOAuth); setLoading(false); }
-  }
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -71,9 +56,13 @@ function LoginForm() {
       )}
 
       {/* Google OAuth */}
-      <button
-        onClick={handleGoogleLogin}
-        disabled={loading}
+      <a
+        href={`/api/auth/google?next=${encodeURIComponent(searchParams.get("next") ?? "/library")}`}
+        onClick={() => {
+          setLoading(true);
+          setHideQueryError(true);
+          setError(null);
+        }}
         className="w-full min-w-0 min-h-12 px-4 py-3 flex items-center justify-center gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low transition-colors text-sm font-semibold leading-snug text-center text-on-surface disabled:opacity-50 disabled:cursor-not-allowed mb-6"
       >
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="shrink-0">
@@ -83,7 +72,7 @@ function LoginForm() {
           <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
         </svg>
         <span className="min-w-0 break-words">{a.googleBtn}</span>
-      </button>
+      </a>
 
       {/* Divider */}
       <div className="flex items-center gap-4 mb-6">

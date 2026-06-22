@@ -289,10 +289,9 @@ export default function LibraryPage() {
               <>
                 <span>{liveStats.images.toLocaleString(copy.locale)}+ {l.stats.assets.split("+").slice(-1)[0].trim()}</span>
                 <span>{liveStats.photographers.toLocaleString(copy.locale)}+ {l.stats.photographers.split("+").slice(-1)[0].trim()}</span>
-                <span>{l.stats.countries}</span>
               </>
             ) : (
-              Object.values(l.stats).map((stat) => (
+              [l.stats.assets, l.stats.photographers].map((stat) => (
                 <span key={stat}>{stat}</span>
               ))
             )}

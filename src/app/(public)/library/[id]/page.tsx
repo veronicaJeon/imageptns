@@ -236,14 +236,6 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   const uploadedDate = new Date(imageData.approved_at ?? imageData.created_at)
     .toLocaleDateString(copy.locale, { year: "numeric", month: "2-digit", day: "2-digit" });
 
-  const shotAtDate = imageData.exif_taken_at
-    ? new Date(imageData.exif_taken_at).toLocaleDateString(copy.locale, { year: "numeric", month: "2-digit", day: "2-digit" })
-    : null;
-
-  const shotLocation = (imageData.exif_location && imageData.exif_location !== "unknown")
-    ? imageData.exif_location
-    : imageData.exif_location === "unknown" ? copy.unknown : null;
-
   const resolutionStr = imageData.width && imageData.height
     ? `${Number(imageData.width).toLocaleString()} × ${Number(imageData.height).toLocaleString()} px`
     : null;
@@ -291,9 +283,6 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                     className="mx-auto max-h-[78vh] w-auto max-w-full object-contain"
                     unoptimized
                   />
-                  <div className="pointer-events-none absolute bottom-4 right-4 rounded bg-black/55 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white">
-                    Watermarked Preview
-                  </div>
                 </>
               ) : (
                 <div className="aspect-[4/3] flex items-center justify-center text-outline">
@@ -503,8 +492,6 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                 { label: d.resolution,            value: resolutionStr ?? "—" },
                 { label: d.details.size,          value: imageData.file_size_mb ? `${imageData.file_size_mb} MB` : "—" },
                 { label: d.details.uploaded,      value: uploadedDate },
-                shotAtDate    ? { label: d.details.shotAt,       value: shotAtDate }    : null,
-                shotLocation  ? { label: d.details.shotLocation,  value: shotLocation }  : null,
                 { label: d.details.id,            value: imageData.asset_id ?? "—" },
               ]).filter((x): x is { label: string; value: string } => x !== null).map(({ label, value }) => (
                 <div key={label}>
