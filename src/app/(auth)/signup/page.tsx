@@ -42,6 +42,9 @@ export default function SignupPage() {
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
+  const googleSignupUrl = `/api/auth/google?next=${encodeURIComponent(
+    "/dashboard",
+  )}&role=${role}&organization=${encodeURIComponent(organization.trim())}`;
 
   async function handleEmailSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -178,12 +181,14 @@ export default function SignupPage() {
               </div>
 
               {/* Google OAuth */}
-              <a
-                href={`/api/auth/google?next=${encodeURIComponent("/dashboard")}&role=${role}&organization=${encodeURIComponent(organization.trim())}`}
+              <button
+                type="button"
                 onClick={() => {
                   setLoading(true);
                   setError(null);
+                  window.location.assign(googleSignupUrl);
                 }}
+                disabled={loading}
                 className="w-full min-w-0 min-h-12 px-4 py-3 flex items-center justify-center gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low transition-colors text-sm font-semibold leading-snug text-center text-on-surface disabled:opacity-50 disabled:cursor-not-allowed mb-6"
               >
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="shrink-0">
@@ -193,7 +198,7 @@ export default function SignupPage() {
                   <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
                 </svg>
                 <span className="min-w-0 break-words">{a.googleBtn}</span>
-              </a>
+              </button>
 
               {/* Divider */}
               <div className="flex items-center gap-4 mb-6">
