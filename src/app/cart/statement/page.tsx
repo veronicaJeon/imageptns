@@ -131,11 +131,16 @@ function CartStatementInner() {
     <main className="min-h-screen bg-white px-4 py-6 text-black sm:px-8 sm:py-10">
       <style>{`
         @media print {
-          @page { margin: 12mm; }
+          @page { margin: 8mm; }
           body { background: #fff !important; }
           .statement-screen-controls { display: none !important; }
           .statement-page { padding: 0 !important; }
-          .statement-card { box-shadow: none !important; border: 0 !important; max-width: none !important; }
+          .statement-card { box-shadow: none !important; border: 0 !important; max-width: none !important; padding: 0 !important; }
+          .statement-card > div:first-child { margin-bottom: 10px !important; padding-bottom: 10px !important; }
+          .statement-card h1 { font-size: 18px !important; }
+          .statement-grid { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; }
+          .statement-item { padding: 7px !important; page-break-inside: avoid !important; break-inside: avoid !important; }
+          .statement-item img { max-height: 58px !important; }
         }
       `}</style>
 
@@ -168,54 +173,55 @@ function CartStatementInner() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b-2 border-zinc-900">
-                  {copy.statementHeaders.map((header) => (
-                    <th key={header} className="py-3 pr-3 text-left text-xs font-bold uppercase tracking-widest text-zinc-600">
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, index) => (
-                  <tr key={item.id} className="border-b border-zinc-200">
-                    <td className="py-3 pr-3 text-zinc-500">{index + 1}</td>
-                    <td className="py-3 pr-3">
-                      {item.src ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={cartStatementThumbnailUrl(item.src, origin, 160, 120)}
-                          alt=""
-                          width="64"
-                          height="48"
-                          loading="eager"
-                          decoding="sync"
-                          className="h-12 w-16 rounded object-cover"
-                        />
-                      ) : (
-                        <div className="h-12 w-16 rounded bg-zinc-100" />
-                      )}
-                    </td>
-                    <td className="py-3 pr-3">
-                      <p className="font-semibold text-zinc-950">{item.title}</p>
-                      <p className="text-xs text-zinc-500">{item.category}</p>
-                      <p className="text-xs font-mono text-zinc-500">{item.assetId ?? item.id}</p>
-                    </td>
-                    <td className="py-3 pr-3 text-zinc-700">{itemCreditLine(item)}</td>
-                    <td className="py-3 pr-3 text-zinc-700">
-                      <p className="font-semibold text-zinc-950">{c.licenseTypes[item.license]}</p>
-                      <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-                        {itemUsageConditions(item, copy.defaultUsageCondition).join(", ")}
-                      </p>
-                    </td>
-                    <td className="py-3 text-right font-semibold text-zinc-950">{formatKRW(displayPrice(item.license, item.id), copy.locale)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="statement-grid grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((item, index) => (
+              <article key={item.id} className="statement-item break-inside-avoid rounded border border-zinc-200 p-3">
+                <div className="flex gap-3">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded bg-zinc-100">
+                    {item.src ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={cartStatementThumbnailUrl(item.src, origin, 180, 180)}
+                        alt=""
+                        width="80"
+                        height="80"
+                        loading="eager"
+                        decoding="sync"
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-zinc-100" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold text-zinc-500">No. {index + 1}</p>
+                    <p className="mt-1 line-clamp-2 text-xs font-black leading-snug text-zinc-950">{item.title}</p>
+                    <p className="mt-1 truncate font-mono text-[10px] text-zinc-500">{item.assetId ?? item.id}</p>
+                    <p className="mt-1 text-[10px] text-zinc-500">{item.category}</p>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-100 pt-2 text-[10px] leading-snug">
+                  <div>
+                    <p className="font-bold text-zinc-500">{c.license}</p>
+                    <p className="mt-0.5 font-semibold text-zinc-950">{c.licenseTypes[item.license]}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-zinc-500">{copy.statementHeaders[5]}</p>
+                    <p className="mt-0.5 font-black text-zinc-950">{formatKRW(displayPrice(item.license, item.id), copy.locale)}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="font-bold text-zinc-500">{copy.statementHeaders[3]}</p>
+                    <p className="mt-0.5 truncate text-zinc-700">{itemCreditLine(item)}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="font-bold text-zinc-500">{copy.statementHeaders[4]}</p>
+                    <p className="mt-0.5 line-clamp-1 text-zinc-700">
+                      {itemUsageConditions(item, copy.defaultUsageCondition).join(", ")}
+                    </p>
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
 
           <div className="ml-auto mt-8 w-full max-w-72 text-sm">

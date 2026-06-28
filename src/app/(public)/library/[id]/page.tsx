@@ -28,6 +28,7 @@ const IMAGE_DETAIL_COPY = {
     licenseDetails: "라이선스 세부 정보",
     ccOriginal: "Creative Commons 원문 보기",
     buyNow: "바로 구매하고 원본 다운로드",
+    cartAdded: "장바구니에 추가됨",
   },
   en: {
     locale: "en-US",
@@ -40,6 +41,7 @@ const IMAGE_DETAIL_COPY = {
     licenseDetails: "License details",
     ccOriginal: "View Creative Commons deed",
     buyNow: "Buy now and download original",
+    cartAdded: "Added to cart",
   },
 } as const;
 
@@ -233,9 +235,6 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
     lang,
   });
 
-  const uploadedDate = new Date(imageData.approved_at ?? imageData.created_at)
-    .toLocaleDateString(copy.locale, { year: "numeric", month: "2-digit", day: "2-digit" });
-
   const resolutionStr = imageData.width && imageData.height
     ? `${Number(imageData.width).toLocaleString()} × ${Number(imageData.height).toLocaleString()} px`
     : null;
@@ -268,10 +267,10 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
 
       {/* ── Main grid ── */}
       <section className="px-6 md:px-12 pb-24 bg-surface">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12">
 
           {/* Image */}
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-8">
             <div className="relative overflow-hidden shadow-ghost bg-surface-container-low">
               {imageData.storage_path_preview ? (
                 <>
@@ -290,10 +289,69 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               )}
             </div>
+
+            {/* Actions */}
+            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+              <button
+                onClick={handleBuyNow}
+                className="w-full rounded bg-on-surface px-4 py-4 text-xs font-bold uppercase tracking-widest text-surface transition-all flex items-center justify-center gap-2 hover:opacity-90"
+              >
+                <span className="material-symbols-outlined text-base">shopping_bag</span>
+                {copy.buyNow}
+              </button>
+              <button
+                onClick={handleAddToCart}
+                className={cn(
+                  "w-full rounded px-4 py-4 text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2",
+                  cartFeedback === "added"
+                    ? "bg-primary-container text-on-primary-container"
+                    : "bg-primary text-white hover:opacity-90"
+                )}
+              >
+                <span className="material-symbols-outlined text-base">
+                  {cartFeedback === "added" ? "check" : "add_shopping_cart"}
+                </span>
+                {cartFeedback === "added" ? copy.cartAdded : d.addToCart}
+              </button>
+              <div className="flex gap-3 sm:col-span-2">
+                <button
+                  onClick={toggleFavorite}
+                  disabled={favLoading}
+                  className={[
+                    "flex-1 rounded border px-4 py-3 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50",
+                    isFavorited
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-outline-variant text-on-surface-variant hover:border-outline",
+                  ].join(" ")}
+                >
+                  <span
+                    className="material-symbols-outlined text-base"
+                    style={{ fontVariationSettings: isFavorited ? "'FILL' 1" : "'FILL' 0" }}
+                  >
+                    favorite
+                  </span>
+                  {d.favorite}
+                </button>
+                <button
+                  onClick={handleShare}
+                  className={cn(
+                    "flex-1 rounded border px-4 py-3 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
+                    shareFeedback === "copied"
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-outline-variant text-on-surface-variant hover:border-outline"
+                  )}
+                >
+                  <span className="material-symbols-outlined text-base">
+                    {shareFeedback === "copied" ? "check" : "share"}
+                  </span>
+                  {shareFeedback === "copied" ? d.copied : d.share}
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Details panel */}
-          <div className="lg:col-span-5 flex flex-col gap-8">
+          <div className="lg:col-span-4 flex flex-col gap-8">
 
             {/* Meta */}
             <div>
@@ -426,72 +484,12 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
               )}
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={handleBuyNow}
-                className="w-full py-4 bg-on-surface text-surface font-bold text-xs uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 hover:opacity-90"
-              >
-                <span className="material-symbols-outlined text-base">shopping_bag</span>
-                {copy.buyNow}
-              </button>
-              <button
-                onClick={handleAddToCart}
-                className={cn(
-                  "w-full py-4 font-bold text-xs uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2",
-                  cartFeedback === "added"
-                    ? "bg-primary-container text-on-primary-container"
-                    : "bg-primary text-white hover:opacity-90"
-                )}
-              >
-                <span className="material-symbols-outlined text-base">
-                  {cartFeedback === "added" ? "check" : "add_shopping_cart"}
-                </span>
-                {cartFeedback === "added" ? t.cart.addedToCart : d.addToCart}
-              </button>
-              <div className="flex gap-3">
-                <button
-                  onClick={toggleFavorite}
-                  disabled={favLoading}
-                  className={[
-                    "flex-1 py-3 rounded border text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50",
-                    isFavorited
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-outline-variant text-on-surface-variant hover:border-outline",
-                  ].join(" ")}
-                >
-                  <span
-                    className="material-symbols-outlined text-base"
-                    style={{ fontVariationSettings: isFavorited ? "'FILL' 1" : "'FILL' 0" }}
-                  >
-                    favorite
-                  </span>
-                  {d.favorite}
-                </button>
-                <button
-                  onClick={handleShare}
-                  className={cn(
-                    "flex-1 py-3 rounded border text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
-                    shareFeedback === "copied"
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-outline-variant text-on-surface-variant hover:border-outline"
-                  )}
-                >
-                  <span className="material-symbols-outlined text-base">
-                    {shareFeedback === "copied" ? "check" : "share"}
-                  </span>
-                  {shareFeedback === "copied" ? d.copied : d.share}
-                </button>
-              </div>
-            </div>
-
             {/* Asset details */}
             <div className="border-t border-outline-variant/20 pt-6 grid grid-cols-2 gap-4">
               {([
                 { label: d.details.format,       value: imageData.file_format ?? "—" },
                 { label: d.resolution,            value: resolutionStr ?? "—" },
                 { label: d.details.size,          value: imageData.file_size_mb ? `${imageData.file_size_mb} MB` : "—" },
-                { label: d.details.uploaded,      value: uploadedDate },
                 { label: d.details.id,            value: imageData.asset_id ?? "—" },
               ]).filter((x): x is { label: string; value: string } => x !== null).map(({ label, value }) => (
                 <div key={label}>

@@ -133,9 +133,15 @@ interface UploadRow {
   id: string;
   asset_id: string | null;
   title: string;
+  title_ko: string | null;
+  title_en: string | null;
   description: string | null;
+  description_ko: string | null;
+  description_en: string | null;
   category: Category;
   tags: string[] | null;
+  tags_ko: string[] | null;
+  tags_en: string[] | null;
   status: string;
   lifecycle_status: string | null;
   deletion_requested_at: string | null;
@@ -164,6 +170,15 @@ interface UploadRow {
   attribution_name: string | null;
   attribution_url: string | null;
   authorship_declaration: AuthorshipDeclaration | null;
+}
+
+function localizedText(
+  lang: "ko" | "en",
+  fallback: string | null | undefined,
+  ko?: string | null,
+  en?: string | null,
+) {
+  return (lang === "ko" ? ko : en)?.trim() || fallback?.trim() || "";
 }
 
 const TIMELINE_STYLES: Record<TimelineState, string> = {
@@ -430,6 +445,7 @@ export default function UploadsPage() {
                 const uploaded = new Date(img.created_at).toLocaleDateString("en-US", {
                   month: "short", day: "numeric", year: "numeric",
                 });
+                const displayTitle = localizedText(lang, img.title, img.title_ko, img.title_en);
                 const canEdit = true; // 모든 상태에서 편집 가능
                 const isEditing = editing?.id === img.id;
                 const deletionPending = img.lifecycle_status === "deletion_requested";
@@ -439,15 +455,15 @@ export default function UploadsPage() {
                     <tr className={`transition-colors ${isEditing ? "bg-surface-container-low" : "hover:bg-surface-container-low"}`}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-14 h-10 bg-surface-container-low rounded shrink-0 overflow-hidden flex items-center justify-center">
+                          <div className="w-16 h-16 bg-surface-container-low rounded shrink-0 overflow-hidden flex items-center justify-center">
                             {img.storage_path_preview ? (
-                              <Image src={img.storage_path_preview} alt={img.title} width={56} height={40} className="w-full h-full object-cover" />
+                              <Image src={img.storage_path_preview} alt={displayTitle} width={64} height={64} className="w-full h-full object-contain" />
                             ) : (
                               <span className="material-symbols-outlined text-outline text-sm">image</span>
                             )}
                           </div>
                           <div className="min-w-0">
-                            <span className="text-on-surface font-medium max-w-[200px] truncate block">{img.title}</span>
+                            <span className="text-on-surface font-medium max-w-[200px] truncate block">{displayTitle}</span>
                             {img.asset_id && <span className="text-xs text-outline">{img.asset_id}</span>}
                           </div>
                         </div>

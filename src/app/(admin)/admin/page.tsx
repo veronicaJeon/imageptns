@@ -47,9 +47,15 @@ interface ImageRow {
   id: string;
   asset_id: string | null;
   title: string;
+  title_ko: string | null;
+  title_en: string | null;
   description: string | null;
+  description_ko: string | null;
+  description_en: string | null;
   category: string;
   tags: string[] | null;
+  tags_ko: string[] | null;
+  tags_en: string[] | null;
   status: string;
   rejection_reason: string | null;
   storage_path_preview: string | null;
@@ -66,6 +72,10 @@ interface ImageRow {
   proof_status: string | null;
   proof_registered_at: string | null;
   photographer: { id: string; full_name: string; avatar_url: string | null; wallet_address?: string | null } | null;
+}
+
+function displayKo(value: string | null | undefined, fallback: string | null | undefined = "") {
+  return value?.trim() || fallback?.trim() || "-";
 }
 
 export default function AdminPage() {
@@ -178,14 +188,14 @@ export default function AdminPage() {
               <div className="flex gap-0 flex-col sm:flex-row">
 
                 {/* Thumbnail */}
-                <div className="w-full sm:w-48 h-36 sm:h-auto shrink-0 bg-surface-container-low flex items-center justify-center overflow-hidden">
+                <div className="w-full sm:w-48 h-56 sm:h-auto shrink-0 bg-surface-container-low flex items-center justify-center overflow-hidden">
                   {img.storage_path_preview ? (
                     <Image
                       src={img.storage_path_preview}
-                      alt={img.title}
+                      alt={displayKo(img.title_ko, img.title)}
                       width={192}
                       height={144}
-                      className="w-full h-full object-cover"
+                      className="h-full w-full object-contain"
                     />
                   ) : (
                     <span className="material-symbols-outlined text-4xl text-outline">image</span>
@@ -198,13 +208,13 @@ export default function AdminPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="font-headline font-bold text-base text-on-surface truncate">{img.title}</h2>
+                        <h2 className="font-headline font-bold text-base text-on-surface truncate">{displayKo(img.title_ko, img.title)}</h2>
                         {img.asset_id && (
                           <span className="text-[10px] font-mono text-outline bg-surface-container-low px-2 py-0.5 rounded">{img.asset_id}</span>
                         )}
                       </div>
-                      {img.description && (
-                        <p className="text-xs text-on-surface-variant mt-0.5 line-clamp-2">{img.description}</p>
+                      {displayKo(img.description_ko, img.description) !== "-" && (
+                        <p className="text-xs text-on-surface-variant mt-0.5 line-clamp-2">{displayKo(img.description_ko, img.description)}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
@@ -248,7 +258,7 @@ export default function AdminPage() {
                   {/* Tags */}
                   {img.tags && img.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                      {img.tags.slice(0, 8).map((tag) => (
+                      {(img.tags_ko?.length ? img.tags_ko : img.tags).slice(0, 8).map((tag) => (
                         <span key={tag} className="text-[10px] bg-primary/8 text-primary px-2 py-0.5 rounded-full">#{tag}</span>
                       ))}
                     </div>
