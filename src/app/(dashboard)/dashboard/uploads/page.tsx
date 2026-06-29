@@ -5,10 +5,10 @@ import Image from "next/image";
 import { useLang } from "@/lib/i18n/store";
 import { buildUploadProofSteps, type TimelineState } from "@/lib/ux/status";
 import { getCopyrightLicense, getFreeUsagePolicy, getLocalizedCopyrightLicense, getLocalizedFreeUsagePolicy, localizedCopyrightLicenses, localizedFreeUsagePolicies, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
+import { IMAGE_CATEGORIES, isImageCategoryCode, type ImageCategoryCode } from "@/lib/images/categories";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
-const CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
-type Category = typeof CATEGORIES[number];
+type Category = ImageCategoryCode;
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 
@@ -296,7 +296,7 @@ export default function UploadsPage() {
       id:           img.id,
       title:        img.title ?? "",
       description:  img.description ?? "",
-      category:     img.category ?? "nature",
+      category:     isImageCategoryCode(img.category) ? img.category : "nature",
       tags:         Array.isArray(img.tags) ? img.tags.join(", ") : "",
       exif_location: img.exif_location ?? "",
       exif_taken_at: img.exif_taken_at ? img.exif_taken_at.slice(0, 10) : "",
@@ -658,8 +658,8 @@ export default function UploadsPage() {
                                   onChange={(e) => setEditing({ ...editing, category: e.target.value as Category })}
                                   className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all"
                                 >
-                                  {CATEGORIES.map((cat) => (
-                                    <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                                  {IMAGE_CATEGORIES.map((cat) => (
+                                    <option key={cat.code} value={cat.code}>{cat[lang]}</option>
                                   ))}
                                 </select>
                               </div>

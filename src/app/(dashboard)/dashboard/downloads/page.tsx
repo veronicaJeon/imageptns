@@ -35,6 +35,8 @@ interface DownloadOrder {
   order_items: DownloadOrderItem[] | null;
 }
 
+const PAGE_DOWNLOAD_LIMIT = 20;
+
 export default function DownloadsPage() {
   const { lang } = useLang();
   const copy = lang === "ko"
@@ -46,6 +48,9 @@ export default function DownloadsPage() {
         subscriptionDownload: "무료다운",
         downloadCount: (count: number) => `다운로드 ${count}회`,
         download: "다운로드",
+        downloadAll: "전체 다운로드",
+        downloadingAll: "다운로드 준비 중...",
+        limitNotice: (count: number, total: number) => `최근 ${count}개만 표시 중입니다. 전체 ${total}개 중 나머지는 주문 내역에서 확인해 주세요.`,
       }
     : {
         title: "Downloads",
@@ -55,10 +60,14 @@ export default function DownloadsPage() {
         subscriptionDownload: "free download",
         downloadCount: (count: number) => `${count} downloads`,
         download: "Download",
+        downloadAll: "Download all",
+        downloadingAll: "Preparing downloads...",
+        limitNotice: (count: number, total: number) => `Showing the latest ${count} items out of ${total}. Check Orders for older items.`,
       };
   const [orders, setOrders]   = useState<DownloadOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [batchDownloading, setBatchDownloading] = useState(false);
 
   useEffect(() => {
     fetch("/api/orders")
@@ -85,6 +94,17 @@ export default function DownloadsPage() {
     }
   }
 
+  async function fetchDownloadUrl(orderItemId: string) {
+    const res = await fetch(`/api/download/${orderItemId}`);
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: "Download failed" }));
+      throw new Error(error ?? "Download failed");
+    }
+    const { url } = await res.json() as { url?: string };
+    if (!url) throw new Error("Download URL missing");
+    return url;
+  }
+
   const items = orders.flatMap((order) =>
     (order.order_items ?? []).map((item) => ({
       orderId:     order.id,
@@ -105,6 +125,25 @@ export default function DownloadsPage() {
       imageDeletionNotice: item.image_deletion_notice,
     }))
   );
+  const visibleItems = items.slice(0, PAGE_DOWNLOAD_LIMIT);
+
+  async function handleDownloadAll() {
+    if (visibleItems.length === 0 || batchDownloading) return;
+    setBatchDownloading(true);
+    try {
+      for (const [index, item] of visibleItems.entries()) {
+        try {
+          const url = await fetchDownloadUrl(item.itemId);
+          window.setTimeout(() => window.open(url, "_blank"), index * 350);
+        } catch (error) {
+          alert(error instanceof Error ? error.message : "Download failed");
+          break;
+        }
+      }
+    } finally {
+      window.setTimeout(() => setBatchDownloading(false), visibleItems.length * 350);
+    }
+  }
 
   if (loading) {
     return (
@@ -116,9 +155,25 @@ export default function DownloadsPage() {
 
   return (
     <div className="p-6 md:p-10">
-      <h1 className="font-headline text-2xl font-extrabold text-on-surface mb-8 tracking-tight">
-        {copy.title}
-      </h1>
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">
+          {copy.title}
+        </h1>
+        {items.length > 0 && (
+          <button
+            type="button"
+            onClick={handleDownloadAll}
+            disabled={batchDownloading}
+            className="inline-flex w-fit items-center gap-2 rounded-lg bg-primary px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {batchDownloading
+              ? <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              : <span className="material-symbols-outlined text-base">download</span>
+            }
+            {batchDownloading ? copy.downloadingAll : copy.downloadAll}
+          </button>
+        )}
+      </div>
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center py-32 gap-4 text-outline">
@@ -130,6 +185,11 @@ export default function DownloadsPage() {
         </div>
       ) : (
         <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
+          {items.length > visibleItems.length && (
+            <p className="px-6 pt-4 text-xs text-outline">
+              {copy.limitNotice(visibleItems.length, items.length)}
+            </p>
+          )}
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
@@ -139,7 +199,7 @@ export default function DownloadsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20">
-              {items.map((row) => {
+              {visibleItems.map((row) => {
                 const date = row.completedAt
                   ? new Date(row.completedAt).toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", { month: "short", day: "numeric", year: "numeric" })
                   : "—";

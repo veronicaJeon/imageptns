@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { imageCategoryPromptList, isImageCategoryCode } from "@/lib/images/categories";
 
 export const maxDuration = 60;
 
@@ -16,8 +17,6 @@ interface AnalyzeResponse {
   category: string;
 }
 
-const VALID_CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
-
 function visionPrompt(primaryLanguage: "ko" | "en") {
   const primary = primaryLanguage === "ko" ? "Korean" : "English";
   const secondary = primaryLanguage === "ko" ? "English" : "Korean";
@@ -33,7 +32,7 @@ function visionPrompt(primaryLanguage: "ko" | "en") {
   "caption_en": "<one factual English sentence, max 20 words>",
   "tags_ko": ["<up to 10 Korean keywords>"],
   "tags_en": ["<up to 10 lowercase English keywords>"],
-  "category": "<exactly one of: nature | people | editorial | urban | abstract | architecture>"
+  "category": "<exactly one of: ${imageCategoryPromptList()}>"
 }`;
 }
 
@@ -58,7 +57,7 @@ function parseJsonResponse(raw: string): AnalyzeResponse | null {
     const caption_en = typeof parsed.caption_en === "string" ? parsed.caption_en.trim() : "";
     const tags_ko = normalizeTags(parsed.tags_ko);
     const tags_en = normalizeTags(parsed.tags_en);
-    const category: string = VALID_CATEGORIES.includes(parsed.category) ? parsed.category : "";
+    const category: string = typeof parsed.category === "string" && isImageCategoryCode(parsed.category) ? parsed.category : "";
     return {
       title: title || title_ko || title_en,
       caption: caption || caption_ko || caption_en,
@@ -224,7 +223,7 @@ Respond with ONLY valid JSON:
   "caption_en": "<one factual English sentence, max 20 words>",
   "tags_ko": ["<up to 10 Korean keywords>"],
   "tags_en": ["<up to 10 lowercase English keywords>"],
-  "category": "<one of: nature | people | editorial | urban | abstract | architecture>"
+  "category": "<one of: ${imageCategoryPromptList()}>"
 }`;
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {

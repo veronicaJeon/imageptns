@@ -6,6 +6,7 @@ import { applyWatermark, createWatermarkedThumbnail } from "@/lib/utils/watermar
 import { notifyOpsNewUpload } from "@/lib/email/resend";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 import { normalizeRotationDegrees } from "@/lib/images/orientation";
+import { isImageCategoryCode } from "@/lib/images/categories";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
 export const maxDuration = 60;
@@ -50,6 +51,9 @@ export async function POST(req: NextRequest) {
 
   if (!title || !category || !storage_path_original) {
     return NextResponse.json({ error: "title, category, and storage_path_original required" }, { status: 400 });
+  }
+  if (!isImageCategoryCode(category)) {
+    return NextResponse.json({ error: "Invalid category" }, { status: 400 });
   }
   if (authorship_declaration !== "ai_generated" && authorship_declaration !== "human_original") {
     return NextResponse.json({ error: "authorship_declaration must be ai_generated or human_original" }, { status: 400 });

@@ -6,6 +6,7 @@ import NextImage from "next/image";
 import { useLang } from "@/lib/i18n/store";
 import { useCart, LicenseType, getLicensePrice } from "@/lib/store/cart";
 import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
+import { imageCategoryLabel } from "@/lib/images/categories";
 
 const LICENSE_KEYS: LicenseType[] = ["editorial", "commercial", "extended"];
 
@@ -70,7 +71,7 @@ export default function CartPage() {
 
   return (
     <div className="pt-32 pb-24 px-6 md:px-8 bg-surface min-h-screen">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="font-headline text-3xl font-extrabold text-on-surface tracking-tight">
             {c.title}
@@ -101,20 +102,20 @@ export default function CartPage() {
             {/* Item list */}
             <div className="lg:col-span-8 flex flex-col gap-4">
               {items.map((item) => (
-                <div key={item.id} className="bg-surface-container-lowest shadow-ghost p-4 sm:p-5 flex flex-col gap-4 sm:flex-row sm:gap-5">
-                  <Link href={`/library/${item.id}`} className="shrink-0">
+                <div key={item.id} className="bg-surface-container-lowest shadow-ghost p-4 sm:p-5 flex flex-col gap-4 sm:flex-row sm:gap-4">
+                  <Link href={`/library/${item.id}`} className="flex h-40 w-full shrink-0 items-center justify-center overflow-hidden rounded bg-surface-container-low sm:h-40 sm:w-40">
                     <NextImage
-                      src={thumbnailUrlFromPreviewUrl(item.src, 240, 180)}
+                      src={thumbnailUrlFromPreviewUrl(item.src, 320, 320)}
                       alt={item.title}
-                      width={100}
-                      height={70}
-                      className="object-cover rounded"
+                      width={160}
+                      height={160}
+                      className="h-full w-full object-contain"
                       unoptimized
                     />
                   </Link>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline mb-1">{item.category}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline mb-1">{imageCategoryLabel(item.category, lang)}</p>
                     <Link href={`/library/${item.id}`}>
                       <p className="font-semibold text-on-surface hover:text-primary transition-colors truncate">{item.title}</p>
                     </Link>
@@ -124,7 +125,7 @@ export default function CartPage() {
                     <p className="mt-2 text-xs text-on-surface-variant">
                       {copy.creditLine}: <span className="font-semibold text-on-surface">{itemCreditLine(item)}</span>
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
+                    <div className="mt-2 flex flex-wrap gap-1">
                       {itemUsageConditions(item, copy.defaultUsageCondition).map((condition) => (
                         <span key={condition} className="rounded-full bg-surface-container-low px-2 py-1 text-[10px] font-bold text-on-surface-variant">
                           {condition}
@@ -133,7 +134,7 @@ export default function CartPage() {
                     </div>
 
                     {/* License selector */}
-                    <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-outline">{copy.purchaseOptions}</p>
+                    <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-outline">{copy.purchaseOptions}</p>
                     <div className="grid grid-cols-3 gap-1.5 mt-2 sm:flex sm:flex-wrap sm:gap-2 sm:mt-3">
                       {LICENSE_KEYS.map((key) => (
                         <button

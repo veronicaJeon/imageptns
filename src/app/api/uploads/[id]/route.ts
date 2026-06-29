@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
+import { isImageCategoryCode } from "@/lib/images/categories";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
-
-const VALID_CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
-type ValidCategory = typeof VALID_CATEGORIES[number];
 
 interface ImagePatchRow {
   id: string;
@@ -62,7 +60,7 @@ export async function PATCH(
   if (title !== undefined && !title.trim()) {
     return NextResponse.json({ error: "Title cannot be empty" }, { status: 400 });
   }
-  if (category !== undefined && !VALID_CATEGORIES.includes(category as ValidCategory)) {
+  if (category !== undefined && !isImageCategoryCode(category)) {
     return NextResponse.json({ error: "Invalid category" }, { status: 400 });
   }
 

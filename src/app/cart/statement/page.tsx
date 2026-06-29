@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { cartStatementThumbnailUrl, collectCartStatementThumbnailUrls } from "@/lib/cart/print";
+import { imageCategoryLabel } from "@/lib/images/categories";
 import { useLang } from "@/lib/i18n/store";
 import { getLicensePrice, LicenseType, useCart } from "@/lib/store/cart";
 
@@ -131,16 +132,20 @@ function CartStatementInner() {
     <main className="min-h-screen bg-white px-4 py-6 text-black sm:px-8 sm:py-10">
       <style>{`
         @media print {
-          @page { margin: 8mm; }
+          @page { margin: 7mm; }
           body { background: #fff !important; }
           .statement-screen-controls { display: none !important; }
           .statement-page { padding: 0 !important; }
           .statement-card { box-shadow: none !important; border: 0 !important; max-width: none !important; padding: 0 !important; }
-          .statement-card > div:first-child { margin-bottom: 10px !important; padding-bottom: 10px !important; }
-          .statement-card h1 { font-size: 18px !important; }
-          .statement-grid { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; }
-          .statement-item { padding: 7px !important; page-break-inside: avoid !important; break-inside: avoid !important; }
-          .statement-item img { max-height: 58px !important; }
+          .statement-card > div:first-child { margin-bottom: 7px !important; padding-bottom: 7px !important; }
+          .statement-card h1 { font-size: 14px !important; margin-top: 2px !important; }
+          .statement-card p { margin-top: 1px !important; }
+          .statement-grid { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 4px !important; }
+          .statement-item { min-height: 52mm !important; padding: 4px !important; page-break-inside: avoid !important; break-inside: avoid !important; }
+          .statement-item img { max-height: 22mm !important; }
+          .statement-item-meta { margin-top: 4px !important; gap: 2px !important; padding-top: 3px !important; }
+          .statement-totals { margin-top: 6px !important; font-size: 10px !important; }
+          .statement-notice { margin-top: 6px !important; font-size: 9px !important; line-height: 1.25 !important; }
         }
       `}</style>
 
@@ -173,18 +178,18 @@ function CartStatementInner() {
             </div>
           </div>
 
-          <div className="statement-grid grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="statement-grid grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {items.map((item, index) => (
               <article key={item.id} className="statement-item break-inside-avoid rounded border border-zinc-200 p-3">
                 <div className="flex gap-3">
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded bg-zinc-100">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-zinc-100">
                     {item.src ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={cartStatementThumbnailUrl(item.src, origin, 180, 180)}
+                        src={cartStatementThumbnailUrl(item.src, origin, 160, 160)}
                         alt=""
-                        width="80"
-                        height="80"
+                        width="64"
+                        height="64"
                         loading="eager"
                         decoding="sync"
                         className="h-full w-full object-contain"
@@ -197,10 +202,10 @@ function CartStatementInner() {
                     <p className="text-[10px] font-bold text-zinc-500">No. {index + 1}</p>
                     <p className="mt-1 line-clamp-2 text-xs font-black leading-snug text-zinc-950">{item.title}</p>
                     <p className="mt-1 truncate font-mono text-[10px] text-zinc-500">{item.assetId ?? item.id}</p>
-                    <p className="mt-1 text-[10px] text-zinc-500">{item.category}</p>
+                    <p className="mt-1 text-[10px] text-zinc-500">{imageCategoryLabel(item.category, lang)}</p>
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-100 pt-2 text-[10px] leading-snug">
+                <div className="statement-item-meta mt-2 grid grid-cols-2 gap-1 border-t border-zinc-100 pt-2 text-[10px] leading-snug">
                   <div>
                     <p className="font-bold text-zinc-500">{c.license}</p>
                     <p className="mt-0.5 font-semibold text-zinc-950">{c.licenseTypes[item.license]}</p>
@@ -209,11 +214,11 @@ function CartStatementInner() {
                     <p className="font-bold text-zinc-500">{copy.statementHeaders[5]}</p>
                     <p className="mt-0.5 font-black text-zinc-950">{formatKRW(displayPrice(item.license, item.id), copy.locale)}</p>
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-2 hidden">
                     <p className="font-bold text-zinc-500">{copy.statementHeaders[3]}</p>
                     <p className="mt-0.5 truncate text-zinc-700">{itemCreditLine(item)}</p>
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-2 hidden">
                     <p className="font-bold text-zinc-500">{copy.statementHeaders[4]}</p>
                     <p className="mt-0.5 line-clamp-1 text-zinc-700">
                       {itemUsageConditions(item, copy.defaultUsageCondition).join(", ")}
@@ -224,7 +229,7 @@ function CartStatementInner() {
             ))}
           </div>
 
-          <div className="ml-auto mt-8 w-full max-w-72 text-sm">
+          <div className="statement-totals ml-auto mt-8 w-full max-w-72 text-sm">
             <div className="flex justify-between border-b border-zinc-200 py-2">
               <span className="text-zinc-600">{c.subtotal}</span>
               <span className="font-semibold">{formatKRW(subtotal, copy.locale)}</span>
@@ -239,7 +244,7 @@ function CartStatementInner() {
             </div>
           </div>
 
-          <p className="mt-10 text-xs leading-relaxed text-zinc-500">
+          <p className="statement-notice mt-10 text-xs leading-relaxed text-zinc-500">
             {copy.statementNotice}
           </p>
         </section>

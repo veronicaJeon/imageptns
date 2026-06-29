@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
+import { imageCategoryLabel } from "@/lib/images/categories";
 
 type Status = "pending" | "approved" | "rejected" | "all";
 
@@ -185,17 +186,17 @@ export default function AdminPage() {
         <div className="flex flex-col gap-4">
           {images.map((img) => (
             <div key={img.id} className="bg-surface-container-lowest shadow-ghost rounded-xl overflow-hidden">
-              <div className="flex gap-0 flex-col sm:flex-row">
+              <div className="flex gap-0 flex-col xl:flex-row">
 
                 {/* Thumbnail */}
-                <div className="w-full sm:w-48 h-56 sm:h-auto shrink-0 bg-surface-container-low flex items-center justify-center overflow-hidden">
+                <div className="w-full xl:w-[48%] min-h-[320px] xl:min-h-[380px] shrink-0 bg-surface-container-low flex items-center justify-center overflow-hidden">
                   {img.storage_path_preview ? (
                     <Image
                       src={img.storage_path_preview}
                       alt={displayKo(img.title_ko, img.title)}
-                      width={192}
-                      height={144}
-                      className="h-full w-full object-contain"
+                      width={900}
+                      height={700}
+                      className="max-h-[72vh] h-full w-full object-contain"
                     />
                   ) : (
                     <span className="material-symbols-outlined text-4xl text-outline">image</span>
@@ -203,7 +204,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* Info */}
-                <div className="flex-1 p-5 flex flex-col gap-3 min-w-0">
+                <div className="flex-1 p-5 flex flex-col gap-3 min-w-0 xl:max-w-[52%]">
                   {/* Top row */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -239,7 +240,7 @@ export default function AdminPage() {
                   <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
                     <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full flex items-center gap-1">
                       <span className="material-symbols-outlined text-[12px]">category</span>
-                      {img.category}
+                      {imageCategoryLabel(img.category, "ko")}
                     </span>
                     {img.file_format && (
                       <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">{img.file_format}</span>
