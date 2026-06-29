@@ -237,15 +237,25 @@ export default function OrdersPage() {
     }
   }
 
-  async function fetchDownloadUrl(orderItemId: string) {
-    const res = await fetch(`/api/download/${orderItemId}`);
+  async function downloadZip(orderItemIds: string[]) {
+    const res = await fetch("/api/download/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderItemIds }),
+    });
     if (!res.ok) {
       const { error } = await res.json().catch(() => ({ error: "Download failed" }));
       throw new Error(error ?? "Download failed");
     }
-    const { url } = await res.json() as { url?: string };
-    if (!url) throw new Error("Download URL missing");
-    return url;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `imagepartners-downloads-${new Date().toISOString().slice(0, 10)}.zip`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function handlePrintReceipt(order: Order) {
@@ -352,17 +362,11 @@ export default function OrdersPage() {
     if (downloadableRows.length === 0 || batchDownloading) return;
     setBatchDownloading(true);
     try {
-      for (const [index, row] of downloadableRows.entries()) {
-        try {
-          const url = await fetchDownloadUrl(row.itemId);
-          window.setTimeout(() => window.open(url, "_blank"), index * 350);
-        } catch (error) {
-          alert(error instanceof Error ? error.message : "Download failed");
-          break;
-        }
-      }
+      await downloadZip(downloadableRows.map((row) => row.itemId));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Download failed");
     } finally {
-      window.setTimeout(() => setBatchDownloading(false), downloadableRows.length * 350);
+      setBatchDownloading(false);
     }
   }
 
