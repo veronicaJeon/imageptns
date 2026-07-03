@@ -44,7 +44,7 @@ export default function AboutPage() {
             <br />
             <span className="text-primary-container">{h.hero.headline2}</span>
           </h1>
-          <p className="max-w-2xl text-lg font-light leading-relaxed text-zinc-300 md:text-xl">
+          <p className="max-w-2xl text-lg font-light leading-relaxed text-white md:text-xl">
             {h.hero.description}
           </p>
         </div>
