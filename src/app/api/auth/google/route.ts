@@ -12,11 +12,17 @@ export async function GET(request: NextRequest) {
   const next = getSafeRelativePath(searchParams.get("next"), "/dashboard");
   const role = searchParams.get("role");
   const organization = cleanText(searchParams.get("organization"));
+  const phoneNumber = cleanText(searchParams.get("phone_number"));
+  const primaryActivityRegions = cleanText(searchParams.get("primary_activity_regions"));
+  const bio = cleanText(searchParams.get("bio"));
 
   const callbackParams = new URLSearchParams();
   callbackParams.set("next", next);
   if (role === "buyer" || role === "photographer") callbackParams.set("role", role);
   if (organization) callbackParams.set("organization", organization);
+  if (phoneNumber) callbackParams.set("phone_number", phoneNumber);
+  if (primaryActivityRegions) callbackParams.set("primary_activity_regions", primaryActivityRegions);
+  if (bio) callbackParams.set("bio", bio);
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({

@@ -33,6 +33,17 @@ export function normalizeSignupPassword(value: unknown): string {
   return value;
 }
 
+export function photographerIntentCreatesBuyerRole(value: unknown) {
+  const requestedRole = normalizeSignupRole(value);
+
+  return {
+    role: "buyer" as const,
+    roles: ["buyer"] as const,
+    photographer_status: requestedRole === "photographer" ? ("pending" as const) : ("none" as const),
+    shouldCreateApplication: requestedRole === "photographer",
+  };
+}
+
 export function decideSignupFlow(lookup: SignupLookupResult): SignupFlowAction {
   if (!lookup.userExists) return "create_account";
   if (!lookup.emailConfirmed) return "resend_confirmation";
