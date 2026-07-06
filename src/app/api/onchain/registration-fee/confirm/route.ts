@@ -30,6 +30,16 @@ export async function GET(req: NextRequest) {
   if (order.status === "paid") return redirectTo(req, { fee: "success" });
   if (order.status !== "pending") return redirectTo(req, { fee: "fail", code: "ORDER_NOT_PENDING" });
 
+  const { data: photographerProfile } = await admin
+    .from("profiles")
+    .select("photographer_status")
+    .eq("id", order.photographer_id)
+    .maybeSingle();
+
+  if (photographerProfile?.photographer_status !== "approved") {
+    return redirectTo(req, { fee: "fail", code: "PHOTOGRAPHER_APPROVAL_REQUIRED" });
+  }
+
   const tossRes = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
     method: "POST",
     headers: {

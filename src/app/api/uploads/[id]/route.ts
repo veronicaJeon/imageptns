@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 import { isImageCategoryCode } from "@/lib/images/categories";
+import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
 interface ImagePatchRow {
@@ -25,6 +26,10 @@ export async function PATCH(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, user.id);
+  if (!authorization.ok) return authorization.response;
 
   const { data: img } = await supabase
     .from("images")
@@ -95,7 +100,6 @@ export async function PATCH(
     update.rejection_reason = null;
   }
 
-  const admin = createAdminClient();
   const { data, error } = await admin
     .from("images")
     .update(update)
@@ -117,6 +121,10 @@ export async function DELETE(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, user.id);
+  if (!authorization.ok) return authorization.response;
+
   // Only allow deleting own pending/rejected images
   const { data: img } = await supabase
     .from("images")
@@ -133,12 +141,11 @@ export async function DELETE(
 
   // Remove from both original and preview storage if path exists.
   if (image.storage_path_original) {
-    const admin = createAdminClient();
     await admin.storage.from("images-original").remove([image.storage_path_original]);
     await admin.storage.from("images-preview").remove([image.storage_path_original]);
   }
 
-  const { error } = await createAdminClient().from("images").delete().eq("id", id).eq("photographer_id", user.id);
+  const { error } = await admin.from("images").delete().eq("id", id).eq("photographer_id", user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireApprovedPhotographer } from "@/lib/photographers/approval";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 interface EarningsLedgerRow {
@@ -15,16 +17,9 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Check role
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "photographer") {
-    return NextResponse.json({ error: "Photographer only" }, { status: 403 });
-  }
+  const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, user.id);
+  if (!authorization.ok) return authorization.response;
 
   const { data: ledger, error } = await supabase
     .from("earnings_ledger")

@@ -7,6 +7,7 @@ import { notifyOpsNewUpload } from "@/lib/email/resend";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 import { normalizeRotationDegrees } from "@/lib/images/orientation";
 import { isImageCategoryCode } from "@/lib/images/categories";
+import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
 export const maxDuration = 60;
@@ -15,6 +16,10 @@ export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, user.id);
+  if (!authorization.ok) return authorization.response;
 
   const { data, error } = await supabase
     .from("images")
@@ -36,6 +41,10 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, user.id);
+  if (!authorization.ok) return authorization.response;
 
   const body = await req.json();
   const {
@@ -114,7 +123,6 @@ export async function POST(req: NextRequest) {
 
   // Apply watermark synchronously before returning so Vercel doesn't terminate it early
   try {
-    const admin = createAdminClient();
     const { data: downloaded, error: downloadErr } = await admin.storage
       .from("images-original")
       .download(storage_path_original);

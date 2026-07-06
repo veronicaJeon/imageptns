@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireApprovedPhotographer } from "@/lib/photographers/approval";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-
-interface PhotographerProfile {
-  role: string | null;
-}
 
 function normalizeDecision(value: unknown) {
   return value === "interested" || value === "declined" ? value : null;
@@ -24,16 +22,9 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
-  if ((profile as PhotographerProfile | null)?.role !== "photographer") {
-    return NextResponse.json({ error: "Photographer only" }, { status: 403 });
-  }
+  const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, user.id);
+  if (!authorization.ok) return authorization.response;
 
   const { data, error } = await supabase
     .from("photo_request_matches")
@@ -58,16 +49,9 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "id and interested/declined status are required" }, { status: 400 });
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
-  if ((profile as PhotographerProfile | null)?.role !== "photographer") {
-    return NextResponse.json({ error: "Photographer only" }, { status: 403 });
-  }
+  const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, user.id);
+  if (!authorization.ok) return authorization.response;
 
   const { data, error } = await supabase
     .from("photo_request_matches")

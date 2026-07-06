@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 
 const MIN_PAYOUT_KRW = 50_000;
 
@@ -15,6 +16,10 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, user.id);
+  if (!authorization.ok) return authorization.response;
 
   const { period } = await req.json();
   if (!period) return NextResponse.json({ error: "period required (YYYY-MM)" }, { status: 400 });
@@ -57,7 +62,6 @@ export async function POST(req: NextRequest) {
   }
 
   // Create payout record (admin client bypasses RLS — no insert policy exists for photographers)
-  const admin = createAdminClient();
   const { data: payout, error: payoutError } = await admin
     .from("payouts")
     .insert({

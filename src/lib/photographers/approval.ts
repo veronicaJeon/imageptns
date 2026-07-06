@@ -25,12 +25,18 @@ export interface PhotographerApplicationPayload {
   bio: string | null;
 }
 
-export interface PhotographerAuthorization {
-  ok: boolean;
-  userId: string;
-  status: PhotographerStatus;
-  response?: NextResponse;
-}
+export type PhotographerAuthorization =
+  | {
+      ok: true;
+      userId: string;
+      status: "approved";
+    }
+  | {
+      ok: false;
+      userId: string;
+      status: PhotographerStatus;
+      response: NextResponse;
+    };
 
 const PHOTOGRAPHER_STATUS_MESSAGES: Record<Exclude<PhotographerStatus, "approved">, string> = {
   none: "사진가 신청을 접수하면 관리자 확인 후 업로드 기능을 사용할 수 있습니다.",
