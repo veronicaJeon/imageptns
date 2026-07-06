@@ -9,6 +9,7 @@ import { getAddress, type Address } from "viem";
 import { useLang } from "@/lib/i18n/store";
 import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
 import { filterOnchainEarnings, sumClaimableUsdc, type OnchainClaimFilter } from "@/lib/onchain/earnings";
+import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 
 const earningsWagmiConfig = createConfig({
   chains: [base, baseSepolia],
@@ -105,11 +106,13 @@ function StatCard({ icon, label, value, sub }: { icon: string; label: string; va
 
 export default function EarningsPage() {
   return (
-    <WagmiProvider config={earningsWagmiConfig}>
-      <QueryClientProvider client={earningsQueryClient}>
-        <EarningsInner />
-      </QueryClientProvider>
-    </WagmiProvider>
+    <PhotographerApprovalGate>
+      <WagmiProvider config={earningsWagmiConfig}>
+        <QueryClientProvider client={earningsQueryClient}>
+          <EarningsInner />
+        </QueryClientProvider>
+      </WagmiProvider>
+    </PhotographerApprovalGate>
   );
 }
 

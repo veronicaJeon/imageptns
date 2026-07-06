@@ -6,6 +6,7 @@ import { useLang } from "@/lib/i18n/store";
 import { buildUploadProofSteps, type TimelineState } from "@/lib/ux/status";
 import { getCopyrightLicense, getFreeUsagePolicy, getLocalizedCopyrightLicense, getLocalizedFreeUsagePolicy, localizedCopyrightLicenses, localizedFreeUsagePolicies, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
 import { IMAGE_CATEGORIES, isImageCategoryCode, type ImageCategoryCode } from "@/lib/images/categories";
+import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
 type Category = ImageCategoryCode;
@@ -214,7 +215,7 @@ function UploadTimeline({ img }: { img: UploadRow }) {
   );
 }
 
-export default function UploadsPage() {
+function UploadsContent() {
   const { t, lang } = useLang();
   const copy = UPLOADS_PAGE_COPY[lang];
   const copyrightLicenses = localizedCopyrightLicenses(lang);
@@ -759,5 +760,13 @@ export default function UploadsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function UploadsPage() {
+  return (
+    <PhotographerApprovalGate>
+      <UploadsContent />
+    </PhotographerApprovalGate>
   );
 }

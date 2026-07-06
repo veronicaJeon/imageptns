@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils/cn";
 import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
 import type { AuthUser } from "@/lib/store/auth";
+import { PhotographerStatusNotice } from "@/components/dashboard/PhotographerStatusNotice";
 
 type NavItem = { href: string; icon: string; key: string };
 
@@ -133,9 +134,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => { init(); }, [init]);
 
-  const role = user?.role ?? demoRole;
+  const isApprovedPhotographer = user?.photographer_status === "approved";
+  const role = user ? (isApprovedPhotographer ? "photographer" : "buyer") : demoRole;
   const viewMode: DashboardMode = user
-    ? role === "photographer"
+    ? isApprovedPhotographer
       ? viewModeOverride ?? "photographer"
       : "buyer"
     : demoRole;
@@ -218,7 +220,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/" className="text-sm font-headline font-black uppercase tracking-tighter text-on-surface">
             IMAGE PARTNERS
           </Link>
-          {user?.role === "photographer" ? (
+          {isApprovedPhotographer ? (
             <div className="flex rounded-lg overflow-hidden bg-surface-container-low p-0.5 gap-0.5">
               {(["photographer", "buyer"] as const).map((r) => (
                 <button
@@ -272,6 +274,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         <div className="flex-1 pb-20 md:pb-0">
+          {user && user.photographer_status !== "approved" && user.photographer_status !== "none" && (
+            <div className="px-4 pt-4 md:px-10 md:pt-6">
+              <PhotographerStatusNotice status={user.photographer_status} compact />
+            </div>
+          )}
           {children}
         </div>
       </main>

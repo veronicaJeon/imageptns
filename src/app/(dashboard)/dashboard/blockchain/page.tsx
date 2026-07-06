@@ -4,6 +4,7 @@ import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from "r
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 
 type RegistrationState =
   | "not_approved"
@@ -508,14 +509,16 @@ function PhotographerBlockchainContent() {
 
 export default function PhotographerBlockchainPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-[40vh] items-center justify-center">
-          <span className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
-      }
-    >
-      <PhotographerBlockchainContent />
-    </Suspense>
+    <PhotographerApprovalGate>
+      <Suspense
+        fallback={
+          <div className="flex min-h-[40vh] items-center justify-center">
+            <span className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        }
+      >
+        <PhotographerBlockchainContent />
+      </Suspense>
+    </PhotographerApprovalGate>
   );
 }

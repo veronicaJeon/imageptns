@@ -7,6 +7,7 @@ import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { PhotographerStatusNotice } from "@/components/dashboard/PhotographerStatusNotice";
 
 interface Subscription {
   id: string;
@@ -29,6 +30,16 @@ interface EthereumProvider {
   request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
 }
 
+type PhotographerStatus = "none" | "pending" | "approved" | "suspended";
+
+interface PhotographerApplication {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  rejection_reason: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
 const BASE_SEPOLIA_CHAIN_ID_HEX = "0x14a34";
 
 export default function SettingsPage() {
@@ -43,8 +54,8 @@ export default function SettingsPage() {
   const [walletAddress, setWalletAddress] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [activityRegions, setActivityRegions] = useState("");
-  const [role, setRole]   = useState<"buyer" | "photographer" | null>(null);
-  const [roles, setRoles] = useState<Array<"buyer" | "photographer">>([]);
+  const [photographerStatus, setPhotographerStatus] = useState<PhotographerStatus>("none");
+  const [photographerApplication, setPhotographerApplication] = useState<PhotographerApplication | null>(null);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,6 +67,7 @@ export default function SettingsPage() {
   const [cancelDone, setCancelDone] = useState(false);
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const [upgradeDone, setUpgradeDone] = useState(false);
+  const [upgradeError, setUpgradeError] = useState("");
   const [walletConnecting, setWalletConnecting] = useState(false);
   const [walletError, setWalletError] = useState("");
   const [withdrawalLoading, setWithdrawalLoading] = useState(false);
@@ -104,8 +116,14 @@ export default function SettingsPage() {
         setWalletAddress(profile.wallet_address ?? "");
         setPhoneNumber(profile.phone_number ?? "");
         setActivityRegions((profile.primary_activity_regions ?? []).join("\n"));
-        setRole(profile.role ?? null);
-        setRoles(Array.isArray(profile.roles) && profile.roles.length > 0 ? profile.roles : [profile.role ?? "buyer"]);
+        setPhotographerStatus(
+          profile.photographer_status === "pending" ||
+          profile.photographer_status === "approved" ||
+          profile.photographer_status === "suspended"
+            ? profile.photographer_status
+            : "none",
+        );
+        setPhotographerApplication(profile.photographer_application ?? null);
         setNotifications({
           sales:      profile.notif_sales      ?? true,
           reviews:    profile.notif_reviews    ?? true,
@@ -118,6 +136,7 @@ export default function SettingsPage() {
           setName(user.full_name);
           setOrganization(user.organization ?? "");
           setEmail(user.email);
+          setPhotographerStatus(user.photographer_status);
         }
       });
   }, [user]);
@@ -135,7 +154,7 @@ export default function SettingsPage() {
           organization,
           bio,
           wallet_address: walletAddress,
-          ...(role === "photographer"
+          ...(photographerStatus !== "none"
             ? { phone_number: phoneNumber, primary_activity_regions: activityRegions }
             : {}),
         }),
@@ -155,18 +174,41 @@ export default function SettingsPage() {
   }
 
   async function handleUpgradeToPhotographer() {
-    if (!confirm("사진가 계정으로 전환하시겠습니까?\n이미지 업로드 및 판매 기능이 활성화됩니다.")) return;
+    if (!confirm("사진가 신청을 접수하시겠습니까?\n관리자 확인 후 업로드 및 판매 기능이 활성화됩니다.")) return;
     setUpgradeLoading(true);
+    setUpgradeError("");
     try {
-      const res = await fetch("/api/profile/upgrade-to-photographer", { method: "POST" });
+      const res = await fetch("/api/profile/upgrade-to-photographer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          organization,
+          phone_number: phoneNumber,
+          primary_activity_regions: activityRegions,
+          bio,
+        }),
+      });
+      const body = await res.json().catch(() => null) as {
+        error?: string;
+        photographer_status?: PhotographerStatus;
+        application?: PhotographerApplication | null;
+      } | null;
       if (res.ok) {
-        setRole("photographer");
-        setRoles((current) => Array.from(new Set([...current, "buyer", "photographer"])));
+        setPhotographerStatus(body?.photographer_status ?? "pending");
+        if (body?.application) {
+          setPhotographerApplication((current) => ({
+            id: body.application?.id ?? current?.id ?? "",
+            status: "pending",
+            rejection_reason: null,
+            created_at: body.application?.created_at ?? current?.created_at ?? new Date().toISOString(),
+            reviewed_at: null,
+          }));
+        }
         setUpgradeDone(true);
         await init();
       } else {
-        const { error } = await res.json();
-        alert(error ?? "전환 중 오류가 발생했습니다.");
+        setUpgradeError(body?.error ?? "사진가 신청을 접수하지 못했습니다.");
       }
     } finally {
       setUpgradeLoading(false);
@@ -304,7 +346,7 @@ export default function SettingsPage() {
             />
           </div>
 
-          {role === "photographer" && (
+          {photographerStatus === "approved" && (
             <div className="flex flex-col gap-5">
               <Input
                 label={s.phoneLabel}
@@ -424,34 +466,81 @@ export default function SettingsPage() {
           계정 역할
         </h2>
 
-        {roles.includes("photographer") || role === "photographer" || upgradeDone ? (
+        {photographerStatus === "approved" ? (
           <div className="flex items-center gap-3 px-5 py-4 bg-primary/5 border border-primary/20 rounded-lg">
             <span className="material-symbols-outlined text-xl text-primary">photo_camera</span>
             <div>
               <p className="text-sm font-bold text-on-surface">사진가 계정</p>
-              <p className="text-xs text-on-surface-variant mt-0.5">이미지 업로드 및 판매 기능이 활성화되어 있습니다.</p>
+              <p className="text-xs text-on-surface-variant mt-0.5">관리자 승인이 완료되어 이미지 업로드 및 판매 기능을 사용할 수 있습니다.</p>
             </div>
           </div>
-        ) : role === "buyer" ? (
+        ) : photographerStatus === "pending" || upgradeDone ? (
+          <div className="flex flex-col gap-4">
+            <PhotographerStatusNotice status="pending" showAction={false} />
+            {photographerApplication?.created_at && (
+              <p className="text-xs text-outline">
+                신청 접수일: {new Date(photographerApplication.created_at).toLocaleDateString("ko-KR", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+            )}
+          </div>
+        ) : (
           <div className="p-5 bg-surface-container-low rounded-lg flex flex-col gap-4">
             <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined text-xl text-outline mt-0.5">shopping_bag</span>
+              <span className="material-symbols-outlined text-xl text-outline mt-0.5">
+                {photographerStatus === "suspended" ? "do_not_disturb_on" : "shopping_bag"}
+              </span>
               <div>
-                <p className="text-sm font-bold text-on-surface">현재 역할: 바이어</p>
-                <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-                  사진가로 전환하면 이미지를 업로드하고 판매할 수 있습니다.<br />
-                  기존 바이어 기능(즐겨찾기, 주문 내역 등)은 그대로 유지됩니다.
+                <p className="text-sm font-bold text-on-surface">
+                  {photographerStatus === "suspended" ? "사진가 권한 중지" : "현재 역할: 바이어"}
                 </p>
+                <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                  사진가 신청을 접수하면 관리자가 통화로 활동 정보를 확인한 뒤 승인합니다.<br />
+                  승인 전에도 기존 바이어 기능은 그대로 이용할 수 있습니다.
+                </p>
+                {photographerApplication?.rejection_reason && (
+                  <p className="mt-2 text-xs text-error">최근 검토 메모: {photographerApplication.rejection_reason}</p>
+                )}
               </div>
             </div>
             <div className="flex flex-col gap-2 text-xs text-on-surface-variant pl-8">
-              {["이미지 업로드 및 검토 신청", "승인된 이미지 라이브러리 노출", "판매 수익 정산 (판매가의 80%)"].map((item) => (
+              {["관리자 확인 후 이미지 업로드 가능", "승인된 이미지 라이브러리 노출", "판매 수익 정산 (판매가의 80%)"].map((item) => (
                 <div key={item} className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-sm text-primary">check</span>
                   {item}
                 </div>
               ))}
             </div>
+            <div className="grid gap-4">
+              <Input
+                label="연락처"
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                icon="phone"
+                placeholder="+82 10 1234 5678"
+              />
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-outline uppercase tracking-widest">주요 활동 지역</label>
+                <textarea
+                  value={activityRegions}
+                  onChange={(e) => setActivityRegions(e.target.value)}
+                  rows={3}
+                  className="w-full bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-none transition-all"
+                  placeholder={s.regionsPlaceholder}
+                />
+                <p className="text-xs text-outline">{s.regionsHint}</p>
+              </div>
+            </div>
+            {upgradeError && (
+              <p className="text-xs text-error flex items-center gap-1">
+                <span className="material-symbols-outlined text-base">error</span>
+                {upgradeError}
+              </p>
+            )}
             <button
               type="button"
               onClick={handleUpgradeToPhotographer}
@@ -463,10 +552,10 @@ export default function SettingsPage() {
               ) : (
                 <span className="material-symbols-outlined text-sm">photo_camera</span>
               )}
-              {upgradeLoading ? "전환 중…" : "사진가로 전환"}
+              {upgradeLoading ? "신청 중…" : photographerStatus === "suspended" ? "사진가 재신청" : "사진가 신청"}
             </button>
           </div>
-        ) : null}
+        )}
       </section>
 
       {/* Subscription */}

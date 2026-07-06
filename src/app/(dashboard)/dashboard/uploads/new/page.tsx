@@ -9,6 +9,7 @@ import { extractExif, type ExifData } from "@/lib/utils/exif";
 import { normalizeRotationDegrees, rotatedDimensions } from "@/lib/images/orientation";
 import { localizedCopyrightLicenses, localizedFreeUsagePolicies, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
 import { IMAGE_CATEGORIES, isImageCategoryCode, type ImageCategoryCode } from "@/lib/images/categories";
+import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
 type Category = ImageCategoryCode;
@@ -248,7 +249,7 @@ function ExifPanel({ data, lang, labels }: { data: ExifData; lang: NewUploadLang
   );
 }
 
-export default function NewUploadPage() {
+function NewUploadContent() {
   const { lang } = useLang();
   const copy = NEW_UPLOAD_COPY[lang];
   const copyrightLicenses = localizedCopyrightLicenses(lang);
@@ -1030,5 +1031,13 @@ export default function NewUploadPage() {
         </form>
       )}
     </div>
+  );
+}
+
+export default function NewUploadPage() {
+  return (
+    <PhotographerApprovalGate>
+      <NewUploadContent />
+    </PhotographerApprovalGate>
   );
 }

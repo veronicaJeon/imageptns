@@ -4,6 +4,7 @@ import { previewUrl } from "@/lib/supabase/storage";
 
 interface ProfileRow {
   role: string | null;
+  photographer_status: string | null;
   wallet_address: string | null;
 }
 
@@ -64,12 +65,12 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, wallet_address")
+    .select("role, photographer_status, wallet_address")
     .eq("id", user.id)
     .single();
 
   const profileRow = profile as ProfileRow | null;
-  const role = profileRow?.role ?? "buyer";
+  const role = profileRow?.photographer_status === "approved" ? "photographer" : "buyer";
 
   if (role === "buyer") {
     const [favRes, ordRes, basePendingRes, baseConfirmedRes, baseFailedRes] = await Promise.all([
