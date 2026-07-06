@@ -96,7 +96,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const [{ data: profile, error: profileError }, authResult, { data: orders, error: ordersError }] = await Promise.all([
     admin
       .from("profiles")
-      .select("id, full_name, bio, role, avatar_url, wallet_address, phone_number, primary_activity_regions, is_admin, created_at, updated_at, last_login_at, login_count, deleted_at")
+      .select("id, full_name, bio, role, photographer_status, avatar_url, wallet_address, phone_number, primary_activity_regions, is_admin, created_at, updated_at, last_login_at, login_count, deleted_at")
       .eq("id", id)
       .single(),
     admin.auth.admin.getUserById(id),

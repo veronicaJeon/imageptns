@@ -8,6 +8,7 @@ interface UserSummary {
   id: string;
   full_name: string | null;
   role: "buyer" | "photographer";
+  photographer_status: "none" | "pending" | "approved" | "suspended";
   avatar_url: string | null;
   is_admin: boolean;
   wallet_address: string | null;
@@ -30,6 +31,7 @@ interface UserDetail {
   full_name: string | null;
   bio: string | null;
   role: "buyer" | "photographer";
+  photographer_status: "none" | "pending" | "approved" | "suspended";
   avatar_url: string | null;
   wallet_address: string | null;
   phone_number: string | null;
@@ -98,6 +100,20 @@ const WITHDRAWAL_ACTION_LABELS: Record<string, string> = {
   settle_claimable_earnings: "클레임 수익 정산",
 };
 
+const PHOTOGRAPHER_STATUS_LABELS: Record<UserSummary["photographer_status"], string> = {
+  none: "미신청",
+  pending: "승인대기",
+  approved: "승인됨",
+  suspended: "중지됨",
+};
+
+const PHOTOGRAPHER_STATUS_STYLES: Record<UserSummary["photographer_status"], string> = {
+  none: "bg-surface-container-low text-outline",
+  pending: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-200",
+  approved: "bg-primary/10 text-primary",
+  suspended: "bg-error/10 text-error",
+};
+
 function formatKRW(amount: number) {
   return `₩${amount.toLocaleString("ko-KR")}`;
 }
@@ -127,6 +143,7 @@ export default function AdminUsersPage() {
   const [orders, setOrders] = useState<UserOrder[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [suspendingPhotographer, setSuspendingPhotographer] = useState(false);
   const [withdrawalAssessment, setWithdrawalAssessment] = useState<ProfileWithdrawalAssessment | null>(null);
   const [withdrawalRequest, setWithdrawalRequest] = useState<WithdrawalRequestSummary | null>(null);
 
@@ -211,6 +228,34 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function suspendPhotographerAccess() {
+    if (!detail) return;
+    const reason = prompt("사진가 권한 회수 사유를 입력하세요. 사용자에게 안내될 수 있습니다.")?.trim() ?? "";
+    if (!confirm(`${detail.full_name || detail.email || detail.id} 회원의 사진가 권한을 회수할까요?`)) return;
+
+    setSuspendingPhotographer(true);
+    try {
+      const res = await fetch(`/api/admin/users/${detail.id}/photographer-suspension`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const body = await res.json().catch(() => null) as { profile?: UserDetail; error?: string } | null;
+      if (!res.ok) throw new Error(body?.error ?? "사진가 권한을 회수하지 못했습니다.");
+
+      setDetail((current) => current ? { ...current, photographer_status: "suspended" } : current);
+      setUsers((current) =>
+        current.map((user) =>
+          user.id === detail.id ? { ...user, photographer_status: "suspended" } : user,
+        ),
+      );
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "사진가 권한을 회수하지 못했습니다.");
+    } finally {
+      setSuspendingPhotographer(false);
+    }
+  }
+
   return (
     <div className="p-6 md:p-10">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -269,9 +314,16 @@ export default function AdminUsersPage() {
                     </div>
                   </td>
                   <td className="px-5 py-4">
-                    <span className="rounded-full bg-surface-container-low px-2.5 py-1 text-xs font-bold text-on-surface-variant">
-                      {user.role === "photographer" ? "사진작가" : "바이어"}
-                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="rounded-full bg-surface-container-low px-2.5 py-1 text-xs font-bold text-on-surface-variant">
+                        {user.role === "photographer" ? "사진작가" : "바이어"}
+                      </span>
+                      {user.photographer_status !== "none" && (
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${PHOTOGRAPHER_STATUS_STYLES[user.photographer_status]}`}>
+                          {PHOTOGRAPHER_STATUS_LABELS[user.photographer_status]}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-4 text-on-surface-variant">
                     <p className="text-xs">{formatDate(user.last_login_at ?? user.authLastSignInAt)}</p>
@@ -303,6 +355,23 @@ export default function AdminUsersPage() {
                 <p className="text-[10px] font-bold uppercase tracking-widest text-primary">{detail.role}</p>
                 <h2 className="mt-1 font-headline text-xl font-extrabold text-on-surface">{detail.full_name || "이름 없음"}</h2>
                 <p className="mt-1 text-sm text-outline">{detail.email || detail.id}</p>
+                {detail.photographer_status !== "none" && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${PHOTOGRAPHER_STATUS_STYLES[detail.photographer_status]}`}>
+                      사진가 {PHOTOGRAPHER_STATUS_LABELS[detail.photographer_status]}
+                    </span>
+                    {detail.photographer_status === "approved" && (
+                      <button
+                        type="button"
+                        onClick={suspendPhotographerAccess}
+                        disabled={suspendingPhotographer}
+                        className="rounded-full border border-error/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-error transition-colors hover:bg-error/10 disabled:opacity-50"
+                      >
+                        {suspendingPhotographer ? "처리 중" : "사진가 권한 회수"}
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                   <div className="rounded-lg bg-surface-container-low p-3"><p className="text-xs text-outline">최종 로그인</p><p className="mt-1 font-semibold">{formatDate(detail.last_login_at ?? detail.authLastSignInAt)}</p></div>
                   <div className="rounded-lg bg-surface-container-low p-3"><p className="text-xs text-outline">총 로그인</p><p className="mt-1 font-semibold">{detail.login_count ?? 0}회</p></div>
