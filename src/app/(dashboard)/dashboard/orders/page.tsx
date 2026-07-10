@@ -118,6 +118,8 @@ const TIMELINE_STYLES: Record<TimelineState, string> = {
   failed: "bg-error text-on-error",
 };
 
+const BULK_DOWNLOAD_LIMIT = 20;
+
 function OrderTimeline({ row }: { row: OrderRow }) {
   const steps = buildOrderStatusSteps({
     status: row.status,
@@ -181,6 +183,8 @@ export default function OrdersPage() {
         licenseFallback: "구매한 라이선스 조건에 따라 사용 가능합니다.",
         downloadExpires: "다운로드 만료:",
         receiptPdf: "영수증 PDF",
+        downloadAll: "전체 다운로드",
+        downloadingAll: "다운로드 준비 중...",
       }
     : {
         popupBlocked: "The receipt popup was blocked.",
@@ -191,11 +195,14 @@ export default function OrdersPage() {
         licenseFallback: "Use is allowed according to the purchased license terms.",
         downloadExpires: "Download expires:",
         receiptPdf: "Receipt PDF",
+        downloadAll: "Download all",
+        downloadingAll: "Preparing downloads...",
       };
 
   const [orders, setOrders]       = useState<Order[]>([]);
   const [loading, setLoading]     = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [batchDownloading, setBatchDownloading] = useState(false);
   const [recoveryTxHashes, setRecoveryTxHashes] = useState<Record<string, string>>({});
   const [confirmingOrderIds, setConfirmingOrderIds] = useState<Record<string, boolean>>({});
 
@@ -228,6 +235,27 @@ export default function OrdersPage() {
     } finally {
       setDownloading(null);
     }
+  }
+
+  async function downloadZip(orderItemIds: string[]) {
+    const res = await fetch("/api/download/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderItemIds }),
+    });
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: "Download failed" }));
+      throw new Error(error ?? "Download failed");
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `imagepartners-downloads-${new Date().toISOString().slice(0, 10)}.zip`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function handlePrintReceipt(order: Order) {
@@ -326,6 +354,21 @@ export default function OrdersPage() {
       isFirstItemInOrder: itemIndex === 0,
     }))
   );
+  const downloadableRows = rows
+    .filter((row) => row.status === "completed")
+    .slice(0, BULK_DOWNLOAD_LIMIT);
+
+  async function handleDownloadAll() {
+    if (downloadableRows.length === 0 || batchDownloading) return;
+    setBatchDownloading(true);
+    try {
+      await downloadZip(downloadableRows.map((row) => row.itemId));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Download failed");
+    } finally {
+      setBatchDownloading(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -337,7 +380,23 @@ export default function OrdersPage() {
 
   return (
     <div className="p-6 md:p-10">
-      <h1 className="font-headline text-2xl font-extrabold text-on-surface mb-8 tracking-tight">{ord.title}</h1>
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">{ord.title}</h1>
+        {downloadableRows.length > 0 && (
+          <button
+            type="button"
+            onClick={handleDownloadAll}
+            disabled={batchDownloading}
+            className="inline-flex w-fit items-center gap-2 rounded-lg bg-primary px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {batchDownloading
+              ? <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              : <span className="material-symbols-outlined text-base">download</span>
+            }
+            {batchDownloading ? copy.downloadingAll : copy.downloadAll}
+          </button>
+        )}
+      </div>
 
       {rows.length === 0 ? (
         <div className="flex flex-col items-center py-32 gap-4 text-outline">

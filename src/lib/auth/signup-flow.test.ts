@@ -4,6 +4,7 @@ import {
   normalizeSignupEmail,
   normalizeSignupPassword,
   normalizeSignupRole,
+  photographerIntentCreatesBuyerRole,
 } from "./signup-flow";
 
 describe("signup flow", () => {
@@ -25,5 +26,20 @@ describe("signup flow", () => {
     expect(normalizeSignupRole("unexpected")).toBe("buyer");
     expect(normalizeSignupPassword("12345678")).toBe("12345678");
     expect(() => normalizeSignupPassword("short")).toThrow("8자 이상");
+  });
+
+  it("keeps photographer signup as buyer role until admin approval", () => {
+    expect(photographerIntentCreatesBuyerRole("photographer")).toEqual({
+      role: "buyer",
+      roles: ["buyer"],
+      photographer_status: "pending",
+      shouldCreateApplication: true,
+    });
+    expect(photographerIntentCreatesBuyerRole("buyer")).toEqual({
+      role: "buyer",
+      roles: ["buyer"],
+      photographer_status: "none",
+      shouldCreateApplication: false,
+    });
   });
 });

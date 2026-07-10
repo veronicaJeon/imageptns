@@ -30,7 +30,7 @@ export const ko: Translations = {
       title: "이미지파트너스에 가입하세요.",
       subtitle: "플랫폼을 어떻게 이용하실지 선택해주세요.",
       roleLabel: "저는…",
-      roleBuyer: "이미지 바이어",
+      roleBuyer: "바이어",
       roleBuyerDesc: "이미지 검색 및 라이선스",
       rolePhotographer: "사진작가",
       rolePhotographerDesc: "작품 등록 및 수익화",
@@ -51,7 +51,7 @@ export const ko: Translations = {
       privacyLink: "개인정보처리방침",
     },
     brand: {
-      tagline: "세계에서 가장 큐레이션된 이미지 아카이브.",
+      tagline: "사진은 과거의 증명입니다.",
       quote: "\"모든 이미지는 이야기를 기다리고 있습니다.\"",
     },
   },
@@ -105,7 +105,7 @@ export const ko: Translations = {
   },
   dashboard: {
     nav: { overview: "개요", sourcing: "내 소싱 요청", favorites: "즐겨찾기", orders: "주문 내역", uploads: "업로드", requests: "운영팀 요청", blockchain: "블록체인 사진", earnings: "수익", settings: "설정" },
-    role: { buyer: "이미지 바이어", photographer: "사진작가" },
+    role: { buyer: "바이어", photographer: "사진작가" },
     overview: {
       greeting: "반갑습니다",
       statFavorites: "즐겨찾기", statOrders: "주문", statCart: "장바구니",

@@ -10,12 +10,31 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, organization, bio, avatar_url, role, roles, wallet_address, phone_number, primary_activity_regions, notif_sales, notif_reviews, notif_newsletter, created_at")
+    .select("id, full_name, organization, bio, avatar_url, role, roles, photographer_status, wallet_address, phone_number, primary_activity_regions, notif_sales, notif_reviews, notif_newsletter, created_at")
     .eq("id", user.id)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ profile: { ...data, email: user.email } });
+
+  const { data: latestApplication, error: applicationError } = await supabase
+    .from("photographer_application_statuses")
+    .select("id, status, applicant_name, organization, phone_number, primary_activity_regions, bio, rejection_reason, reviewed_at, created_at, updated_at")
+    .eq("profile_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (applicationError) {
+    console.error("[profile] photographer application lookup failed", applicationError);
+  }
+
+  return NextResponse.json({
+    profile: {
+      ...data,
+      email: user.email,
+      photographer_application: latestApplication ?? null,
+    },
+  });
 }
 
 export async function PATCH(req: NextRequest) {

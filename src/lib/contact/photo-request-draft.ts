@@ -68,24 +68,10 @@ export function draftPhotoRequestFromSearchParams(params: URLSearchParams, lang:
 
   const query = cleanText(params.get("query"));
   const usageLabels = usageLabelsFromParams(params, lang);
-  const lines = lang === "ko"
-    ? [
-        query ? `찾고 있는 사진: ${query}` : "찾고 있는 사진:",
-        usageLabels.length > 0 ? `희망 사용 조건: ${usageLabels.join(", ")}` : "",
-        "검색 결과에서 적합한 이미지를 찾지 못해 이미지 소싱 요청으로 전환했습니다.",
-        "필요한 장면, 사용 프로젝트, 사용 맥락은 아래 항목에서 보완해주세요.",
-      ].filter(Boolean)
-    : [
-        query ? `Requested image: ${query}` : "Requested image:",
-        usageLabels.length > 0 ? `Preferred usage terms: ${usageLabels.join(", ")}` : "",
-        "I could not find a suitable image in the search results and moved this into an image sourcing request.",
-        "Please add the needed scene, project, and usage context below.",
-      ].filter(Boolean);
-
   return {
     mode: "photo",
     title: query ? (lang === "ko" ? `${query} 이미지 소싱 요청` : `${query} image sourcing request`) : (lang === "ko" ? "이미지 소싱 요청" : "Image sourcing request"),
-    brief: lines.join("\n"),
+    brief: query,
     usage_context: usageLabels.length > 0
       ? (lang === "ko" ? `검색 조건과 동일한 사용 조건 검토: ${usageLabels.join(", ")}` : `Review the same usage terms as the search filters: ${usageLabels.join(", ")}`)
       : "",

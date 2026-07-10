@@ -5,7 +5,6 @@ import Image from "next/image";
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/i18n/store";
-import { buildSiteUrl } from "@/lib/routing/canonical";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -23,20 +22,9 @@ function LoginForm() {
   const queryError =
     !hideQueryError && searchParams.get("error") === "oauth" ? a.errorOAuth : null;
   const displayedError = error ?? queryError;
-
-  async function handleGoogleLogin() {
-    setLoading(true);
-    setHideQueryError(true);
-    setError(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: buildSiteUrl("/api/auth/callback"),
-      },
-    });
-    if (error) { setError(a.errorOAuth); setLoading(false); }
-  }
+  const googleLoginUrl = `/api/auth/google?next=${encodeURIComponent(
+    searchParams.get("next") ?? "/library",
+  )}`;
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -72,7 +60,13 @@ function LoginForm() {
 
       {/* Google OAuth */}
       <button
-        onClick={handleGoogleLogin}
+        type="button"
+        onClick={() => {
+          setLoading(true);
+          setHideQueryError(true);
+          setError(null);
+          window.location.assign(googleLoginUrl);
+        }}
         disabled={loading}
         className="w-full min-w-0 min-h-12 px-4 py-3 flex items-center justify-center gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low transition-colors text-sm font-semibold leading-snug text-center text-on-surface disabled:opacity-50 disabled:cursor-not-allowed mb-6"
       >

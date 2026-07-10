@@ -245,7 +245,7 @@ export default function DashboardPage() {
           ) : (
             <div className="bg-surface-container-lowest shadow-ghost overflow-hidden">
               {(stats?.recent ?? []).map((item, i, arr) => (
-                <div key={i} className={`flex items-center gap-4 px-6 py-4 ${i < arr.length - 1 ? "border-b border-outline-variant/20" : ""}`}>
+                <div key={i} className={`flex items-start gap-3 px-4 py-4 sm:items-center sm:gap-4 sm:px-6 ${i < arr.length - 1 ? "border-b border-outline-variant/20" : ""}`}>
                   <div className="w-15 h-10 bg-surface-container-low rounded shrink-0 overflow-hidden flex items-center justify-center" style={{ width: 60, height: 40 }}>
                     {item.src ? (
                       <Image src={item.src} alt={item.title} width={60} height={40} className="w-full h-full object-cover" />
@@ -253,13 +253,15 @@ export default function DashboardPage() {
                       <span className="material-symbols-outlined text-outline text-sm">image</span>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-on-surface truncate">{item.title}</p>
                     <p className="text-xs text-outline">{item.date}</p>
                   </div>
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${ACTION_STYLE[item.action] ?? "bg-surface-container-high text-on-surface-variant"}`}>
-                    {item.action}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center">
+                    <span className={`max-w-[7rem] truncate rounded-full px-2.5 py-1 text-[10px] font-bold sm:max-w-none sm:px-3 sm:text-xs ${ACTION_STYLE[item.action] ?? "bg-surface-container-high text-on-surface-variant"}`}>
+                      {item.action}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -334,7 +336,7 @@ export default function DashboardPage() {
           ) : (
             <div className="bg-surface-container-lowest shadow-ghost overflow-hidden">
               {(stats?.recent ?? []).map((item, i, arr) => (
-                <div key={i} className={`flex items-center gap-4 px-6 py-4 ${i < arr.length - 1 ? "border-b border-outline-variant/20" : ""}`}>
+                <div key={i} className={`flex items-start gap-3 px-4 py-4 sm:items-center sm:gap-4 sm:px-6 ${i < arr.length - 1 ? "border-b border-outline-variant/20" : ""}`}>
                   <div className="bg-surface-container-low rounded shrink-0 overflow-hidden flex items-center justify-center" style={{ width: 60, height: 40 }}>
                     {item.src ? (
                       <Image src={item.src} alt={item.title} width={60} height={40} className="w-full h-full object-cover" />
@@ -342,18 +344,20 @@ export default function DashboardPage() {
                       <span className="material-symbols-outlined text-outline text-sm">image</span>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-on-surface truncate">{item.title}</p>
                     <p className="text-xs text-outline">{item.date}</p>
                   </div>
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${ACTION_STYLE[item.action] ?? "bg-amber-50 text-amber-400"}`}>
-                    {item.action}
-                  </span>
-                  {item.proofStatus && item.proofStatus !== "not_registered" && (
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant">
-                      credential {item.proofStatus}
+                  <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center">
+                    <span className={`max-w-[7rem] truncate rounded-full px-2.5 py-1 text-[10px] font-bold sm:max-w-none sm:px-3 sm:text-xs ${ACTION_STYLE[item.action] ?? "bg-amber-50 text-amber-400"}`}>
+                      {item.action}
                     </span>
-                  )}
+                    {item.proofStatus && item.proofStatus !== "not_registered" && (
+                      <span className="max-w-[7rem] truncate rounded-full bg-surface-container-high px-2.5 py-1 text-[10px] font-bold text-on-surface-variant sm:max-w-none">
+                        credential {item.proofStatus}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

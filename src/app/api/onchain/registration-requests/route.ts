@@ -8,6 +8,7 @@ import {
 } from "@/lib/onchain/registration";
 import { recordOnchainEvent } from "@/lib/onchain/events";
 import { normalizeCommerceSettings, type CommerceSettingsRow } from "@/lib/commerce/settings";
+import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 
 interface RegistrationImageRow {
   id: string;
@@ -60,6 +61,9 @@ export async function GET() {
   const userId = user.id;
 
   const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, userId);
+  if (!authorization.ok) return authorization.response;
+
   const [{ data, error }, { data: settingsRow }] = await Promise.all([
     admin
     .from("images")
@@ -102,6 +106,9 @@ export async function POST(req: NextRequest) {
   if (imageIds.length === 0) return NextResponse.json({ error: "imageIds required" }, { status: 400 });
 
   const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, userId);
+  if (!authorization.ok) return authorization.response;
+
   const { data: rows, error: loadError } = await admin
     .from("images")
     .select("id, status, sales_count, proof_status")

@@ -150,6 +150,8 @@ export async function GET(
     similar: ((similar ?? []) as SimilarImageRow[]).map((s) => ({
       id: s.id,
       title: s.title,
+      titleKo: s.title_ko,
+      titleEn: s.title_en,
       category: s.category,
       photographerId: s.photographer_id,
       photographer: firstPhotographer(s.photographer)?.full_name ?? "",

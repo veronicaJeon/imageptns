@@ -109,7 +109,7 @@ export async function sendImageApproved(opts: {
       <p>제출하신 이미지가 검토를 통과하여 라이브러리에 게시되었습니다.</p>
       <p><strong>이미지:</strong> ${opts.imageTitle}</p>
       <p><strong>에셋 ID:</strong> ${opts.assetId}</p>
-      <p>이미지 바이어들이 이미지를 검색하고 라이선스를 구매할 수 있습니다.</p>
+      <p>바이어들이 이미지를 검색하고 라이선스를 구매할 수 있습니다.</p>
       <br><p>Image Partners 팀 드림</p>
     `,
   });
@@ -172,6 +172,66 @@ export async function sendImageRejected(opts: {
       <p><strong>에셋 ID:</strong> ${opts.assetId}</p>
       <p><strong>반려 사유:</strong> ${opts.reason}</p>
       <p>수정 후 다시 제출해 주시면 재검토 해드리겠습니다.</p>
+      <br><p>Image Partners 팀 드림</p>
+    `,
+  });
+}
+
+export async function sendPhotographerApplicationApproved(opts: {
+  photographerEmail: string;
+  photographerName: string;
+}) {
+  const photographerName = escapeHtml(opts.photographerName);
+
+  await sendEmail({
+    to: opts.photographerEmail,
+    subject: "[Image Partners] 사진가 신청이 승인되었습니다",
+    html: `
+      <p>${photographerName}님, 안녕하세요.</p>
+      <p>사진가 신청이 승인되었습니다. 이제 이미지 업로드, 운영팀 요청, 판매 정산 기능을 사용할 수 있습니다.</p>
+      <p><a href="https://imageptns.vercel.app/dashboard/uploads">대시보드에서 업로드 시작하기 →</a></p>
+      <br><p>Image Partners 팀 드림</p>
+    `,
+  });
+}
+
+export async function sendPhotographerApplicationRejected(opts: {
+  photographerEmail: string;
+  photographerName: string;
+  reason: string;
+}) {
+  const photographerName = escapeHtml(opts.photographerName);
+  const reason = escapeHtml(opts.reason);
+
+  await sendEmail({
+    to: opts.photographerEmail,
+    subject: "[Image Partners] 사진가 신청 검토 결과 안내",
+    html: `
+      <p>${photographerName}님, 안녕하세요.</p>
+      <p>사진가 신청이 아래 사유로 승인되지 않았습니다.</p>
+      <p><strong>사유:</strong> ${reason}</p>
+      <p>정보를 보완한 뒤 설정 페이지에서 다시 신청할 수 있습니다.</p>
+      <br><p>Image Partners 팀 드림</p>
+    `,
+  });
+}
+
+export async function sendPhotographerAccessSuspended(opts: {
+  photographerEmail: string;
+  photographerName: string;
+  reason?: string | null;
+}) {
+  const photographerName = escapeHtml(opts.photographerName);
+  const reason = opts.reason ? escapeHtml(opts.reason) : null;
+
+  await sendEmail({
+    to: opts.photographerEmail,
+    subject: "[Image Partners] 사진가 권한 상태 안내",
+    html: `
+      <p>${photographerName}님, 안녕하세요.</p>
+      <p>운영 확인이 필요한 사유로 사진가 권한이 중지되었습니다.</p>
+      ${reason ? `<p><strong>메모:</strong> ${reason}</p>` : ""}
+      <p>설정 페이지에서 활동 정보를 보완해 재신청할 수 있습니다.</p>
       <br><p>Image Partners 팀 드림</p>
     `,
   });

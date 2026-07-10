@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/admin/commission",        icon: "percent",         label: "수수료 정책"  },
   { href: "/admin/support",           icon: "support_agent",   label: "고객 문의"    },
   { href: "/admin/users",             icon: "manage_accounts", label: "회원관리"      },
+  { href: "/admin/photographer-applications", icon: "how_to_reg", label: "사진가 승인" },
   { href: "/admin/profile-withdrawal-requests", icon: "person_remove", label: "탈퇴 검토" },
   { href: "/admin/admins",            icon: "admin_panel_settings", label: "관리자 계정" },
   { href: "/admin/presence",          icon: "groups",          label: "동시접속자"   },

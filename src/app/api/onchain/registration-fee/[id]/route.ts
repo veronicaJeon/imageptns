@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 
 interface FeeOrderItemRow {
   image_id: string;
@@ -33,6 +34,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   if (order.photographer_id !== user.id && !isAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (!isAdmin) {
+    const authorization = await requireApprovedPhotographer(admin, user.id);
+    if (!authorization.ok) return authorization.response;
   }
 
   const { data: itemRows } = await admin

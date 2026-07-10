@@ -8,6 +8,7 @@ export interface AuthUser {
   organization: string | null;
   role: "buyer" | "photographer";
   roles: Array<"buyer" | "photographer">;
+  photographer_status: "none" | "pending" | "approved" | "suspended";
   avatar_url: string | null;
   is_admin: boolean;
 }
@@ -35,7 +36,7 @@ export const useAuth = create<AuthStore>((set) => ({
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name, organization, role, roles, avatar_url, is_admin")
+        .select("full_name, organization, role, roles, photographer_status, avatar_url, is_admin")
         .eq("id", user.id)
         .single();
 
@@ -47,6 +48,12 @@ export const useAuth = create<AuthStore>((set) => ({
           organization: profile?.organization ?? null,
           role: (profile?.role as "buyer" | "photographer") ?? "buyer",
           roles: Array.isArray(profile?.roles) ? profile.roles as Array<"buyer" | "photographer"> : [(profile?.role as "buyer" | "photographer") ?? "buyer"],
+          photographer_status:
+            profile?.photographer_status === "pending" ||
+            profile?.photographer_status === "approved" ||
+            profile?.photographer_status === "suspended"
+              ? profile.photographer_status
+              : "none",
           avatar_url: profile?.avatar_url ?? null,
           is_admin: profile?.is_admin ?? false,
         },
@@ -61,7 +68,7 @@ export const useAuth = create<AuthStore>((set) => ({
         }
         const { data: p } = await supabase
           .from("profiles")
-          .select("full_name, organization, role, roles, avatar_url, is_admin")
+          .select("full_name, organization, role, roles, photographer_status, avatar_url, is_admin")
           .eq("id", session.user.id)
           .single();
 
@@ -73,6 +80,12 @@ export const useAuth = create<AuthStore>((set) => ({
             organization: p?.organization ?? null,
             role: (p?.role as "buyer" | "photographer") ?? "buyer",
             roles: Array.isArray(p?.roles) ? p.roles as Array<"buyer" | "photographer"> : [(p?.role as "buyer" | "photographer") ?? "buyer"],
+            photographer_status:
+              p?.photographer_status === "pending" ||
+              p?.photographer_status === "approved" ||
+              p?.photographer_status === "suspended"
+                ? p.photographer_status
+                : "none",
             avatar_url: p?.avatar_url ?? null,
             is_admin: p?.is_admin ?? false,
           },

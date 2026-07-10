@@ -9,11 +9,16 @@ import {
   normalizeSignupPassword,
   normalizeSignupRole,
   normalizeSignupText,
+  photographerIntentCreatesBuyerRole,
   SIGNUP_CONFIRMATION_RESENT_MESSAGE,
   SIGNUP_CONFIRMATION_SENT_MESSAGE,
   SIGNUP_EXISTING_ACCOUNT_MESSAGE,
   type SignupLookupResult,
 } from "@/lib/auth/signup-flow";
+import {
+  buildPhotographerApplicationPayload,
+  ensurePendingPhotographerApplication,
+} from "@/lib/photographers/approval";
 
 function createPublicAuthClient() {
   return createClient(
@@ -62,15 +67,39 @@ export async function POST(req: NextRequest) {
   let password: string;
   let name: string;
   let organization: string;
+  let phoneNumber: unknown;
+  let primaryActivityRegions: unknown;
+  let bio: unknown;
   try {
     email = normalizeSignupEmail(payload.email);
     password = normalizeSignupPassword(payload.password);
     name = normalizeSignupText(payload.name, "이름", 80);
     organization = normalizeSignupText(payload.organization, "소속", 120);
+    phoneNumber = typeof payload.phone_number === "string" ? payload.phone_number : null;
+    primaryActivityRegions = payload.primary_activity_regions ?? [];
+    bio = typeof payload.bio === "string" ? payload.bio : "";
   } catch (error) {
     return badRequest(error instanceof Error ? error.message : "가입 정보를 확인해주세요.");
   }
   const role = normalizeSignupRole(payload.role);
+  const signupIntent = photographerIntentCreatesBuyerRole(role);
+  if (signupIntent.shouldCreateApplication) {
+    try {
+      const applicationPayload = buildPhotographerApplicationPayload({
+        profileId: "00000000-0000-0000-0000-000000000000",
+        name,
+        organization,
+        phoneNumber,
+        primaryActivityRegions,
+        bio,
+      });
+      if (!applicationPayload.phone_number || applicationPayload.primary_activity_regions.length === 0) {
+        return badRequest("사진가 신청을 위해 연락처와 주요 활동 지역을 입력해주세요.");
+      }
+    } catch (error) {
+      return badRequest(error instanceof Error ? error.message : "사진가 신청 정보를 확인해주세요.");
+    }
+  }
   const emailRedirectTo = buildSiteUrl("/api/auth/callback");
 
   const admin = createAdminClient();
@@ -133,13 +162,35 @@ export async function POST(req: NextRequest) {
     email,
     password,
     options: {
-      data: { full_name: name, role, organization },
+      data: {
+        full_name: name,
+        role,
+        requested_role: role,
+        organization,
+      },
       emailRedirectTo,
     },
   });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  const createdUserId = data.user?.id;
+  if (createdUserId && signupIntent.shouldCreateApplication) {
+    try {
+      await ensurePendingPhotographerApplication(admin, {
+        profileId: createdUserId,
+        name,
+        organization,
+        phoneNumber,
+        primaryActivityRegions,
+        bio,
+      });
+    } catch (applicationError) {
+      console.error("[auth-signup] photographer application creation failed", applicationError);
+      return NextResponse.json({ error: "사진가 신청을 접수하지 못했습니다." }, { status: 500 });
+    }
   }
 
   if (data.session) {

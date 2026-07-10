@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useLang } from "@/lib/i18n/store";
+import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 
 type MatchDecision = "interested" | "declined";
 
@@ -136,7 +137,7 @@ function formatBudget(request: ContactPhotoRequest, locale: string, copy: typeof
     : copy.maxBudget(formatKRW(request.budget_max_krw, locale));
 }
 
-export default function DashboardRequestsPage() {
+function DashboardRequestsContent() {
   const { lang } = useLang();
   const copy = PHOTOGRAPHER_REQUESTS_COPY[lang];
   const [matches, setMatches] = useState<PhotoRequestMatch[]>([]);
@@ -326,5 +327,13 @@ export default function DashboardRequestsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DashboardRequestsPage() {
+  return (
+    <PhotographerApprovalGate>
+      <DashboardRequestsContent />
+    </PhotographerApprovalGate>
   );
 }

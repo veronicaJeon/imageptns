@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import { randomUUID } from "crypto";
 
 const ALLOWED_IMAGE_TYPES: Record<string, string> = {
@@ -13,6 +15,10 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, user.id);
+  if (!authorization.ok) return authorization.response;
 
   const { filename, contentType } = await req.json() as { filename?: string; contentType?: string };
   if (!filename || !contentType) {

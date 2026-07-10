@@ -232,7 +232,7 @@ export const en: Translations = {
       title: "Join Image Partners.",
       subtitle: "Choose how you'd like to use the platform.",
       roleLabel: "I am a…",
-      roleBuyer: "Image Buyer",
+      roleBuyer: "Buyer",
       roleBuyerDesc: "Find & license imagery",
       rolePhotographer: "Photographer",
       rolePhotographerDesc: "Submit & monetize work",
@@ -253,7 +253,7 @@ export const en: Translations = {
       privacyLink: "Privacy Policy",
     },
     brand: {
-      tagline: "The world's most curated image archive.",
+      tagline: "Photographs are proof of the past.",
       quote: "\"Every image is a story waiting to be told.\"",
     },
   },
@@ -307,7 +307,7 @@ export const en: Translations = {
   },
   dashboard: {
     nav: { overview: "Overview", sourcing: "My sourcing requests", favorites: "Favorites", orders: "Orders", uploads: "Uploads", requests: "Team requests", blockchain: "Blockchain", earnings: "Earnings", settings: "Settings" },
-    role: { buyer: "Image Buyer", photographer: "Photographer" },
+    role: { buyer: "Buyer", photographer: "Photographer" },
     overview: {
       greeting: "Good to see you",
       statFavorites: "Favorites", statOrders: "Orders", statCart: "In Cart",

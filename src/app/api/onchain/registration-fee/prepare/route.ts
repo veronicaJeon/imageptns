@@ -9,6 +9,7 @@ import {
   isSelfFundedFeeEligible,
 } from "@/lib/onchain/registration-fee";
 import { recordOnchainEvent } from "@/lib/onchain/events";
+import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 
 interface FeeImageRow {
   id: string;
@@ -26,11 +27,14 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const userId = user.id;
 
+  const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, userId);
+  if (!authorization.ok) return authorization.response;
+
   const body = (await req.json().catch(() => null)) as { imageIds?: string[] } | null;
   const imageIds = Array.from(new Set(body?.imageIds ?? [])).filter(Boolean);
   if (imageIds.length === 0) return NextResponse.json({ error: "imageIds required" }, { status: 400 });
 
-  const admin = createAdminClient();
   const { data: rows, error: loadError } = await admin
     .from("images")
     .select("id, asset_id, title, status, sales_count, proof_status, proof_request_payment_status")

@@ -23,6 +23,22 @@ interface ClaimableEarningRow {
   claimable_amount: number | string | null;
 }
 
+interface PhotographerApplicationSummary {
+  id: string;
+  profile_id: string;
+  status: "pending" | "approved" | "rejected";
+  applicant_name: string;
+  organization: string | null;
+  phone_number: string | null;
+  primary_activity_regions: string[] | null;
+  bio: string | null;
+  admin_note: string | null;
+  rejection_reason: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
 function hasValue(value: string | null | undefined) {
   return Boolean(value && value.trim());
 }
@@ -93,10 +109,15 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 
   const { id } = await params;
   const admin = createAdminClient();
-  const [{ data: profile, error: profileError }, authResult, { data: orders, error: ordersError }] = await Promise.all([
+  const [
+    { data: profile, error: profileError },
+    authResult,
+    { data: orders, error: ordersError },
+    { data: applications, error: applicationsError },
+  ] = await Promise.all([
     admin
       .from("profiles")
-      .select("id, full_name, bio, role, avatar_url, wallet_address, phone_number, primary_activity_regions, is_admin, created_at, updated_at, last_login_at, login_count, deleted_at")
+      .select("id, full_name, bio, role, photographer_status, avatar_url, wallet_address, phone_number, primary_activity_regions, is_admin, created_at, updated_at, last_login_at, login_count, deleted_at")
       .eq("id", id)
       .single(),
     admin.auth.admin.getUserById(id),
@@ -113,11 +134,22 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       .eq("buyer_id", id)
       .order("created_at", { ascending: false })
       .limit(50),
+    admin
+      .from("photographer_applications")
+      .select("id, profile_id, status, applicant_name, organization, phone_number, primary_activity_regions, bio, admin_note, rejection_reason, reviewed_at, created_at, updated_at")
+      .eq("profile_id", id)
+      .order("created_at", { ascending: false })
+      .limit(10),
   ]);
 
   if (profileError) return NextResponse.json({ error: profileError.message }, { status: 404 });
   if (authResult.error) return NextResponse.json({ error: authResult.error.message }, { status: 500 });
   if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 500 });
+  if (applicationsError) return NextResponse.json({ error: applicationsError.message }, { status: 500 });
+
+  const applicationRows = (applications ?? []) as PhotographerApplicationSummary[];
+  const latestApplication = applicationRows[0] ?? null;
+  const pendingApplication = applicationRows.find((application) => application.status === "pending") ?? null;
 
   return NextResponse.json({
     user: {
@@ -125,6 +157,9 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       email: authResult.data.user?.email ?? "",
       authCreatedAt: authResult.data.user?.created_at ?? null,
       authLastSignInAt: authResult.data.user?.last_sign_in_at ?? null,
+      latest_photographer_application: latestApplication,
+      pending_photographer_application: pendingApplication,
+      photographer_applications: applicationRows,
     },
     orders: orders ?? [],
   });

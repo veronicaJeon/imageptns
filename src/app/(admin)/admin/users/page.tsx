@@ -4,10 +4,31 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import type { ProfileWithdrawalAssessment } from "@/lib/profiles/withdrawal";
 
+type PhotographerStatus = "none" | "pending" | "approved" | "suspended";
+
+interface PhotographerApplicationSummary {
+  id: string;
+  profile_id: string;
+  status: "pending" | "approved" | "rejected";
+  applicant_name: string;
+  organization: string | null;
+  phone_number: string | null;
+  primary_activity_regions: string[] | null;
+  bio: string | null;
+  admin_note: string | null;
+  rejection_reason: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
 interface UserSummary {
   id: string;
   full_name: string | null;
   role: "buyer" | "photographer";
+  photographer_status: PhotographerStatus;
+  latest_photographer_application: PhotographerApplicationSummary | null;
+  pending_photographer_application: PhotographerApplicationSummary | null;
   avatar_url: string | null;
   is_admin: boolean;
   wallet_address: string | null;
@@ -30,6 +51,10 @@ interface UserDetail {
   full_name: string | null;
   bio: string | null;
   role: "buyer" | "photographer";
+  photographer_status: PhotographerStatus;
+  latest_photographer_application: PhotographerApplicationSummary | null;
+  pending_photographer_application: PhotographerApplicationSummary | null;
+  photographer_applications: PhotographerApplicationSummary[];
   avatar_url: string | null;
   wallet_address: string | null;
   phone_number: string | null;
@@ -98,6 +123,32 @@ const WITHDRAWAL_ACTION_LABELS: Record<string, string> = {
   settle_claimable_earnings: "클레임 수익 정산",
 };
 
+const PHOTOGRAPHER_STATUS_LABELS: Record<UserSummary["photographer_status"], string> = {
+  none: "미신청",
+  pending: "승인대기",
+  approved: "승인됨",
+  suspended: "중지됨",
+};
+
+const PHOTOGRAPHER_STATUS_STYLES: Record<UserSummary["photographer_status"], string> = {
+  none: "bg-surface-container-low text-outline",
+  pending: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-200",
+  approved: "bg-primary/10 text-primary",
+  suspended: "bg-error/10 text-error",
+};
+
+const APPLICATION_STATUS_LABELS: Record<PhotographerApplicationSummary["status"], string> = {
+  pending: "신청대기",
+  approved: "신청승인",
+  rejected: "신청거절",
+};
+
+const APPLICATION_STATUS_STYLES: Record<PhotographerApplicationSummary["status"], string> = {
+  pending: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-200",
+  approved: "bg-primary/10 text-primary",
+  rejected: "bg-error/10 text-error",
+};
+
 function formatKRW(amount: number) {
   return `₩${amount.toLocaleString("ko-KR")}`;
 }
@@ -121,12 +172,15 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("all");
+  const [photographerStatus, setPhotographerStatus] = useState("all");
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<UserDetail | null>(null);
   const [orders, setOrders] = useState<UserOrder[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [suspendingPhotographer, setSuspendingPhotographer] = useState(false);
+  const [reviewingPhotographerApplication, setReviewingPhotographerApplication] = useState(false);
   const [withdrawalAssessment, setWithdrawalAssessment] = useState<ProfileWithdrawalAssessment | null>(null);
   const [withdrawalRequest, setWithdrawalRequest] = useState<WithdrawalRequestSummary | null>(null);
 
@@ -135,6 +189,7 @@ export default function AdminUsersPage() {
     const params = new URLSearchParams();
     if (query.trim()) params.set("query", query.trim());
     if (role !== "all") params.set("role", role);
+    if (photographerStatus !== "all") params.set("photographer_status", photographerStatus);
     try {
       const res = await fetch(`/api/admin/users?${params.toString()}`);
       if (!res.ok) throw new Error("회원 목록을 불러오지 못했습니다.");
@@ -145,7 +200,7 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [query, role]);
+  }, [query, role, photographerStatus]);
 
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
@@ -211,6 +266,102 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function suspendPhotographerAccess() {
+    if (!detail) return;
+    const reason = prompt("사진가 권한 회수 사유를 입력하세요. 사용자에게 안내될 수 있습니다.")?.trim() ?? "";
+    if (!confirm(`${detail.full_name || detail.email || detail.id} 회원의 사진가 권한을 회수할까요?`)) return;
+
+    setSuspendingPhotographer(true);
+    try {
+      const res = await fetch(`/api/admin/users/${detail.id}/photographer-suspension`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const body = await res.json().catch(() => null) as { profile?: UserDetail; error?: string } | null;
+      if (!res.ok) throw new Error(body?.error ?? "사진가 권한을 회수하지 못했습니다.");
+
+      setDetail((current) => current ? { ...current, photographer_status: "suspended" } : current);
+      setUsers((current) =>
+        current.map((user) =>
+          user.id === detail.id ? { ...user, photographer_status: "suspended" } : user,
+        ),
+      );
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "사진가 권한을 회수하지 못했습니다.");
+    } finally {
+      setSuspendingPhotographer(false);
+    }
+  }
+
+  async function reviewPhotographerApplication(action: "approve" | "reject") {
+    if (!detail?.pending_photographer_application) return;
+
+    const application = detail.pending_photographer_application;
+    const adminNote = prompt("관리자 메모를 입력하세요. 신청자에게는 공개되지 않습니다.")?.trim() ?? "";
+    const rejectionReason = action === "reject"
+      ? prompt("거절 사유를 입력하세요. 신청자에게 안내됩니다.")?.trim() ?? ""
+      : "";
+
+    if (action === "reject" && !rejectionReason) return;
+    if (!confirm(`${application.applicant_name}님의 사진가 신청을 ${action === "approve" ? "승인" : "거절"}할까요?`)) return;
+
+    setReviewingPhotographerApplication(true);
+    try {
+      const res = await fetch("/api/admin/photographer-applications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: application.id,
+          action,
+          admin_note: adminNote,
+          rejection_reason: rejectionReason,
+        }),
+      });
+      const body = await res.json().catch(() => null) as {
+        application?: PhotographerApplicationSummary;
+        error?: string;
+      } | null;
+      if (!res.ok || !body?.application) {
+        throw new Error(body?.error ?? "사진가 신청 검토 결과를 저장하지 못했습니다.");
+      }
+
+      const reviewedApplication = body.application;
+      const nextPhotographerStatus: PhotographerStatus = action === "approve" ? "approved" : "suspended";
+      setDetail((current) => {
+        if (!current) return current;
+        const applications = current.photographer_applications.length > 0
+          ? current.photographer_applications.map((row) => row.id === reviewedApplication.id ? reviewedApplication : row)
+          : [reviewedApplication];
+        return {
+          ...current,
+          role: action === "approve" ? "photographer" : current.role,
+          photographer_status: nextPhotographerStatus,
+          latest_photographer_application: reviewedApplication,
+          pending_photographer_application: null,
+          photographer_applications: applications,
+        };
+      });
+      setUsers((current) =>
+        current.map((user) =>
+          user.id === reviewedApplication.profile_id
+            ? {
+              ...user,
+              role: action === "approve" ? "photographer" : user.role,
+              photographer_status: nextPhotographerStatus,
+              latest_photographer_application: reviewedApplication,
+              pending_photographer_application: null,
+            }
+            : user,
+        ),
+      );
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "사진가 신청 검토 결과를 저장하지 못했습니다.");
+    } finally {
+      setReviewingPhotographerApplication(false);
+    }
+  }
+
   return (
     <div className="p-6 md:p-10">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -233,6 +384,17 @@ export default function AdminUsersPage() {
             <option value="all">전체 역할</option>
             <option value="buyer">바이어</option>
             <option value="photographer">사진작가</option>
+          </select>
+          <select
+            value={photographerStatus}
+            onChange={(event) => setPhotographerStatus(event.target.value)}
+            className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+          >
+            <option value="all">전체 사진가상태</option>
+            <option value="pending">승인대기</option>
+            <option value="approved">승인됨</option>
+            <option value="suspended">중지됨</option>
+            <option value="none">미신청</option>
           </select>
           <button onClick={loadUsers} className="h-11 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-widest text-white">조회</button>
         </div>
@@ -269,9 +431,21 @@ export default function AdminUsersPage() {
                     </div>
                   </td>
                   <td className="px-5 py-4">
-                    <span className="rounded-full bg-surface-container-low px-2.5 py-1 text-xs font-bold text-on-surface-variant">
-                      {user.role === "photographer" ? "사진작가" : "바이어"}
-                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="rounded-full bg-surface-container-low px-2.5 py-1 text-xs font-bold text-on-surface-variant">
+                        {user.role === "photographer" ? "사진작가" : "바이어"}
+                      </span>
+                      {user.photographer_status !== "none" && (
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${PHOTOGRAPHER_STATUS_STYLES[user.photographer_status]}`}>
+                          {PHOTOGRAPHER_STATUS_LABELS[user.photographer_status]}
+                        </span>
+                      )}
+                      {user.pending_photographer_application && (
+                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-600 dark:bg-amber-900/20 dark:text-amber-200">
+                          신청서 대기
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-4 text-on-surface-variant">
                     <p className="text-xs">{formatDate(user.last_login_at ?? user.authLastSignInAt)}</p>
@@ -303,6 +477,88 @@ export default function AdminUsersPage() {
                 <p className="text-[10px] font-bold uppercase tracking-widest text-primary">{detail.role}</p>
                 <h2 className="mt-1 font-headline text-xl font-extrabold text-on-surface">{detail.full_name || "이름 없음"}</h2>
                 <p className="mt-1 text-sm text-outline">{detail.email || detail.id}</p>
+                {detail.photographer_status !== "none" && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${PHOTOGRAPHER_STATUS_STYLES[detail.photographer_status]}`}>
+                      사진가 {PHOTOGRAPHER_STATUS_LABELS[detail.photographer_status]}
+                    </span>
+                    {detail.photographer_status === "approved" && (
+                      <button
+                        type="button"
+                        onClick={suspendPhotographerAccess}
+                        disabled={suspendingPhotographer}
+                        className="rounded-full border border-error/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-error transition-colors hover:bg-error/10 disabled:opacity-50"
+                      >
+                        {suspendingPhotographer ? "처리 중" : "사진가 권한 회수"}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {detail.latest_photographer_application && (
+                  <div className="mt-4 rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사진가 신청</p>
+                        <p className="mt-1 text-sm font-semibold text-on-surface">
+                          {detail.latest_photographer_application.applicant_name}
+                        </p>
+                        <p className="mt-1 text-xs text-outline">
+                          접수 {formatDate(detail.latest_photographer_application.created_at)}
+                          {detail.latest_photographer_application.reviewed_at
+                            ? ` · 검토 ${formatDate(detail.latest_photographer_application.reviewed_at)}`
+                            : ""}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${APPLICATION_STATUS_STYLES[detail.latest_photographer_application.status]}`}>
+                        {APPLICATION_STATUS_LABELS[detail.latest_photographer_application.status]}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 grid gap-2 text-xs text-on-surface-variant">
+                      <p>소속: {detail.latest_photographer_application.organization ?? detail.full_name ?? "-"}</p>
+                      <p>연락처: {detail.latest_photographer_application.phone_number ?? detail.phone_number ?? "-"}</p>
+                      {(detail.latest_photographer_application.primary_activity_regions?.length ?? 0) > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {detail.latest_photographer_application.primary_activity_regions?.map((region) => (
+                            <span key={region} className="rounded-full bg-surface-container-lowest px-2 py-1 text-[10px] font-bold text-on-surface-variant">
+                              {region}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {detail.latest_photographer_application.bio && (
+                        <p className="leading-relaxed">소개: {detail.latest_photographer_application.bio}</p>
+                      )}
+                      {detail.latest_photographer_application.rejection_reason && (
+                        <p className="text-error">거절 사유: {detail.latest_photographer_application.rejection_reason}</p>
+                      )}
+                      {detail.latest_photographer_application.admin_note && (
+                        <p className="text-outline">관리자 메모: {detail.latest_photographer_application.admin_note}</p>
+                      )}
+                    </div>
+
+                    {detail.pending_photographer_application && (
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                        <button
+                          type="button"
+                          onClick={() => reviewPhotographerApplication("approve")}
+                          disabled={reviewingPhotographerApplication}
+                          className="rounded-lg bg-primary px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-opacity disabled:opacity-50"
+                        >
+                          {reviewingPhotographerApplication ? "처리 중" : "사진가 승인"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => reviewPhotographerApplication("reject")}
+                          disabled={reviewingPhotographerApplication}
+                          className="rounded-lg border border-error/30 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-error transition-colors hover:bg-error/10 disabled:opacity-50"
+                        >
+                          거절
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                   <div className="rounded-lg bg-surface-container-low p-3"><p className="text-xs text-outline">최종 로그인</p><p className="mt-1 font-semibold">{formatDate(detail.last_login_at ?? detail.authLastSignInAt)}</p></div>
                   <div className="rounded-lg bg-surface-container-low p-3"><p className="text-xs text-outline">총 로그인</p><p className="mt-1 font-semibold">{detail.login_count ?? 0}회</p></div>

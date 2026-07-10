@@ -7,6 +7,7 @@ interface ProfileRow {
   full_name: string | null;
   role: "buyer" | "photographer";
   roles: Array<"buyer" | "photographer"> | null;
+  photographer_status: "none" | "pending" | "approved" | "suspended";
   avatar_url: string | null;
   is_admin: boolean;
   wallet_address: string | null;
@@ -36,6 +37,22 @@ interface AuthUserSummary {
   created_at?: string;
 }
 
+interface PhotographerApplicationSummary {
+  id: string;
+  profile_id: string;
+  status: "pending" | "approved" | "rejected";
+  applicant_name: string;
+  organization: string | null;
+  phone_number: string | null;
+  primary_activity_regions: string[] | null;
+  bio: string | null;
+  admin_note: string | null;
+  rejection_reason: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
 function summarizeOrders(orders: OrderSummaryRow[]) {
   return orders.reduce(
     (summary, order) => {
@@ -62,17 +79,26 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const query = searchParams.get("query")?.trim().toLowerCase() ?? "";
   const role = searchParams.get("role") ?? "all";
+  const photographerStatus = searchParams.get("photographer_status") ?? "all";
   const adminOnly = searchParams.get("admin") === "true";
 
   const admin = createAdminClient();
   let profileQuery = admin
     .from("profiles")
-    .select("id, full_name, role, roles, avatar_url, is_admin, wallet_address, phone_number, primary_activity_regions, created_at, updated_at, last_login_at, login_count, deleted_at")
+    .select("id, full_name, role, roles, photographer_status, avatar_url, is_admin, wallet_address, phone_number, primary_activity_regions, created_at, updated_at, last_login_at, login_count, deleted_at")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(300);
 
   if (role === "buyer" || role === "photographer") profileQuery = profileQuery.eq("role", role);
+  if (
+    photographerStatus === "none" ||
+    photographerStatus === "pending" ||
+    photographerStatus === "approved" ||
+    photographerStatus === "suspended"
+  ) {
+    profileQuery = profileQuery.eq("photographer_status", photographerStatus);
+  }
   if (adminOnly) profileQuery = profileQuery.eq("is_admin", true);
 
   const [{ data: profileData, error: profileError }, authResult, { data: orderData, error: orderError }] = await Promise.all([
@@ -89,6 +115,28 @@ export async function GET(req: NextRequest) {
   if (orderError) return NextResponse.json({ error: orderError.message }, { status: 500 });
 
   const profiles = (profileData ?? []) as ProfileRow[];
+  const profileIds = profiles.map((profile) => profile.id);
+  const { data: applicationData, error: applicationError } = profileIds.length > 0
+    ? await admin
+      .from("photographer_applications")
+      .select("id, profile_id, status, applicant_name, organization, phone_number, primary_activity_regions, bio, admin_note, rejection_reason, reviewed_at, created_at, updated_at")
+      .in("profile_id", profileIds)
+      .order("created_at", { ascending: false })
+    : { data: [], error: null };
+
+  if (applicationError) return NextResponse.json({ error: applicationError.message }, { status: 500 });
+
+  const latestApplicationByProfile = new Map<string, PhotographerApplicationSummary>();
+  const pendingApplicationByProfile = new Map<string, PhotographerApplicationSummary>();
+  for (const application of (applicationData ?? []) as PhotographerApplicationSummary[]) {
+    if (!latestApplicationByProfile.has(application.profile_id)) {
+      latestApplicationByProfile.set(application.profile_id, application);
+    }
+    if (application.status === "pending" && !pendingApplicationByProfile.has(application.profile_id)) {
+      pendingApplicationByProfile.set(application.profile_id, application);
+    }
+  }
+
   const authUsers = ((authResult.data.users ?? []) as AuthUserSummary[]);
   const authById = new Map(authUsers.map((user) => [user.id, user]));
   const orders = (orderData ?? []) as OrderSummaryRow[];
@@ -107,12 +155,29 @@ export async function GET(req: NextRequest) {
         email: auth?.email ?? "",
         authCreatedAt: auth?.created_at ?? null,
         authLastSignInAt: auth?.last_sign_in_at ?? null,
+        latest_photographer_application: latestApplicationByProfile.get(profile.id) ?? null,
+        pending_photographer_application: pendingApplicationByProfile.get(profile.id) ?? null,
         ...summarizeOrders(ordersByBuyer.get(profile.id) ?? []),
       };
     })
     .filter((user) => {
       if (!query) return true;
-      return [user.email, user.full_name, user.wallet_address, user.phone_number, ...(user.primary_activity_regions ?? []), user.id]
+      const latestApplication = user.latest_photographer_application;
+      return [
+        user.email,
+        user.full_name,
+        user.wallet_address,
+        user.phone_number,
+        user.photographer_status,
+        latestApplication?.applicant_name,
+        latestApplication?.organization,
+        latestApplication?.phone_number,
+        latestApplication?.bio,
+        latestApplication?.rejection_reason,
+        ...(latestApplication?.primary_activity_regions ?? []),
+        ...(user.primary_activity_regions ?? []),
+        user.id,
+      ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query));
     });

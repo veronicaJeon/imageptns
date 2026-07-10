@@ -8,10 +8,11 @@ import { useLang } from "@/lib/i18n/store";
 import { extractExif, type ExifData } from "@/lib/utils/exif";
 import { normalizeRotationDegrees, rotatedDimensions } from "@/lib/images/orientation";
 import { localizedCopyrightLicenses, localizedFreeUsagePolicies, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
+import { IMAGE_CATEGORIES, isImageCategoryCode, type ImageCategoryCode } from "@/lib/images/categories";
+import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
-const CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
-type Category = typeof CATEGORIES[number];
+type Category = ImageCategoryCode;
 
 const ACCEPTED_TYPES = ["image/tiff", "image/jpeg", "image/png", "image/webp"];
 const MAX_SIZE_MB = 500;
@@ -161,11 +162,11 @@ type ExifLabelCopy = Record<keyof typeof NEW_UPLOAD_COPY.ko.exifLabels, string>;
 
 // ── Adaptive preview container based on aspect ratio ─────────────────────────
 function previewContainerClass(w: number | null, h: number | null): string {
-  if (!w || !h) return "w-full max-h-64 overflow-hidden rounded-lg";
+  if (!w || !h) return "w-full max-h-[70vh] overflow-hidden rounded-lg";
   const r = w / h;
-  if (r >= 1.35)  return "w-full overflow-hidden rounded-lg";              // landscape
-  if (r <= 0.74)  return "max-w-[280px] mx-auto overflow-hidden rounded-lg"; // portrait
-  return "max-w-[420px] mx-auto overflow-hidden rounded-lg";              // square-ish
+  if (r >= 1.35)  return "w-full overflow-hidden rounded-lg";                  // landscape
+  if (r <= 0.74)  return "w-full max-w-[720px] mx-auto overflow-hidden rounded-lg"; // portrait
+  return "w-full max-w-[820px] mx-auto overflow-hidden rounded-lg";             // square-ish
 }
 
 // ── EXIF metadata display ─────────────────────────────────────────────────────
@@ -248,7 +249,7 @@ function ExifPanel({ data, lang, labels }: { data: ExifData; lang: NewUploadLang
   );
 }
 
-export default function NewUploadPage() {
+function NewUploadContent() {
   const { lang } = useLang();
   const copy = NEW_UPLOAD_COPY[lang];
   const copyrightLicenses = localizedCopyrightLicenses(lang);
@@ -391,7 +392,7 @@ export default function NewUploadPage() {
         tags_ko: Array.isArray(tags_ko) ? tags_ko : lang === "ko" && Array.isArray(aiTags) ? aiTags : [],
         tags_en: Array.isArray(tags_en) ? tags_en : lang === "en" && Array.isArray(aiTags) ? aiTags : [],
       });
-      if (aiCategory && CATEGORIES.includes(aiCategory as Category)) setCategory(aiCategory as Category);
+      if (aiCategory && isImageCategoryCode(aiCategory)) setCategory(aiCategory);
 
       setAiStatus(filled ? "done" : "failed");
     } catch {
@@ -545,7 +546,7 @@ export default function NewUploadPage() {
   }
 
   return (
-    <div className="p-6 md:p-10 max-w-2xl">
+    <div className="p-6 md:p-10 max-w-6xl">
       <div className="flex items-center gap-3 mb-8">
         <Link href="/dashboard/uploads" className="text-outline hover:text-on-surface transition-colors">
           <span className="material-symbols-outlined text-xl">arrow_back</span>
@@ -569,7 +570,7 @@ export default function NewUploadPage() {
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => fileInputRef.current?.click()}
-            className="cursor-pointer border-2 border-dashed border-outline-variant rounded-xl p-8 flex flex-col items-center gap-4 hover:border-primary hover:bg-primary/5 transition-all"
+            className="cursor-pointer border-2 border-dashed border-outline-variant rounded-xl p-6 md:p-8 flex flex-col items-center gap-4 hover:border-primary hover:bg-primary/5 transition-all"
           >
             <input
               ref={fileInputRef}
@@ -585,7 +586,7 @@ export default function NewUploadPage() {
                   alt="Preview"
                   width={imgWidth ?? 800}
                   height={imgHeight ?? 600}
-                  className="w-full h-auto block transition-transform duration-200"
+                  className="max-h-[72vh] w-full h-auto object-contain block transition-transform duration-200"
                   style={{
                     transform: rotationDegrees ? `rotate(${rotationDegrees}deg)` : "none",
                   }}
@@ -731,8 +732,8 @@ export default function NewUploadPage() {
               required value={category} onChange={(e) => setCategory(e.target.value as Category)}
               className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface outline-none transition-all"
             >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+              {IMAGE_CATEGORIES.map((c) => (
+                <option key={c.code} value={c.code}>{c[lang]}</option>
               ))}
             </select>
           </div>
@@ -1030,5 +1031,13 @@ export default function NewUploadPage() {
         </form>
       )}
     </div>
+  );
+}
+
+export default function NewUploadPage() {
+  return (
+    <PhotographerApprovalGate>
+      <NewUploadContent />
+    </PhotographerApprovalGate>
   );
 }

@@ -4,8 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useLang } from "@/lib/i18n/store";
-import { buildSiteUrl } from "@/lib/routing/canonical";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { RadioCard } from "@/components/ui/RadioCard";
@@ -39,25 +37,19 @@ export default function SignupPage() {
   const [role, setRole]           = useState<Role>("buyer");
   const [name, setName]           = useState("");
   const [organization, setOrganization] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [activityRegions, setActivityRegions] = useState("");
+  const [bio, setBio] = useState("");
   const [email, setEmail]         = useState("");
   const [password, setPassword]   = useState("");
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
-
-  async function handleGoogleSignup() {
-    setLoading(true);
-    setError(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        // Pass role via callback URL; server route will attach it to user metadata
-        redirectTo: buildSiteUrl(`/api/auth/callback?role=${role}&organization=${encodeURIComponent(organization.trim())}`),
-      },
-    });
-    if (error) { setError(t.auth.login.errorOAuth); setLoading(false); }
-  }
+  const googleSignupUrl = `/api/auth/google?next=${encodeURIComponent(
+    "/dashboard",
+  )}&role=${role}&organization=${encodeURIComponent(organization.trim())}&phone_number=${encodeURIComponent(
+    phoneNumber.trim(),
+  )}&primary_activity_regions=${encodeURIComponent(activityRegions.trim())}&bio=${encodeURIComponent(bio.trim())}`;
 
   async function handleEmailSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -66,7 +58,16 @@ export default function SignupPage() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, organization, email, password, role }),
+      body: JSON.stringify({
+        name,
+        organization,
+        email,
+        password,
+        role,
+        phone_number: phoneNumber,
+        primary_activity_regions: activityRegions,
+        bio,
+      }),
     });
 
     const result = await res.json().catch(() => null) as {
@@ -195,7 +196,16 @@ export default function SignupPage() {
 
               {/* Google OAuth */}
               <button
-                onClick={handleGoogleSignup}
+                type="button"
+                onClick={() => {
+                  if (role === "photographer" && (!phoneNumber.trim() || !activityRegions.trim())) {
+                    setError("사진가 신청을 위해 연락처와 주요 활동 지역을 입력해주세요.");
+                    return;
+                  }
+                  setLoading(true);
+                  setError(null);
+                  window.location.assign(googleSignupUrl);
+                }}
                 disabled={loading}
                 className="w-full min-w-0 min-h-12 px-4 py-3 flex items-center justify-center gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low transition-colors text-sm font-semibold leading-snug text-center text-on-surface disabled:opacity-50 disabled:cursor-not-allowed mb-6"
               >
@@ -237,6 +247,41 @@ export default function SignupPage() {
                   required
                   autoComplete="organization"
                 />
+                {role === "photographer" && (
+                  <>
+                    <Input
+                      label="연락처"
+                      type="tel"
+                      placeholder="+82 10 1234 5678"
+                      value={phoneNumber}
+                      onChange={(event) => setPhoneNumber(event.target.value)}
+                      icon="phone"
+                      required
+                      autoComplete="tel"
+                    />
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-outline uppercase tracking-widest">주요 활동 지역</label>
+                      <textarea
+                        value={activityRegions}
+                        onChange={(event) => setActivityRegions(event.target.value)}
+                        rows={3}
+                        className="w-full bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-none transition-all"
+                        placeholder="예: 서울, 경기, 부산"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-outline uppercase tracking-widest">간단 소개</label>
+                      <textarea
+                        value={bio}
+                        onChange={(event) => setBio(event.target.value)}
+                        rows={3}
+                        className="w-full bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-none transition-all"
+                        placeholder="주요 촬영 분야나 활동 이력을 간단히 적어주세요."
+                      />
+                    </div>
+                  </>
+                )}
                 <Input
                   label={a.emailLabel}
                   type="email"

@@ -116,6 +116,10 @@ function formatSize(value: number | null) {
   return `${Number(value).toLocaleString("ko-KR")} MB`;
 }
 
+function displayKo(value: string | null | undefined, fallback: string | null | undefined = "") {
+  return value?.trim() || fallback?.trim() || "-";
+}
+
 export default function AdminImagesPage() {
   const [images, setImages] = useState<AdminImage[]>([]);
   const [queryInput, setQueryInput] = useState("");
@@ -449,24 +453,29 @@ export default function AdminImagesPage() {
                 </td>
                 <td className="px-5 py-5 align-top">
                   <div className="flex items-start gap-4">
-                    <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-lg bg-surface-container-low">
+                    <div className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low">
                       {image.storage_path_preview ? (
-                        <Image src={image.storage_path_preview} alt="" fill sizes="112px" className="object-cover" />
+                        <Image src={image.storage_path_preview} alt="" fill sizes="112px" className="object-contain" />
                       ) : (
                         <span className="material-symbols-outlined absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-outline">image</span>
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="max-w-[360px] truncate font-semibold text-on-surface">{image.title}</p>
+                      <p className="max-w-[360px] truncate font-semibold text-on-surface">{displayKo(image.title_ko, image.title)}</p>
+                      {displayKo(image.title_en, "") !== "-" && (
+                        <p className="mt-0.5 max-w-[360px] truncate text-xs text-outline">{image.title_en}</p>
+                      )}
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-outline">
                         <span>{image.category}</span>
                         <span className="font-mono">{image.asset_id ?? "-"}</span>
                       </div>
                       <div className="mt-3 flex max-w-[420px] flex-wrap gap-1">
-                        {(image.tags ?? []).slice(0, 5).map((tag) => (
+                        {(image.tags_ko?.length ? image.tags_ko : image.tags ?? []).slice(0, 5).map((tag) => (
                           <span key={tag} className="rounded-full bg-primary/8 px-2 py-0.5 text-[10px] font-semibold text-primary">#{tag}</span>
                         ))}
-                        {(image.tags?.length ?? 0) > 5 && <span className="text-[10px] text-outline">+{(image.tags?.length ?? 0) - 5}</span>}
+                        {((image.tags_ko?.length ? image.tags_ko : image.tags)?.length ?? 0) > 5 && (
+                          <span className="text-[10px] text-outline">+{((image.tags_ko?.length ? image.tags_ko : image.tags)?.length ?? 0) - 5}</span>
+                        )}
                       </div>
                       <p className="mt-3 text-xs text-on-surface-variant">
                         {image.width && image.height ? `${image.width} x ${image.height}` : "크기 미기록"}

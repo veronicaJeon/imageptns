@@ -113,7 +113,7 @@ export function ImageCard({
       {/* 이미지 */}
       <Image
         src={thumbnailUrlFromPreviewUrl(image.src, 640, 480)}
-        alt={image.alt}
+        alt={displayTitle || image.alt}
         width={image.width}
         height={image.height}
         className="w-full h-auto object-cover group-hover:scale-[1.02] transition-transform duration-700"

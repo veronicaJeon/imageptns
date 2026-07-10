@@ -5,10 +5,11 @@ import Image from "next/image";
 import { useLang } from "@/lib/i18n/store";
 import { buildUploadProofSteps, type TimelineState } from "@/lib/ux/status";
 import { getCopyrightLicense, getFreeUsagePolicy, getLocalizedCopyrightLicense, getLocalizedFreeUsagePolicy, localizedCopyrightLicenses, localizedFreeUsagePolicies, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
+import { IMAGE_CATEGORIES, isImageCategoryCode, type ImageCategoryCode } from "@/lib/images/categories";
+import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
-const CATEGORIES = ["nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
-type Category = typeof CATEGORIES[number];
+type Category = ImageCategoryCode;
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 
@@ -133,9 +134,15 @@ interface UploadRow {
   id: string;
   asset_id: string | null;
   title: string;
+  title_ko: string | null;
+  title_en: string | null;
   description: string | null;
+  description_ko: string | null;
+  description_en: string | null;
   category: Category;
   tags: string[] | null;
+  tags_ko: string[] | null;
+  tags_en: string[] | null;
   status: string;
   lifecycle_status: string | null;
   deletion_requested_at: string | null;
@@ -164,6 +171,15 @@ interface UploadRow {
   attribution_name: string | null;
   attribution_url: string | null;
   authorship_declaration: AuthorshipDeclaration | null;
+}
+
+function localizedText(
+  lang: "ko" | "en",
+  fallback: string | null | undefined,
+  ko?: string | null,
+  en?: string | null,
+) {
+  return (lang === "ko" ? ko : en)?.trim() || fallback?.trim() || "";
 }
 
 const TIMELINE_STYLES: Record<TimelineState, string> = {
@@ -199,7 +215,7 @@ function UploadTimeline({ img }: { img: UploadRow }) {
   );
 }
 
-export default function UploadsPage() {
+function UploadsContent() {
   const { t, lang } = useLang();
   const copy = UPLOADS_PAGE_COPY[lang];
   const copyrightLicenses = localizedCopyrightLicenses(lang);
@@ -281,7 +297,7 @@ export default function UploadsPage() {
       id:           img.id,
       title:        img.title ?? "",
       description:  img.description ?? "",
-      category:     img.category ?? "nature",
+      category:     isImageCategoryCode(img.category) ? img.category : "nature",
       tags:         Array.isArray(img.tags) ? img.tags.join(", ") : "",
       exif_location: img.exif_location ?? "",
       exif_taken_at: img.exif_taken_at ? img.exif_taken_at.slice(0, 10) : "",
@@ -344,12 +360,12 @@ export default function UploadsPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">{up.title}</h1>
+    <div className="p-4 md:p-10">
+      <div className="flex items-center justify-between gap-3 mb-6 md:mb-8">
+        <h1 className="font-headline text-xl font-extrabold text-on-surface tracking-tight md:text-2xl">{up.title}</h1>
         <a
           href="/dashboard/uploads/new"
-          className="flex items-center gap-2 px-5 py-3 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
+          className="flex shrink-0 items-center gap-1.5 rounded bg-primary px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 md:gap-2 md:px-5 md:py-3 md:text-xs"
         >
           <span className="material-symbols-outlined text-base">cloud_upload</span>
           {up.uploadBtn}
@@ -364,7 +380,7 @@ export default function UploadsPage() {
       ) : (
         <>
           {/* Status filter tabs */}
-          <div className="flex gap-1 mb-4 border-b border-outline-variant/20">
+          <div className="-mx-1 mb-4 flex gap-1 overflow-x-auto border-b border-outline-variant/20 px-1">
             {(Object.keys(copy.filterTabs) as StatusFilter[]).map((key) => {
               const tab = { key, label: copy.filterTabs[key] };
               const count =
@@ -379,7 +395,7 @@ export default function UploadsPage() {
                     setActiveFilter(tab.key);
                     setEditing(null);
                   }}
-                  className={`px-4 py-2.5 text-xs font-bold uppercase tracking-widest border-b-2 -mb-px transition-colors ${
+                  className={`shrink-0 whitespace-nowrap px-2.5 py-2 text-[11px] font-bold uppercase tracking-wide border-b-2 -mb-px transition-colors md:px-4 md:py-2.5 md:text-xs md:tracking-widest ${
                     isActive
                       ? "border-primary text-primary"
                       : "border-transparent text-outline hover:text-on-surface"
@@ -406,8 +422,8 @@ export default function UploadsPage() {
               <p className="text-sm">{copy.empty[activeFilter]}</p>
             </div>
           ) : (
-            <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="-mx-4 overflow-x-auto bg-surface-container-lowest shadow-ghost md:mx-0">
+              <table className="min-w-[820px] w-full text-sm">
                 <thead>
                   <tr className="border-b border-outline-variant/20">
                     <th className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">{c.image}</th>
@@ -430,6 +446,7 @@ export default function UploadsPage() {
                 const uploaded = new Date(img.created_at).toLocaleDateString("en-US", {
                   month: "short", day: "numeric", year: "numeric",
                 });
+                const displayTitle = localizedText(lang, img.title, img.title_ko, img.title_en);
                 const canEdit = true; // 모든 상태에서 편집 가능
                 const isEditing = editing?.id === img.id;
                 const deletionPending = img.lifecycle_status === "deletion_requested";
@@ -439,15 +456,15 @@ export default function UploadsPage() {
                     <tr className={`transition-colors ${isEditing ? "bg-surface-container-low" : "hover:bg-surface-container-low"}`}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-14 h-10 bg-surface-container-low rounded shrink-0 overflow-hidden flex items-center justify-center">
+                          <div className="w-16 h-16 bg-surface-container-low rounded shrink-0 overflow-hidden flex items-center justify-center">
                             {img.storage_path_preview ? (
-                              <Image src={img.storage_path_preview} alt={img.title} width={56} height={40} className="w-full h-full object-cover" />
+                              <Image src={img.storage_path_preview} alt={displayTitle} width={64} height={64} className="w-full h-full object-contain" />
                             ) : (
                               <span className="material-symbols-outlined text-outline text-sm">image</span>
                             )}
                           </div>
                           <div className="min-w-0">
-                            <span className="text-on-surface font-medium max-w-[200px] truncate block">{img.title}</span>
+                            <span className="text-on-surface font-medium max-w-[200px] truncate block">{displayTitle}</span>
                             {img.asset_id && <span className="text-xs text-outline">{img.asset_id}</span>}
                           </div>
                         </div>
@@ -642,8 +659,8 @@ export default function UploadsPage() {
                                   onChange={(e) => setEditing({ ...editing, category: e.target.value as Category })}
                                   className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all"
                                 >
-                                  {CATEGORIES.map((cat) => (
-                                    <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                                  {IMAGE_CATEGORIES.map((cat) => (
+                                    <option key={cat.code} value={cat.code}>{cat[lang]}</option>
                                   ))}
                                 </select>
                               </div>
@@ -743,5 +760,13 @@ export default function UploadsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function UploadsPage() {
+  return (
+    <PhotographerApprovalGate>
+      <UploadsContent />
+    </PhotographerApprovalGate>
   );
 }
