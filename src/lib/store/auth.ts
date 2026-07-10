@@ -13,11 +13,62 @@ export interface AuthUser {
   is_admin: boolean;
 }
 
+type ProfileRole = AuthUser["role"];
+type PhotographerStatus = AuthUser["photographer_status"];
+type ProfileRow = {
+  full_name?: string | null;
+  organization?: string | null;
+  role?: string | null;
+  roles?: unknown;
+  photographer_status?: string | null;
+  avatar_url?: string | null;
+  is_admin?: boolean | null;
+};
+
 interface AuthStore {
   user: AuthUser | null;
   loading: boolean;
   init: () => Promise<void>;
   signOut: () => Promise<void>;
+}
+
+function normalizePhotographerStatus(value: unknown): PhotographerStatus {
+  return value === "pending" || value === "approved" || value === "suspended" ? value : "none";
+}
+
+function normalizeProfileRole(value: unknown): ProfileRole {
+  return value === "photographer" ? "photographer" : "buyer";
+}
+
+function normalizeProfileRoles(profile: ProfileRow | null | undefined, status: PhotographerStatus) {
+  const fallbackRole = normalizeProfileRole(profile?.role);
+  const rawRoles = Array.isArray(profile?.roles)
+    ? profile.roles.filter((role): role is ProfileRole => role === "buyer" || role === "photographer")
+    : [fallbackRole];
+  const roles = rawRoles.length > 0 ? rawRoles : [fallbackRole];
+
+  if (status !== "approved") {
+    return Array.from(new Set(roles));
+  }
+
+  return Array.from(new Set<ProfileRole>(["buyer", ...roles, "photographer"]));
+}
+
+function buildAuthUser(user: { id: string; email?: string | null }, profile: ProfileRow | null | undefined): AuthUser {
+  const photographerStatus = normalizePhotographerStatus(profile?.photographer_status);
+  const role = photographerStatus === "approved" ? "photographer" : normalizeProfileRole(profile?.role);
+
+  return {
+    id: user.id,
+    email: user.email ?? "",
+    full_name: profile?.full_name ?? "",
+    organization: profile?.organization ?? null,
+    role,
+    roles: normalizeProfileRoles(profile, photographerStatus),
+    photographer_status: photographerStatus,
+    avatar_url: profile?.avatar_url ?? null,
+    is_admin: profile?.is_admin ?? false,
+  };
 }
 
 export const useAuth = create<AuthStore>((set) => ({
@@ -40,25 +91,7 @@ export const useAuth = create<AuthStore>((set) => ({
         .eq("id", user.id)
         .single();
 
-      set({
-        user: {
-          id: user.id,
-          email: user.email ?? "",
-          full_name: profile?.full_name ?? "",
-          organization: profile?.organization ?? null,
-          role: (profile?.role as "buyer" | "photographer") ?? "buyer",
-          roles: Array.isArray(profile?.roles) ? profile.roles as Array<"buyer" | "photographer"> : [(profile?.role as "buyer" | "photographer") ?? "buyer"],
-          photographer_status:
-            profile?.photographer_status === "pending" ||
-            profile?.photographer_status === "approved" ||
-            profile?.photographer_status === "suspended"
-              ? profile.photographer_status
-              : "none",
-          avatar_url: profile?.avatar_url ?? null,
-          is_admin: profile?.is_admin ?? false,
-        },
-        loading: false,
-      });
+      set({ user: buildAuthUser(user, profile), loading: false });
 
       // Listen for auth state changes
       supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -72,25 +105,7 @@ export const useAuth = create<AuthStore>((set) => ({
           .eq("id", session.user.id)
           .single();
 
-        set({
-          user: {
-            id: session.user.id,
-            email: session.user.email ?? "",
-            full_name: p?.full_name ?? "",
-            organization: p?.organization ?? null,
-            role: (p?.role as "buyer" | "photographer") ?? "buyer",
-            roles: Array.isArray(p?.roles) ? p.roles as Array<"buyer" | "photographer"> : [(p?.role as "buyer" | "photographer") ?? "buyer"],
-            photographer_status:
-              p?.photographer_status === "pending" ||
-              p?.photographer_status === "approved" ||
-              p?.photographer_status === "suspended"
-                ? p.photographer_status
-                : "none",
-            avatar_url: p?.avatar_url ?? null,
-            is_admin: p?.is_admin ?? false,
-          },
-          loading: false,
-        });
+        set({ user: buildAuthUser(session.user, p), loading: false });
       });
     } catch {
       // Supabase env vars missing or network error — show logged-out UI
