@@ -55,6 +55,10 @@ function hasOnchainOrArweaveRecord(image: WithdrawalImageRow) {
   );
 }
 
+function normalizeProfileRole(profile: { role: "buyer" | "photographer"; photographer_status: string | null }) {
+  return profile.photographer_status === "approved" ? "photographer" : profile.role;
+}
+
 async function loadProfileWithdrawalAssessment(
   admin: ReturnType<typeof createAdminClient>,
   profileId: string,
@@ -154,6 +158,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({
     user: {
       ...profile,
+      role: normalizeProfileRole(profile),
       email: authResult.data.user?.email ?? "",
       authCreatedAt: authResult.data.user?.created_at ?? null,
       authLastSignInAt: authResult.data.user?.last_sign_in_at ?? null,
@@ -177,7 +182,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const admin = createAdminClient();
   const { data: target, error: targetError } = await admin
     .from("profiles")
-    .select("id, full_name, is_admin, role")
+    .select("id, full_name, is_admin, role, photographer_status")
     .eq("id", id)
     .single();
 
@@ -194,7 +199,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     }
   }
 
-  if (target.role === "photographer") {
+  if (target.role === "photographer" || target.photographer_status === "approved") {
     const { assessment, error } = await loadProfileWithdrawalAssessment(admin, id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

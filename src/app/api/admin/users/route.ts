@@ -72,6 +72,16 @@ function summarizeOrders(orders: OrderSummaryRow[]) {
   );
 }
 
+function normalizeProfileRole(profile: ProfileRow): ProfileRow["role"] {
+  return profile.photographer_status === "approved" ? "photographer" : profile.role;
+}
+
+function normalizeProfileRoles(profile: ProfileRow) {
+  const roles = Array.isArray(profile.roles) && profile.roles.length > 0 ? profile.roles : [profile.role];
+  if (profile.photographer_status !== "approved") return roles;
+  return Array.from(new Set<ProfileRow["role"]>(["buyer", ...roles, "photographer"]));
+}
+
 export async function GET(req: NextRequest) {
   const adminUser = await requireAdminUser();
   if (!adminUser) return forbidden();
@@ -151,7 +161,8 @@ export async function GET(req: NextRequest) {
       const auth = authById.get(profile.id);
       return {
         ...profile,
-        roles: Array.isArray(profile.roles) && profile.roles.length > 0 ? profile.roles : [profile.role],
+        role: normalizeProfileRole(profile),
+        roles: normalizeProfileRoles(profile),
         email: auth?.email ?? "",
         authCreatedAt: auth?.created_at ?? null,
         authLastSignInAt: auth?.last_sign_in_at ?? null,
