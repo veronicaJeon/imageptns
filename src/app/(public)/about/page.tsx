@@ -39,12 +39,12 @@ export default function AboutPage() {
               {h.hero.badge}
             </Badge>
           )}
-          <h1 className="mb-8 font-headline text-5xl font-extrabold leading-tight tracking-tighter text-on-surface md:text-8xl">
+          <h1 className="mb-8 font-headline text-5xl font-extrabold leading-tight tracking-tighter text-white md:text-8xl">
             {h.hero.headline1}
             <br />
             <span className="text-primary-container">{h.hero.headline2}</span>
           </h1>
-          <p className="max-w-2xl text-lg font-light leading-relaxed text-on-surface-variant md:text-xl">
+          <p className="max-w-2xl text-lg font-light leading-relaxed text-white md:text-xl">
             {h.hero.description}
           </p>
         </div>
