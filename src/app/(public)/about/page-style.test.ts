@@ -11,7 +11,7 @@ const source = readFileSync(
 describe("about page hero text contrast", () => {
   it("uses fixed light text for the image-backed hero heading", () => {
     const headingClass = source.match(
-      /<h1 className="([^"]*)">\s*\{h\.hero\.headline1\}/s
+      /<h1 className="([^"]*)">[\s\S]*?\{h\.hero\.headline1\}/
     )?.[1];
 
     expect(headingClass?.split(/\s+/)).toContain("text-white");
@@ -20,7 +20,7 @@ describe("about page hero text contrast", () => {
 
   it("uses fixed white text for the image-backed hero description", () => {
     const descriptionClass = source.match(
-      /<p className="([^"]*)">\s*\{h\.hero\.description\}/s
+      /<p className="([^"]*)">[\s\S]*?\{h\.hero\.description\}/
     )?.[1];
 
     expect(descriptionClass?.split(/\s+/)).toContain("text-white");
