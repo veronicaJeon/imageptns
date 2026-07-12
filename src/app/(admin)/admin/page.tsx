@@ -141,7 +141,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="p-4 md:p-10">
 
       {/* Header */}
       <div className="mb-8">
@@ -152,13 +152,13 @@ export default function AdminPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-surface-container-lowest p-1 rounded-xl w-fit shadow-ghost">
+      <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl bg-surface-container-lowest p-1 shadow-ghost sm:inline-grid sm:w-fit sm:grid-cols-4">
         {TABS.map(({ key, label, icon }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
             className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200",
+              "flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition-all duration-200 sm:gap-2 sm:px-4 sm:text-xs",
               tab === key
                 ? "bg-primary text-white shadow-sm"
                 : "text-on-surface-variant hover:text-on-surface"
@@ -237,7 +237,7 @@ export default function AdminPage() {
                   </div>
 
                   {/* Meta chips */}
-                  <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
+                  <div className="flex flex-wrap gap-2 text-[10px] font-semibold">
                     <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full flex items-center gap-1">
                       <span className="material-symbols-outlined text-[12px]">category</span>
                       {imageCategoryLabel(img.category, "ko")}
