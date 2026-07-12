@@ -10,7 +10,7 @@ export function Footer() {
     <footer className="bg-surface-container-low w-full px-6 py-12 font-body text-sm md:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 md:flex-row md:items-start md:justify-between">
         <div className="max-w-xl">
-          <div className="text-base font-headline font-black uppercase tracking-tighter text-on-surface mb-4">
+          <div className="text-base font-headline font-black uppercase text-on-surface mb-4">
             IMAGE PARTNERS
           </div>
           <p className="text-on-surface-variant leading-relaxed mb-6">{f.tagline}</p>
@@ -18,7 +18,7 @@ export function Footer() {
         </div>
 
         <address className="not-italic leading-relaxed text-on-surface-variant">
-          <p className="mb-3 text-xs font-bold uppercase tracking-widest text-on-surface">
+          <p className="mb-3 text-xs font-semibold text-on-surface">
             {f.company.title}
           </p>
           <p>{f.company.address}</p>

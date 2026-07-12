@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       status, estimated_fee_krw, charged_fee_krw, fee_status,
       impact_snapshot, admin_note, created_at,
       image:images!image_id(
-        id, asset_id, title, status,
+        id, asset_id, title, status, lifecycle_status,
         storage_path_preview, storage_path_full, storage_path_original, original_filename,
         sales_count, proof_status, proof_tx_hash,
         proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id
@@ -96,7 +96,7 @@ export async function PATCH(req: NextRequest) {
       id, image_id, requester_id, requester_role, reason_category, reason,
       status, estimated_fee_krw, charged_fee_krw, fee_status, impact_snapshot,
       image:images!image_id(
-        id, asset_id, title, status,
+        id, asset_id, title, status, lifecycle_status,
         storage_path_preview, storage_path_full, storage_path_original, original_filename,
         sales_count, proof_status, proof_tx_hash,
         proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id

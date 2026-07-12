@@ -3,6 +3,7 @@
 import Image from "next/image";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
 
 type ImageStatus = "all" | "pending" | "approved" | "rejected" | "draft";
 
@@ -16,6 +17,7 @@ interface AdminImage {
   description_ko: string | null;
   description_en: string | null;
   category: string;
+  category_codes?: string[];
   tags: string[] | null;
   tags_ko: string[] | null;
   tags_en: string[] | null;
@@ -46,7 +48,7 @@ interface ImageEditState {
   description: string;
   descriptionKo: string;
   descriptionEn: string;
-  category: string;
+  categoryCodes: string[];
   tags: string;
   tagsKo: string;
   tagsEn: string;
@@ -128,6 +130,7 @@ export default function AdminImagesPage() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [categories, setCategories] = useState<ImageCategory[]>(() => [...DEFAULT_IMAGE_CATEGORIES]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -166,6 +169,15 @@ export default function AdminImagesPage() {
       setLoading(false);
     }
   }, [page, query, status]);
+
+  useEffect(() => {
+    fetch("/api/admin/categories")
+      .then((res) => res.json())
+      .then((data: { categories?: ImageCategory[] }) => {
+        if (data.categories?.length) setCategories(data.categories.filter((category) => category.active !== false));
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => { loadImages(); }, [loadImages]);
 
@@ -306,7 +318,7 @@ export default function AdminImagesPage() {
         description: detail.description ?? "",
         descriptionKo: detail.description_ko ?? detail.description ?? "",
         descriptionEn: detail.description_en ?? detail.description ?? "",
-        category: detail.category ?? "",
+        categoryCodes: detail.category_codes?.length ? detail.category_codes : [detail.category || categories[0]?.code || "nature"],
         tags: (detail.tags ?? []).join(", "),
         tagsKo: (detail.tags_ko ?? detail.tags ?? []).join(", "),
         tagsEn: (detail.tags_en ?? detail.tags ?? []).join(", "),
@@ -330,6 +342,18 @@ export default function AdminImagesPage() {
       : current);
   }
 
+  function toggleEditCategory(code: string) {
+    setEditState((current) => {
+      if (!current) return current;
+      if (current.categoryCodes.includes(code)) {
+        return current.categoryCodes.length > 1
+          ? { ...current, categoryCodes: current.categoryCodes.filter((item) => item !== code) }
+          : current;
+      }
+      return { ...current, categoryCodes: [...current.categoryCodes, code] };
+    });
+  }
+
   async function saveEdit() {
     if (!editState) return;
     setEditSaving(true);
@@ -349,7 +373,8 @@ export default function AdminImagesPage() {
           description: editState.description,
           description_ko: editState.descriptionKo,
           description_en: editState.descriptionEn,
-          category: editState.category,
+          category: editState.categoryCodes[0],
+          category_codes: editState.categoryCodes,
           tags: editState.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
           tags_ko: editState.tagsKo.split(",").map((tag) => tag.trim()).filter(Boolean),
           tags_en: editState.tagsEn.split(",").map((tag) => tag.trim()).filter(Boolean),
@@ -369,7 +394,7 @@ export default function AdminImagesPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="p-4 md:p-10">
       <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">이미지 관리</h1>
@@ -395,7 +420,7 @@ export default function AdminImagesPage() {
               <option key={value} value={value}>{STATUS_LABELS[value]}</option>
             ))}
           </select>
-          <button className="h-11 rounded-lg bg-primary px-5 text-xs font-bold uppercase tracking-widest text-white">검색</button>
+          <button className="h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-white">검색</button>
         </form>
       </div>
 
@@ -408,7 +433,7 @@ export default function AdminImagesPage() {
           <button
             onClick={deleteSelected}
             disabled={selectedIds.length === 0 || deleting}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-error px-4 text-xs font-bold uppercase tracking-widest text-on-error transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-error px-4 text-xs font-semibold text-on-error transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
           >
             <span className="material-symbols-outlined text-base">delete</span>
             {deleting ? "처리 중..." : `선택 삭제/아카이브 (${selectedIds.length})`}
@@ -416,7 +441,7 @@ export default function AdminImagesPage() {
           <button
             onClick={downloadSelected}
             disabled={selectedIds.length === 0 || downloading}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-on-surface px-4 text-xs font-bold uppercase tracking-widest text-surface-container-lowest transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-on-surface px-4 text-xs font-semibold text-surface-container-lowest transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
           >
             <span className="material-symbols-outlined text-base">download</span>
             {downloading ? "준비 중..." : `선택 원본 다운로드 (${selectedIds.length})`}
@@ -424,26 +449,26 @@ export default function AdminImagesPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl bg-surface-container-lowest shadow-ghost">
-        <table className="w-full min-w-[920px] text-sm">
-          <thead>
+      <div className="rounded-xl bg-surface-container-lowest shadow-ghost md:overflow-x-auto">
+        <table className="w-full text-sm md:min-w-[920px]">
+          <thead className="hidden md:table-header-group">
             <tr className="border-b border-outline-variant/20">
               <th className="w-12 px-5 py-4 text-left">
                 <input type="checkbox" checked={allPageSelected} onChange={toggleAllPage} aria-label="현재 페이지 전체 선택" />
               </th>
               {["이미지 정보", "상태", "성과", "등록 정보"].map((head) => (
-                <th key={head} className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">{head}</th>
+                <th key={head} className="px-5 py-4 text-left text-[11px] font-semibold text-outline">{head}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-outline-variant/20">
+          <tbody className="grid gap-3 p-3 md:table-row-group md:divide-y md:divide-outline-variant/20 md:p-0">
             {loading ? (
               <tr><td colSpan={5} className="px-5 py-20 text-center text-outline">이미지 목록을 불러오는 중...</td></tr>
             ) : images.length === 0 ? (
               <tr><td colSpan={5} className="px-5 py-20 text-center text-outline">조건에 맞는 이미지가 없습니다.</td></tr>
             ) : images.map((image) => (
-              <tr key={image.id} className="hover:bg-surface-container-low">
-                <td className="px-5 py-5 align-top">
+              <tr key={image.id} className="grid grid-cols-2 overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest hover:bg-surface-container-low md:table-row md:rounded-none md:border-0">
+                <td className="col-span-2 flex justify-end px-4 pt-4 align-top md:table-cell md:w-12 md:px-5 md:py-5">
                   <input
                     type="checkbox"
                     checked={selectedSet.has(image.id)}
@@ -451,9 +476,9 @@ export default function AdminImagesPage() {
                     aria-label={`${image.title} 선택`}
                   />
                 </td>
-                <td className="px-5 py-5 align-top">
-                  <div className="flex items-start gap-4">
-                    <div className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low">
+                <td className="col-span-2 px-4 pb-4 pt-2 align-top md:px-5 md:py-5">
+                  <div className="flex items-start gap-3 md:gap-4">
+                    <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low md:h-28 md:w-28">
                       {image.storage_path_preview ? (
                         <Image src={image.storage_path_preview} alt="" fill sizes="112px" className="object-contain" />
                       ) : (
@@ -496,8 +521,8 @@ export default function AdminImagesPage() {
                     </div>
                   </div>
                 </td>
-                <td className="px-5 py-5 align-top">
-                  <div className="flex w-32 flex-col items-start gap-2">
+                <td data-label="상태" className="border-t border-outline-variant/20 px-4 py-4 align-top before:block before:pb-2 before:text-xs before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-5 md:py-5 md:before:hidden">
+                  <div className="flex flex-col items-start gap-2 md:w-32">
                     <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${STATUS_CLASSES[image.status] ?? "bg-surface-container-high text-outline"}`}>
                       {STATUS_LABELS[image.status] ?? image.status}
                     </span>
@@ -518,8 +543,8 @@ export default function AdminImagesPage() {
                     </button>
                   </div>
                 </td>
-                <td className="px-5 py-5 align-top text-xs text-on-surface-variant">
-                  <div className="grid w-32 grid-cols-2 gap-2">
+                <td data-label="성과" className="border-t border-outline-variant/20 px-4 py-4 align-top text-xs text-on-surface-variant before:block before:pb-2 before:text-xs before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-5 md:py-5 md:before:hidden">
+                  <div className="grid grid-cols-2 gap-2 md:w-32">
                     <div className="rounded-lg bg-surface-container-low p-2">
                       <p className="text-[10px] text-outline">조회</p>
                       <p className="font-semibold text-on-surface">{(image.views_count ?? 0).toLocaleString("ko-KR")}</p>
@@ -538,9 +563,11 @@ export default function AdminImagesPage() {
                     {transactionLoadingId === image.id ? "로딩" : "거래내역"}
                   </button>
                 </td>
-                <td className="px-5 py-5 align-top text-xs text-on-surface-variant">
+                <td data-label="등록 정보" className="col-span-2 grid grid-cols-[72px_minmax(0,1fr)] gap-3 border-t border-outline-variant/20 px-4 py-4 align-top text-xs text-on-surface-variant before:text-xs before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-5 md:py-5 md:before:hidden">
+                  <div>
                   <p className="max-w-40 truncate font-medium text-on-surface">{image.photographer?.full_name ?? "-"}</p>
                   <p className="mt-1 text-outline">{formatDate(image.created_at)}</p>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -652,7 +679,7 @@ export default function AdminImagesPage() {
             <div className="max-h-[68vh] overflow-y-auto p-5">
               <div className="grid gap-4">
                 <label className="grid gap-2">
-                  <span className="text-xs font-bold uppercase tracking-widest text-outline">제목</span>
+                  <span className="text-xs font-semibold text-outline">제목</span>
                   <input
                     value={editState.title}
                     onChange={(event) => updateEdit("title", event.target.value)}
@@ -661,7 +688,7 @@ export default function AdminImagesPage() {
                 </label>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="grid gap-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-outline">한글 제목</span>
+                    <span className="text-xs font-semibold text-outline">한글 제목</span>
                     <input
                       value={editState.titleKo}
                       onChange={(event) => updateEdit("titleKo", event.target.value)}
@@ -669,7 +696,7 @@ export default function AdminImagesPage() {
                     />
                   </label>
                   <label className="grid gap-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-outline">영문 제목</span>
+                    <span className="text-xs font-semibold text-outline">영문 제목</span>
                     <input
                       value={editState.titleEn}
                       onChange={(event) => updateEdit("titleEn", event.target.value)}
@@ -678,7 +705,7 @@ export default function AdminImagesPage() {
                   </label>
                 </div>
                 <label className="grid gap-2">
-                  <span className="text-xs font-bold uppercase tracking-widest text-outline">대표 설명</span>
+                  <span className="text-xs font-semibold text-outline">대표 설명</span>
                   <textarea
                     value={editState.description}
                     onChange={(event) => updateEdit("description", event.target.value)}
@@ -688,7 +715,7 @@ export default function AdminImagesPage() {
                 </label>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="grid gap-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-outline">한글 설명</span>
+                    <span className="text-xs font-semibold text-outline">한글 설명</span>
                     <textarea
                       value={editState.descriptionKo}
                       onChange={(event) => updateEdit("descriptionKo", event.target.value)}
@@ -697,7 +724,7 @@ export default function AdminImagesPage() {
                     />
                   </label>
                   <label className="grid gap-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-outline">영문 설명</span>
+                    <span className="text-xs font-semibold text-outline">영문 설명</span>
                     <textarea
                       value={editState.descriptionEn}
                       onChange={(event) => updateEdit("descriptionEn", event.target.value)}
@@ -708,15 +735,26 @@ export default function AdminImagesPage() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="grid gap-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-outline">카테고리</span>
-                    <input
-                      value={editState.category}
-                      onChange={(event) => updateEdit("category", event.target.value)}
-                      className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
-                    />
+                    <span className="text-xs font-semibold text-outline">카테고리</span>
+                    <div className="flex min-h-11 flex-wrap gap-2 rounded-lg bg-surface-container-lowest p-2 ring-1 ring-outline-variant">
+                      {categories.map((category) => {
+                        const checked = editState.categoryCodes.includes(category.code);
+                        return (
+                          <button
+                            key={category.code}
+                            type="button"
+                            onClick={() => toggleEditCategory(category.code)}
+                            className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold transition-colors ${checked ? "border-primary bg-primary/10 text-primary" : "border-outline-variant text-on-surface-variant hover:border-outline"}`}
+                          >
+                            <span className="material-symbols-outlined text-sm">{checked ? "check_circle" : "radio_button_unchecked"}</span>
+                            {category.ko}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </label>
                   <label className="grid gap-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-outline">게시여부</span>
+                    <span className="text-xs font-semibold text-outline">게시여부</span>
                     <select
                       value={editState.is_published ? "true" : "false"}
                       onChange={(event) => updateEdit("is_published", event.target.value === "true")}
@@ -728,7 +766,7 @@ export default function AdminImagesPage() {
                   </label>
                 </div>
                 <label className="grid gap-2">
-                  <span className="text-xs font-bold uppercase tracking-widest text-outline">태그</span>
+                  <span className="text-xs font-semibold text-outline">태그</span>
                   <input
                     value={editState.tags}
                     onChange={(event) => updateEdit("tags", event.target.value)}
@@ -738,7 +776,7 @@ export default function AdminImagesPage() {
                 </label>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="grid gap-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-outline">한글 태그</span>
+                    <span className="text-xs font-semibold text-outline">한글 태그</span>
                     <input
                       value={editState.tagsKo}
                       onChange={(event) => updateEdit("tagsKo", event.target.value)}
@@ -747,7 +785,7 @@ export default function AdminImagesPage() {
                     />
                   </label>
                   <label className="grid gap-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-outline">영문 태그</span>
+                    <span className="text-xs font-semibold text-outline">영문 태그</span>
                     <input
                       value={editState.tagsEn}
                       onChange={(event) => updateEdit("tagsEn", event.target.value)}
@@ -757,7 +795,7 @@ export default function AdminImagesPage() {
                   </label>
                 </div>
                 <div className="rounded-xl border border-outline-variant/40 p-4">
-                  <p className="text-xs font-bold uppercase tracking-widest text-outline">이미지별 가격</p>
+                  <p className="text-xs font-semibold text-outline">이미지별 가격</p>
                   <p className="mt-1 text-xs text-on-surface-variant">비워두면 전역 상품 가격을 사용합니다. 0원 입력도 가능합니다.</p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     {LICENSE_CODES.map((code) => (
@@ -782,7 +820,7 @@ export default function AdminImagesPage() {
               <button
                 type="button"
                 onClick={() => setEditState(null)}
-                className="rounded-lg border border-outline-variant px-4 py-2 text-xs font-bold uppercase tracking-widest text-on-surface"
+                className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface"
               >
                 취소
               </button>
@@ -790,7 +828,7 @@ export default function AdminImagesPage() {
                 type="button"
                 onClick={saveEdit}
                 disabled={editSaving}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-bold uppercase tracking-widest text-white disabled:opacity-50"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {editSaving ? "저장 중..." : "저장"}
               </button>

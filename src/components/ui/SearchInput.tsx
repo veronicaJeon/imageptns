@@ -44,7 +44,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           <button
             type="button"
             onClick={() => onSearch((props.value as string) ?? "")}
-            className="shrink-0 px-4 py-2 bg-gradient-to-r from-primary to-primary-container text-white text-xs font-black uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
+            className="shrink-0 rounded bg-primary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
           >
             Search
           </button>

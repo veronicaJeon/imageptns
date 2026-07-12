@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
+import { applyAdminImageListLifecycleFilter } from "@/lib/images/admin-list";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { previewUrl } from "@/lib/supabase/storage";
 
@@ -55,6 +56,7 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .range(from, to);
 
+  query = applyAdminImageListLifecycleFilter(query);
   if (status !== "all") query = query.eq("status", status);
   if (queryText) {
     const escaped = escapeLike(queryText);

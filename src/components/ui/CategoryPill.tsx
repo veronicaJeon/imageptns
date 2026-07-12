@@ -14,8 +14,8 @@ export function CategoryPill({ label, active, onClick, className }: CategoryPill
     <button
       onClick={onClick}
       className={cn(
-        "px-6 py-2 rounded-full",
-        "text-xs font-bold uppercase tracking-widest",
+        "px-4 py-2 rounded-full",
+        "text-sm font-semibold",
         "transition-colors duration-200",
         active
           ? "bg-primary-container text-on-primary-container"

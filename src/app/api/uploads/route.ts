@@ -6,7 +6,7 @@ import { applyWatermark, createWatermarkedThumbnail } from "@/lib/utils/watermar
 import { notifyOpsNewUpload } from "@/lib/email/resend";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 import { normalizeRotationDegrees } from "@/lib/images/orientation";
-import { isImageCategoryCode } from "@/lib/images/categories";
+import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryInput, syncImageCategoryAssignments } from "@/lib/images/category-server";
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
@@ -29,8 +29,10 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const categoryMap = await getImageCategoryCodeMap(admin, (data ?? []).map((img) => img.id));
   const uploads = (data ?? []).map((img) => ({
     ...img,
+    category_codes: categoryCodesForImage(categoryMap, img.id, img.category),
     storage_path_preview: previewUrl(img.storage_path_preview),
   }));
 
@@ -48,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const {
-    title, description, category, tags,
+    title, description, category, category_codes, tags,
     title_ko, title_en, description_ko, description_en, tags_ko, tags_en,
     storage_path_original, original_filename,
     width, height, resolution_mp, file_format, file_size_mb,
@@ -58,11 +60,10 @@ export async function POST(req: NextRequest) {
     authorship_declaration, factuality_attested,
   } = body;
 
-  if (!title || !category || !storage_path_original) {
+  const categoryInput = await normalizeImageCategoryInput(admin, category_codes, category);
+
+  if (!title || categoryInput.codes.length === 0 || !storage_path_original) {
     return NextResponse.json({ error: "title, category, and storage_path_original required" }, { status: 400 });
-  }
-  if (!isImageCategoryCode(category)) {
-    return NextResponse.json({ error: "Invalid category" }, { status: 400 });
   }
   if (authorship_declaration !== "ai_generated" && authorship_declaration !== "human_original") {
     return NextResponse.json({ error: "authorship_declaration must be ai_generated or human_original" }, { status: 400 });
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
       title_en:             title_en?.trim() || title,
       description_ko:       description_ko?.trim() || description || null,
       description_en:       description_en?.trim() || description || null,
-      category,
+      category:             categoryInput.primary,
       tags:                 tags ?? [],
       tags_ko:              Array.isArray(tags_ko) && tags_ko.length > 0 ? tags_ko : tags ?? [],
       tags_en:              Array.isArray(tags_en) && tags_en.length > 0 ? tags_en : tags ?? [],
@@ -120,6 +121,8 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await syncImageCategoryAssignments(admin, data.id, categoryInput.codes);
 
   // Apply watermark synchronously before returning so Vercel doesn't terminate it early
   try {

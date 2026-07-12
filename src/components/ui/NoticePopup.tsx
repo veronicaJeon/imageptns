@@ -61,14 +61,14 @@ export function NoticePopup() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={dismiss}>
       <div
-        className="bg-surface-container-lowest rounded-2xl shadow-xl w-full max-w-md p-7 flex flex-col gap-4"
+        className="bg-surface-container-lowest rounded-lg shadow-xl w-full max-w-md p-7 flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-xl text-primary">campaign</span>
-            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{copy.title}</span>
+            <span className="text-xs font-semibold text-primary">{copy.title}</span>
           </div>
           <button type="button" onClick={dismiss} className="text-outline hover:text-on-surface transition-colors">
             <span className="material-symbols-outlined text-xl">close</span>
@@ -95,7 +95,7 @@ export function NoticePopup() {
           <button
             type="button"
             onClick={dismiss}
-            className="px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
+            className="px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded hover:opacity-90 transition-opacity"
           >
             {copy.confirm}
           </button>

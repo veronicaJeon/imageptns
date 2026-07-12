@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { categoryCodesForImage, getImageCategoryCodeMap, getImageIdsForCategory } from "@/lib/images/category-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const PAGE_SIZE = 20;
@@ -57,6 +58,13 @@ export async function GET(req: NextRequest) {
   const hasUsageFilters = freeOnly || educationFreeOnly || commercialOnly || derivativesOnly;
 
   const supabase = createAdminClient();
+  let categoryImageIds: string[] | null = null;
+  if (category && category !== "all") {
+    categoryImageIds = await getImageIdsForCategory(supabase, category);
+    if (categoryImageIds && categoryImageIds.length === 0) {
+      return NextResponse.json({ images: [], hasMore: false });
+    }
+  }
 
   let q = supabase
     .from("images")
@@ -69,7 +77,9 @@ export async function GET(req: NextRequest) {
     .range(offset, offset + fetchCount - 1);
 
   if (category && category !== "all") {
-    q = q.eq("category", category);
+    q = categoryImageIds
+      ? q.in("id", categoryImageIds)
+      : q.eq("category", category);
   }
 
   if (query) {
@@ -156,6 +166,7 @@ export async function GET(req: NextRequest) {
   const raw = data ?? [];
   const hasMore = raw.length > limit;
   const sliced = hasMore ? raw.slice(0, limit) : raw;
+  const categoryMap = await getImageCategoryCodeMap(supabase, sliced.map((img) => img.id));
 
   const images = (sliced as ImageListRow[]).map((img) => {
     let src = "";
@@ -172,6 +183,7 @@ export async function GET(req: NextRequest) {
       titleKo:      img.title_ko,
       titleEn:      img.title_en,
       category:     img.category,
+      categoryCodes: categoryCodesForImage(categoryMap, img.id, img.category),
       photographerId: img.photographer_id,
       photographer: firstPhotographer(img.photographer)?.full_name ?? "",
       src,

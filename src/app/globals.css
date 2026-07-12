@@ -117,6 +117,8 @@ body {
   min-height: 100%;
   margin: 0;
   overflow-x: hidden;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 button,
@@ -129,10 +131,32 @@ textarea {
 button,
 a {
   max-width: 100%;
+  word-break: keep-all;
 }
 
 button {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+}
+
+th {
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  letter-spacing: 0;
+}
+
+td {
+  overflow-wrap: break-word;
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll table {
+  border-collapse: collapse;
 }
 
 img,

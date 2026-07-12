@@ -20,8 +20,8 @@ export function Badge({ children, variant = "surface", className }: BadgeProps) 
     <span
       className={cn(
         "inline-block px-3 py-1",
-        "text-xs font-bold uppercase tracking-widest",
-        "rounded-xs",
+        "text-xs font-semibold whitespace-nowrap",
+        "rounded-full",
         variantStyles[variant],
         className
       )}

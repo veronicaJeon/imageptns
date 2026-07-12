@@ -7,11 +7,9 @@ import { MasonryGrid } from "@/components/gallery/MasonryGrid";
 import { ImageCard, ImageCardData } from "@/components/gallery/ImageCard";
 import { CategoryPill } from "@/components/ui/CategoryPill";
 import { buildPhotoRequestHref } from "@/lib/contact/photo-request-draft";
+import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
 
 const PAGE_SIZE = 20;
-
-const CATEGORY_KEYS = ["all", "nature", "people", "editorial", "urban", "abstract", "architecture"] as const;
-type CategoryKey = typeof CATEGORY_KEYS[number];
 
 const SORT_KEYS = ["newest", "popular", "relevant"] as const;
 type SortKey = typeof SORT_KEYS[number];
@@ -50,13 +48,11 @@ const LIBRARY_PAGE_COPY = {
 
 function AdRail({ side }: { side: "left" | "right" }) {
   return (
-    <aside className="hidden 2xl:block">
+    <aside className="hidden 2xl:block" aria-label={`${side} sponsored rail`}>
       <div className="sticky top-36 h-[640px] rounded-lg border border-dashed border-outline-variant bg-surface-container-lowest/70 px-4 py-5 text-center text-outline">
-        <p className="text-[10px] font-bold uppercase tracking-widest">Advertisement</p>
-        <div className="mt-6 flex h-[560px] items-center justify-center rounded-md bg-surface-container-low text-xs leading-relaxed">
-          Google AdSense
-          <br />
-          {side === "left" ? "Left Rail" : "Right Rail"}
+        <p className="text-[10px] font-semibold text-on-surface-variant">Sponsored</p>
+        <div className="mt-6 flex h-[560px] items-center justify-center rounded-md bg-surface-container-low px-3 text-xs leading-relaxed">
+          광고 영역
         </div>
       </div>
     </aside>
@@ -71,7 +67,8 @@ export default function LibraryPage() {
   const copy = LIBRARY_PAGE_COPY[lang];
 
   const [query, setQuery]             = useState("");
-  const [category, setCategory]       = useState<CategoryKey>("all");
+  const [category, setCategory]       = useState("all");
+  const [categories, setCategories]   = useState<ImageCategory[]>(() => [...DEFAULT_IMAGE_CATEGORIES]);
   const [sort, setSort]               = useState<SortKey>("newest");
   const [freeOnly, setFreeOnly]       = useState(false);
   const [educationFreeOnly, setEducationFreeOnly] = useState(false);
@@ -98,6 +95,15 @@ export default function LibraryPage() {
     fetch("/api/stats")
       .then((r) => r.json())
       .then(setLiveStats)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((data: { categories?: ImageCategory[] }) => {
+        if (data.categories?.length) setCategories(data.categories);
+      })
       .catch(() => {});
   }, []);
 
@@ -198,7 +204,7 @@ export default function LibraryPage() {
     return () => observerRef.current?.disconnect();
   }, [hasMore, offset, fetchPage]);
 
-  function handleCategoryChange(key: CategoryKey) {
+  function handleCategoryChange(key: string) {
     setCategory(key);
     setShowSuggestions(false);
   }
@@ -224,13 +230,17 @@ export default function LibraryPage() {
     { label: usageLabels.commercial, checked: commercialOnly, onChange: setCommercialOnly, icon: "business_center" },
     { label: usageLabels.derivatives, checked: derivativesOnly, onChange: setDerivativesOnly, icon: "edit" },
   ];
+  const categoryOptions = [
+    { code: "all", label: l.categories.all },
+    ...categories.map((item) => ({ code: item.code, label: item[lang] })),
+  ];
 
   return (
     <>
       {/* ── Hero / Search ─────────────────────────── */}
       <section className="pt-36 pb-16 px-6 md:px-16 bg-surface">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="font-headline text-4xl md:text-6xl font-extrabold tracking-tighter text-on-surface mb-4">
+          <h1 className="font-headline text-4xl md:text-6xl font-extrabold text-on-surface mb-4">
             {l.hero.headline}
           </h1>
           <p className="text-on-surface-variant mb-10 text-lg">{l.hero.sub}</p>
@@ -284,7 +294,7 @@ export default function LibraryPage() {
           </div>
 
           {/* Stats */}
-          <div className="flex justify-center gap-10 mt-8 text-xs font-bold uppercase tracking-widest text-outline">
+          <div className="flex justify-center gap-6 mt-8 text-xs font-semibold text-outline sm:gap-10">
             {liveStats ? (
               <>
                 <span>{liveStats.images.toLocaleString(copy.locale)}+ {l.stats.assets.split("+").slice(-1)[0].trim()}</span>
@@ -351,12 +361,12 @@ export default function LibraryPage() {
             <div className="flex items-center justify-between gap-4 flex-wrap">
             {/* Category pills */}
               <div className="flex max-h-24 flex-wrap gap-2 overflow-y-auto pr-1 md:max-h-none md:overflow-visible">
-                {CATEGORY_KEYS.map((key) => (
+                {categoryOptions.map((item) => (
                   <CategoryPill
-                    key={key}
-                    label={l.categories[key]}
-                    active={category === key}
-                    onClick={() => handleCategoryChange(key)}
+                    key={item.code}
+                    label={item.label}
+                    active={category === item.code}
+                    onClick={() => handleCategoryChange(item.code)}
                   />
                 ))}
               </div>
@@ -374,7 +384,7 @@ export default function LibraryPage() {
                   {copy.photoRequest}
                 </Link>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-outline uppercase tracking-widest hidden sm:inline">
+                  <span className="text-xs text-outline hidden sm:inline">
                     {l.sort.label}
                   </span>
                   <select
@@ -391,7 +401,7 @@ export default function LibraryPage() {
             </div>
 
             <div className="flex max-h-24 flex-wrap items-center gap-2 overflow-y-auto border-t border-outline-variant/20 pt-3 pr-1 md:max-h-none md:overflow-visible">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-outline">{usageLabels.title}</span>
+              <span className="text-xs font-semibold text-outline">{usageLabels.title}</span>
               {usageFilters.map((filter) => (
                 <label
                   key={filter.label}
@@ -432,7 +442,7 @@ export default function LibraryPage() {
                 <p className="text-base">{l.noResults}</p>
                 <Link
                   href={photoRequestHref}
-                  className="mt-2 flex h-11 items-center gap-2 rounded bg-primary px-5 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90"
+                  className="mt-2 flex h-11 items-center gap-2 rounded bg-primary px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
                 >
                   <span className="material-symbols-outlined text-base">assignment_add</span>
                   {copy.requestWithConditions}
@@ -463,7 +473,7 @@ export default function LibraryPage() {
 
                 {/* End of results */}
                 {!hasMore && images.length > 0 && (
-                  <p className="text-center text-xs text-outline uppercase tracking-widest py-12">
+                  <p className="text-center text-xs text-outline py-12">
                     — {images.length} {l.results} —
                   </p>
                 )}

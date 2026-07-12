@@ -5,11 +5,9 @@ import Image from "next/image";
 import { useLang } from "@/lib/i18n/store";
 import { buildUploadProofSteps, type TimelineState } from "@/lib/ux/status";
 import { getCopyrightLicense, getFreeUsagePolicy, getLocalizedCopyrightLicense, getLocalizedFreeUsagePolicy, localizedCopyrightLicenses, localizedFreeUsagePolicies, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
-import { IMAGE_CATEGORIES, isImageCategoryCode, type ImageCategoryCode } from "@/lib/images/categories";
+import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
 import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
-
-type Category = ImageCategoryCode;
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 
@@ -119,7 +117,7 @@ interface EditState {
   id: string;
   title: string;
   description: string;
-  category: Category;
+  categoryCodes: string[];
   tags: string;
   exif_location: string;
   exif_taken_at: string;
@@ -139,7 +137,8 @@ interface UploadRow {
   description: string | null;
   description_ko: string | null;
   description_en: string | null;
-  category: Category;
+  category: string;
+  category_codes?: string[];
   tags: string[] | null;
   tags_ko: string[] | null;
   tags_en: string[] | null;
@@ -199,15 +198,15 @@ function UploadTimeline({ img }: { img: UploadRow }) {
   const steps = buildUploadProofSteps({ status: img.status, proofStatus: img.proof_status });
 
   return (
-    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+    <div className="mt-3 grid grid-cols-3 gap-2">
       {steps.map((step, index) => (
-        <div key={step.key} className="flex gap-2 min-w-0">
+        <div key={step.key} className="flex min-w-0 flex-col items-center gap-1 text-center sm:flex-row sm:items-start sm:gap-2 sm:text-left">
           <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${TIMELINE_STYLES[step.state]}`}>
             {step.state === "done" ? "✓" : step.state === "failed" ? "!" : index + 1}
           </span>
-          <div>
-            <p className="text-[11px] font-bold text-on-surface">{step.label}</p>
-            <p className="text-[10px] leading-relaxed text-outline">{step.description}</p>
+          <div className="min-w-0">
+            <p className="line-clamp-2 text-[10px] font-semibold leading-tight text-on-surface sm:text-[11px] sm:font-bold">{step.label}</p>
+            <p className="hidden text-[10px] leading-relaxed text-outline sm:block">{step.description}</p>
           </div>
         </div>
       ))}
@@ -215,7 +214,7 @@ function UploadTimeline({ img }: { img: UploadRow }) {
   );
 }
 
-function UploadsContent() {
+function UploadsPageContent() {
   const { t, lang } = useLang();
   const copy = UPLOADS_PAGE_COPY[lang];
   const copyrightLicenses = localizedCopyrightLicenses(lang);
@@ -229,6 +228,7 @@ function UploadsContent() {
   const [editing, setEditing] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeFilter, setActiveFilter] = useState<StatusFilter>("all");
+  const [categories, setCategories] = useState<ImageCategory[]>(() => [...DEFAULT_IMAGE_CATEGORIES]);
 
   useEffect(() => {
     fetch("/api/uploads")
@@ -236,6 +236,27 @@ function UploadsContent() {
       .then(({ uploads }) => setUploads(uploads ?? []))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((data: { categories?: ImageCategory[] }) => {
+        if (data.categories?.length) setCategories(data.categories);
+      })
+      .catch(() => {});
+  }, []);
+
+  function toggleEditingCategory(code: string) {
+    setEditing((current) => {
+      if (!current) return current;
+      if (current.categoryCodes.includes(code)) {
+        return current.categoryCodes.length > 1
+          ? { ...current, categoryCodes: current.categoryCodes.filter((item) => item !== code) }
+          : current;
+      }
+      return { ...current, categoryCodes: [...current.categoryCodes, code] };
+    });
+  }
 
   function requiresAdminDeletionRequest(img: UploadRow) {
     return (
@@ -297,7 +318,7 @@ function UploadsContent() {
       id:           img.id,
       title:        img.title ?? "",
       description:  img.description ?? "",
-      category:     isImageCategoryCode(img.category) ? img.category : "nature",
+      categoryCodes: img.category_codes?.length ? img.category_codes : [img.category || categories[0]?.code || "nature"],
       tags:         Array.isArray(img.tags) ? img.tags.join(", ") : "",
       exif_location: img.exif_location ?? "",
       exif_taken_at: img.exif_taken_at ? img.exif_taken_at.slice(0, 10) : "",
@@ -319,7 +340,8 @@ function UploadsContent() {
         body: JSON.stringify({
           title:        editing.title.trim(),
           description:  editing.description.trim() || null,
-          category:     editing.category,
+          category:     editing.categoryCodes[0],
+          category_codes: editing.categoryCodes,
           tags:         editing.tags.split(",").map((t) => t.trim()).filter(Boolean),
           exif_location: editing.exif_location.trim() || null,
           exif_taken_at: editing.exif_taken_at || null,
@@ -365,7 +387,7 @@ function UploadsContent() {
         <h1 className="font-headline text-xl font-extrabold text-on-surface tracking-tight md:text-2xl">{up.title}</h1>
         <a
           href="/dashboard/uploads/new"
-          className="flex shrink-0 items-center gap-1.5 rounded bg-primary px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 md:gap-2 md:px-5 md:py-3 md:text-xs"
+          className="flex shrink-0 items-center gap-1.5 rounded bg-primary px-3 py-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 md:gap-2 md:px-5 md:py-3 md:text-sm"
         >
           <span className="material-symbols-outlined text-base">cloud_upload</span>
           {up.uploadBtn}
@@ -395,7 +417,7 @@ function UploadsContent() {
                     setActiveFilter(tab.key);
                     setEditing(null);
                   }}
-                  className={`shrink-0 whitespace-nowrap px-2.5 py-2 text-[11px] font-bold uppercase tracking-wide border-b-2 -mb-px transition-colors md:px-4 md:py-2.5 md:text-xs md:tracking-widest ${
+                  className={`shrink-0 whitespace-nowrap px-2.5 py-2 text-[11px] font-semibold border-b-2 -mb-px transition-colors md:px-4 md:py-2.5 md:text-xs ${
                     isActive
                       ? "border-primary text-primary"
                       : "border-transparent text-outline hover:text-on-surface"
@@ -422,15 +444,15 @@ function UploadsContent() {
               <p className="text-sm">{copy.empty[activeFilter]}</p>
             </div>
           ) : (
-            <div className="-mx-4 overflow-x-auto bg-surface-container-lowest shadow-ghost md:mx-0">
-              <table className="min-w-[820px] w-full text-sm">
-                <thead>
+            <div className="-mx-4 bg-surface-container-lowest shadow-ghost md:mx-0 md:overflow-x-auto">
+              <table className="w-full text-sm md:min-w-[820px]">
+                <thead className="hidden md:table-header-group">
                   <tr className="border-b border-outline-variant/20">
-                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">{c.image}</th>
-                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">{c.status}</th>
-                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">{c.views}</th>
-                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">{c.sales}</th>
-                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-6 py-4">
+                    <th className="text-left text-[11px] font-semibold text-outline px-6 py-4">{c.image}</th>
+                    <th className="text-left text-[11px] font-semibold text-outline px-6 py-4">{c.status}</th>
+                    <th className="text-left text-[11px] font-semibold text-outline px-6 py-4">{c.views}</th>
+                    <th className="text-left text-[11px] font-semibold text-outline px-6 py-4">{c.sales}</th>
+                    <th className="text-left text-[11px] font-semibold text-outline px-6 py-4">
                       <span className="flex items-center gap-1">
                         {c.uploaded}
                         <span className="material-symbols-outlined text-[12px] text-primary" title={copy.latestSort}>
@@ -441,7 +463,7 @@ function UploadsContent() {
                     <th className="px-6 py-4" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant/20">
+                <tbody className="grid gap-3 p-3 md:table-row-group md:divide-y md:divide-outline-variant/20 md:p-0">
                   {filteredUploads.map((img) => {
                 const uploaded = new Date(img.created_at).toLocaleDateString("en-US", {
                   month: "short", day: "numeric", year: "numeric",
@@ -453,8 +475,8 @@ function UploadsContent() {
 
                 return (
                   <Fragment key={img.id}>
-                    <tr className={`transition-colors ${isEditing ? "bg-surface-container-low" : "hover:bg-surface-container-low"}`}>
-                      <td className="px-6 py-4">
+                    <tr className={`grid grid-cols-3 overflow-hidden rounded-lg border border-outline-variant/30 transition-colors md:table-row md:rounded-none md:border-0 ${isEditing ? "bg-surface-container-low" : "bg-surface-container-lowest hover:bg-surface-container-low"}`}>
+                      <td className="col-span-3 px-4 py-4 md:px-6 md:py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-16 h-16 bg-surface-container-low rounded shrink-0 overflow-hidden flex items-center justify-center">
                             {img.storage_path_preview ? (
@@ -469,7 +491,7 @@ function UploadsContent() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="col-span-3 border-t border-outline-variant/20 px-4 py-4 md:border-t-0 md:px-6 md:py-4">
                         <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_STYLES[img.status] ?? ""}`}>
                           {up.statuses[img.status as keyof typeof up.statuses] ?? img.status}
                         </span>
@@ -531,16 +553,17 @@ function UploadsContent() {
                         </div>
                         <UploadTimeline img={img} />
                       </td>
-                      <td className="px-6 py-4 text-on-surface-variant">{(img.views_count ?? 0).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-on-surface-variant">{img.sales_count ?? 0}</td>
-                      <td className="px-6 py-4 text-on-surface-variant">{uploaded}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                      <td data-label={c.views} className="border-t border-outline-variant/20 px-4 py-3 text-center text-sm font-semibold text-on-surface before:block before:text-[10px] before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-6 md:py-4 md:text-left md:text-sm md:font-normal md:text-on-surface-variant md:before:hidden">{(img.views_count ?? 0).toLocaleString()}</td>
+                      <td data-label={c.sales} className="border-t border-outline-variant/20 px-4 py-3 text-center text-sm font-semibold text-on-surface before:block before:text-[10px] before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-6 md:py-4 md:text-left md:text-sm md:font-normal md:text-on-surface-variant md:before:hidden">{img.sales_count ?? 0}</td>
+                      <td data-label={c.uploaded} className="border-t border-outline-variant/20 px-2 py-3 text-center text-xs font-semibold text-on-surface before:block before:text-[10px] before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-6 md:py-4 md:text-left md:text-sm md:font-normal md:text-on-surface-variant md:before:hidden">{uploaded}</td>
+                      <td className="col-span-3 border-t border-outline-variant/20 px-4 py-3 md:border-t-0 md:px-6 md:py-4">
+                        <div className="flex items-center justify-end gap-3 md:justify-start md:gap-2">
                           {canEdit && (
                             <button
                               onClick={() => isEditing ? setEditing(null) : openEdit(img)}
                               className={`transition-colors ${isEditing ? "text-primary" : "text-outline hover:text-primary"}`}
                               title={copy.editTitle}
+                              aria-label={copy.editTitle}
                             >
                               <span className="material-symbols-outlined text-base">
                                 {isEditing ? "close" : "edit"}
@@ -553,6 +576,7 @@ function UploadsContent() {
                               disabled={deleting === img.id}
                               className="text-outline hover:text-error transition-colors disabled:opacity-50"
                               title={requiresAdminDeletionRequest(img) ? copy.deleteRequestTitle : copy.deleteTitle}
+                              aria-label={requiresAdminDeletionRequest(img) ? copy.deleteRequestTitle : copy.deleteTitle}
                             >
                               {deleting === img.id
                                 ? <span className="w-4 h-4 border-2 border-error border-t-transparent rounded-full animate-spin inline-block" />
@@ -566,14 +590,14 @@ function UploadsContent() {
 
                     {/* Inline edit form */}
                     {isEditing && editing && (
-                      <tr>
-                        <td colSpan={6} className="px-6 pb-6 pt-2 bg-surface-container-low border-b border-outline-variant/20">
+                      <tr className="block md:table-row">
+                        <td colSpan={6} className="block rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-4 md:table-cell md:rounded-none md:border-0 md:border-b md:border-outline-variant/20 md:px-6 md:pb-6 md:pt-2">
                           <div className="max-w-2xl flex flex-col gap-4">
-                            <p className="text-xs font-bold text-outline uppercase tracking-widest">{copy.editMeta}</p>
+                            <p className="text-xs font-semibold text-outline">{copy.editMeta}</p>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div className="flex flex-col gap-1.5 sm:col-span-2">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.title}</label>
+                                <label className="text-xs font-semibold text-outline">{copy.title}</label>
                                 <input
                                   type="text"
                                   value={editing.title}
@@ -583,7 +607,7 @@ function UploadsContent() {
                               </div>
 
                               <div className="flex flex-col gap-1.5 sm:col-span-2">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.description}</label>
+                                <label className="text-xs font-semibold text-outline">{copy.description}</label>
                                 <textarea
                                   value={editing.description}
                                   onChange={(e) => setEditing({ ...editing, description: e.target.value })}
@@ -593,7 +617,7 @@ function UploadsContent() {
                               </div>
 
                               <div className="flex flex-col gap-1.5 sm:col-span-2">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.authorship}</label>
+                                <label className="text-xs font-semibold text-outline">{copy.authorship}</label>
                                 <select
                                   value={editing.authorship_declaration}
                                   onChange={(e) => setEditing({ ...editing, authorship_declaration: e.target.value as AuthorshipDeclaration })}
@@ -605,7 +629,7 @@ function UploadsContent() {
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.copyright}</label>
+                                <label className="text-xs font-semibold text-outline">{copy.copyright}</label>
                                 <select
                                   value={editing.copyright_license}
                                   onChange={(e) => setEditing({ ...editing, copyright_license: e.target.value as CopyrightLicenseCode })}
@@ -618,7 +642,7 @@ function UploadsContent() {
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.freeUse}</label>
+                                <label className="text-xs font-semibold text-outline">{copy.freeUse}</label>
                                 <select
                                   value={editing.free_usage_policy}
                                   onChange={(e) => setEditing({ ...editing, free_usage_policy: e.target.value as FreeUsagePolicyCode })}
@@ -631,7 +655,7 @@ function UploadsContent() {
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.attributionName}</label>
+                                <label className="text-xs font-semibold text-outline">{copy.attributionName}</label>
                                 <input
                                   type="text"
                                   value={editing.attribution_name}
@@ -642,7 +666,7 @@ function UploadsContent() {
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.attributionUrl}</label>
+                                <label className="text-xs font-semibold text-outline">{copy.attributionUrl}</label>
                                 <input
                                   type="url"
                                   value={editing.attribution_url}
@@ -653,20 +677,27 @@ function UploadsContent() {
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.category}</label>
-                                <select
-                                  value={editing.category}
-                                  onChange={(e) => setEditing({ ...editing, category: e.target.value as Category })}
-                                  className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all"
-                                >
-                                  {IMAGE_CATEGORIES.map((cat) => (
-                                    <option key={cat.code} value={cat.code}>{cat[lang]}</option>
-                                  ))}
-                                </select>
+                                <label className="text-xs font-semibold text-outline">{copy.category}</label>
+                                <div className="flex flex-wrap gap-2 rounded bg-surface-container-lowest p-2 ring-1 ring-outline-variant">
+                                  {categories.map((cat) => {
+                                    const checked = editing.categoryCodes.includes(cat.code);
+                                    return (
+                                      <button
+                                        key={cat.code}
+                                        type="button"
+                                        onClick={() => toggleEditingCategory(cat.code)}
+                                        className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold transition-colors ${checked ? "border-primary bg-primary/10 text-primary" : "border-outline-variant text-on-surface-variant hover:border-outline"}`}
+                                      >
+                                        <span className="material-symbols-outlined text-sm">{checked ? "check_circle" : "radio_button_unchecked"}</span>
+                                        {cat[lang]}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.tags}</label>
+                                <label className="text-xs font-semibold text-outline">{copy.tags}</label>
                                 <input
                                   type="text"
                                   value={editing.tags}
@@ -677,7 +708,7 @@ function UploadsContent() {
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.shotAt}</label>
+                                <label className="text-xs font-semibold text-outline">{copy.shotAt}</label>
                                 <div className="flex gap-2">
                                   <input
                                     type="date"
@@ -697,7 +728,7 @@ function UploadsContent() {
                               </div>
 
                               <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-outline uppercase tracking-widest">{copy.shotLocation}</label>
+                                <label className="text-xs font-semibold text-outline">{copy.shotLocation}</label>
                                 <div className="flex gap-2">
                                   <input
                                     type="text"
@@ -722,7 +753,7 @@ function UploadsContent() {
                               <button
                                 onClick={() => handleSave(false)}
                                 disabled={saving || !editing.title.trim()}
-                                className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+                                className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded hover:opacity-90 transition-opacity disabled:opacity-50"
                               >
                                 {saving ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
                                 {copy.save}
@@ -732,7 +763,7 @@ function UploadsContent() {
                                 <button
                                   onClick={() => handleSave(true)}
                                   disabled={saving || !editing.title.trim()}
-                                  className="flex items-center gap-1.5 px-5 py-2.5 border border-primary text-primary text-xs font-bold uppercase tracking-widest rounded hover:bg-primary/5 transition-colors disabled:opacity-50"
+                                  className="flex items-center gap-1.5 px-5 py-2.5 border border-primary text-primary text-sm font-semibold rounded hover:bg-primary/5 transition-colors disabled:opacity-50"
                                 >
                                   <span className="material-symbols-outlined text-sm">send</span>
                                   {copy.saveAndResubmit}
@@ -766,7 +797,7 @@ function UploadsContent() {
 export default function UploadsPage() {
   return (
     <PhotographerApprovalGate>
-      <UploadsContent />
+      <UploadsPageContent />
     </PhotographerApprovalGate>
   );
 }

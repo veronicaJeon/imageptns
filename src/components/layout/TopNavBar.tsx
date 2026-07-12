@@ -90,7 +90,7 @@ export function TopNavBar() {
         <Link
           href="/"
           onClick={() => setMobileMenuOpen(false)}
-          className="min-w-0 text-base md:text-lg font-headline font-black uppercase tracking-tighter text-on-surface hover:text-primary transition-colors duration-200"
+          className="min-w-0 text-base md:text-lg font-headline font-black uppercase text-on-surface hover:text-primary transition-colors duration-200"
         >
           IMAGE PARTNERS
         </Link>
@@ -122,7 +122,7 @@ export function TopNavBar() {
           {/* Language toggle */}
           <button
             onClick={toggle}
-            className="inline-flex items-center justify-center gap-1 h-9 w-9 rounded-lg text-xs font-bold tracking-widest text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200 sm:w-auto sm:px-3"
+            className="inline-flex items-center justify-center gap-1 h-9 w-9 rounded-lg text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200 sm:w-auto sm:px-3"
             aria-label={copy.language}
           >
             <span className="material-symbols-outlined text-base leading-none">language</span>

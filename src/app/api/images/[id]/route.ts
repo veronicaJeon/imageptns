@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { categoryCodesForImage, getImageCategoryCodeMap, getImageIdsForCategory } from "@/lib/images/category-server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -92,6 +93,8 @@ export async function GET(
   }
 
   const image = img as ImageDetailRow;
+  const currentCategoryMap = await getImageCategoryCodeMap(admin, [id]);
+  const currentCategoryCodes = categoryCodesForImage(currentCategoryMap, id, image.category);
 
   // Increment views via admin client — RLS blocks updates on approved images for non-owners
   admin
@@ -113,16 +116,25 @@ export async function GET(
     })
     .then(() => {});
 
-  // Similar images (same category, excluding this one)
-  const { data: similar } = await admin
+  const similarCategoryIdSets = await Promise.all(currentCategoryCodes.map((code) => getImageIdsForCategory(admin, code)));
+  const similarIds = Array.from(new Set(similarCategoryIdSets.flatMap((ids) => ids ?? []))).filter((imageId) => imageId !== id);
+
+  // Similar images (any overlapping category, excluding this one)
+  let similarQuery = admin
     .from("images")
     .select("id, title, title_ko, title_en, category, storage_path_preview, width, height, photographer_id, photographer:profiles!photographer_id(full_name)")
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
     .eq("is_published", true)
-    .eq("category", image.category)
     .neq("id", id)
     .limit(4);
+
+  similarQuery = similarIds.length > 0
+    ? similarQuery.in("id", similarIds)
+    : similarQuery.eq("category", image.category);
+
+  const { data: similar } = await similarQuery;
+  const similarCategoryMap = await getImageCategoryCodeMap(admin, ((similar ?? []) as SimilarImageRow[]).map((row) => row.id));
 
   // Convert storage paths → public URLs
   function previewUrl(path: string | null | undefined): string {
@@ -142,6 +154,7 @@ export async function GET(
   return NextResponse.json({
     image: {
       ...image,
+      category_codes: currentCategoryCodes,
       storage_path_preview: previewUrl(image.storage_path_preview),
       photographer: photographer
         ? { ...photographer, display_name: photographerName }
@@ -153,6 +166,7 @@ export async function GET(
       titleKo: s.title_ko,
       titleEn: s.title_en,
       category: s.category,
+      categoryCodes: categoryCodesForImage(similarCategoryMap, s.id, s.category),
       photographerId: s.photographer_id,
       photographer: firstPhotographer(s.photographer)?.full_name ?? "",
       src: previewUrl(s.storage_path_preview),

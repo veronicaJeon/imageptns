@@ -3,6 +3,7 @@ import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeLicensePrice } from "@/lib/commerce/pricing";
 import { previewUrl } from "@/lib/supabase/storage";
+import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryInput, syncImageCategoryAssignments } from "@/lib/images/category-server";
 
 function normalizeTags(value: unknown) {
   if (!Array.isArray(value)) return [];
@@ -42,9 +43,12 @@ export async function GET(
   if (imageError || !image) return NextResponse.json({ error: imageError?.message ?? "Image not found" }, { status: 404 });
   if (overridesError) return NextResponse.json({ error: overridesError.message }, { status: 500 });
 
+  const categoryMap = await getImageCategoryCodeMap(admin, [id]);
+
   return NextResponse.json({
     image: {
       ...image,
+      category_codes: categoryCodesForImage(categoryMap, id, image.category),
       storage_path_preview: previewUrl(image.storage_path_preview),
       price_overrides: overrides ?? [],
     },
@@ -64,8 +68,9 @@ export async function PATCH(
 
   const title = stringValue(body.title, 200);
   const category = stringValue(body.category, 80);
+  const categoryInput = await normalizeImageCategoryInput(admin, body.category_codes, category);
   if (!title) return NextResponse.json({ error: "제목은 필수입니다." }, { status: 400 });
-  if (!category) return NextResponse.json({ error: "카테고리는 필수입니다." }, { status: 400 });
+  if (categoryInput.codes.length === 0) return NextResponse.json({ error: "카테고리는 필수입니다." }, { status: 400 });
 
   const isPublished = Boolean(body.is_published);
   const { data: image, error: imageError } = await admin
@@ -77,7 +82,7 @@ export async function PATCH(
       description: stringValue(body.description, 5000) || null,
       description_ko: stringValue(body.description_ko, 5000) || stringValue(body.description, 5000) || null,
       description_en: stringValue(body.description_en, 5000) || stringValue(body.description, 5000) || null,
-      category,
+      category: categoryInput.primary,
       tags: normalizeTags(body.tags),
       tags_ko: normalizeTags(body.tags_ko),
       tags_en: normalizeTags(body.tags_en),
@@ -91,6 +96,8 @@ export async function PATCH(
     .single();
 
   if (imageError || !image) return NextResponse.json({ error: imageError?.message ?? "Image update failed" }, { status: 500 });
+
+  await syncImageCategoryAssignments(admin, id, categoryInput.codes);
 
   const priceOverrides = body.priceOverrides && typeof body.priceOverrides === "object"
     ? body.priceOverrides as Record<string, unknown>
@@ -126,6 +133,7 @@ export async function PATCH(
   return NextResponse.json({
     image: {
       ...image,
+      category_codes: categoryInput.codes,
       storage_path_preview: previewUrl(image.storage_path_preview),
       price_overrides: overrideRows.map(({ license_code, price_krw }) => ({ license_code, price_krw })),
     },

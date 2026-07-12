@@ -17,7 +17,7 @@ export function LegalPlaceholder({ titleKey }: LegalPlaceholderProps) {
       <h1 className="font-headline text-3xl font-extrabold text-on-surface mb-3">{titleKey}</h1>
       <p className="text-on-surface-variant mb-2">{l.comingSoon}</p>
       <p className="text-sm text-outline max-w-sm mb-10">{l.comingSoonSub}</p>
-      <Link href="/" className="text-xs font-bold uppercase tracking-widest text-primary hover:underline flex items-center gap-1">
+      <Link href="/" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
         <span className="material-symbols-outlined text-base">arrow_back</span>
         {l.backBtn}
       </Link>

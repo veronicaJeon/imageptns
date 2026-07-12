@@ -104,7 +104,7 @@ function RoleSection({
           </button>
         </div>
         {user.is_admin && (
-          <span className="text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded text-center">Admin</span>
+          <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded text-center">Admin</span>
         )}
       </div>
     );
@@ -115,7 +115,7 @@ function RoleSection({
       <span className="material-symbols-outlined text-base text-primary">shopping_bag</span>
       <span className="text-xs font-bold text-on-surface capitalize">{roleLabels.buyer}</span>
       {user.is_admin && (
-        <span className="ml-auto text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded">Admin</span>
+        <span className="ml-auto text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Admin</span>
       )}
     </div>
   );
@@ -151,7 +151,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="hidden md:flex flex-col w-64 shrink-0 bg-surface-container-lowest shadow-ghost">
         {/* Brand */}
         <div className="px-6 py-6 border-b border-outline-variant/20">
-          <Link href="/" className="text-sm font-headline font-black uppercase tracking-tighter text-on-surface hover:text-primary transition-colors">
+          <Link href="/" className="text-sm font-headline font-black uppercase text-on-surface hover:text-primary transition-colors">
             IMAGE PARTNERS
           </Link>
         </div>
@@ -217,7 +217,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
         <div className="md:hidden flex items-center justify-between px-4 py-4 bg-surface-container-lowest border-b border-outline-variant/20">
-          <Link href="/" className="text-sm font-headline font-black uppercase tracking-tighter text-on-surface">
+          <Link href="/" className="text-sm font-headline font-black uppercase text-on-surface">
             IMAGE PARTNERS
           </Link>
           {isApprovedPhotographer ? (

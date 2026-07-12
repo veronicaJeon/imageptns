@@ -25,6 +25,19 @@ export const useLang = create<LangStore>()(
         }),
       setLang: (lang) => set({ lang, t: lang === "ko" ? ko : en }),
     }),
-    { name: "imageptns-lang-v2" }
+    {
+      name: "imageptns-lang-v2",
+      partialize: (state) => ({ lang: state.lang }),
+      merge: (persisted, current) => {
+        const persistedLang = (persisted as Partial<LangStore> | undefined)?.lang;
+        const lang = persistedLang === "en" ? "en" : "ko";
+
+        return {
+          ...current,
+          lang,
+          t: lang === "ko" ? ko : en,
+        };
+      },
+    }
   )
 );

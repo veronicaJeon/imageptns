@@ -3,41 +3,83 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/lib/store/auth";
-
-const NAV_ITEMS = [
-  { href: "/admin",                   icon: "pending_actions", label: "이미지 검토"   },
-  { href: "/admin/images",            icon: "photo_library",    label: "이미지 관리"   },
-  { href: "/admin/image-cleanup",      icon: "cleaning_services", label: "이미지 정리" },
-  { href: "/admin/image-deletion-requests", icon: "delete_forever", label: "삭제 요청" },
-  { href: "/admin/onchain",           icon: "account_balance",  label: "온체인 운영"  },
-  { href: "/admin/onchain-registrations", icon: "verified",     label: "온체인 등록사진" },
-  { href: "/admin/payment-requests", icon: "account_balance",   label: "결제요청목록" },
-  { href: "/admin/payouts",           icon: "payments",        label: "정산 관리"    },
-  { href: "/admin/onchain-claims",    icon: "verified",        label: "온체인 클레임" },
-  { href: "/admin/pricing",           icon: "sell",            label: "상품 가격"    },
-  { href: "/admin/commission",        icon: "percent",         label: "수수료 정책"  },
-  { href: "/admin/support",           icon: "support_agent",   label: "고객 문의"    },
-  { href: "/admin/users",             icon: "manage_accounts", label: "회원관리"      },
-  { href: "/admin/photographer-applications", icon: "how_to_reg", label: "사진가 승인" },
-  { href: "/admin/profile-withdrawal-requests", icon: "person_remove", label: "탈퇴 검토" },
-  { href: "/admin/admins",            icon: "admin_panel_settings", label: "관리자 계정" },
-  { href: "/admin/presence",          icon: "groups",          label: "동시접속자"   },
-  { href: "/admin/activity",          icon: "timeline",        label: "방문 로그"    },
-  { href: "/admin/audit",             icon: "policy",          label: "감사 로그"    },
-  { href: "/admin/stats",             icon: "bar_chart",       label: "통계"         },
-  { href: "/admin/image-insights",    icon: "insights",        label: "이미지 인사이트" },
-  { href: "/admin/notices",           icon: "campaign",        label: "공지사항"      },
-  { href: "/admin/legal",             icon: "gavel",           label: "법률정보"      },
-];
+import {
+  ADMIN_NAV_GROUPS,
+  adminNavGroupIsActive,
+  adminNavItemIsActive,
+  defaultOpenAdminGroups,
+} from "@/lib/admin/nav";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, init, signOut } = useAuth();
+  const [openGroupIds, setOpenGroupIds] = useState<string[]>(() => defaultOpenAdminGroups(ADMIN_NAV_GROUPS, pathname));
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const visibleOpenGroupIds = useMemo(() => {
+    const activeGroups = defaultOpenAdminGroups(ADMIN_NAV_GROUPS, pathname);
+    return Array.from(new Set([...openGroupIds, ...activeGroups]));
+  }, [openGroupIds, pathname]);
 
   useEffect(() => { init(); }, [init]);
+
+  function toggleGroup(groupId: string) {
+    setOpenGroupIds((current) => (
+      current.includes(groupId)
+        ? current.filter((id) => id !== groupId)
+        : [...current, groupId]
+    ));
+  }
+
+  function renderNavGroups(mode: "desktop" | "mobile") {
+    return ADMIN_NAV_GROUPS.map((group) => {
+      const groupOpen = visibleOpenGroupIds.includes(group.id);
+      const groupActive = adminNavGroupIsActive(group, pathname);
+      return (
+        <section key={group.id} className={mode === "desktop" ? "rounded-lg" : "border-b border-outline-variant/20 last:border-b-0"}>
+          <button
+            type="button"
+            onClick={() => toggleGroup(group.id)}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors",
+              groupActive ? "bg-primary/10 text-primary" : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
+              mode === "mobile" && "rounded-none py-3",
+            )}
+            aria-expanded={groupOpen}
+          >
+            <span className="material-symbols-outlined text-lg">{group.icon}</span>
+            <span className="min-w-0 flex-1 truncate">{group.label}</span>
+            <span className="material-symbols-outlined text-lg">{groupOpen ? "expand_less" : "expand_more"}</span>
+          </button>
+          {groupOpen && (
+            <div className={cn("grid gap-1", mode === "desktop" ? "mt-1 pl-2" : "px-3 pb-3")}>
+              {group.items.map(({ href, icon, label }) => {
+                const isActive = adminNavItemIsActive(href, pathname);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-lg">{icon}</span>
+                    <span className="truncate">{label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      );
+    });
+  }
 
   return (
     <div className="min-h-screen flex bg-surface-container-low">
@@ -46,32 +88,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className="hidden md:flex flex-col w-60 shrink-0 bg-surface-container-lowest shadow-ghost">
         {/* Brand */}
         <div className="px-6 py-6 border-b border-outline-variant/20">
-          <Link href="/" className="text-sm font-headline font-black uppercase tracking-tighter text-on-surface hover:text-primary transition-colors">
+          <Link href="/" className="text-sm font-headline font-black uppercase text-on-surface hover:text-primary transition-colors">
             IMAGE PARTNERS
           </Link>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary mt-1">Admin</p>
+          <p className="text-[10px] font-semibold text-primary mt-1">Admin</p>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 py-4 px-3 flex flex-col gap-1">
-          {NAV_ITEMS.map(({ href, icon, label }) => {
-            const isActive = pathname === href;
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200",
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
-                )}
-              >
-                <span className="material-symbols-outlined text-xl">{icon}</span>
-                {label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
+          {renderNavGroups("desktop")}
         </nav>
 
         {/* User info */}
@@ -100,30 +125,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Mobile top bar */}
         <div className="md:hidden flex items-center justify-between px-4 py-4 bg-surface-container-lowest border-b border-outline-variant/20">
           <div>
-            <Link href="/" className="text-sm font-headline font-black uppercase tracking-tighter text-on-surface">
+            <Link href="/" className="text-sm font-headline font-black uppercase text-on-surface">
               IMAGE PARTNERS
             </Link>
-            <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-primary">Admin</span>
+            <span className="ml-2 text-[10px] font-semibold text-primary">Admin</span>
           </div>
         </div>
-        {/* Mobile bottom nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex bg-surface-container-lowest border-t border-outline-variant/20">
-          {NAV_ITEMS.map(({ href, icon, label }) => {
-            const isActive = pathname === href;
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  "flex-1 flex flex-col items-center py-3 gap-1 text-[10px] font-bold transition-colors",
-                  isActive ? "text-primary" : "text-on-surface-variant"
-                )}
-              >
-                <span className="material-symbols-outlined text-xl">{icon}</span>
-                {label}
-              </Link>
-            );
-          })}
+        {/* Mobile accordion nav */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-container-lowest border-t border-outline-variant/20 shadow-ghost">
+          {mobileMenuOpen && (
+            <div className="max-h-[70vh] overflow-y-auto border-b border-outline-variant/20">
+              {renderNavGroups("mobile")}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            className="flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-bold text-on-surface"
+            aria-expanded={mobileMenuOpen}
+          >
+            <span className="material-symbols-outlined text-xl">{mobileMenuOpen ? "close" : "menu"}</span>
+            관리자 메뉴
+            <span className="material-symbols-outlined text-xl">{mobileMenuOpen ? "expand_more" : "expand_less"}</span>
+          </button>
         </nav>
 
         <div className="flex-1 pb-20 md:pb-0">

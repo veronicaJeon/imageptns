@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordAdminAuditLog } from "@/lib/admin/audit";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
+import { applyAdminImageDeleteTargetFilter } from "@/lib/images/admin-delete";
 import { applyImageDeletion, type ImageDeletionRow } from "@/lib/images/deletion-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -28,15 +29,17 @@ export async function POST(req: NextRequest) {
     : "관리자 선택 삭제";
 
   const admin = createAdminClient();
-  const { data, error } = await admin
+  const imageQuery = applyAdminImageDeleteTargetFilter(admin
     .from("images")
     .select(`
-      id, asset_id, title, status,
+      id, asset_id, title, status, lifecycle_status,
       storage_path_preview, storage_path_full, storage_path_original, original_filename,
       sales_count, proof_status, proof_tx_hash,
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id
     `)
-    .in("id", uniqueIds);
+    .in("id", uniqueIds));
+
+  const { data, error } = await imageQuery;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
-import { isImageCategoryCode } from "@/lib/images/categories";
+import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryInput, syncImageCategoryAssignments } from "@/lib/images/category-server";
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 
@@ -41,7 +41,7 @@ export async function PATCH(
   if (!img) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { title, description, title_ko, title_en, description_ko, description_en, tags_ko, tags_en, category, tags, exif_location, exif_taken_at, resubmit, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration } = body as {
+  const { title, description, title_ko, title_en, description_ko, description_en, tags_ko, tags_en, category, category_codes, tags, exif_location, exif_taken_at, resubmit, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration } = body as {
     title?: string;
     description?: string;
     title_ko?: string;
@@ -49,6 +49,7 @@ export async function PATCH(
     description_ko?: string;
     description_en?: string;
     category?: string;
+    category_codes?: string[];
     tags?: string[];
     tags_ko?: string[];
     tags_en?: string[];
@@ -65,11 +66,11 @@ export async function PATCH(
   if (title !== undefined && !title.trim()) {
     return NextResponse.json({ error: "Title cannot be empty" }, { status: 400 });
   }
-  if (category !== undefined && !isImageCategoryCode(category)) {
-    return NextResponse.json({ error: "Invalid category" }, { status: 400 });
-  }
 
   const image = img as ImagePatchRow;
+  const categoryInput = category !== undefined || category_codes !== undefined
+    ? await normalizeImageCategoryInput(admin, category_codes, category)
+    : null;
   const update: Record<string, unknown> = {};
   if (title !== undefined) update.title = title.trim();
   if (description !== undefined) update.description = description || null;
@@ -77,7 +78,7 @@ export async function PATCH(
   if (title_en !== undefined) update.title_en = title_en.trim() || title?.trim() || null;
   if (description_ko !== undefined) update.description_ko = description_ko || description || null;
   if (description_en !== undefined) update.description_en = description_en || description || null;
-  if (category !== undefined) update.category = category;
+  if (categoryInput) update.category = categoryInput.primary;
   if (Array.isArray(tags)) update.tags = tags.map((t) => t.trim().toLowerCase()).filter(Boolean);
   if (Array.isArray(tags_ko)) update.tags_ko = tags_ko.map((t) => t.trim()).filter(Boolean);
   if (Array.isArray(tags_en)) update.tags_en = tags_en.map((t) => t.trim().toLowerCase()).filter(Boolean);
@@ -109,7 +110,18 @@ export async function PATCH(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ image: data });
+
+  if (categoryInput) {
+    await syncImageCategoryAssignments(admin, id, categoryInput.codes);
+  }
+
+  const categoryMap = await getImageCategoryCodeMap(admin, [id]);
+  return NextResponse.json({
+    image: {
+      ...data,
+      category_codes: categoryCodesForImage(categoryMap, id, data.category),
+    },
+  });
 }
 
 export async function DELETE(

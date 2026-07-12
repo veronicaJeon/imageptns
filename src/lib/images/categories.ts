@@ -10,7 +10,17 @@ export const IMAGE_CATEGORIES = [
   { code: "abstract", ko: "추상/배경", en: "Abstract / Background" },
 ] as const;
 
-export type ImageCategoryCode = (typeof IMAGE_CATEGORIES)[number]["code"];
+export const DEFAULT_IMAGE_CATEGORIES = IMAGE_CATEGORIES;
+
+export interface ImageCategory {
+  code: string;
+  ko: string;
+  en: string;
+  sort_order?: number;
+  active?: boolean;
+}
+
+export type ImageCategoryCode = string;
 
 export function isImageCategoryCode(value: string): value is ImageCategoryCode {
   return IMAGE_CATEGORIES.some((category) => category.code === value);
@@ -23,4 +33,40 @@ export function imageCategoryLabel(value: string | null | undefined, lang: "ko" 
 
 export function imageCategoryPromptList() {
   return IMAGE_CATEGORIES.map((category) => category.code).join(" | ");
+}
+
+export function normalizeCategoryCodes(
+  values: unknown,
+  allowedCodes?: ReadonlySet<string>,
+) {
+  const rawValues = Array.isArray(values) ? values : values ? [values] : [];
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const value of rawValues) {
+    const code = String(value).trim();
+    if (!code) continue;
+    if (allowedCodes && !allowedCodes.has(code)) continue;
+    if (seen.has(code)) continue;
+    seen.add(code);
+    normalized.push(code);
+  }
+
+  return normalized;
+}
+
+export function primaryCategoryCode(
+  values: unknown,
+  fallback: string,
+  allowedCodes?: ReadonlySet<string>,
+) {
+  return normalizeCategoryCodes(values, allowedCodes)[0] ?? fallback;
+}
+
+export function categoryAssignmentRows(imageId: string, values: unknown) {
+  return normalizeCategoryCodes(values).map((categoryCode, index) => ({
+    image_id: imageId,
+    category_code: categoryCode,
+    is_primary: index === 0,
+  }));
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -8,14 +8,18 @@ import { useLang } from "@/lib/i18n/store";
 import { extractExif, type ExifData } from "@/lib/utils/exif";
 import { normalizeRotationDegrees, rotatedDimensions } from "@/lib/images/orientation";
 import { localizedCopyrightLicenses, localizedFreeUsagePolicies, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
-import { IMAGE_CATEGORIES, isImageCategoryCode, type ImageCategoryCode } from "@/lib/images/categories";
+import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
 import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
+import {
+  ACCEPTED_UPLOAD_TYPES,
+  MAX_UPLOAD_SIZE_MB,
+  canSubmitUploadBatch,
+  filterAcceptedUploadFiles,
+  uploadFileClientId,
+  type UploadDraftReadiness,
+} from "@/lib/uploads/batch-client";
 
-type Category = ImageCategoryCode;
-
-const ACCEPTED_TYPES = ["image/tiff", "image/jpeg", "image/png", "image/webp"];
-const MAX_SIZE_MB = 500;
 const UNKNOWN = "unknown";
 
 const NEW_UPLOAD_COPY = {
@@ -30,12 +34,28 @@ const NEW_UPLOAD_COPY = {
       unsupportedType: "지원하지 않는 파일 형식입니다. TIFF, JPEG, PNG, WebP만 허용됩니다.",
       tooLarge: (max: number) => `파일 크기는 ${max}MB를 초과할 수 없습니다.`,
       uploadFailed: "업로드 중 오류가 발생했습니다.",
+      duplicate: "이미 대기열에 추가된 파일입니다.",
     },
     pageTitle: "이미지 업로드",
     doneTitle: "업로드 완료!",
-    doneBody: "이미지가 검토 대기 중입니다. 승인 후 라이브러리에 노출됩니다.",
+    doneBody: "선택한 이미지가 검토 대기 중입니다. 승인 후 라이브러리에 노출됩니다.",
     dropTitle: "파일을 드래그하거나 클릭하여 선택",
-    dropHelp: "TIFF, JPEG, PNG, WebP · 최대 500MB",
+    dropHelp: "여러 장 선택 가능 · TIFF, JPEG, PNG, WebP · 최대 500MB",
+    addMore: "사진 추가",
+    queueTitle: "업로드 대기열",
+    queueHelp: "유사한 사진을 묶어 올리고, 각 사진을 선택해 세부 정보를 조정하세요.",
+    fileCount: (count: number) => `${count}장 선택됨`,
+    activeFile: "편집 중",
+    remove: "삭제",
+    copyToAll: "현재 입력값 전체 적용",
+    copiedToAll: "현재 사진의 제목, 설명, 태그, 카테고리, 촬영정보를 다른 대기 파일에 복사했습니다.",
+    noFiles: "먼저 업로드할 이미지를 선택하세요.",
+    pending: "대기",
+    uploadingFile: "업로드 중",
+    savingFile: "저장 중",
+    uploadedFile: "완료",
+    failedFile: "실패",
+    partialFailed: (count: number) => `${count}개 파일 업로드에 실패했습니다. 실패 항목을 확인한 뒤 다시 제출해 주세요.`,
     rotated: "회전 보정",
     rotateLeft: "왼쪽 회전",
     rotateRight: "오른쪽 회전",
@@ -65,26 +85,26 @@ const NEW_UPLOAD_COPY = {
     shotAtError: "촬영일시를 입력하거나 '미상'을 선택하세요.",
     locationPlaceholder: "예: Seoul, Korea",
     locationError: "촬영장소를 입력하거나 '미상'을 선택하세요.",
-    copyrightTitle: "저작권 및 공개 범위 *",
-    copyrightHelp: "사진별로 Creative Commons 등급과 무료 사용 조건을 지정합니다. 상업 라이선스 판매가 필요한 경우 기본 정책을 유지하세요.",
+    copyrightTitle: "공통 저작권 및 공개 범위 *",
+    copyrightHelp: "이번 대기열에 있는 모든 사진에 같은 저작권 등급과 무료 사용 조건을 적용합니다.",
     freeHelpBefore: "무료로 공개하려면 무료 사용 정책에서",
     freeAll: "전체 무료",
     freeEducation: "교육용 무료",
     freeHelpAfter: "를 선택하세요. CC0/CC BY 계열을 선택하면 라이브러리에서도 해당 저작권 등급이 함께 표시됩니다.",
-    attributionName: "출처 표기명",
+    attributionName: "공통 출처 표기명",
     attributionPlaceholder: "예: 작가명 또는 스튜디오명",
-    attributionUrl: "출처 URL",
-    authorshipTitle: "AI 및 오리지널리티 보증 *",
-    authorshipHelp: "플랫폼 운영 리스크 관리를 위해 업로드하는 이미지의 생성 방식을 반드시 선언해주세요.",
+    attributionUrl: "공통 출처 URL",
+    authorshipTitle: "공통 AI 및 오리지널리티 보증 *",
+    authorshipHelp: "대기열에 있는 모든 이미지의 생성 방식을 선언해주세요.",
     humanTitle: "AI 이미지가 아니며, 본인의 오리지널리티가 있음을 보증합니다.",
     humanBody: "직접 촬영했거나 권리자로서 라이선스 판매 및 증명을 요청할 수 있는 이미지입니다.",
     aiTitle: "이 이미지는 AI 생성 이미지입니다.",
     aiBody: "AI 생성 또는 AI 보정 사실을 명시하며, 판매/배포 권한을 보유하고 있음을 확인합니다.",
     authorshipError: "AI 여부 또는 오리지널리티 보증을 선택해주세요.",
-    factualityTitle: "업로드 내용 사실성 보증 *",
+    factualityTitle: "공통 업로드 내용 사실성 보증 *",
     factualityBody: "이번에 제출하는 사진, 제목, 설명, 캡션, 태그 및 관련 메타데이터가 사실과 부합하며, 제3자의 권리나 신원을 오인하게 만들지 않음을 확인합니다.",
     factualityError: "사실성 보증 동의가 필요합니다.",
-    submit: "검토 제출",
+    submit: "선택 사진 검토 제출",
     reviewHelp: "제출한 이미지는 운영팀 검토 후 라이브러리에 노출됩니다. 검토에는 1-3 영업일이 소요됩니다.",
   },
   en: {
@@ -98,12 +118,28 @@ const NEW_UPLOAD_COPY = {
       unsupportedType: "Unsupported file type. TIFF, JPEG, PNG, and WebP are allowed.",
       tooLarge: (max: number) => `File size must not exceed ${max}MB.`,
       uploadFailed: "An error occurred while uploading.",
+      duplicate: "This file is already in the upload queue.",
     },
-    pageTitle: "Upload image",
+    pageTitle: "Upload images",
     doneTitle: "Upload complete",
-    doneBody: "Your image is pending review. It will appear in the library after approval.",
-    dropTitle: "Drag a file here or click to select",
-    dropHelp: "TIFF, JPEG, PNG, WebP · up to 500MB",
+    doneBody: "Your selected images are pending review. They will appear in the library after approval.",
+    dropTitle: "Drag files here or click to select",
+    dropHelp: "Multiple files supported · TIFF, JPEG, PNG, WebP · up to 500MB",
+    addMore: "Add photos",
+    queueTitle: "Upload queue",
+    queueHelp: "Upload similar photos together, then select each photo to refine its details.",
+    fileCount: (count: number) => `${count} selected`,
+    activeFile: "Editing",
+    remove: "Remove",
+    copyToAll: "Apply current fields to all",
+    copiedToAll: "Copied this photo's title, description, tags, categories, and shooting info to the other queued files.",
+    noFiles: "Select images to upload first.",
+    pending: "Pending",
+    uploadingFile: "Uploading",
+    savingFile: "Saving",
+    uploadedFile: "Done",
+    failedFile: "Failed",
+    partialFailed: (count: number) => `${count} file(s) failed to upload. Check failed items and submit again.`,
     rotated: "rotation correction",
     rotateLeft: "Rotate left",
     rotateRight: "Rotate right",
@@ -133,82 +169,121 @@ const NEW_UPLOAD_COPY = {
     shotAtError: "Enter the date taken or choose Unknown.",
     locationPlaceholder: "Example: Seoul, Korea",
     locationError: "Enter the location taken or choose Unknown.",
-    copyrightTitle: "Copyright and release scope *",
-    copyrightHelp: "Set the Creative Commons level and free-use policy for this image. Keep the standard policy if you want to sell commercial licenses.",
+    copyrightTitle: "Shared copyright and release scope *",
+    copyrightHelp: "Apply the same Creative Commons level and free-use policy to every photo in this queue.",
     freeHelpBefore: "To publish this as free, choose",
     freeAll: "Free for all uses",
     freeEducation: "Free for education",
     freeHelpAfter: "in the free-use policy. CC0/CC BY-family choices will also be shown in the library.",
-    attributionName: "Credit name",
+    attributionName: "Shared credit name",
     attributionPlaceholder: "Example: photographer or studio name",
-    attributionUrl: "Credit URL",
-    authorshipTitle: "AI and originality declaration *",
-    authorshipHelp: "To manage platform risk, declare how this image was created.",
+    attributionUrl: "Shared credit URL",
+    authorshipTitle: "Shared AI and originality declaration *",
+    authorshipHelp: "Declare how every image in this queue was created.",
     humanTitle: "This is not an AI image, and I attest to my originality.",
     humanBody: "This image was photographed by me, or I hold the rights needed to sell licenses and request proof.",
     aiTitle: "This is an AI-generated image.",
     aiBody: "I disclose AI generation or AI alteration and confirm that I hold the rights to sell or distribute it.",
     authorshipError: "Select whether this is AI-generated or originality-attested.",
-    factualityTitle: "Factuality attestation *",
+    factualityTitle: "Shared factuality attestation *",
     factualityBody: "I confirm that the submitted image, title, description, caption, tags, and metadata are factual and do not mislead about third-party rights or identity.",
     factualityError: "Factuality attestation is required.",
-    submit: "Submit for review",
+    submit: "Submit selected photos",
     reviewHelp: "Submitted images appear in the library after operations review. Review usually takes 1-3 business days.",
   },
 } as const;
 
 type NewUploadLang = keyof typeof NEW_UPLOAD_COPY;
 type ExifLabelCopy = Record<keyof typeof NEW_UPLOAD_COPY.ko.exifLabels, string>;
+type LocalizedDraft = {
+  title_ko: string;
+  title_en: string;
+  description_ko: string;
+  description_en: string;
+  tags_ko: string[];
+  tags_en: string[];
+};
+type DraftStatus = "idle" | "uploading" | "saving" | "done" | "error";
+type AiStatus = "idle" | "analyzing" | "done" | "failed";
+type DraftSource = "exif" | "manual";
 
-// ── Adaptive preview container based on aspect ratio ─────────────────────────
+interface UploadDraft extends UploadDraftReadiness {
+  file: File;
+  preview: string;
+  localizedDraft: LocalizedDraft;
+  takenAtSource: DraftSource;
+  locationSource: DraftSource;
+  rotationDegrees: number;
+  imgWidth: number | null;
+  imgHeight: number | null;
+  aiStatus: AiStatus;
+  exifData: ExifData | null;
+  uploadStatus: DraftStatus;
+  progress: number;
+  errorMsg: string;
+}
+
+const EMPTY_LOCALIZED_DRAFT: LocalizedDraft = {
+  title_ko: "",
+  title_en: "",
+  description_ko: "",
+  description_en: "",
+  tags_ko: [],
+  tags_en: [],
+};
+
+function cloneLocalizedDraft(draft: LocalizedDraft) {
+  return {
+    ...draft,
+    tags_ko: [...draft.tags_ko],
+    tags_en: [...draft.tags_en],
+  };
+}
+
 function previewContainerClass(w: number | null, h: number | null): string {
   if (!w || !h) return "w-full max-h-[70vh] overflow-hidden rounded-lg";
   const r = w / h;
-  if (r >= 1.35)  return "w-full overflow-hidden rounded-lg";                  // landscape
-  if (r <= 0.74)  return "w-full max-w-[720px] mx-auto overflow-hidden rounded-lg"; // portrait
-  return "w-full max-w-[820px] mx-auto overflow-hidden rounded-lg";             // square-ish
+  if (r >= 1.35) return "w-full overflow-hidden rounded-lg";
+  if (r <= 0.74) return "w-full max-w-[720px] mx-auto overflow-hidden rounded-lg";
+  return "w-full max-w-[820px] mx-auto overflow-hidden rounded-lg";
 }
 
-// ── EXIF metadata display ─────────────────────────────────────────────────────
 function ExifPanel({ data, lang, labels }: { data: ExifData; lang: NewUploadLang; labels: ExifLabelCopy }) {
   const [expanded, setExpanded] = useState(false);
-
-  // Build structured rows
   const rows: { label: string; value: string }[] = [];
 
-  if (data.takenAt)        rows.push({ label: labels.takenAt, value: data.takenAt.toLocaleString(lang === "ko" ? "ko-KR" : "en-US") });
-  if (data.locationLabel)  rows.push({ label: labels.location, value: data.locationLabel });
-  if (data.lat != null && data.lng != null)
-    rows.push({ label: "GPS", value: `${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}` });
+  if (data.takenAt) rows.push({ label: labels.takenAt, value: data.takenAt.toLocaleString(lang === "ko" ? "ko-KR" : "en-US") });
+  if (data.locationLabel) rows.push({ label: labels.location, value: data.locationLabel });
+  if (data.lat != null && data.lng != null) rows.push({ label: "GPS", value: `${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}` });
   if (data.altitude != null) rows.push({ label: labels.altitude, value: `${data.altitude.toFixed(0)}m` });
-  if (data.camera)         rows.push({ label: labels.camera, value: data.camera });
-  if (data.lensModel)      rows.push({ label: labels.lens, value: data.lensModel });
+  if (data.camera) rows.push({ label: labels.camera, value: data.camera });
+  if (data.lensModel) rows.push({ label: labels.lens, value: data.lensModel });
   if (data.focalLength != null) {
-    const fl = `${data.focalLength}mm${data.focalLength35mm ? ` (${data.focalLength35mm}mm ${labels.equivalent})` : ""}`;
-    rows.push({ label: labels.focalLength, value: fl });
+    rows.push({
+      label: labels.focalLength,
+      value: `${data.focalLength}mm${data.focalLength35mm ? ` (${data.focalLength35mm}mm ${labels.equivalent})` : ""}`,
+    });
   }
-  if (data.iso != null)        rows.push({ label: "ISO", value: String(data.iso) });
-  if (data.aperture != null)   rows.push({ label: labels.aperture, value: `f/${data.aperture}` });
-  if (data.shutterSpeed)       rows.push({ label: labels.shutterSpeed, value: data.shutterSpeed });
-  if (data.flash)              rows.push({ label: labels.flash, value: data.flash });
-  if (data.whiteBalance)       rows.push({ label: labels.whiteBalance, value: data.whiteBalance });
-  if (data.exposureMode)       rows.push({ label: labels.exposureMode, value: data.exposureMode });
-  if (data.meteringMode)       rows.push({ label: labels.meteringMode, value: data.meteringMode });
-  if (data.colorSpace)         rows.push({ label: labels.colorSpace, value: data.colorSpace });
+  if (data.iso != null) rows.push({ label: "ISO", value: String(data.iso) });
+  if (data.aperture != null) rows.push({ label: labels.aperture, value: `f/${data.aperture}` });
+  if (data.shutterSpeed) rows.push({ label: labels.shutterSpeed, value: data.shutterSpeed });
+  if (data.flash) rows.push({ label: labels.flash, value: data.flash });
+  if (data.whiteBalance) rows.push({ label: labels.whiteBalance, value: data.whiteBalance });
+  if (data.exposureMode) rows.push({ label: labels.exposureMode, value: data.exposureMode });
+  if (data.meteringMode) rows.push({ label: labels.meteringMode, value: data.meteringMode });
+  if (data.colorSpace) rows.push({ label: labels.colorSpace, value: data.colorSpace });
   if (data.orientation != null) rows.push({ label: labels.orientation, value: String(data.orientation) });
-  if (data.software)           rows.push({ label: labels.software, value: data.software });
+  if (data.software) rows.push({ label: labels.software, value: data.software });
 
-  // Raw additional fields
-  for (const [k, v] of Object.entries(data.rawFields)) {
+  for (const [key, raw] of Object.entries(data.rawFields)) {
     if (rows.length >= 40) break;
-    const val = v instanceof Date ? v.toLocaleString(lang === "ko" ? "ko-KR" : "en-US") : String(v);
-    if (val.length > 120) continue;
-    rows.push({ label: k, value: val });
+    const value = raw instanceof Date ? raw.toLocaleString(lang === "ko" ? "ko-KR" : "en-US") : String(raw);
+    if (value.length > 120) continue;
+    rows.push({ label: key, value });
   }
 
   if (rows.length === 0) return null;
 
-  // Summary line: key exposure info
   const summaryParts: string[] = [];
   if (data.camera) summaryParts.push(data.camera);
   if (data.iso != null) summaryParts.push(`ISO ${data.iso}`);
@@ -218,29 +293,26 @@ function ExifPanel({ data, lang, labels }: { data: ExifData; lang: NewUploadLang
   const summary = summaryParts.join(" · ") || rows[0].value;
 
   return (
-    <div className="rounded-lg bg-surface-container-low border border-outline-variant/40 text-xs overflow-hidden">
-      {/* Summary row — always visible */}
+    <div className="overflow-hidden rounded-lg border border-outline-variant/40 bg-surface-container-low text-xs">
       <button
         type="button"
-        onClick={() => setExpanded((x) => !x)}
-        className="w-full flex items-center justify-between px-4 py-2.5 gap-3 text-on-surface-variant hover:bg-surface-container transition-colors"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-on-surface-variant transition-colors hover:bg-surface-container"
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="material-symbols-outlined text-sm shrink-0">photo_camera</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="material-symbols-outlined shrink-0 text-sm">photo_camera</span>
           <span className="truncate">{summary}</span>
         </div>
-        <span className="material-symbols-outlined text-sm shrink-0 transition-transform duration-200" style={{ transform: expanded ? "rotate(180deg)" : "none" }}>
+        <span className="material-symbols-outlined shrink-0 text-sm transition-transform duration-200" style={{ transform: expanded ? "rotate(180deg)" : "none" }}>
           expand_more
         </span>
       </button>
-
-      {/* Expanded grid */}
       {expanded && (
-        <div className="border-t border-outline-variant/30 px-4 py-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-outline-variant/30 px-4 py-3">
           {rows.map(({ label, value }) => (
             <div key={label} className="contents">
-              <span className="text-outline font-semibold truncate">{label}</span>
-              <span className="text-on-surface-variant truncate" title={value}>{value}</span>
+              <span className="truncate font-semibold text-outline">{label}</span>
+              <span className="truncate text-on-surface-variant" title={value}>{value}</span>
             </div>
           ))}
         </div>
@@ -249,76 +321,151 @@ function ExifPanel({ data, lang, labels }: { data: ExifData; lang: NewUploadLang
   );
 }
 
+function fileFormat(file: File) {
+  if (file.type === "image/tiff") return "TIFF";
+  if (file.type === "image/jpeg") return "JPEG";
+  return file.type.split("/")[1]?.toUpperCase() ?? "IMAGE";
+}
+
 function NewUploadContent() {
   const { lang } = useLang();
   const copy = NEW_UPLOAD_COPY[lang];
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewUrlsRef = useRef(new Set<string>());
   const copyrightLicenses = localizedCopyrightLicenses(lang);
   const freeUsagePolicies = localizedFreeUsagePolicies(lang);
-  const router = useRouter();
 
-  const [file, setFile]         = useState<File | null>(null);
-  const [preview, setPreview]   = useState<string | null>(null);
-  const [title, setTitle]       = useState("");
-  const [description, setDesc]  = useState("");
-  const [localizedDraft, setLocalizedDraft] = useState({
-    title_ko: "",
-    title_en: "",
-    description_ko: "",
-    description_en: "",
-    tags_ko: [] as string[],
-    tags_en: [] as string[],
-  });
-  const [category, setCategory] = useState<Category>("nature");
-  const [tags, setTags]         = useState("");
-  // 촬영일시: ISO date string | "unknown" | ""
-  const [takenAt, setTakenAt]   = useState("");
-  const [takenAtSource, setTakenAtSource] = useState<"exif" | "manual">("manual");
-  // 촬영장소: text | "unknown" | ""
-  const [location, setLocation] = useState("");
-  const [locationSource, setLocationSource] = useState<"exif" | "manual">("manual");
+  const [categories, setCategories] = useState<ImageCategory[]>(() => [...DEFAULT_IMAGE_CATEGORIES]);
+  const [drafts, setDrafts] = useState<UploadDraft[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [copyrightLicense, setCopyrightLicense] = useState<CopyrightLicenseCode>("standard");
   const [freeUsagePolicy, setFreeUsagePolicy] = useState<FreeUsagePolicyCode>("none");
   const [attributionName, setAttributionName] = useState("");
   const [attributionUrl, setAttributionUrl] = useState("");
   const [authorshipDeclaration, setAuthorshipDeclaration] = useState<AuthorshipDeclaration | "">("");
   const [factualityAgreed, setFactualityAgreed] = useState(false);
-  const [rotationDegrees, setRotationDegrees] = useState(0);
-
-  const [imgWidth, setImgWidth]   = useState<number | null>(null);
-  const [imgHeight, setImgHeight] = useState<number | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [status, setStatus]     = useState<"idle" | "uploading" | "saving" | "done" | "error">("idle");
+  const [submitting, setSubmitting] = useState(false);
+  const [pageDone, setPageDone] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [aiStatus, setAiStatus] = useState<"idle" | "analyzing" | "done" | "failed">("idle");
-  const [exifData, setExifData] = useState<ExifData | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [noticeMsg, setNoticeMsg] = useState("");
 
-  async function resizeForAI(f: File): Promise<string> {
-    if (f.type === "image/tiff") {
+  const activeDraft = useMemo(
+    () => drafts.find((draft) => draft.id === activeDraftId) ?? drafts[0] ?? null,
+    [activeDraftId, drafts],
+  );
+  const activeDimensions = activeDraft
+    ? rotatedDimensions(activeDraft.imgWidth, activeDraft.imgHeight, activeDraft.rotationDegrees)
+    : { width: null, height: null };
+  const batchBusy = submitting || drafts.some((draft) => draft.uploadStatus === "uploading" || draft.uploadStatus === "saving");
+  const canSubmit = canSubmitUploadBatch({
+    drafts,
+    authorshipDeclaration,
+    factualityAgreed,
+    busy: batchBusy,
+  });
+
+  useEffect(() => {
+    const previewUrls = previewUrlsRef.current;
+    return () => {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      previewUrls.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data: { categories?: ImageCategory[] }) => {
+        const next = data.categories?.length ? data.categories : [...DEFAULT_IMAGE_CATEGORIES];
+        setCategories(next);
+        setDrafts((current) => {
+          const allowed = new Set(next.map((category) => category.code));
+          const fallback = next[0]?.code ?? "nature";
+          return current.map((draft) => {
+            const filtered = draft.categoryCodes.filter((code) => allowed.has(code));
+            return { ...draft, categoryCodes: filtered.length > 0 ? filtered : [fallback] };
+          });
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  function updateDraft(id: string, updater: (draft: UploadDraft) => UploadDraft) {
+    setDrafts((current) => current.map((draft) => draft.id === id ? updater(draft) : draft));
+  }
+
+  function patchActiveDraft(patch: Partial<UploadDraft>) {
+    if (!activeDraft) return;
+    updateDraft(activeDraft.id, (draft) => ({ ...draft, ...patch }));
+  }
+
+  function createDraft(file: File, defaultCategoryCodes: string[]): UploadDraft {
+    const preview = URL.createObjectURL(file);
+    previewUrlsRef.current.add(preview);
+    return {
+      id: uploadFileClientId(file),
+      file,
+      preview,
+      title: "",
+      description: "",
+      localizedDraft: cloneLocalizedDraft(EMPTY_LOCALIZED_DRAFT),
+      categoryCodes: defaultCategoryCodes.length > 0 ? [...defaultCategoryCodes] : [categories[0]?.code ?? "nature"],
+      tags: "",
+      takenAt: "",
+      takenAtSource: "manual",
+      location: "",
+      locationSource: "manual",
+      rotationDegrees: 0,
+      imgWidth: null,
+      imgHeight: null,
+      aiStatus: "idle",
+      exifData: null,
+      uploadStatus: "idle",
+      progress: 0,
+      errorMsg: "",
+    };
+  }
+
+  function loadImageDimensions(id: string, file: File) {
+    if (file.type === "image/tiff") return;
+    const url = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      updateDraft(id, (draft) => ({ ...draft, imgWidth: img.naturalWidth, imgHeight: img.naturalHeight }));
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => URL.revokeObjectURL(url);
+    img.src = url;
+  }
+
+  async function resizeForAI(file: File): Promise<string> {
+    if (file.type === "image/tiff") {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.readAsDataURL(f);
+        reader.readAsDataURL(file);
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = reject;
       });
     }
+
     return new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(f);
+      const url = URL.createObjectURL(file);
       const img = new window.Image();
       img.onload = () => {
-        const MAX = 800;
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const max = 800;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
         const canvas = document.createElement("canvas");
         canvas.width = Math.round(img.width * scale);
         canvas.height = Math.round(img.height * scale);
-        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(url);
         resolve(canvas.toDataURL("image/jpeg", 0.85));
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);
         const reader = new FileReader();
-        reader.readAsDataURL(f);
+        reader.readAsDataURL(file);
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = reject;
       };
@@ -326,32 +473,29 @@ function NewUploadContent() {
     });
   }
 
-  async function runAiAnalysis(f: File) {
-    setAiStatus("analyzing");
+  async function runAiAnalysis(draftId: string, file: File) {
+    updateDraft(draftId, (draft) => ({ ...draft, aiStatus: "analyzing" }));
     try {
       const [exif, imageBase64] = await Promise.all([
-        extractExif(f),
-        resizeForAI(f),
+        extractExif(file),
+        resizeForAI(file),
       ]);
 
-      setExifData(exif);
-
-      // Pre-fill 촬영일시 / 촬영장소 from EXIF
-      if (exif?.takenAt) {
-        setTakenAt(exif.takenAt.toISOString().slice(0, 10));
-        setTakenAtSource("exif");
-      }
-      if (exif?.locationLabel) {
-        setLocation(exif.locationLabel);
-        setLocationSource("exif");
-      }
+      updateDraft(draftId, (draft) => ({
+        ...draft,
+        exifData: exif,
+        takenAt: exif?.takenAt ? exif.takenAt.toISOString().slice(0, 10) : draft.takenAt,
+        takenAtSource: exif?.takenAt ? "exif" : draft.takenAtSource,
+        location: exif?.locationLabel ?? draft.location,
+        locationSource: exif?.locationLabel ? "exif" : draft.locationSource,
+      }));
 
       const aiRes = await fetch("/api/ai/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageBase64,
-          filename: f.name,
+          filename: file.name,
           language: lang,
           exifData: exif
             ? {
@@ -365,7 +509,10 @@ function NewUploadContent() {
         }),
       });
 
-      if (!aiRes.ok) { setAiStatus("failed"); return; }
+      if (!aiRes.ok) {
+        updateDraft(draftId, (draft) => ({ ...draft, aiStatus: "failed" }));
+        return;
+      }
 
       const {
         title: aiTitle,
@@ -379,655 +526,785 @@ function NewUploadContent() {
         tags_ko,
         tags_en,
       } = await aiRes.json();
-      const filled = !!(aiTitle || caption || (Array.isArray(aiTags) && aiTags.length > 0));
+      const aiTagList = Array.isArray(aiTags) ? aiTags : [];
+      const categoryExists = typeof aiCategory === "string" && categories.some((item) => item.code === aiCategory);
+      const filled = !!(aiTitle || caption || aiTagList.length > 0);
 
-      if (aiTitle) setTitle(aiTitle);
-      if (caption) setDesc(caption);
-      if (Array.isArray(aiTags) && aiTags.length > 0) setTags(aiTags.join(", "));
-      setLocalizedDraft({
-        title_ko: title_ko || (lang === "ko" ? aiTitle : ""),
-        title_en: title_en || (lang === "en" ? aiTitle : ""),
-        description_ko: caption_ko || (lang === "ko" ? caption : ""),
-        description_en: caption_en || (lang === "en" ? caption : ""),
-        tags_ko: Array.isArray(tags_ko) ? tags_ko : lang === "ko" && Array.isArray(aiTags) ? aiTags : [],
-        tags_en: Array.isArray(tags_en) ? tags_en : lang === "en" && Array.isArray(aiTags) ? aiTags : [],
-      });
-      if (aiCategory && isImageCategoryCode(aiCategory)) setCategory(aiCategory);
-
-      setAiStatus(filled ? "done" : "failed");
+      updateDraft(draftId, (draft) => ({
+        ...draft,
+        title: aiTitle || draft.title,
+        description: caption || draft.description,
+        tags: aiTagList.length > 0 ? aiTagList.join(", ") : draft.tags,
+        localizedDraft: {
+          title_ko: title_ko || (lang === "ko" ? aiTitle : "") || draft.localizedDraft.title_ko,
+          title_en: title_en || (lang === "en" ? aiTitle : "") || draft.localizedDraft.title_en,
+          description_ko: caption_ko || (lang === "ko" ? caption : "") || draft.localizedDraft.description_ko,
+          description_en: caption_en || (lang === "en" ? caption : "") || draft.localizedDraft.description_en,
+          tags_ko: Array.isArray(tags_ko) ? tags_ko : lang === "ko" && aiTagList.length > 0 ? aiTagList : draft.localizedDraft.tags_ko,
+          tags_en: Array.isArray(tags_en) ? tags_en : lang === "en" && aiTagList.length > 0 ? aiTagList : draft.localizedDraft.tags_en,
+        },
+        categoryCodes: categoryExists
+          ? [aiCategory, ...draft.categoryCodes.filter((code) => code !== aiCategory)]
+          : draft.categoryCodes,
+        aiStatus: filled ? "done" : "failed",
+      }));
     } catch {
-      setAiStatus("failed");
+      updateDraft(draftId, (draft) => ({ ...draft, aiStatus: "failed" }));
     }
   }
 
-  function handleFileChange(f: File | null) {
-    if (!f) return;
-    if (!ACCEPTED_TYPES.includes(f.type)) {
-      setErrorMsg(copy.errors.unsupportedType);
-      return;
+  function handleFiles(files: FileList | File[]) {
+    const incoming = Array.from(files);
+    if (incoming.length === 0) return;
+
+    const result = filterAcceptedUploadFiles(incoming);
+    const existingIds = new Set(drafts.map((draft) => draft.id));
+    const newFiles = result.accepted.filter((file) => !existingIds.has(uploadFileClientId(file)));
+    const messages = result.rejected.map(({ file, reason }) => (
+      reason === "too-large"
+        ? `${file.name}: ${copy.errors.tooLarge(MAX_UPLOAD_SIZE_MB)}`
+        : `${file.name}: ${copy.errors.unsupportedType}`
+    ));
+
+    if (result.accepted.length > 0 && newFiles.length === 0) {
+      messages.push(copy.errors.duplicate);
     }
-    if (f.size > MAX_SIZE_MB * 1024 * 1024) {
-      setErrorMsg(copy.errors.tooLarge(MAX_SIZE_MB));
-      return;
+
+    const defaultCategoryCodes = activeDraft?.categoryCodes ?? [categories[0]?.code ?? "nature"];
+    const newDrafts = newFiles.map((file) => createDraft(file, defaultCategoryCodes));
+
+    if (newDrafts.length > 0) {
+      setDrafts((current) => [...current, ...newDrafts]);
+      setActiveDraftId((current) => current ?? newDrafts[0].id);
+      setPageDone(false);
+      setNoticeMsg("");
+      newDrafts.forEach((draft) => {
+        loadImageDimensions(draft.id, draft.file);
+        runAiAnalysis(draft.id, draft.file);
+      });
     }
-    setErrorMsg("");
-    setFile(f);
-    setTitle("");     // clear title — will be filled by AI
-    setDesc("");
-    setTags("");
-    setLocalizedDraft({ title_ko: "", title_en: "", description_ko: "", description_en: "", tags_ko: [], tags_en: [] });
-    setImgWidth(null); setImgHeight(null);
-    setRotationDegrees(0);
-    setFactualityAgreed(false);
-    const objectUrl = URL.createObjectURL(f);
-    setPreview(objectUrl);
-    // Extract image dimensions (skip for TIFF — canvas can't decode it)
-    if (f.type !== "image/tiff") {
-      const img = new window.Image();
-      img.onload = () => { setImgWidth(img.naturalWidth); setImgHeight(img.naturalHeight); };
-      img.src = objectUrl;
-    }
-    setTakenAt(""); setTakenAtSource("manual");
-    setLocation(""); setLocationSource("manual");
-    setAiStatus("idle");
-    setExifData(null);
-    runAiAnalysis(f);
+
+    setErrorMsg(messages.join(" / "));
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
-    const f = e.dataTransfer.files[0];
-    if (f) handleFileChange(f);
+    handleFiles(e.dataTransfer.files);
   }
 
-  const orientedDimensions = rotatedDimensions(imgWidth, imgHeight, rotationDegrees);
-  const displayWidth = orientedDimensions.width;
-  const displayHeight = orientedDimensions.height;
+  function removeDraft(id: string) {
+    setDrafts((current) => {
+      const removed = current.find((draft) => draft.id === id);
+      if (removed) {
+        URL.revokeObjectURL(removed.preview);
+        previewUrlsRef.current.delete(removed.preview);
+      }
+      const next = current.filter((draft) => draft.id !== id);
+      if (activeDraftId === id) setActiveDraftId(next[0]?.id ?? null);
+      return next;
+    });
+  }
 
-  const canSubmit =
-    !!file &&
-    !!title.trim() &&
-    !!description.trim() &&
-    tags.split(",").map((t) => t.trim()).filter(Boolean).length > 0 &&
-    !!takenAt &&
-    !!location &&
-    !!authorshipDeclaration &&
-    factualityAgreed &&
-    status !== "uploading" &&
-    status !== "saving";
+  function toggleActiveCategory(code: string) {
+    if (!activeDraft) return;
+    updateDraft(activeDraft.id, (draft) => {
+      if (draft.categoryCodes.includes(code)) {
+        return {
+          ...draft,
+          categoryCodes: draft.categoryCodes.length > 1
+            ? draft.categoryCodes.filter((item) => item !== code)
+            : draft.categoryCodes,
+        };
+      }
+      return { ...draft, categoryCodes: [...draft.categoryCodes, code] };
+    });
+  }
+
+  function copyActiveFieldsToAll() {
+    if (!activeDraft || drafts.length <= 1) return;
+    setDrafts((current) => current.map((draft) => (
+      draft.id === activeDraft.id
+        ? draft
+        : {
+            ...draft,
+            title: activeDraft.title,
+            description: activeDraft.description,
+            localizedDraft: cloneLocalizedDraft(activeDraft.localizedDraft),
+            categoryCodes: [...activeDraft.categoryCodes],
+            tags: activeDraft.tags,
+            takenAt: activeDraft.takenAt,
+            takenAtSource: activeDraft.takenAtSource,
+            location: activeDraft.location,
+            locationSource: activeDraft.locationSource,
+            uploadStatus: draft.uploadStatus === "done" ? "done" : "idle",
+            errorMsg: "",
+          }
+    )));
+    setErrorMsg("");
+    setNoticeMsg(copy.copiedToAll);
+  }
+
+  function draftStatusLabel(draft: UploadDraft) {
+    if (draft.uploadStatus === "uploading") return copy.uploadingFile;
+    if (draft.uploadStatus === "saving") return copy.savingFile;
+    if (draft.uploadStatus === "done") return copy.uploadedFile;
+    if (draft.uploadStatus === "error") return copy.failedFile;
+    return copy.pending;
+  }
+
+  async function uploadOriginalFile(draft: UploadDraft, uploadUrl: string) {
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", uploadUrl);
+      xhr.setRequestHeader("Content-Type", draft.file.type);
+      xhr.upload.addEventListener("progress", (ev) => {
+        if (!ev.lengthComputable) return;
+        updateDraft(draft.id, (current) => ({ ...current, progress: Math.round((ev.loaded / ev.total) * 100) }));
+      });
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error(`Upload failed: ${xhr.status}`));
+      });
+      xhr.addEventListener("error", reject);
+      xhr.send(draft.file);
+    });
+  }
+
+  async function submitDraft(draft: UploadDraft) {
+    updateDraft(draft.id, (current) => ({ ...current, uploadStatus: "uploading", progress: 0, errorMsg: "" }));
+
+    const presignRes = await fetch("/api/uploads/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: draft.file.name, contentType: draft.file.type }),
+    });
+    if (!presignRes.ok) throw new Error("Failed to get upload URL");
+    const { uploadUrl, storagePath } = await presignRes.json() as { uploadUrl: string; storagePath: string };
+
+    await uploadOriginalFile(draft, uploadUrl);
+    updateDraft(draft.id, (current) => ({ ...current, uploadStatus: "saving", progress: 100 }));
+
+    const tagList = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
+    const display = rotatedDimensions(draft.imgWidth, draft.imgHeight, draft.rotationDegrees);
+
+    const saveRes = await fetch("/api/uploads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        original_filename: draft.file.name,
+        title: draft.title.trim(),
+        description: draft.description.trim(),
+        title_ko: lang === "ko" ? draft.title.trim() : draft.localizedDraft.title_ko,
+        title_en: lang === "en" ? draft.title.trim() : draft.localizedDraft.title_en,
+        description_ko: lang === "ko" ? draft.description.trim() : draft.localizedDraft.description_ko,
+        description_en: lang === "en" ? draft.description.trim() : draft.localizedDraft.description_en,
+        tags_ko: lang === "ko" ? tagList : draft.localizedDraft.tags_ko,
+        tags_en: lang === "en" ? tagList : draft.localizedDraft.tags_en,
+        category: draft.categoryCodes[0],
+        category_codes: draft.categoryCodes,
+        tags: tagList,
+        storage_path_original: storagePath,
+        file_size_mb: parseFloat((draft.file.size / 1024 / 1024).toFixed(2)),
+        file_format: fileFormat(draft.file),
+        width: display.width,
+        height: display.height,
+        resolution_mp: display.width && display.height ? parseFloat(((display.width * display.height) / 1_000_000).toFixed(1)) : null,
+        upload_rotation_degrees: draft.rotationDegrees,
+        upload_original_width: draft.imgWidth,
+        upload_original_height: draft.imgHeight,
+        exif_taken_at: draft.takenAt === UNKNOWN ? null : draft.takenAt || null,
+        exif_taken_at_unknown: draft.takenAt === UNKNOWN,
+        exif_location: draft.location || null,
+        exif_lat: draft.exifData?.lat ?? null,
+        exif_lng: draft.exifData?.lng ?? null,
+        exif_camera: draft.exifData?.camera ?? null,
+        copyright_license: copyrightLicense,
+        free_usage_policy: freeUsagePolicy,
+        attribution_name: attributionName.trim() || null,
+        attribution_url: attributionUrl.trim() || null,
+        authorship_declaration: authorshipDeclaration,
+        factuality_attested: factualityAgreed,
+      }),
+    });
+
+    if (!saveRes.ok) {
+      const err = await saveRes.json().catch(() => null) as { error?: string } | null;
+      throw new Error(err?.error ?? "Failed to save");
+    }
+
+    updateDraft(draft.id, (current) => ({ ...current, uploadStatus: "done", progress: 100, errorMsg: "" }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
-    setStatus("uploading");
-    setProgress(0);
-    setErrorMsg("");
-
-    try {
-      const presignRes = await fetch("/api/uploads/presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file!.name, contentType: file!.type }),
-      });
-      if (!presignRes.ok) throw new Error("Failed to get upload URL");
-      const { uploadUrl, storagePath } = await presignRes.json();
-
-      const xhr = new XMLHttpRequest();
-      await new Promise<void>((resolve, reject) => {
-        xhr.open("PUT", uploadUrl);
-        xhr.setRequestHeader("Content-Type", file!.type);
-        xhr.upload.addEventListener("progress", (ev) => {
-          if (ev.lengthComputable) setProgress(Math.round((ev.loaded / ev.total) * 100));
-        });
-        xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(`Upload failed: ${xhr.status}`));
-        });
-        xhr.addEventListener("error", reject);
-        xhr.send(file!);
-      });
-      setProgress(100);
-
-      setStatus("saving");
-      const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean);
-
-      const saveRes = await fetch("/api/uploads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          original_filename: file!.name,
-          title: title.trim(),
-          description: description.trim(),
-          title_ko: lang === "ko" ? title.trim() : localizedDraft.title_ko,
-          title_en: lang === "en" ? title.trim() : localizedDraft.title_en,
-          description_ko: lang === "ko" ? description.trim() : localizedDraft.description_ko,
-          description_en: lang === "en" ? description.trim() : localizedDraft.description_en,
-          tags_ko: lang === "ko" ? tagList : localizedDraft.tags_ko,
-          tags_en: lang === "en" ? tagList : localizedDraft.tags_en,
-          category,
-          tags: tagList,
-          storage_path_original: storagePath,
-          file_size_mb: parseFloat((file!.size / 1024 / 1024).toFixed(2)),
-          file_format: file!.type === "image/tiff" ? "TIFF" : file!.type === "image/jpeg" ? "JPEG" : file!.type.split("/")[1].toUpperCase(),
-          width: displayWidth,
-          height: displayHeight,
-          resolution_mp: displayWidth && displayHeight ? parseFloat(((displayWidth * displayHeight) / 1_000_000).toFixed(1)) : null,
-          upload_rotation_degrees: rotationDegrees,
-          upload_original_width: imgWidth,
-          upload_original_height: imgHeight,
-          // 촬영일시: "unknown" → null (TIMESTAMPTZ 불가), 날짜 문자열 → ISO
-          exif_taken_at: takenAt === UNKNOWN ? null : takenAt || null,
-          exif_taken_at_unknown: takenAt === UNKNOWN,
-          // 촬영장소: "unknown" 그대로 저장 가능
-          exif_location: location || null,
-          exif_lat: exifData?.lat ?? null,
-          exif_lng: exifData?.lng ?? null,
-          exif_camera: exifData?.camera ?? null,
-          copyright_license: copyrightLicense,
-          free_usage_policy: freeUsagePolicy,
-          attribution_name: attributionName.trim() || null,
-          attribution_url: attributionUrl.trim() || null,
-          authorship_declaration: authorshipDeclaration,
-          factuality_attested: factualityAgreed,
-        }),
-      });
-
-      if (!saveRes.ok) {
-        const err = await saveRes.json();
-        throw new Error(err.error ?? "Failed to save");
-      }
-
-      setStatus("done");
-      setTimeout(() => router.push("/dashboard/uploads"), 1500);
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : copy.errors.uploadFailed);
-      setStatus("error");
+    if (!canSubmit) {
+      setErrorMsg(drafts.length === 0 ? copy.noFiles : copy.errors.uploadFailed);
+      return;
     }
+
+    setSubmitting(true);
+    setErrorMsg("");
+    setNoticeMsg("");
+    let failed = 0;
+
+    for (const draft of drafts.filter((item) => item.uploadStatus !== "done")) {
+      try {
+        await submitDraft(draft);
+      } catch (err) {
+        failed += 1;
+        updateDraft(draft.id, (current) => ({
+          ...current,
+          uploadStatus: "error",
+          errorMsg: err instanceof Error ? err.message : copy.errors.uploadFailed,
+        }));
+      }
+    }
+
+    setSubmitting(false);
+    if (failed > 0) {
+      setErrorMsg(copy.partialFailed(failed));
+      return;
+    }
+
+    setPageDone(true);
+    setTimeout(() => router.push("/dashboard/uploads"), 1500);
   }
 
   return (
-    <div className="p-6 md:p-10 max-w-6xl">
-      <div className="flex items-center gap-3 mb-8">
-        <Link href="/dashboard/uploads" className="text-outline hover:text-on-surface transition-colors">
+    <div className="max-w-7xl p-6 md:p-10">
+      <div className="mb-8 flex items-center gap-3">
+        <Link href="/dashboard/uploads" className="text-outline transition-colors hover:text-on-surface">
           <span className="material-symbols-outlined text-xl">arrow_back</span>
         </Link>
-        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">{copy.pageTitle}</h1>
+        <div>
+          <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">{copy.pageTitle}</h1>
+          {drafts.length > 0 && <p className="mt-1 text-xs text-outline">{copy.fileCount(drafts.length)}</p>}
+        </div>
       </div>
 
-      {status === "done" && (
-        <div className="flex flex-col items-center py-16 gap-4 text-center">
+      {pageDone && (
+        <div className="flex flex-col items-center gap-4 py-16 text-center">
           <span className="material-symbols-outlined text-6xl text-primary">check_circle</span>
           <h2 className="font-headline text-xl font-extrabold text-on-surface">{copy.doneTitle}</h2>
-          <p className="text-on-surface-variant text-sm">{copy.doneBody}</p>
+          <p className="text-sm text-on-surface-variant">{copy.doneBody}</p>
         </div>
       )}
 
-      {status !== "done" && (
+      {!pageDone && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-
-          {/* ── Drop zone ── */}
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => fileInputRef.current?.click()}
-            className="cursor-pointer border-2 border-dashed border-outline-variant rounded-xl p-6 md:p-8 flex flex-col items-center gap-4 hover:border-primary hover:bg-primary/5 transition-all"
+            className="flex cursor-pointer flex-col items-center gap-4 rounded-xl border-2 border-dashed border-outline-variant p-6 transition-all hover:border-primary hover:bg-primary/5 md:p-8"
           >
             <input
               ref={fileInputRef}
               type="file"
-              accept=".tiff,.tif,.jpg,.jpeg,.png,.webp"
+              multiple
+              accept={ACCEPTED_UPLOAD_TYPES.join(",")}
               className="sr-only"
-              onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+              onChange={(e) => handleFiles(e.target.files ?? [])}
             />
-            {preview ? (
-              <div className={previewContainerClass(displayWidth, displayHeight)}>
-                <Image
-                  src={preview}
-                  alt="Preview"
-                  width={imgWidth ?? 800}
-                  height={imgHeight ?? 600}
-                  className="max-h-[72vh] w-full h-auto object-contain block transition-transform duration-200"
-                  style={{
-                    transform: rotationDegrees ? `rotate(${rotationDegrees}deg)` : "none",
-                  }}
-                  unoptimized
-                />
-              </div>
-            ) : (
-              <>
-                <span className="material-symbols-outlined text-5xl text-outline">cloud_upload</span>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-on-surface">{copy.dropTitle}</p>
-                  <p className="text-xs text-outline mt-1">{copy.dropHelp}</p>
-                </div>
-              </>
-            )}
+            <span className="material-symbols-outlined text-5xl text-outline">cloud_upload</span>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-on-surface">{drafts.length > 0 ? copy.addMore : copy.dropTitle}</p>
+              <p className="mt-1 text-xs text-outline">{copy.dropHelp}</p>
+            </div>
           </div>
 
-          {/* ── File info + EXIF ── */}
-          {file && (
-            <div className="flex flex-col gap-2">
-              {/* Filename / size / dimensions */}
-              <div className="flex items-center gap-2 text-xs text-outline">
-                <span className="material-symbols-outlined text-sm">insert_drive_file</span>
-                <span className="font-mono truncate max-w-xs">{file.name}</span>
-                <span>·</span>
-                <span>{(file.size / 1024 / 1024).toFixed(1)} MB</span>
-                {displayWidth && displayHeight && (
-                  <>
+          {drafts.length > 0 && (
+            <div className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-on-surface">{copy.queueTitle}</p>
+                  <p className="mt-1 text-xs text-outline">{copy.queueHelp}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={copyActiveFieldsToAll}
+                  disabled={!activeDraft || drafts.length <= 1}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded border border-outline-variant px-3 text-xs font-bold text-on-surface-variant transition-colors hover:border-outline hover:text-on-surface disabled:opacity-40"
+                >
+                  <span className="material-symbols-outlined text-base">content_copy</span>
+                  {copy.copyToAll}
+                </button>
+              </div>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {drafts.map((draft) => {
+                  const active = activeDraft?.id === draft.id;
+                  return (
+                    <div
+                      key={draft.id}
+                      className={[
+                        "flex min-w-0 items-center gap-3 rounded-lg border p-2 transition-colors",
+                        active ? "border-primary bg-primary/5" : "border-outline-variant/40 bg-surface-container-low",
+                      ].join(" ")}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setActiveDraftId(draft.id)}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <div className="h-12 w-16 shrink-0 overflow-hidden rounded bg-surface-container">
+                          <Image src={draft.preview} alt="" width={64} height={48} className="h-full w-full object-cover" unoptimized />
+                        </div>
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-bold text-on-surface">{draft.file.name}</span>
+                          <span className="mt-1 flex items-center gap-1 text-[11px] text-outline">
+                            {active && <span className="font-semibold text-primary">{copy.activeFile}</span>}
+                            {active && <span>·</span>}
+                            <span>{draftStatusLabel(draft)}</span>
+                            {draft.uploadStatus === "uploading" && <span>· {draft.progress}%</span>}
+                          </span>
+                          {draft.errorMsg && <span className="mt-1 block truncate text-[11px] text-error">{draft.errorMsg}</span>}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeDraft(draft.id)}
+                        disabled={draft.uploadStatus === "uploading" || draft.uploadStatus === "saving"}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-outline transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:opacity-40"
+                        aria-label={copy.remove}
+                      >
+                        <span className="material-symbols-outlined text-base">close</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {activeDraft && (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+              <section className="flex flex-col gap-4">
+                <div className={previewContainerClass(activeDimensions.width, activeDimensions.height)}>
+                  <Image
+                    src={activeDraft.preview}
+                    alt="Preview"
+                    width={activeDraft.imgWidth ?? 900}
+                    height={activeDraft.imgHeight ?? 600}
+                    className="block max-h-[72vh] h-auto w-full object-contain transition-transform duration-200"
+                    style={{ transform: activeDraft.rotationDegrees ? `rotate(${activeDraft.rotationDegrees}deg)` : "none" }}
+                    unoptimized
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-outline">
+                    <span className="material-symbols-outlined text-sm">insert_drive_file</span>
+                    <span className="max-w-xs truncate font-mono">{activeDraft.file.name}</span>
                     <span>·</span>
-                    <span>{displayWidth.toLocaleString()} × {displayHeight.toLocaleString()} px</span>
-                  </>
-                )}
-                {rotationDegrees > 0 && (
-                  <>
-                    <span>·</span>
-                    <span>{rotationDegrees}° {copy.rotated}</span>
-                  </>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setRotationDegrees((value) => normalizeRotationDegrees(value + 270))}
-                  className="h-9 px-3 rounded-lg border border-outline-variant text-xs font-bold text-on-surface-variant hover:text-on-surface hover:border-outline flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-sm">rotate_left</span>
-                  {copy.rotateLeft}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRotationDegrees((value) => normalizeRotationDegrees(value + 90))}
-                  className="h-9 px-3 rounded-lg border border-outline-variant text-xs font-bold text-on-surface-variant hover:text-on-surface hover:border-outline flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-sm">rotate_right</span>
-                  {copy.rotateRight}
-                </button>
-                {rotationDegrees > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setRotationDegrees(0)}
-                    className="h-9 px-3 rounded-lg border border-outline-variant text-xs font-bold text-outline hover:text-on-surface hover:border-outline flex items-center gap-1.5"
-                  >
-                    <span className="material-symbols-outlined text-sm">restart_alt</span>
-                    {copy.reset}
-                  </button>
-                )}
-                <span className="text-[11px] text-outline">
-                  {copy.rotationHelp}
-                </span>
-              </div>
-              {/* EXIF metadata panel */}
-              {exifData && <ExifPanel data={exifData} lang={lang} labels={copy.exifLabels} />}
-            </div>
-          )}
-
-          {/* AI status */}
-          {aiStatus === "analyzing" && (
-            <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-              <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin inline-block shrink-0" />
-              {copy.aiAnalyzing}
-            </div>
-          )}
-          {aiStatus === "done" && (
-            <div className="px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">auto_awesome</span>
-              {copy.aiDone}
-            </div>
-          )}
-          {aiStatus === "failed" && (
-            <div className="px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">info</span>
-              {copy.aiFailed}
-            </div>
-          )}
-
-          {/* Progress */}
-          {status === "uploading" && (
-            <div>
-              <div className="flex justify-between text-xs text-outline mb-1">
-                <span>{copy.uploading}</span><span>{progress}%</span>
-              </div>
-              <div className="h-2 bg-surface-container-low rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-300 rounded-full" style={{ width: `${progress}%` }} />
-              </div>
-            </div>
-          )}
-          {status === "saving" && (
-            <p className="text-xs text-outline flex items-center gap-2">
-              <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin inline-block" />
-              {copy.saving}
-            </p>
-          )}
-
-          {/* ── 작품 제목 * (AI 자동생성) ── */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-outline uppercase tracking-widest flex items-center gap-2">
-              {copy.title}
-              {aiStatus === "done" && title && (
-                <span className="normal-case font-normal text-primary text-[10px] bg-primary/10 px-2 py-0.5 rounded-full">{copy.aiGenerated}</span>
-              )}
-            </label>
-            <input
-              type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder={aiStatus === "analyzing" ? copy.titlePlaceholderAnalyzing : copy.titlePlaceholder}
-              className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
-            />
-          </div>
-
-          {/* ── 설명 * ── */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-outline uppercase tracking-widest">{copy.description}</label>
-            <textarea
-              required value={description} onChange={(e) => setDesc(e.target.value)}
-              rows={3} placeholder={copy.descriptionPlaceholder}
-              className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-none transition-all"
-            />
-          </div>
-
-          {/* ── 카테고리 * ── */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-outline uppercase tracking-widest">{copy.category}</label>
-            <select
-              required value={category} onChange={(e) => setCategory(e.target.value as Category)}
-              className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface outline-none transition-all"
-            >
-              {IMAGE_CATEGORIES.map((c) => (
-                <option key={c.code} value={c.code}>{c[lang]}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* ── 태그 * ── */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-outline uppercase tracking-widest">{copy.tags}</label>
-            <input
-              type="text" value={tags} onChange={(e) => setTags(e.target.value)}
-              placeholder={copy.tagsPlaceholder}
-              className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
-            />
-            {tags && tags.split(",").map((t) => t.trim()).filter(Boolean).length === 0 && (
-              <p className="text-xs text-error">{copy.tagsError}</p>
-            )}
-          </div>
-
-          {/* ── 촬영일시 * ── */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-outline uppercase tracking-widest">
-              {copy.shotAt}
-              {takenAtSource === "exif" && (
-                <span className="ml-2 normal-case font-normal text-primary text-[10px] bg-primary/10 px-2 py-0.5 rounded-full">{copy.exifAuto}</span>
-              )}
-            </label>
-            {takenAt === UNKNOWN ? (
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-12 bg-surface-container-low ring-1 ring-outline-variant/50 rounded-lg px-4 flex items-center text-sm text-outline">
-                  {copy.unknownFull}
+                    <span>{(activeDraft.file.size / 1024 / 1024).toFixed(1)} MB</span>
+                    {activeDimensions.width && activeDimensions.height && (
+                      <>
+                        <span>·</span>
+                        <span>{activeDimensions.width.toLocaleString()} × {activeDimensions.height.toLocaleString()} px</span>
+                      </>
+                    )}
+                    {activeDraft.rotationDegrees > 0 && (
+                      <>
+                        <span>·</span>
+                        <span>{activeDraft.rotationDegrees}° {copy.rotated}</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => patchActiveDraft({ rotationDegrees: normalizeRotationDegrees(activeDraft.rotationDegrees + 270), uploadStatus: activeDraft.uploadStatus === "done" ? "done" : "idle" })}
+                      className="flex h-9 items-center gap-1.5 rounded-lg border border-outline-variant px-3 text-xs font-bold text-on-surface-variant hover:border-outline hover:text-on-surface"
+                    >
+                      <span className="material-symbols-outlined text-sm">rotate_left</span>
+                      {copy.rotateLeft}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => patchActiveDraft({ rotationDegrees: normalizeRotationDegrees(activeDraft.rotationDegrees + 90), uploadStatus: activeDraft.uploadStatus === "done" ? "done" : "idle" })}
+                      className="flex h-9 items-center gap-1.5 rounded-lg border border-outline-variant px-3 text-xs font-bold text-on-surface-variant hover:border-outline hover:text-on-surface"
+                    >
+                      <span className="material-symbols-outlined text-sm">rotate_right</span>
+                      {copy.rotateRight}
+                    </button>
+                    {activeDraft.rotationDegrees > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => patchActiveDraft({ rotationDegrees: 0, uploadStatus: activeDraft.uploadStatus === "done" ? "done" : "idle" })}
+                        className="flex h-9 items-center gap-1.5 rounded-lg border border-outline-variant px-3 text-xs font-bold text-outline hover:border-outline hover:text-on-surface"
+                      >
+                        <span className="material-symbols-outlined text-sm">restart_alt</span>
+                        {copy.reset}
+                      </button>
+                    )}
+                    <span className="text-[11px] text-outline">{copy.rotationHelp}</span>
+                  </div>
+                  {activeDraft.exifData && <ExifPanel data={activeDraft.exifData} lang={lang} labels={copy.exifLabels} />}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { setTakenAt(""); setTakenAtSource("manual"); }}
-                  className="h-12 px-4 text-xs text-outline hover:text-on-surface border border-outline-variant rounded-lg transition-colors"
-                >
-                  {copy.manualInput}
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={takenAt}
-                  onChange={(e) => { setTakenAt(e.target.value); setTakenAtSource("manual"); }}
-                  className="flex-1 h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface outline-none transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => { setTakenAt(UNKNOWN); setTakenAtSource("manual"); }}
-                  className="h-12 px-4 text-xs text-outline hover:text-on-surface border border-outline-variant rounded-lg transition-colors whitespace-nowrap"
-                >
-                  {copy.unknown}
-                </button>
-              </div>
-            )}
-            {!takenAt && file && aiStatus !== "analyzing" && (
-              <p className="text-xs text-error">{copy.shotAtError}</p>
-            )}
-          </div>
+              </section>
 
-          {/* ── 촬영장소 * ── */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-outline uppercase tracking-widest">
-              {copy.shotLocation}
-              {locationSource === "exif" && (
-                <span className="ml-2 normal-case font-normal text-primary text-[10px] bg-primary/10 px-2 py-0.5 rounded-full">{copy.exifAuto}</span>
-              )}
-            </label>
-            {location === UNKNOWN ? (
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-12 bg-surface-container-low ring-1 ring-outline-variant/50 rounded-lg px-4 flex items-center text-sm text-outline">
-                  {copy.unknownFull}
+              <section className="flex flex-col gap-6">
+                {activeDraft.aiStatus === "analyzing" && (
+                  <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+                    <span className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    {copy.aiAnalyzing}
+                  </div>
+                )}
+                {activeDraft.aiStatus === "done" && (
+                  <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                    <span className="material-symbols-outlined text-base">auto_awesome</span>
+                    {copy.aiDone}
+                  </div>
+                )}
+                {activeDraft.aiStatus === "failed" && (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <span className="material-symbols-outlined text-base">info</span>
+                    {copy.aiFailed}
+                  </div>
+                )}
+
+                {(activeDraft.uploadStatus === "uploading" || activeDraft.uploadStatus === "saving") && (
+                  <div>
+                    <div className="mb-1 flex justify-between text-xs text-outline">
+                      <span>{activeDraft.uploadStatus === "saving" ? copy.saving : copy.uploading}</span>
+                      <span>{activeDraft.progress}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-surface-container-low">
+                      <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${activeDraft.progress}%` }} />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-outline">
+                    {copy.title}
+                    {activeDraft.aiStatus === "done" && activeDraft.title && (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-normal normal-case text-primary">{copy.aiGenerated}</span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={activeDraft.title}
+                    onChange={(e) => patchActiveDraft({ title: e.target.value, uploadStatus: activeDraft.uploadStatus === "done" ? "done" : "idle", errorMsg: "" })}
+                    placeholder={activeDraft.aiStatus === "analyzing" ? copy.titlePlaceholderAnalyzing : copy.titlePlaceholder}
+                    className="h-12 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                  />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { setLocation(""); setLocationSource("manual"); }}
-                  className="h-12 px-4 text-xs text-outline hover:text-on-surface border border-outline-variant rounded-lg transition-colors"
-                >
-                  {copy.manualInput}
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={location}
-                  onChange={(e) => { setLocation(e.target.value); setLocationSource("manual"); }}
-                  placeholder={copy.locationPlaceholder}
-                  className="flex-1 h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => { setLocation(UNKNOWN); setLocationSource("manual"); }}
-                  className="h-12 px-4 text-xs text-outline hover:text-on-surface border border-outline-variant rounded-lg transition-colors whitespace-nowrap"
-                >
-                  {copy.unknown}
-                </button>
-              </div>
-            )}
-            {!location && file && aiStatus !== "analyzing" && (
-              <p className="text-xs text-error">{copy.locationError}</p>
-            )}
-          </div>
 
-          {/* ── 저작권/무료 사용 정책 ── */}
-          <div className="flex flex-col gap-4 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5">
-            <div>
-              <p className="text-xs font-bold text-outline uppercase tracking-widest">{copy.copyrightTitle}</p>
-              <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-                {copy.copyrightHelp}
-              </p>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-outline">{copy.description}</label>
+                  <textarea
+                    required
+                    value={activeDraft.description}
+                    onChange={(e) => patchActiveDraft({ description: e.target.value, uploadStatus: activeDraft.uploadStatus === "done" ? "done" : "idle", errorMsg: "" })}
+                    rows={3}
+                    placeholder={copy.descriptionPlaceholder}
+                    className="resize-none rounded-lg bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-outline">{copy.category}</label>
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map((item) => {
+                      const checked = activeDraft.categoryCodes.includes(item.code);
+                      return (
+                        <button
+                          key={item.code}
+                          type="button"
+                          onClick={() => toggleActiveCategory(item.code)}
+                          className={[
+                            "inline-flex h-10 items-center gap-2 rounded-full border px-3 text-xs font-bold transition-colors",
+                            checked ? "border-primary bg-primary/10 text-primary" : "border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-outline",
+                          ].join(" ")}
+                        >
+                          <span className="material-symbols-outlined text-base">{checked ? "check_circle" : "radio_button_unchecked"}</span>
+                          {item[lang]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-outline">{copy.tags}</label>
+                  <input
+                    type="text"
+                    value={activeDraft.tags}
+                    onChange={(e) => patchActiveDraft({ tags: e.target.value, uploadStatus: activeDraft.uploadStatus === "done" ? "done" : "idle", errorMsg: "" })}
+                    placeholder={copy.tagsPlaceholder}
+                    className="h-12 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                  />
+                  {activeDraft.tags && activeDraft.tags.split(",").map((tag) => tag.trim()).filter(Boolean).length === 0 && (
+                    <p className="text-xs text-error">{copy.tagsError}</p>
+                  )}
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-outline">
+                      {copy.shotAt}
+                      {activeDraft.takenAtSource === "exif" && (
+                        <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-normal normal-case text-primary">{copy.exifAuto}</span>
+                      )}
+                    </label>
+                    {activeDraft.takenAt === UNKNOWN ? (
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-12 flex-1 items-center rounded-lg bg-surface-container-low px-4 text-sm text-outline ring-1 ring-outline-variant/50">
+                          {copy.unknownFull}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => patchActiveDraft({ takenAt: "", takenAtSource: "manual" })}
+                          className="h-12 rounded-lg border border-outline-variant px-4 text-xs text-outline transition-colors hover:text-on-surface"
+                        >
+                          {copy.manualInput}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="date"
+                          value={activeDraft.takenAt}
+                          onChange={(e) => patchActiveDraft({ takenAt: e.target.value, takenAtSource: "manual" })}
+                          className="h-12 flex-1 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all focus:ring-2 focus:ring-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => patchActiveDraft({ takenAt: UNKNOWN, takenAtSource: "manual" })}
+                          className="h-12 whitespace-nowrap rounded-lg border border-outline-variant px-4 text-xs text-outline transition-colors hover:text-on-surface"
+                        >
+                          {copy.unknown}
+                        </button>
+                      </div>
+                    )}
+                    {!activeDraft.takenAt && activeDraft.aiStatus !== "analyzing" && <p className="text-xs text-error">{copy.shotAtError}</p>}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-outline">
+                      {copy.shotLocation}
+                      {activeDraft.locationSource === "exif" && (
+                        <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-normal normal-case text-primary">{copy.exifAuto}</span>
+                      )}
+                    </label>
+                    {activeDraft.location === UNKNOWN ? (
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-12 flex-1 items-center rounded-lg bg-surface-container-low px-4 text-sm text-outline ring-1 ring-outline-variant/50">
+                          {copy.unknownFull}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => patchActiveDraft({ location: "", locationSource: "manual" })}
+                          className="h-12 rounded-lg border border-outline-variant px-4 text-xs text-outline transition-colors hover:text-on-surface"
+                        >
+                          {copy.manualInput}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={activeDraft.location}
+                          onChange={(e) => patchActiveDraft({ location: e.target.value, locationSource: "manual" })}
+                          placeholder={copy.locationPlaceholder}
+                          className="h-12 flex-1 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => patchActiveDraft({ location: UNKNOWN, locationSource: "manual" })}
+                          className="h-12 whitespace-nowrap rounded-lg border border-outline-variant px-4 text-xs text-outline transition-colors hover:text-on-surface"
+                        >
+                          {copy.unknown}
+                        </button>
+                      </div>
+                    )}
+                    {!activeDraft.location && activeDraft.aiStatus !== "analyzing" && <p className="text-xs text-error">{copy.locationError}</p>}
+                  </div>
+                </div>
+              </section>
             </div>
+          )}
 
-            <div className="grid gap-3">
-              {copyrightLicenses.map((license) => (
+          {drafts.length > 0 && (
+            <>
+              <div className="flex flex-col gap-4 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-outline">{copy.copyrightTitle}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{copy.copyrightHelp}</p>
+                </div>
+
+                <div className="grid gap-3">
+                  {copyrightLicenses.map((license) => (
+                    <label
+                      key={license.code}
+                      className={[
+                        "flex cursor-pointer gap-3 rounded-lg border px-4 py-3 transition-colors",
+                        copyrightLicense === license.code ? "border-primary bg-primary/5" : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
+                      ].join(" ")}
+                    >
+                      <input
+                        type="radio"
+                        name="copyright_license"
+                        value={license.code}
+                        checked={copyrightLicense === license.code}
+                        onChange={() => setCopyrightLicense(license.code)}
+                        className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-on-surface">{license.label}</span>
+                        <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">{license.summary}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {freeUsagePolicies.map((policy) => (
+                    <label
+                      key={policy.code}
+                      className={[
+                        "cursor-pointer rounded-lg border px-4 py-3 transition-colors",
+                        freeUsagePolicy === policy.code ? "border-primary bg-primary/5" : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
+                      ].join(" ")}
+                    >
+                      <input
+                        type="radio"
+                        name="free_usage_policy"
+                        value={policy.code}
+                        checked={freeUsagePolicy === policy.code}
+                        onChange={() => setFreeUsagePolicy(policy.code)}
+                        className="sr-only"
+                      />
+                      <span className="block text-sm font-bold text-on-surface">{policy.label}</span>
+                      <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{policy.summary}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <p className="text-xs leading-relaxed text-on-surface-variant">
+                  {copy.freeHelpBefore} <span className="font-semibold text-on-surface">{copy.freeAll}</span> {lang === "ko" ? "또는" : "or"} <span className="font-semibold text-on-surface">{copy.freeEducation}</span>{lang === "ko" ? "" : " "} {copy.freeHelpAfter}
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-outline">{copy.attributionName}</label>
+                    <input
+                      type="text"
+                      value={attributionName}
+                      onChange={(e) => setAttributionName(e.target.value)}
+                      placeholder={copy.attributionPlaceholder}
+                      className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-outline">{copy.attributionUrl}</label>
+                    <input
+                      type="url"
+                      value={attributionUrl}
+                      onChange={(e) => setAttributionUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-outline">{copy.authorshipTitle}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{copy.authorshipHelp}</p>
+                </div>
+
                 <label
-                  key={license.code}
                   className={[
                     "flex cursor-pointer gap-3 rounded-lg border px-4 py-3 transition-colors",
-                    copyrightLicense === license.code
-                      ? "border-primary bg-primary/5"
-                      : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
+                    authorshipDeclaration === "human_original" ? "border-primary bg-primary/5" : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
                   ].join(" ")}
                 >
                   <input
                     type="radio"
-                    name="copyright_license"
-                    value={license.code}
-                    checked={copyrightLicense === license.code}
-                    onChange={() => setCopyrightLicense(license.code)}
+                    name="authorship_declaration"
+                    value="human_original"
+                    checked={authorshipDeclaration === "human_original"}
+                    onChange={() => setAuthorshipDeclaration("human_original")}
                     className="mt-1 h-4 w-4 shrink-0 accent-primary"
                   />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-bold text-on-surface">{license.label}</span>
-                    <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">{license.summary}</span>
+                  <span>
+                    <span className="block text-sm font-bold text-on-surface">{copy.humanTitle}</span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">{copy.humanBody}</span>
                   </span>
                 </label>
-              ))}
-            </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              {freeUsagePolicies.map((policy) => (
                 <label
-                  key={policy.code}
                   className={[
-                    "cursor-pointer rounded-lg border px-4 py-3 transition-colors",
-                    freeUsagePolicy === policy.code
-                      ? "border-primary bg-primary/5"
-                      : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
+                    "flex cursor-pointer gap-3 rounded-lg border px-4 py-3 transition-colors",
+                    authorshipDeclaration === "ai_generated" ? "border-primary bg-primary/5" : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
                   ].join(" ")}
                 >
                   <input
                     type="radio"
-                    name="free_usage_policy"
-                    value={policy.code}
-                    checked={freeUsagePolicy === policy.code}
-                    onChange={() => setFreeUsagePolicy(policy.code)}
-                    className="sr-only"
+                    name="authorship_declaration"
+                    value="ai_generated"
+                    checked={authorshipDeclaration === "ai_generated"}
+                    onChange={() => setAuthorshipDeclaration("ai_generated")}
+                    className="mt-1 h-4 w-4 shrink-0 accent-primary"
                   />
-                  <span className="block text-sm font-bold text-on-surface">{policy.label}</span>
-                  <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{policy.summary}</span>
+                  <span>
+                    <span className="block text-sm font-bold text-on-surface">{copy.aiTitle}</span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">{copy.aiBody}</span>
+                  </span>
                 </label>
-              ))}
-            </div>
 
-            <p className="text-xs leading-relaxed text-on-surface-variant">
-              {copy.freeHelpBefore} <span className="font-semibold text-on-surface">{copy.freeAll}</span> {lang === "ko" ? "또는" : "or"} <span className="font-semibold text-on-surface">{copy.freeEducation}</span>{lang === "ko" ? "" : " "} {copy.freeHelpAfter}
-            </p>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-outline uppercase tracking-widest">{copy.attributionName}</label>
-                <input
-                  type="text"
-                  value={attributionName}
-                  onChange={(e) => setAttributionName(e.target.value)}
-                  placeholder={copy.attributionPlaceholder}
-                  className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
-                />
+                {!authorshipDeclaration && <p className="text-xs text-error">{copy.authorshipError}</p>}
               </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-outline uppercase tracking-widest">{copy.attributionUrl}</label>
+
+              <label className="flex cursor-pointer gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 transition-colors hover:border-outline">
                 <input
-                  type="url"
-                  value={attributionUrl}
-                  onChange={(e) => setAttributionUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                  type="checkbox"
+                  checked={factualityAgreed}
+                  onChange={(e) => setFactualityAgreed(e.target.checked)}
+                  className="mt-1 h-4 w-4 shrink-0 accent-primary"
                 />
-              </div>
-            </div>
-          </div>
-
-          {/* ── AI / 오리지널리티 선언 ── */}
-          <div className="flex flex-col gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5">
-            <div>
-              <p className="text-xs font-bold text-outline uppercase tracking-widest">{copy.authorshipTitle}</p>
-              <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-                {copy.authorshipHelp}
-              </p>
-            </div>
-
-            <label
-              className={[
-                "flex cursor-pointer gap-3 rounded-lg border px-4 py-3 transition-colors",
-                authorshipDeclaration === "human_original"
-                  ? "border-primary bg-primary/5"
-                  : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
-              ].join(" ")}
-            >
-              <input
-                type="radio"
-                name="authorship_declaration"
-                value="human_original"
-                checked={authorshipDeclaration === "human_original"}
-                onChange={() => setAuthorshipDeclaration("human_original")}
-                className="mt-1 h-4 w-4 shrink-0 accent-primary"
-              />
-              <span>
-                <span className="block text-sm font-bold text-on-surface">
-                  {copy.humanTitle}
+                <span>
+                  <span className="block text-sm font-bold text-on-surface">{copy.factualityTitle}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{copy.factualityBody}</span>
+                  {!factualityAgreed && <span className="mt-2 block text-xs text-error">{copy.factualityError}</span>}
                 </span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">
-                  {copy.humanBody}
-                </span>
-              </span>
-            </label>
-
-            <label
-              className={[
-                "flex cursor-pointer gap-3 rounded-lg border px-4 py-3 transition-colors",
-                authorshipDeclaration === "ai_generated"
-                  ? "border-primary bg-primary/5"
-                  : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
-              ].join(" ")}
-            >
-              <input
-                type="radio"
-                name="authorship_declaration"
-                value="ai_generated"
-                checked={authorshipDeclaration === "ai_generated"}
-                onChange={() => setAuthorshipDeclaration("ai_generated")}
-                className="mt-1 h-4 w-4 shrink-0 accent-primary"
-              />
-              <span>
-                <span className="block text-sm font-bold text-on-surface">{copy.aiTitle}</span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">
-                  {copy.aiBody}
-                </span>
-              </span>
-            </label>
-
-            {!authorshipDeclaration && file && (
-              <p className="text-xs text-error">{copy.authorshipError}</p>
-            )}
-          </div>
-
-          <label className="flex cursor-pointer gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 transition-colors hover:border-outline">
-            <input
-              type="checkbox"
-              checked={factualityAgreed}
-              onChange={(e) => setFactualityAgreed(e.target.checked)}
-              className="mt-1 h-4 w-4 shrink-0 accent-primary"
-            />
-            <span>
-              <span className="block text-sm font-bold text-on-surface">{copy.factualityTitle}</span>
-              <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">
-                {copy.factualityBody}
-              </span>
-              {!factualityAgreed && file && (
-                <span className="mt-2 block text-xs text-error">{copy.factualityError}</span>
-              )}
-            </span>
-          </label>
+              </label>
+            </>
+          )}
 
           {errorMsg && (
-            <div className="px-4 py-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-lg border border-error/20 bg-error/10 px-4 py-3 text-sm text-error">
               <span className="material-symbols-outlined text-base">error</span>
               {errorMsg}
+            </div>
+          )}
+
+          {noticeMsg && (
+            <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
+              <span className="material-symbols-outlined text-base">check_circle</span>
+              {noticeMsg}
             </div>
           )}
 
           <button
             type="submit"
             disabled={!canSubmit}
-            className="w-full py-4 bg-primary text-white font-bold text-xs uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex w-full items-center justify-center gap-2 rounded bg-primary py-4 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-base">cloud_upload</span>
+            {batchBusy ? (
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <span className="material-symbols-outlined text-base">cloud_upload</span>
+            )}
             {copy.submit}
           </button>
 
-          <p className="text-xs text-outline text-center leading-relaxed">
-            {copy.reviewHelp}
-          </p>
+          <p className="text-center text-xs leading-relaxed text-outline">{copy.reviewHelp}</p>
         </form>
       )}
     </div>

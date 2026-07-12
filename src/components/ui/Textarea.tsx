@@ -14,7 +14,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     return (
       <div className="flex flex-col gap-2 w-full">
         {label && (
-          <label className="text-xs font-bold text-outline uppercase tracking-widest">
+          <label className="text-xs font-semibold text-outline">
             {label}
           </label>
         )}

@@ -7,6 +7,11 @@ import { useEffect, Suspense, useMemo, useState } from "react";
 import { useCart } from "@/lib/store/cart";
 import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 import { useLang } from "@/lib/i18n/store";
+import {
+  initialSelectedDownloadIds,
+  toggleDownloadId,
+  toggleDownloadSelectionAll,
+} from "@/lib/checkout/success-downloads";
 
 interface SuccessOrderItem {
   id: string;
@@ -35,6 +40,11 @@ const CHECKOUT_SUCCESS_COPY = {
     originalsHelp: "다운로드 링크는 서버에서 안전하게 서명되어 새 창으로 열립니다.",
     empty: "결제는 완료됐지만 이 화면에서 주문 항목을 불러오지 못했습니다. 주문 내역에서 다운로드를 확인해주세요.",
     downloadOriginal: "원본 다운로드",
+    selectAll: "전체 선택",
+    clearSelection: "선택 해제",
+    downloadSelected: "선택 다운로드",
+    selectedCount: (count: number) => `${count}개 선택됨`,
+    bulkDownloadError: "선택한 원본 파일을 ZIP으로 만들지 못했습니다.",
     orders: "주문 내역 보기",
     library: "라이브러리로",
   },
@@ -47,6 +57,11 @@ const CHECKOUT_SUCCESS_COPY = {
     originalsHelp: "Download links are securely signed by the server and open in a new window.",
     empty: "Payment is complete, but we could not load the order items on this page. Please check downloads from your order history.",
     downloadOriginal: "Download original",
+    selectAll: "Select all",
+    clearSelection: "Clear selection",
+    downloadSelected: "Download selected",
+    selectedCount: (count: number) => `${count} selected`,
+    bulkDownloadError: "Could not prepare the selected originals as a ZIP.",
     orders: "View orders",
     library: "Back to library",
   },
@@ -61,6 +76,8 @@ function SuccessContent() {
   const [orders, setOrders] = useState<SuccessOrder[]>([]);
   const [loadingOrder, setLoadingOrder] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [selectedDownloadIds, setSelectedDownloadIds] = useState<string[]>([]);
+  const [batchDownloading, setBatchDownloading] = useState(false);
 
   useEffect(() => {
     clear();
@@ -81,6 +98,13 @@ function SuccessContent() {
     }
     return completed[0] ?? null;
   }, [orderNumber, orders]);
+  const purchasedItems = useMemo(() => completedOrder?.order_items ?? [], [completedOrder]);
+  const purchasedItemIds = useMemo(() => purchasedItems.map((item) => item.id), [purchasedItems]);
+  const allSelected = purchasedItemIds.length > 0 && purchasedItemIds.every((id) => selectedDownloadIds.includes(id));
+
+  useEffect(() => {
+    setSelectedDownloadIds(initialSelectedDownloadIds(purchasedItems));
+  }, [purchasedItems]);
 
   async function handleDownload(orderItemId: string) {
     setDownloading(orderItemId);
@@ -98,7 +122,38 @@ function SuccessContent() {
     }
   }
 
-  const purchasedItems = completedOrder?.order_items ?? [];
+  async function downloadZip(orderItemIds: string[]) {
+    const res = await fetch("/api/download/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderItemIds }),
+    });
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: copy.bulkDownloadError }));
+      throw new Error(error ?? copy.bulkDownloadError);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `imagepartners-downloads-${new Date().toISOString().slice(0, 10)}.zip`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function handleDownloadSelected() {
+    if (selectedDownloadIds.length === 0 || batchDownloading) return;
+    setBatchDownloading(true);
+    try {
+      await downloadZip(selectedDownloadIds);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : copy.bulkDownloadError);
+    } finally {
+      setBatchDownloading(false);
+    }
+  }
 
   return (
     <div className="min-h-screen px-6 py-32 bg-surface">
@@ -122,7 +177,34 @@ function SuccessContent() {
               <p className="text-sm font-bold text-on-surface">{copy.originalsTitle}</p>
               <p className="mt-1 text-xs text-outline">{copy.originalsHelp}</p>
             </div>
-            {loadingOrder && <span className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              {loadingOrder && <span className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
+              {!loadingOrder && purchasedItems.length > 0 && (
+                <>
+                  <span className="hidden text-xs font-medium text-outline sm:inline">{copy.selectedCount(selectedDownloadIds.length)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDownloadIds((current) => toggleDownloadSelectionAll(current, purchasedItemIds))}
+                    className="inline-flex h-9 items-center gap-1.5 rounded border border-outline-variant px-3 text-xs font-bold text-on-surface-variant transition-colors hover:border-outline hover:text-on-surface"
+                  >
+                    <span className="material-symbols-outlined text-base">{allSelected ? "deselect" : "select_all"}</span>
+                    {allSelected ? copy.clearSelection : copy.selectAll}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadSelected}
+                    disabled={selectedDownloadIds.length === 0 || batchDownloading}
+                    className="inline-flex h-9 items-center gap-1.5 rounded bg-primary px-3 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                  >
+                    {batchDownloading
+                      ? <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      : <span className="material-symbols-outlined text-base">folder_zip</span>
+                    }
+                    {copy.downloadSelected}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {!loadingOrder && purchasedItems.length === 0 ? (
@@ -134,6 +216,15 @@ function SuccessContent() {
               {purchasedItems.map((item) => (
                 <div key={item.id} className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-center gap-3">
+                    <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest transition-colors hover:border-outline">
+                      <input
+                        type="checkbox"
+                        checked={selectedDownloadIds.includes(item.id)}
+                        onChange={() => setSelectedDownloadIds((current) => toggleDownloadId(current, item.id))}
+                        className="h-4 w-4 accent-primary"
+                        aria-label={item.image?.title ?? item.id}
+                      />
+                    </label>
                     <div className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded bg-surface-container-low">
                       {item.image?.storage_path_preview ? (
                         <Image

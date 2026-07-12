@@ -13,6 +13,7 @@ export interface ImageDeletionRow {
   asset_id: string | null;
   title: string;
   status: string | null;
+  lifecycle_status: string | null;
   storage_path_preview: string | null;
   storage_path_full: string | null;
   storage_path_original: string | null;
