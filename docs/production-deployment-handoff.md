@@ -4,9 +4,11 @@
 
 ## 현재 운영 기준점
 
-- 배포 시각: 2026-07-14 23:14:26 KST
-- Production deployment ID: `dpl_5dV3kCqhwKgGFWH3gzxcnUfzTt3j`
-- Production URL: `https://imageptns-elkkjyegy-veronicajeons-projects.vercel.app`
+- 배포 시각: 2026-07-14 23:42:29 KST
+- 릴리스 브랜치: `main`
+- 릴리스 커밋 SHA: `7d25ded353c09ff5f567d2e9b6e392b01e66a349`
+- Production deployment ID: `dpl_DbcyawdXE6UNuLFLaw7VN7xxBP6r`
+- Production URL: `https://imageptns-ie3k2zegb-veronicajeons-projects.vercel.app`
 - 운영 상태: `Ready`, `https://www.imagepartners.kr` alias 연결 확인
 - 검증 기준: 57개 테스트 파일·240개 테스트 통과, 린트 오류 0(기존 경고 11건), TypeScript·프로덕션 빌드 통과
 
@@ -108,6 +110,8 @@ git status -sb
 ```
 
 커밋 이후 파일을 수정했다면 기존 검증 결과를 재사용하지 않는다. 변경을 다시 검토·검증·커밋·푸시한 후 배포한다.
+
+배포가 끝난 뒤 이 문서의 현재 운영 기준점, 배포 ID, 검증 결과만 갱신하는 문서 전용 커밋은 애플리케이션 재배포 대상에서 제외할 수 있다. 이 경우 직전 애플리케이션 릴리스 커밋 SHA와 문서 커밋 SHA를 혼동하지 않도록 완료 보고에 둘 다 기록한다.
 
 ## 5. Vercel·Supabase 운영 환경 확인
 
