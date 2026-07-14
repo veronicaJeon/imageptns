@@ -13,9 +13,11 @@ import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerSta
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 import {
   ACCEPTED_UPLOAD_TYPES,
+  MAX_UPLOAD_BATCH_FILES,
   MAX_UPLOAD_SIZE_MB,
   canSubmitUploadBatch,
   filterAcceptedUploadFiles,
+  takeAvailableUploadSlots,
   uploadFileClientId,
   type UploadDraftReadiness,
 } from "@/lib/uploads/batch-client";
@@ -31,19 +33,20 @@ const NEW_UPLOAD_COPY = {
       exposureMode: "노출모드", meteringMode: "측광모드", colorSpace: "색공간", orientation: "방향", software: "소프트웨어",
     },
     errors: {
-      unsupportedType: "지원하지 않는 파일 형식입니다. TIFF, JPEG, PNG, WebP만 허용됩니다.",
+      unsupportedType: "지원하지 않는 파일 형식입니다. JPEG만 허용됩니다.",
       tooLarge: (max: number) => `파일 크기는 ${max}MB를 초과할 수 없습니다.`,
       uploadFailed: "업로드 중 오류가 발생했습니다.",
       duplicate: "이미 대기열에 추가된 파일입니다.",
+      batchLimit: (max: number) => `한 번에 최대 ${max}장까지만 업로드할 수 있습니다. 초과한 사진은 추가되지 않았습니다.`,
     },
     pageTitle: "이미지 업로드",
     doneTitle: "업로드 완료!",
     doneBody: "선택한 이미지가 검토 대기 중입니다. 승인 후 라이브러리에 노출됩니다.",
     dropTitle: "파일을 드래그하거나 클릭하여 선택",
-    dropHelp: "여러 장 선택 가능 · TIFF, JPEG, PNG, WebP · 최대 500MB",
+    dropHelp: "여러장을 동시에 업로드 할 수 있습니다. 안정적인 업로드를 위해 1회 20장 이하까지 가능합니다. 한 이미지당 최대 500MB, JPEG로 업로드 해 주십시오.",
     addMore: "사진 추가",
-    queueTitle: "업로드 대기열",
-    queueHelp: "유사한 사진을 묶어 올리고, 각 사진을 선택해 세부 정보를 조정하세요.",
+    queueTitle: "업로드 대기창",
+    queueHelp: "1. 유사한 이미지들을 업로드 할 때는 대표 이미지에 정보를 모두 입력한 뒤, '현재 입력값 전체 적용'을 클릭합니다. 그러면 동일한 정보가 유사한 이미지들 전체에 적용됩니다.\n2. 그 이미지들 가운데 디테일한 정보의 차이가 있을 경우, 그 이미지를 클릭한 후 다른 정보를 입력하면 수정됩니다.\n3. 위와 같이 수정한 후 '선택 이미지 업로드'를 클릭하면 정확하게 업로드됩니다.",
     fileCount: (count: number) => `${count}장 선택됨`,
     activeFile: "편집 중",
     remove: "삭제",
@@ -96,7 +99,7 @@ const NEW_UPLOAD_COPY = {
     attributionUrl: "공통 출처 URL",
     authorshipTitle: "공통 AI 및 오리지널리티 보증 *",
     authorshipHelp: "대기열에 있는 모든 이미지의 생성 방식을 선언해주세요.",
-    humanTitle: "AI 이미지가 아니며, 본인의 오리지널리티가 있음을 보증합니다.",
+    humanTitle: "AI 생성 이미지가 아니며, 본인의 오리지널리티가 있음을 보증합니다.",
     humanBody: "직접 촬영했거나 권리자로서 라이선스 판매 및 증명을 요청할 수 있는 이미지입니다.",
     aiTitle: "이 이미지는 AI 생성 이미지입니다.",
     aiBody: "AI 생성 또는 AI 보정 사실을 명시하며, 판매/배포 권한을 보유하고 있음을 확인합니다.",
@@ -104,7 +107,7 @@ const NEW_UPLOAD_COPY = {
     factualityTitle: "공통 업로드 내용 사실성 보증 *",
     factualityBody: "이번에 제출하는 사진, 제목, 설명, 캡션, 태그 및 관련 메타데이터가 사실과 부합하며, 제3자의 권리나 신원을 오인하게 만들지 않음을 확인합니다.",
     factualityError: "사실성 보증 동의가 필요합니다.",
-    submit: "선택 사진 검토 제출",
+    submit: "선택 이미지 업로드",
     reviewHelp: "제출한 이미지는 운영팀 검토 후 라이브러리에 노출됩니다. 검토에는 1-3 영업일이 소요됩니다.",
   },
   en: {
@@ -115,19 +118,20 @@ const NEW_UPLOAD_COPY = {
       exposureMode: "Exposure mode", meteringMode: "Metering mode", colorSpace: "Color space", orientation: "Orientation", software: "Software",
     },
     errors: {
-      unsupportedType: "Unsupported file type. TIFF, JPEG, PNG, and WebP are allowed.",
+      unsupportedType: "Unsupported file type. Only JPEG is allowed.",
       tooLarge: (max: number) => `File size must not exceed ${max}MB.`,
       uploadFailed: "An error occurred while uploading.",
       duplicate: "This file is already in the upload queue.",
+      batchLimit: (max: number) => `You can upload a maximum of ${max} photos per batch. Extra photos were not added.`,
     },
     pageTitle: "Upload images",
     doneTitle: "Upload complete",
     doneBody: "Your selected images are pending review. They will appear in the library after approval.",
     dropTitle: "Drag files here or click to select",
-    dropHelp: "Multiple files supported · TIFF, JPEG, PNG, WebP · up to 500MB",
+    dropHelp: "Upload multiple images at once. A maximum of 20 images is allowed per batch for reliability. Each JPEG may be up to 500MB.",
     addMore: "Add photos",
-    queueTitle: "Upload queue",
-    queueHelp: "Upload similar photos together, then select each photo to refine its details.",
+    queueTitle: "Upload window",
+    queueHelp: "1. For similar images, complete the representative image first, then select 'Apply current fields to all'.\n2. If an image has different details, select it and edit those fields individually.\n3. When the details are correct, select 'Upload selected images'.",
     fileCount: (count: number) => `${count} selected`,
     activeFile: "Editing",
     remove: "Remove",
@@ -188,7 +192,7 @@ const NEW_UPLOAD_COPY = {
     factualityTitle: "Shared factuality attestation *",
     factualityBody: "I confirm that the submitted image, title, description, caption, tags, and metadata are factual and do not mislead about third-party rights or identity.",
     factualityError: "Factuality attestation is required.",
-    submit: "Submit selected photos",
+    submit: "Upload selected images",
     reviewHelp: "Submitted images appear in the library after operations review. Review usually takes 1-3 business days.",
   },
 } as const;
@@ -559,7 +563,9 @@ function NewUploadContent() {
 
     const result = filterAcceptedUploadFiles(incoming);
     const existingIds = new Set(drafts.map((draft) => draft.id));
-    const newFiles = result.accepted.filter((file) => !existingIds.has(uploadFileClientId(file)));
+    const uniqueNewFiles = result.accepted.filter((file) => !existingIds.has(uploadFileClientId(file)));
+    const limited = takeAvailableUploadSlots(uniqueNewFiles, drafts.length);
+    const newFiles = limited.accepted;
     const messages = result.rejected.map(({ file, reason }) => (
       reason === "too-large"
         ? `${file.name}: ${copy.errors.tooLarge(MAX_UPLOAD_SIZE_MB)}`
@@ -567,7 +573,9 @@ function NewUploadContent() {
     ));
 
     if (result.accepted.length > 0 && newFiles.length === 0) {
-      messages.push(copy.errors.duplicate);
+      messages.push(uniqueNewFiles.length === 0 ? copy.errors.duplicate : copy.errors.batchLimit(MAX_UPLOAD_BATCH_FILES));
+    } else if (limited.overflow.length > 0) {
+      messages.push(copy.errors.batchLimit(MAX_UPLOAD_BATCH_FILES));
     }
 
     const defaultCategoryCodes = activeDraft?.categoryCodes ?? [categories[0]?.code ?? "nature"];
@@ -819,7 +827,7 @@ function NewUploadContent() {
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-bold text-on-surface">{copy.queueTitle}</p>
-                  <p className="mt-1 text-xs text-outline">{copy.queueHelp}</p>
+                  <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-outline">{copy.queueHelp}</p>
                 </div>
                 <button
                   type="button"

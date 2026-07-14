@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { categoryCodesForImage, getImageCategoryCodeMap, getImageIdsForCategory } from "@/lib/images/category-server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { rankSimilarImages, similaritySearchTerms } from "@/lib/images/similarity";
 
 interface ImageDetailRow {
   id: string;
@@ -45,7 +46,14 @@ interface SimilarImageRow {
   title: string;
   title_ko?: string | null;
   title_en?: string | null;
+  description?: string | null;
+  description_ko?: string | null;
+  description_en?: string | null;
   category: string;
+  tags?: string[] | null;
+  tags_ko?: string[] | null;
+  tags_en?: string[] | null;
+  exif_location?: string | null;
   storage_path_preview: string | null;
   width: number | null;
   height: number | null;
@@ -119,22 +127,76 @@ export async function GET(
   const similarCategoryIdSets = await Promise.all(currentCategoryCodes.map((code) => getImageIdsForCategory(admin, code)));
   const similarIds = Array.from(new Set(similarCategoryIdSets.flatMap((ids) => ids ?? []))).filter((imageId) => imageId !== id);
 
-  // Similar images (any overlapping category, excluding this one)
-  let similarQuery = admin
+  const similarSelect = `id, title, title_ko, title_en, description, description_ko, description_en, category,
+    tags, tags_ko, tags_en, exif_location, storage_path_preview, width, height, photographer_id,
+    photographer:profiles!photographer_id(full_name)`;
+  const currentSimilarityMetadata = {
+    id: image.id,
+    title: image.title,
+    title_ko: image.title_ko,
+    title_en: image.title_en,
+    description: image.description,
+    description_ko: image.description_ko,
+    description_en: image.description_en,
+    tags: image.tags,
+    tags_ko: image.tags_ko,
+    tags_en: image.tags_en,
+    exif_location: image.exif_location,
+    photographer_id: image.photographer_id,
+    categoryCodes: currentCategoryCodes,
+  };
+
+  // Build a broad candidate pool, then rank it by title, tags, and shooting
+  // location. Category is only a tie-breaker and cannot make an unrelated
+  // image appear as "similar" by itself.
+  let categoryQuery = admin
     .from("images")
-    .select("id, title, title_ko, title_en, category, storage_path_preview, width, height, photographer_id, photographer:profiles!photographer_id(full_name)")
+    .select(similarSelect)
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
     .eq("is_published", true)
     .neq("id", id)
-    .limit(4);
+    .order("created_at", { ascending: false })
+    .limit(160);
 
-  similarQuery = similarIds.length > 0
-    ? similarQuery.in("id", similarIds)
-    : similarQuery.eq("category", image.category);
+  categoryQuery = similarIds.length > 0
+    ? categoryQuery.in("id", similarIds.slice(0, 500))
+    : categoryQuery.eq("category", image.category);
 
-  const { data: similar } = await similarQuery;
-  const similarCategoryMap = await getImageCategoryCodeMap(admin, ((similar ?? []) as SimilarImageRow[]).map((row) => row.id));
+  const searchTerms = similaritySearchTerms(currentSimilarityMetadata);
+  const titleQuery = searchTerms.length > 0
+    ? admin
+      .from("images")
+      .select(similarSelect)
+      .eq("status", "approved")
+      .eq("lifecycle_status", "active")
+      .eq("is_published", true)
+      .neq("id", id)
+      .or(searchTerms.flatMap((term) => [
+        `title.ilike.%${term}%`,
+        `title_ko.ilike.%${term}%`,
+        `title_en.ilike.%${term}%`,
+      ]).join(","))
+      .limit(80)
+    : null;
+
+  const [{ data: categoryCandidates }, titleResult] = await Promise.all([
+    categoryQuery,
+    titleQuery ?? Promise.resolve({ data: [] }),
+  ]);
+  const candidateMap = new Map<string, SimilarImageRow>();
+  for (const row of [...(categoryCandidates ?? []), ...(titleResult.data ?? [])] as SimilarImageRow[]) {
+    candidateMap.set(row.id, row);
+  }
+  const candidates = Array.from(candidateMap.values());
+  const similarCategoryMap = await getImageCategoryCodeMap(admin, candidates.map((row) => row.id));
+  const similar = rankSimilarImages(
+    currentSimilarityMetadata,
+    candidates.map((candidate) => ({
+      ...candidate,
+      categoryCodes: categoryCodesForImage(similarCategoryMap, candidate.id, candidate.category),
+    })),
+  ).slice(0, 4).map(({ image: candidate }) => candidate);
 
   // Convert storage paths → public URLs
   function previewUrl(path: string | null | undefined): string {
@@ -160,7 +222,7 @@ export async function GET(
         ? { ...photographer, display_name: photographerName }
         : null,
     },
-    similar: ((similar ?? []) as SimilarImageRow[]).map((s) => ({
+    similar: similar.map((s) => ({
       id: s.id,
       title: s.title,
       titleKo: s.title_ko,

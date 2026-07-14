@@ -336,6 +336,24 @@ export default function AdminImagesPage() {
     setEditState((current) => current ? { ...current, [key]: value } : current);
   }
 
+  function updatePrimaryTitle(value: string) {
+    setEditState((current) => current ? {
+      ...current,
+      title: value,
+      titleKo: !current.titleKo || current.titleKo === current.title ? value : current.titleKo,
+      titleEn: !current.titleEn || current.titleEn === current.title ? value : current.titleEn,
+    } : current);
+  }
+
+  function updatePrimaryDescription(value: string) {
+    setEditState((current) => current ? {
+      ...current,
+      description: value,
+      descriptionKo: !current.descriptionKo || current.descriptionKo === current.description ? value : current.descriptionKo,
+      descriptionEn: !current.descriptionEn || current.descriptionEn === current.description ? value : current.descriptionEn,
+    } : current);
+  }
+
   function updateEditPrice(licenseCode: string, value: string) {
     setEditState((current) => current
       ? { ...current, priceOverrides: { ...current.priceOverrides, [licenseCode]: value } }
@@ -397,7 +415,7 @@ export default function AdminImagesPage() {
     <div className="p-4 md:p-10">
       <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">이미지 관리</h1>
+          <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">이미지 상세 관리</h1>
           <p className="mt-1 text-sm text-outline">이미지 목록을 검색하고 선택한 원본 파일을 관리자 권한으로 다운로드합니다.</p>
         </div>
 
@@ -486,9 +504,12 @@ export default function AdminImagesPage() {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="max-w-[360px] truncate font-semibold text-on-surface">{displayKo(image.title_ko, image.title)}</p>
+                      <p className="max-w-[360px] truncate font-semibold text-on-surface">{image.title}</p>
+                      {displayKo(image.title_ko, "") !== "-" && image.title_ko !== image.title && (
+                        <p className="mt-0.5 max-w-[360px] truncate text-xs text-outline">KO · {image.title_ko}</p>
+                      )}
                       {displayKo(image.title_en, "") !== "-" && (
-                        <p className="mt-0.5 max-w-[360px] truncate text-xs text-outline">{image.title_en}</p>
+                        <p className="mt-0.5 max-w-[360px] truncate text-xs text-outline">EN · {image.title_en}</p>
                       )}
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-outline">
                         <span>{image.category}</span>
@@ -682,7 +703,7 @@ export default function AdminImagesPage() {
                   <span className="text-xs font-semibold text-outline">제목</span>
                   <input
                     value={editState.title}
-                    onChange={(event) => updateEdit("title", event.target.value)}
+                    onChange={(event) => updatePrimaryTitle(event.target.value)}
                     className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
                   />
                 </label>
@@ -708,7 +729,7 @@ export default function AdminImagesPage() {
                   <span className="text-xs font-semibold text-outline">대표 설명</span>
                   <textarea
                     value={editState.description}
-                    onChange={(event) => updateEdit("description", event.target.value)}
+                    onChange={(event) => updatePrimaryDescription(event.target.value)}
                     rows={3}
                     className="rounded-lg bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
                   />

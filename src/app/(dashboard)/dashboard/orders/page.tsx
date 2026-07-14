@@ -185,6 +185,7 @@ export default function OrdersPage() {
         receiptPdf: "영수증 PDF",
         downloadAll: "전체 다운로드",
         downloadingAll: "다운로드 준비 중...",
+        deleted: "Deleted",
       }
     : {
         popupBlocked: "The receipt popup was blocked.",
@@ -197,6 +198,7 @@ export default function OrdersPage() {
         receiptPdf: "Receipt PDF",
         downloadAll: "Download all",
         downloadingAll: "Preparing downloads...",
+        deleted: "Deleted",
       };
 
   const [orders, setOrders]       = useState<Order[]>([]);
@@ -355,7 +357,7 @@ export default function OrdersPage() {
     }))
   );
   const downloadableRows = rows
-    .filter((row) => row.status === "completed")
+    .filter((row) => row.status === "completed" && row.imageLifecycleStatus === "active")
     .slice(0, BULK_DOWNLOAD_LIMIT);
 
   async function handleDownloadAll() {
@@ -414,8 +416,12 @@ export default function OrdersPage() {
             return (
               <article key={row.itemId} className="rounded-xl bg-surface-container-lowest p-4 shadow-ghost">
                 <div className="flex gap-3">
-                  {row.src ? (
+                  {row.src && !imageUnavailable ? (
                     <Image src={row.src} alt={row.title} width={88} height={64} className="h-16 w-24 shrink-0 rounded object-cover" />
+                  ) : imageUnavailable ? (
+                    <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded border border-outline-variant bg-transparent text-[11px] font-bold text-outline">
+                      {copy.deleted}
+                    </div>
                   ) : (
                     <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded bg-surface-container-low">
                       <span className="material-symbols-outlined text-outline text-sm">image</span>
@@ -460,7 +466,7 @@ export default function OrdersPage() {
                 {row.imageDeletionNotice && (
                   <p className="mt-3 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-[11px] leading-relaxed text-error">{row.imageDeletionNotice}</p>
                 )}
-                {row.status === "completed" && (
+                {row.status === "completed" && !imageUnavailable && (
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       onClick={() => handleDownload(row.itemId)}
@@ -527,8 +533,12 @@ export default function OrdersPage() {
                 <tr key={row.itemId} className="hover:bg-surface-container-low transition-colors align-top">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      {row.src ? (
+                      {row.src && !imageUnavailable ? (
                         <Image src={row.src} alt={row.title} width={56} height={40} className="object-cover rounded shrink-0 w-14 h-10" />
+                      ) : imageUnavailable ? (
+                        <div className="flex h-10 w-14 shrink-0 items-center justify-center rounded border border-outline-variant bg-transparent text-[9px] font-bold text-outline">
+                          {copy.deleted}
+                        </div>
                       ) : (
                         <div className="w-14 h-10 bg-surface-container-low rounded shrink-0 flex items-center justify-center">
                           <span className="material-symbols-outlined text-outline text-sm">image</span>
@@ -608,7 +618,7 @@ export default function OrdersPage() {
                         {copy.recoveryHelp}
                       </div>
                     )}
-                    {row.status === "completed" && (
+                    {row.status === "completed" && !imageUnavailable && (
                       <div className="mt-3 max-w-md rounded-lg bg-surface-container-low px-3 py-2 text-[11px] leading-relaxed text-on-surface-variant">
                         <span className="font-bold text-on-surface">{copy.license}</span>{" "}
                         {LICENSE_SUMMARY[lang][row.license] ?? copy.licenseFallback}

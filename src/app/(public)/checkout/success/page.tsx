@@ -21,6 +21,7 @@ interface SuccessOrderItem {
     title: string | null;
     storage_path_preview: string | null;
     asset_id: string | null;
+    lifecycle_status?: string | null;
   } | null;
 }
 
@@ -47,6 +48,7 @@ const CHECKOUT_SUCCESS_COPY = {
     bulkDownloadError: "선택한 원본 파일을 ZIP으로 만들지 못했습니다.",
     orders: "주문 내역 보기",
     library: "라이브러리로",
+    deleted: "Deleted",
   },
   en: {
     downloadError: "Could not generate the original file download link.",
@@ -64,6 +66,7 @@ const CHECKOUT_SUCCESS_COPY = {
     bulkDownloadError: "Could not prepare the selected originals as a ZIP.",
     orders: "View orders",
     library: "Back to library",
+    deleted: "Deleted",
   },
 } as const;
 
@@ -72,7 +75,7 @@ function SuccessContent() {
   const copy = CHECKOUT_SUCCESS_COPY[lang];
   const searchParams = useSearchParams();
   const orderNumber  = searchParams.get("order") ?? "";
-  const { clear }    = useCart();
+  const { completeCheckout } = useCart();
   const [orders, setOrders] = useState<SuccessOrder[]>([]);
   const [loadingOrder, setLoadingOrder] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -80,8 +83,8 @@ function SuccessContent() {
   const [batchDownloading, setBatchDownloading] = useState(false);
 
   useEffect(() => {
-    clear();
-  }, [clear]);
+    completeCheckout();
+  }, [completeCheckout]);
 
   useEffect(() => {
     fetch("/api/orders")
@@ -99,12 +102,16 @@ function SuccessContent() {
     return completed[0] ?? null;
   }, [orderNumber, orders]);
   const purchasedItems = useMemo(() => completedOrder?.order_items ?? [], [completedOrder]);
-  const purchasedItemIds = useMemo(() => purchasedItems.map((item) => item.id), [purchasedItems]);
+  const downloadablePurchasedItems = useMemo(
+    () => purchasedItems.filter((item) => !item.image?.lifecycle_status || item.image.lifecycle_status === "active"),
+    [purchasedItems],
+  );
+  const purchasedItemIds = useMemo(() => downloadablePurchasedItems.map((item) => item.id), [downloadablePurchasedItems]);
   const allSelected = purchasedItemIds.length > 0 && purchasedItemIds.every((id) => selectedDownloadIds.includes(id));
 
   useEffect(() => {
-    setSelectedDownloadIds(initialSelectedDownloadIds(purchasedItems));
-  }, [purchasedItems]);
+    setSelectedDownloadIds(initialSelectedDownloadIds(downloadablePurchasedItems));
+  }, [downloadablePurchasedItems]);
 
   async function handleDownload(orderItemId: string) {
     setDownloading(orderItemId);
@@ -220,13 +227,14 @@ function SuccessContent() {
                       <input
                         type="checkbox"
                         checked={selectedDownloadIds.includes(item.id)}
+                        disabled={Boolean(item.image?.lifecycle_status && item.image.lifecycle_status !== "active")}
                         onChange={() => setSelectedDownloadIds((current) => toggleDownloadId(current, item.id))}
-                        className="h-4 w-4 accent-primary"
+                        className="h-4 w-4 accent-primary disabled:opacity-30"
                         aria-label={item.image?.title ?? item.id}
                       />
                     </label>
                     <div className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded bg-surface-container-low">
-                      {item.image?.storage_path_preview ? (
+                      {item.image?.storage_path_preview && item.image.lifecycle_status === "active" ? (
                         <Image
                           src={thumbnailUrlFromPreviewUrl(item.image.storage_path_preview, 160, 120)}
                           alt={item.image.title ?? ""}
@@ -235,6 +243,8 @@ function SuccessContent() {
                           className="h-full w-full object-cover"
                           unoptimized
                         />
+                      ) : item.image?.lifecycle_status && item.image.lifecycle_status !== "active" ? (
+                        <span className="text-[10px] font-bold text-outline">{copy.deleted}</span>
                       ) : (
                         <span className="material-symbols-outlined text-outline">image</span>
                       )}
@@ -247,6 +257,7 @@ function SuccessContent() {
                       </p>
                     </div>
                   </div>
+                  {(!item.image?.lifecycle_status || item.image.lifecycle_status === "active") && (
                   <button
                     type="button"
                     onClick={() => handleDownload(item.id)}
@@ -260,6 +271,7 @@ function SuccessContent() {
                     )}
                     {copy.downloadOriginal}
                   </button>
+                  )}
                 </div>
               ))}
             </div>

@@ -247,7 +247,7 @@ export default function LibraryPage() {
 
           {/* Search bar */}
           <div className="relative">
-            <div className="relative bg-surface-container-lowest shadow-ghost rounded-lg overflow-hidden">
+            <div className="relative overflow-hidden rounded-lg border border-outline-variant/60 bg-surface-container-low shadow-ghost ring-1 ring-black/5 transition-colors focus-within:border-primary/60 focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary/20">
               <span className="material-symbols-outlined pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-2xl leading-none text-outline">
                 search
               </span>

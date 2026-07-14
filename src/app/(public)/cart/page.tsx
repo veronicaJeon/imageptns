@@ -43,7 +43,7 @@ export default function CartPage() {
   const { t, lang } = useLang();
   const c = t.cart;
   const copy = CART_PAGE_COPY[lang];
-  const { items, removeItem, updateLicense } = useCart();
+  const { items, removeItem, updateLicense, startCartCheckout } = useCart();
   const [licensePrices, setLicensePrices] = useState<Partial<Record<LicenseType, number>>>({});
   const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
   const cartImageIds = items.map((item) => item.id).join(",");
@@ -195,6 +195,7 @@ export default function CartPage() {
 
                 <Link
                   href="/checkout"
+                  onClick={startCartCheckout}
                   className="block w-full py-4 bg-primary text-white text-xs font-bold uppercase tracking-widest text-center rounded hover:opacity-90 transition-opacity"
                 >
                   {c.checkoutBtn}

@@ -4,6 +4,8 @@ import {
   dedupeUploadFiles,
   filterAcceptedUploadFiles,
   initialDraftIdForFiles,
+  MAX_UPLOAD_BATCH_FILES,
+  takeAvailableUploadSlots,
   uploadFileClientId,
 } from "./batch-client";
 
@@ -37,6 +39,16 @@ describe("batch upload client helpers", () => {
   it("uses the first valid file as the initial active draft", () => {
     expect(initialDraftIdForFiles([imageFile("a.jpg", "image/jpeg", 1, 20), imageFile("b.jpg", "image/jpeg", 1, 30)]))
       .toBe("a.jpg:1048576:20");
+  });
+
+  it("hard-limits a batch to 20 files including files already queued", () => {
+    const files = Array.from({ length: 5 }, (_, index) => imageFile(`${index}.jpg`));
+    const result = takeAvailableUploadSlots(files, 18);
+
+    expect(MAX_UPLOAD_BATCH_FILES).toBe(20);
+    expect(result.accepted.map((file) => file.name)).toEqual(["0.jpg", "1.jpg"]);
+    expect(result.overflow.map((file) => file.name)).toEqual(["2.jpg", "3.jpg", "4.jpg"]);
+    expect(takeAvailableUploadSlots(files, 20).accepted).toEqual([]);
   });
 
   it("builds stable ids from browser file identity fields", () => {

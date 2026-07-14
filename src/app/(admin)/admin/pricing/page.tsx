@@ -14,7 +14,6 @@ interface LicenseTypeRow {
 }
 
 interface CommerceSettingsRow {
-  download_access_days: number;
   subscription_basic_downloads: number;
   subscription_pro_downloads: number;
   subscription_enterprise_downloads: number;
@@ -33,7 +32,6 @@ export default function AdminPricingPage() {
   const [saving, setSaving] = useState<string | null>(null);
   const [commerceSettings, setCommerceSettings] = useState<CommerceSettingsRow | null>(null);
   const [commerceDrafts, setCommerceDrafts] = useState<Record<keyof CommerceSettingsRow, string>>({
-    download_access_days: "30",
     subscription_basic_downloads: "5",
     subscription_pro_downloads: "30",
     subscription_enterprise_downloads: "100",
@@ -86,7 +84,6 @@ export default function AdminPricingPage() {
         arweaveSelfFundedRequestFeeKrw: number;
       } };
       const row = data.row ?? {
-        download_access_days: data.settings?.downloadAccessDays ?? 30,
         subscription_basic_downloads: data.settings?.subscriptionDownloadQuotas.basic ?? 5,
         subscription_pro_downloads: data.settings?.subscriptionDownloadQuotas.pro ?? 30,
         subscription_enterprise_downloads: data.settings?.subscriptionDownloadQuotas.enterprise ?? 100,
@@ -94,7 +91,6 @@ export default function AdminPricingPage() {
       };
       setCommerceSettings(row);
       setCommerceDrafts({
-        download_access_days: String(row.download_access_days),
         subscription_basic_downloads: String(row.subscription_basic_downloads),
         subscription_pro_downloads: String(row.subscription_pro_downloads),
         subscription_enterprise_downloads: String(row.subscription_enterprise_downloads),
@@ -184,7 +180,7 @@ export default function AdminPricingPage() {
           <div>
             <h2 className="font-headline text-lg font-extrabold text-on-surface">구매/구독 운영 정책</h2>
             <p className="mt-1 text-xs text-outline">
-              원본 다운로드 가능 기간, 구독 플랜별 무료다운 개수, 판매 전 Arweave 셀프 등록 요청 수수료를 조정합니다.
+              구독 플랜별 무료다운 개수와 판매 전 Arweave 셀프 등록 요청 수수료를 조정합니다. 다운로드 기간은 데이터 운영주기 관리에서 설정합니다.
             </p>
           </div>
           <button
@@ -207,9 +203,8 @@ export default function AdminPricingPage() {
             <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-4">
             {([
-              ["download_access_days", "다운로드 기간", "일", 1, 3650],
               ["subscription_basic_downloads", "Basic 무료다운", "개", 0, 10000],
               ["subscription_pro_downloads", "Pro 무료다운", "개", 0, 10000],
               ["subscription_enterprise_downloads", "Enterprise 무료다운", "개", 0, 10000],

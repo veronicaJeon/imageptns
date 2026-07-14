@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { previewUrl } from "@/lib/supabase/storage";
+import { orderHistoryPreview } from "@/lib/orders/history";
 
 interface OrderImage {
   id: string;
@@ -44,6 +45,8 @@ function normalizeImage(image: OrderItem["image"]) {
 function normalizeOrderItem(item: OrderItem) {
   const image = normalizeImage(item.image);
   const snapshotPreview = previewUrl(item.image_preview_path_snapshot);
+  const lifecycleStatus = item.image_lifecycle_status ?? image?.lifecycle_status ?? "active";
+  const preview = orderHistoryPreview(lifecycleStatus, image?.storage_path_preview, snapshotPreview);
   return {
     ...item,
     image: image
@@ -51,8 +54,8 @@ function normalizeOrderItem(item: OrderItem) {
         ...image,
         title: image.title ?? item.image_title_snapshot,
         asset_id: image.asset_id ?? item.image_asset_id_snapshot,
-        storage_path_preview: image.storage_path_preview || snapshotPreview,
-        lifecycle_status: item.image_lifecycle_status ?? image.lifecycle_status ?? "active",
+        storage_path_preview: preview,
+        lifecycle_status: lifecycleStatus,
         deleted_at: item.image_deleted_at ?? image.deleted_at,
       }
       : {
@@ -60,8 +63,8 @@ function normalizeOrderItem(item: OrderItem) {
         title: item.image_title_snapshot,
         category: null,
         asset_id: item.image_asset_id_snapshot,
-        storage_path_preview: snapshotPreview,
-        lifecycle_status: item.image_lifecycle_status ?? "active",
+        storage_path_preview: preview,
+        lifecycle_status: lifecycleStatus,
         deleted_at: item.image_deleted_at,
         width: null,
         height: null,

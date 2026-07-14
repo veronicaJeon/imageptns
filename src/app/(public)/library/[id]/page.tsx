@@ -21,9 +21,10 @@ const IMAGE_DETAIL_COPY = {
     locale: "ko-KR",
     unknown: "미상",
     copyLinkPrompt: "링크를 복사하세요:",
+    copyCreditPrompt: "저작자 표시를 복사하세요:",
     usageConditions: "사용 조건",
     creditLine: "저작자 표시",
-    copy: "복사",
+    creditCopied: "복사됨",
     creditHelp: "모든 사용에는 위 저작자 표시가 필요합니다. 사용상 주의사항이 있는 이미지는 이 영역에 별도로 표시됩니다.",
     licenseDetails: "라이선스 세부 정보",
     ccOriginal: "Creative Commons 원문 보기",
@@ -34,9 +35,10 @@ const IMAGE_DETAIL_COPY = {
     locale: "en-US",
     unknown: "Unknown",
     copyLinkPrompt: "Copy this link:",
+    copyCreditPrompt: "Copy this credit line:",
     usageConditions: "Usage terms",
     creditLine: "Credit line",
-    copy: "Copy",
+    creditCopied: "Copied",
     creditHelp: "All uses require the credit line above. Any image-specific usage notes will appear in this area.",
     licenseDetails: "License details",
     ccOriginal: "View Creative Commons deed",
@@ -96,7 +98,9 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   const [favLoading, setFavLoading]   = useState(false);
   const [cartFeedback, setCartFeedback] = useState<"idle" | "added">("idle");
   const [shareFeedback, setShareFeedback] = useState<"idle" | "copied">("idle");
+  const [creditFeedback, setCreditFeedback] = useState<"idle" | "copied">("idle");
   const addItem = useCart((s) => s.addItem);
+  const startDirectPurchase = useCart((s) => s.startDirectPurchase);
 
   useEffect(() => {
     fetch(`/api/images/${id}`)
@@ -177,7 +181,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
   function handleBuyNow() {
     if (!imageData) return;
     const photographer = imageData.photographer?.full_name ?? "";
-    addItem({
+    startDirectPurchase({
       id,
       assetId:      imageData.asset_id ?? undefined,
       title:        displayTitle,
@@ -251,6 +255,39 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
       tryClipboard().catch(() => prompt(copy.copyLinkPrompt, url));
     } else {
       prompt(copy.copyLinkPrompt, url);
+    }
+  }
+
+  function handleCreditCopy() {
+    const showCopied = () => {
+      setCreditFeedback("copied");
+      setTimeout(() => setCreditFeedback("idle"), 1800);
+    };
+    const copyWithSelection = () => {
+      const textarea = document.createElement("textarea");
+      textarea.value = creditLine;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      try {
+        return document.execCommand("copy");
+      } finally {
+        document.body.removeChild(textarea);
+      }
+    };
+
+    const selectionCopied = copyWithSelection();
+    showCopied();
+
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(creditLine).catch(() => {
+        if (!selectionCopied) prompt(copy.copyCreditPrompt, creditLine);
+      });
+    } else if (!selectionCopied) {
+      prompt(copy.copyCreditPrompt, creditLine);
     }
   }
 
@@ -401,16 +438,22 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
                 <div className="mt-4 rounded-md bg-surface-container-low px-3 py-2">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.creditLine}</p>
-                  <div className="mt-1 flex items-center justify-between gap-3">
-                    <code className="break-all text-xs font-bold text-on-surface">{creditLine}</code>
-                    <button
-                      type="button"
-                      onClick={() => navigator.clipboard?.writeText(creditLine)}
-                      className="shrink-0 rounded bg-on-surface px-2.5 py-1 text-[10px] font-bold text-surface"
-                    >
-                      {copy.copy}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCreditCopy}
+                    className="group mt-1 flex w-full items-start justify-between gap-3 rounded px-0 py-1 text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-label={copy.creditLine}
+                    title={copy.creditLine}
+                  >
+                    <code className="min-w-0 break-all text-xs font-bold text-on-surface transition-colors group-hover:text-primary">
+                      {creditLine}
+                    </code>
+                    {creditFeedback === "copied" && (
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        {copy.creditCopied}
+                      </span>
+                    )}
+                  </button>
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-on-surface-variant">
                   {copy.creditHelp}

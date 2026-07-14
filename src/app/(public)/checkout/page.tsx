@@ -10,7 +10,7 @@ import { createConfig, http, injected, WagmiProvider } from "wagmi";
 import { base, baseSepolia } from "wagmi/chains";
 import { getAddress, type Address, type Hex } from "viem";
 import { useLang } from "@/lib/i18n/store";
-import { useCart, type LicenseType, getLicensePrice } from "@/lib/store/cart";
+import { checkoutItemsForState, useCart, type LicenseType, getLicensePrice } from "@/lib/store/cart";
 import { useAuth } from "@/lib/store/auth";
 import { ERC20_ABI, IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
 import { isQuoteExpired, type OnchainQuoteSnapshot } from "@/lib/onchain/quote";
@@ -282,7 +282,8 @@ function CheckoutContent() {
   const { t, lang } = useLang();
   const ch = t.checkout;
   const copy = CHECKOUT_PAGE_COPY[lang];
-  const { items } = useCart();
+  const { items: cartItems, directPurchase, completeCheckout } = useCart();
+  const items = checkoutItemsForState(cartItems, directPurchase);
   const { user, loading: authLoading, init } = useAuth();
   const router = useRouter();
   const [licensePrices, setLicensePrices] = useState<Partial<Record<LicenseType, number>>>({});
@@ -1120,7 +1121,10 @@ function CheckoutContent() {
             </dl>
             <button
               type="button"
-              onClick={() => router.push("/dashboard/orders")}
+              onClick={() => {
+                completeCheckout();
+                router.push("/dashboard/orders");
+              }}
               className="mt-5 w-full rounded-lg bg-primary px-5 py-3 text-xs font-bold uppercase tracking-widest text-white hover:opacity-90"
             >
               {copy.bankTransferConfirm}

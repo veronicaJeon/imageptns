@@ -2,6 +2,8 @@
 
 Image Partners is linked to Vercel through the repository-local `.vercel/` project config. Do not rely on a globally installed `vercel` binary, because the local machine may not have one on `PATH`.
 
+배포 전후 전체 체크리스트, Supabase 환경 검증, 스모크 테스트, 롤백 기준과 보고 양식은 [운영 배포 인수인계](./production-deployment-handoff.md)를 따른다.
+
 ## Production Deploy
 
 Run from the repository root:

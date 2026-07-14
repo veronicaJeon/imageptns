@@ -38,6 +38,7 @@ const UPLOADS_PAGE_COPY = {
     deleteRequestTitle: "삭제 요청",
     deleteTitle: "삭제",
     editMeta: "메타데이터 편집",
+    editHelp: "제목이나 설명을 바꾸려면 해당 사진 오른쪽의 ‘편집’을 누르세요. 수정 후 아래의 ‘저장’을 누르면 반영됩니다.",
     title: "제목 *",
     description: "설명",
     authorship: "AI / 오리지널리티 선언",
@@ -84,6 +85,7 @@ const UPLOADS_PAGE_COPY = {
     deleteRequestTitle: "Request deletion",
     deleteTitle: "Delete",
     editMeta: "Edit metadata",
+    editHelp: "To change a title or description, select Edit beside the photo, then choose Save below.",
     title: "Title *",
     description: "Description",
     authorship: "AI / originality declaration",
@@ -332,6 +334,7 @@ function UploadsPageContent() {
 
   async function handleSave(resubmit = false) {
     if (!editing || !editing.title.trim()) return;
+    const normalizedTags = editing.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
     setSaving(true);
     try {
       const res = await fetch(`/api/uploads/${editing.id}`, {
@@ -340,9 +343,15 @@ function UploadsPageContent() {
         body: JSON.stringify({
           title:        editing.title.trim(),
           description:  editing.description.trim() || null,
+          title_ko:     lang === "ko" ? editing.title.trim() : undefined,
+          title_en:     lang === "en" ? editing.title.trim() : undefined,
+          description_ko: lang === "ko" ? editing.description.trim() || null : undefined,
+          description_en: lang === "en" ? editing.description.trim() || null : undefined,
           category:     editing.categoryCodes[0],
           category_codes: editing.categoryCodes,
-          tags:         editing.tags.split(",").map((t) => t.trim()).filter(Boolean),
+          tags:         normalizedTags,
+          tags_ko:      lang === "ko" ? normalizedTags : undefined,
+          tags_en:      lang === "en" ? normalizedTags : undefined,
           exif_location: editing.exif_location.trim() || null,
           exif_taken_at: editing.exif_taken_at || null,
           copyright_license: editing.copyright_license,
@@ -393,6 +402,13 @@ function UploadsPageContent() {
           {up.uploadBtn}
         </a>
       </div>
+
+      {uploads.length > 0 && (
+        <div className="mb-5 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-xs leading-relaxed text-on-surface-variant">
+          <span className="material-symbols-outlined mt-0.5 text-base text-primary">edit_note</span>
+          <p>{copy.editHelp}</p>
+        </div>
+      )}
 
       {uploads.length === 0 ? (
         <div className="flex flex-col items-center py-32 gap-4 text-outline">
@@ -561,13 +577,14 @@ function UploadsPageContent() {
                           {canEdit && (
                             <button
                               onClick={() => isEditing ? setEditing(null) : openEdit(img)}
-                              className={`transition-colors ${isEditing ? "text-primary" : "text-outline hover:text-primary"}`}
+                              className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold transition-colors ${isEditing ? "bg-primary/10 text-primary" : "text-on-surface-variant hover:bg-primary/5 hover:text-primary"}`}
                               title={copy.editTitle}
                               aria-label={copy.editTitle}
                             >
                               <span className="material-symbols-outlined text-base">
                                 {isEditing ? "close" : "edit"}
                               </span>
+                              <span>{isEditing ? copy.cancel : copy.editTitle}</span>
                             </button>
                           )}
                           {canEdit && (

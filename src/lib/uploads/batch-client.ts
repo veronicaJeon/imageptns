@@ -1,4 +1,5 @@
-export const ACCEPTED_UPLOAD_TYPES = ["image/tiff", "image/jpeg", "image/png", "image/webp"] as const;
+export const ACCEPTED_UPLOAD_TYPES = ["image/jpeg"] as const;
+export const MAX_UPLOAD_BATCH_FILES = 20;
 export const MAX_UPLOAD_SIZE_MB = 500;
 
 export type UploadFileRejectionReason = "unsupported-type" | "too-large";
@@ -59,6 +60,14 @@ export function filterAcceptedUploadFiles(files: File[]) {
   return {
     accepted: dedupeUploadFiles(accepted),
     rejected,
+  };
+}
+
+export function takeAvailableUploadSlots(files: File[], existingCount: number) {
+  const availableCount = Math.max(0, MAX_UPLOAD_BATCH_FILES - existingCount);
+  return {
+    accepted: files.slice(0, availableCount),
+    overflow: files.slice(availableCount),
   };
 }
 

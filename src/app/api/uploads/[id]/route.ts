@@ -31,7 +31,7 @@ export async function PATCH(
   const authorization = await requireApprovedPhotographer(admin, user.id);
   if (!authorization.ok) return authorization.response;
 
-  const { data: img } = await supabase
+  const { data: img } = await admin
     .from("images")
     .select("id, status, photographer_id")
     .eq("id", id)
@@ -138,7 +138,7 @@ export async function DELETE(
   if (!authorization.ok) return authorization.response;
 
   // Only allow deleting own pending/rejected images
-  const { data: img } = await supabase
+  const { data: img } = await admin
     .from("images")
     .select("id, status, storage_path_original")
     .eq("id", id)

@@ -18,7 +18,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     label: "이미지관리",
     items: [
       { href: "/admin", icon: "pending_actions", label: "이미지 검토" },
-      { href: "/admin/images", icon: "photo_library", label: "이미지 관리" },
+      { href: "/admin/images", icon: "photo_library", label: "이미지 상세 관리" },
       { href: "/admin/categories", icon: "category", label: "카테고리 관리" },
       { href: "/admin/image-cleanup", icon: "cleaning_services", label: "이미지 정리" },
       { href: "/admin/image-deletion-requests", icon: "delete_forever", label: "삭제 요청" },
@@ -43,8 +43,17 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { href: "/admin/payment-requests", icon: "account_balance", label: "결제요청목록" },
       { href: "/admin/payouts", icon: "payments", label: "정산 관리" },
-      { href: "/admin/pricing", icon: "sell", label: "상품 가격" },
-      { href: "/admin/commission", icon: "percent", label: "수수료 정책" },
+    ],
+  },
+  {
+    id: "operations-policy",
+    icon: "policy",
+    label: "운영정책관리",
+    items: [
+      { href: "/admin/legal", icon: "gavel", label: "법률정보" },
+      { href: "/admin/commission", icon: "percent", label: "수수료정책" },
+      { href: "/admin/pricing", icon: "sell", label: "상품가격" },
+      { href: "/admin/data-lifecycle", icon: "data_usage", label: "데이터 운영주기 관리" },
     ],
   },
   {
@@ -75,7 +84,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { href: "/admin/support", icon: "support_agent", label: "고객 문의" },
       { href: "/admin/notices", icon: "campaign", label: "공지사항" },
-      { href: "/admin/legal", icon: "gavel", label: "법률정보" },
     ],
   },
 ];
