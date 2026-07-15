@@ -58,17 +58,23 @@ export async function notifyOpsContact(opts: {
   email:   string;
   subject: string;
   message: string;
+  phone?: string | null;
+  organization?: string | null;
 }) {
   const name = escapeHtml(opts.name);
   const email = escapeHtml(opts.email);
   const subject = escapeHtml(opts.subject);
   const message = escapeHtml(opts.message);
+  const phone = opts.phone ? escapeHtml(opts.phone) : null;
+  const organization = opts.organization ? escapeHtml(opts.organization) : null;
   await sendEmail({
     to:      OPS_EMAIL,
     subject: `[문의] ${opts.subject} — ${opts.name}`,
     html: `
       <p><strong>이름:</strong> ${name}</p>
       <p><strong>이메일:</strong> ${email}</p>
+      ${phone ? `<p><strong>연락처:</strong> ${phone}</p>` : ""}
+      ${organization ? `<p><strong>소속:</strong> ${organization}</p>` : ""}
       <p><strong>제목:</strong> ${subject}</p>
       <p><strong>내용:</strong></p>
       <pre>${message}</pre>

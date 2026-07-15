@@ -1,3 +1,5 @@
+import { normalizePhoneNumber } from "../profile/contact";
+
 export const INQUIRY_TYPES = ["general", "photo_request"] as const;
 
 export const PHOTO_REQUEST_STATUSES = [
@@ -57,6 +59,7 @@ export interface NormalizedContactSubmission {
   reference_note: string | null;
   non_copying_attested: boolean;
   requester_organization: string | null;
+  requester_phone: string | null;
   usage_project: string | null;
   usage_context: string | null;
   buyer_id: string | null;
@@ -68,6 +71,7 @@ export interface NormalizedContactSubmission {
 
 export interface PhotoRequestBuyerValidationFields {
   requester_organization: unknown;
+  requester_phone?: unknown;
   usage_project: unknown;
   usage_context: unknown;
   deadline_at: unknown;
@@ -78,7 +82,7 @@ type BuyerValidationLocale = "ko" | "en";
 
 const BUYER_VALIDATION_MESSAGES = {
   ko: {
-    requesterOrganization: "요청자 소속을 입력해주세요. 예: ○○출판사, 국립○○박물관, 프리랜서",
+    requesterPhone: "연락처는 숫자 7~15자리의 전화번호 형식으로 입력해주세요.",
     usageProject: "사용 프로젝트를 입력해주세요. 예: 중학교 한국사 보조교재, 전시 리플렛, 단행본 개정판",
     usageContextTooLong: "사용 맥락은 1000자 이내로 입력해주세요.",
     usageContextRequired: "사용 맥락을 입력해주세요. 이미지가 어떤 내용 옆에서 어떤 역할로 쓰이는지 적어주세요.",
@@ -86,7 +90,7 @@ const BUYER_VALIDATION_MESSAGES = {
     referenceUrl: "참고 URL은 http:// 또는 https://로 시작하는 웹 주소만 입력할 수 있습니다.",
   },
   en: {
-    requesterOrganization: "Enter your organization. For example: a publisher, museum, agency, or freelance practice.",
+    requesterPhone: "Enter a phone number containing 7 to 15 digits.",
     usageProject: "Enter the project where this image will be used. For example: a textbook, exhibition leaflet, or revised book edition.",
     usageContextTooLong: "Usage context must be 1,000 characters or fewer.",
     usageContextRequired: "Enter the usage context. Explain what content the image will appear next to and what role it should play.",
@@ -304,10 +308,15 @@ export function validatePhotoRequestBuyerFields(
   locale: BuyerValidationLocale = "ko",
 ): string | null {
   const messages = BUYER_VALIDATION_MESSAGES[locale];
-  try {
-    normalizeText(input.requester_organization, "requester_organization", 160);
-  } catch {
-    return messages.requesterOrganization;
+  const organization = typeof input.requester_organization === "string" ? input.requester_organization.trim() : "";
+  if (organization.length > 160) return locale === "ko" ? "요청자 소속은 160자 이내로 입력해주세요." : "Organization must be 160 characters or fewer.";
+
+  const phone = typeof input.requester_phone === "string" ? input.requester_phone.trim() : "";
+  if (phone) {
+    const digits = phone.replace(/\D/g, "");
+    if (!/^[+\d\s().-]+$/.test(phone) || digits.length < 7 || digits.length > 15) {
+      return messages.requesterPhone;
+    }
   }
 
   try {
@@ -374,6 +383,7 @@ export function normalizeContactSubmissionInput(
       reference_note: null,
       non_copying_attested: false,
       requester_organization: null,
+      requester_phone: null,
       usage_project: null,
       usage_context: null,
       sourcing_purposes: [],
@@ -397,7 +407,8 @@ export function normalizeContactSubmissionInput(
     reference_url: normalizeReferenceUrl(body.reference_url),
     reference_note: normalizeOptionalText(body.reference_note, "reference_note", 1000),
     non_copying_attested: body.non_copying_attested === true,
-    requester_organization: normalizeText(body.requester_organization, "requester_organization", 160),
+    requester_organization: normalizeOptionalText(body.requester_organization, "requester_organization", 160),
+    requester_phone: normalizePhoneNumber(body.requester_phone),
     usage_project: normalizeText(body.usage_project, "usage_project", 240),
     usage_context: normalizeText(body.usage_context, "usage_context", 1000),
     sourcing_purposes: normalizeSourcingPurposes(body.sourcing_purposes),

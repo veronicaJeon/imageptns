@@ -39,6 +39,8 @@ const CONTACT_PHOTO_COPY = {
       briefHelp: "문장으로 길게 써도 좋고, 필요한 컷·분위기·피해야 할 요소를 짧게 적어도 충분합니다.",
       organization: "요청자 소속",
       organizationPlaceholder: "예: ○○출판사, 국립○○박물관, 프리랜서",
+      phone: "휴대전화번호(연락처)",
+      phonePlaceholder: "예: 010-1234-5678",
       usageProject: "사용 프로젝트",
       usageProjectPlaceholder: "예: 중학교 한국사 보조교재",
       usageContext: "사용 맥락",
@@ -93,6 +95,8 @@ const CONTACT_PHOTO_COPY = {
       briefHelp: "A full paragraph is welcome. Short notes about the needed shot, mood, or things to avoid are also enough.",
       organization: "Requester organization",
       organizationPlaceholder: "Example: publisher, museum, agency, or freelancer",
+      phone: "Mobile phone (contact)",
+      phonePlaceholder: "Example: +82 10-1234-5678",
       usageProject: "Usage project",
       usageProjectPlaceholder: "Example: middle-school Korean history workbook",
       usageContext: "Usage context",
@@ -145,6 +149,7 @@ function ContactPageContent() {
     title: "",
     brief: "",
     requester_organization: "",
+    requester_phone: "",
     usage_project: "",
     usage_context: "",
     deadline_at: "",
@@ -176,6 +181,7 @@ function ContactPageContent() {
       setPhotoForm((prev) => ({
         ...prev,
         requester_organization: prev.requester_organization || user.organization || "",
+        requester_phone: prev.requester_phone || user.phone_number || "",
       }));
     }
   }, [user]);
@@ -250,6 +256,7 @@ function ContactPageContent() {
 
     const buyerValidationError = validatePhotoRequestBuyerFields({
       requester_organization: photoForm.requester_organization,
+      requester_phone: photoForm.requester_phone,
       usage_project: photoForm.usage_project,
       usage_context: photoForm.usage_context,
       deadline_at: photoForm.deadline_at ? `${photoForm.deadline_at}T23:59:59.000Z` : "",
@@ -262,6 +269,24 @@ function ContactPageContent() {
     }
 
     try {
+      const requestedPhone = photoForm.requester_phone.trim();
+      const requestedOrganization = photoForm.requester_organization.trim();
+      const savedPhone = user.phone_number?.trim() ?? "";
+      const savedOrganization = user.organization?.trim() ?? "";
+      let syncPhone = false;
+      let syncOrganization = false;
+
+      if (requestedPhone && requestedPhone !== savedPhone) {
+        syncPhone = window.confirm(savedPhone
+          ? "내 연락처의 전화번호를 지금 번호로 변경하시겠습니까?"
+          : "입력한 전화번호를 내 연락처로 등록하시겠습니까?");
+      }
+      if (requestedOrganization && requestedOrganization !== savedOrganization) {
+        syncOrganization = window.confirm(savedOrganization
+          ? "내 연락처의 소속출판사를 지금 소속으로 변경하시겠습니까?"
+          : "입력한 소속출판사를 내 고객정보로 등록하시겠습니까?");
+      }
+
       const buyerName = user.full_name || form.name || "Image Partners Buyer";
       const buyerEmail = user.email || form.email;
       if (!buyerEmail) {
@@ -277,6 +302,9 @@ function ContactPageContent() {
           message: photoForm.brief,
           inquiry_type: "photo_request",
           requester_organization: photoForm.requester_organization,
+          requester_phone: photoForm.requester_phone,
+          sync_profile_phone: syncPhone,
+          sync_profile_organization: syncOrganization,
           usage_project: photoForm.usage_project,
           usage_context: photoForm.usage_context,
           deadline_at: photoForm.deadline_at ? `${photoForm.deadline_at}T23:59:59.000Z` : null,
@@ -491,12 +519,23 @@ function ContactPageContent() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.organization} <span className="text-error">*</span></label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.organization}</label>
                   <input
                     type="text"
                     value={photoForm.requester_organization}
                     onChange={setPhoto("requester_organization")}
                     placeholder={photoCopy.fields.organizationPlaceholder}
+                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.phone}</label>
+                  <input
+                    type="tel"
+                    value={photoForm.requester_phone}
+                    onChange={setPhoto("requester_phone")}
+                    placeholder={photoCopy.fields.phonePlaceholder}
                     className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                   />
                 </div>

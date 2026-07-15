@@ -4,6 +4,7 @@ import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { buildPhotoRequestInviteRecipients, formatPhotoRequestBudget } from "@/lib/contact/photo-request-invites";
 import { sendPhotoRequestInviteEmails } from "@/lib/email/contact";
 import { sendPhotoRequestInvite } from "@/lib/email/resend";
+import { sendSupportStatusUpdate } from "@/lib/email/gmail";
 import { candidateImageEligibility } from "@/lib/sourcing/candidates";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -37,6 +38,7 @@ interface ContactSubmissionRow {
   reference_note: string | null;
   non_copying_attested: boolean | null;
   requester_organization: string | null;
+  requester_phone: string | null;
   usage_project: string | null;
   usage_context: string | null;
   sourcing_purposes: string[] | null;
@@ -116,6 +118,8 @@ type SupportPostBody = {
   rightsResult?: unknown;
   rightsExplanation?: unknown;
   imageIds?: unknown;
+  photographerIds?: unknown;
+  targetRegions?: unknown;
 };
 
 function first<T>(value: T | T[] | null): T | null {
@@ -197,6 +201,27 @@ function scorePhotographer(targetRegions: string[], photographerRegions: string[
   return { score, reason: reasons.join(", ") };
 }
 
+async function notifyCustomerStatus(row: Pick<ContactSubmissionRow, "name" | "email" | "subject" | "inquiry_type">, status: "in_progress" | "resolved") {
+  if (!row.email) return "skipped" as const;
+  try {
+    await sendSupportStatusUpdate({
+      name: row.name ?? "고객",
+      email: row.email,
+      subject: row.subject ?? "문의",
+      status,
+      inquiryType: row.inquiry_type ?? "general",
+    });
+    return "sent" as const;
+  } catch (error) {
+    console.error("[admin/support] status email failed", {
+      submissionId: "id" in row ? row.id : undefined,
+      status,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return "failed" as const;
+  }
+}
+
 function mapGeneralSubmission(submission: ContactSubmissionRow) {
   return {
     ...submission,
@@ -241,6 +266,7 @@ function mapPhotoSubmission(submission: ContactSubmissionRow) {
       reference_note: submission.reference_note,
       non_copying_attested: submission.non_copying_attested,
       requester_organization: submission.requester_organization,
+      requester_phone: submission.requester_phone,
       usage_project: submission.usage_project,
       usage_context: submission.usage_context,
       sourcing_purposes: submission.sourcing_purposes ?? [],
@@ -344,7 +370,7 @@ export async function GET(req: NextRequest) {
         created_at, updated_at, resolved_at, inquiry_type, location_label, target_regions,
         category, tags, usage_intent, license_intent, budget_min_krw, budget_max_krw,
         deadline_at, reference_url, reference_note, non_copying_attested,
-        requester_organization, usage_project, usage_context, sourcing_purposes,
+        requester_organization, requester_phone, usage_project, usage_context, sourcing_purposes,
         request_status,
         assignee:profiles!contact_submissions_assigned_to_fkey(id, full_name),
         matches:photo_request_matches(id, photographer_id, status, score, reason, created_at, updated_at)
@@ -432,7 +458,12 @@ export async function PATCH(req: NextRequest) {
     after: data,
   });
 
-  return NextResponse.json({ submission: data });
+  const beforeRow = before as ContactSubmissionRow;
+  const emailDelivery = body.status !== undefined && beforeRow.status !== data.status
+    ? await notifyCustomerStatus(data as ContactSubmissionRow, data.status === "resolved" ? "resolved" : "in_progress")
+    : "unchanged";
+
+  return NextResponse.json({ submission: data, emailDelivery });
 }
 
 export async function POST(req: NextRequest) {
@@ -457,6 +488,10 @@ export async function POST(req: NextRequest) {
     return publishSourcingAnswer(body, adminUser.id);
   }
 
+  if (body?.action === "add_selected_photo_request_matches") {
+    return addSelectedPhotoRequestMatches(body, adminUser.id);
+  }
+
   if (body?.action !== "create_photo_request_matches") {
     return NextResponse.json({ error: "Unsupported support action" }, { status: 400 });
   }
@@ -471,7 +506,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const { data: requestData, error: requestError } = await admin
     .from("contact_submissions")
-    .select("id, subject, request_status, target_regions")
+    .select("id, name, email, subject, inquiry_type, request_status, target_regions")
     .eq("id", requestId)
     .eq("inquiry_type", "photo_request")
     .single();
@@ -487,6 +522,7 @@ export async function POST(req: NextRequest) {
     .from("profiles")
     .select("id, full_name, primary_activity_regions")
     .contains("roles", ["photographer"])
+    .eq("photographer_status", "approved")
     .is("deleted_at", null);
 
   if (photographerError) return NextResponse.json({ error: photographerError.message }, { status: 500 });
@@ -556,10 +592,108 @@ export async function POST(req: NextRequest) {
     after: { matches, inserted: rows.length, skipped: candidates.length - rows.length },
   });
 
+  if (requestRow.request_status === "submitted") {
+    await notifyCustomerStatus(requestRow as ContactSubmissionRow, "in_progress");
+  }
+
   return NextResponse.json({
     matches: matches ?? [],
     inserted: rows.length,
     skipped: candidates.length - rows.length,
+  });
+}
+
+async function addSelectedPhotoRequestMatches(body: SupportPostBody, adminUserId: string) {
+  const requestId = typeof body.requestId === "string" ? body.requestId.trim() : "";
+  const photographerIds = Array.from(new Set(
+    Array.isArray(body.photographerIds)
+      ? body.photographerIds.map((id) => typeof id === "string" ? id.trim() : "").filter(Boolean)
+      : [],
+  )).slice(0, 50);
+  const targetRegions = normalizeTextList(body.targetRegions);
+
+  if (!requestId) return NextResponse.json({ error: "requestId is required" }, { status: 400 });
+  if (photographerIds.length === 0) {
+    return NextResponse.json({ error: "사진가를 한 명 이상 선택해주세요." }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const { data: requestRow, error: requestError } = await admin
+    .from("contact_submissions")
+    .select("id, name, email, subject, inquiry_type, target_regions, request_status")
+    .eq("id", requestId)
+    .eq("inquiry_type", "photo_request")
+    .single();
+  if (requestError || !requestRow) return NextResponse.json({ error: "Photo request not found" }, { status: 404 });
+
+  const { data: photographerRows, error: photographerError } = await admin
+    .from("profiles")
+    .select("id, full_name, primary_activity_regions")
+    .in("id", photographerIds)
+    .contains("roles", ["photographer"])
+    .eq("photographer_status", "approved")
+    .is("deleted_at", null);
+  if (photographerError) return NextResponse.json({ error: photographerError.message }, { status: 500 });
+
+  const validPhotographers = (photographerRows ?? []) as PhotographerProfileRow[];
+  const { data: existingRows, error: existingError } = await admin
+    .from("photo_request_matches")
+    .select("photographer_id")
+    .eq("contact_submission_id", requestId)
+    .in("photographer_id", validPhotographers.map((row) => row.id));
+  if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
+  const existingIds = new Set((existingRows ?? []).map((row) => row.photographer_id));
+
+  const rows = validPhotographers
+    .filter((photographer) => !existingIds.has(photographer.id))
+    .map((photographer) => {
+      const match = targetRegions.length > 0
+        ? scorePhotographer(targetRegions, photographer.primary_activity_regions)
+        : { score: 0, reason: "관리자 직접 선택" };
+      return {
+        contact_submission_id: requestId,
+        photographer_id: photographer.id,
+        status: "candidate",
+        score: match.score,
+        reason: match.reason || "관리자 직접 선택",
+      };
+    });
+
+  const { data: matches, error: insertError } = rows.length > 0
+    ? await admin.from("photo_request_matches").insert(rows).select()
+    : { data: [], error: null };
+  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+
+  const now = new Date().toISOString();
+  const requestUpdate: Record<string, unknown> = {
+    request_status: "matching",
+    status: "in_progress",
+    updated_at: now,
+  };
+  if (targetRegions.length > 0) {
+    requestUpdate.target_regions = targetRegions;
+    requestUpdate.location_label = targetRegions.join(", ");
+  }
+  await admin.from("contact_submissions").update(requestUpdate).eq("id", requestId);
+
+  await recordAdminAuditLog(admin, {
+    actorId: adminUserId,
+    action: "photo_request.matches_selected",
+    targetType: "contact_submission",
+    targetId: requestId,
+    targetLabel: requestRow.subject ?? requestId,
+    before: requestRow,
+    after: { photographerIds, targetRegions, matches },
+  });
+
+  if (requestRow.request_status === "submitted") {
+    await notifyCustomerStatus(requestRow as ContactSubmissionRow, "in_progress");
+  }
+
+  return NextResponse.json({
+    matches: matches ?? [],
+    inserted: rows.length,
+    skipped: photographerIds.length - rows.length,
   });
 }
 
@@ -753,16 +887,19 @@ async function publishSourcingAnswer(body: SupportPostBody, adminUserId: string)
 
   if (candidateError) return NextResponse.json({ error: candidateError.message }, { status: 500 });
 
-  const { error: requestError } = await admin
+  const { data: completedRequest, error: requestError } = await admin
     .from("contact_submissions")
     .update({
       internal_sourcing_status: "answered",
       buyer_sourcing_status: "answer_ready",
-      request_status: "in_progress",
-      status: "in_progress",
+      request_status: "fulfilled",
+      status: "resolved",
+      resolved_at: now,
       updated_at: now,
     })
-    .eq("id", answer.contact_submission_id);
+    .eq("id", answer.contact_submission_id)
+    .select("id, name, email, subject, inquiry_type")
+    .single();
 
   if (requestError) return NextResponse.json({ error: requestError.message }, { status: 500 });
 
@@ -774,6 +911,8 @@ async function publishSourcingAnswer(body: SupportPostBody, adminUserId: string)
     before: answer as unknown as Record<string, unknown>,
     after: published,
   });
+
+  await notifyCustomerStatus(completedRequest as ContactSubmissionRow, "resolved");
 
   return NextResponse.json({ answer: published });
 }

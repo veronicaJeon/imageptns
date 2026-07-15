@@ -114,6 +114,7 @@ describe("normalizeContactSubmissionInput", () => {
       reference_note: null,
       non_copying_attested: false,
       requester_organization: null,
+      requester_phone: null,
       usage_project: null,
       usage_context: null,
       buyer_id: null,
@@ -157,6 +158,7 @@ describe("normalizeContactSubmissionInput", () => {
       reference_note: "Use the composition only.",
       non_copying_attested: false,
       requester_organization: "Image Partners Books",
+      requester_phone: null,
       usage_project: "Middle school history workbook",
       usage_context: "Opening spread about modern Seoul lifestyles",
       buyer_id: null,
@@ -167,8 +169,8 @@ describe("normalizeContactSubmissionInput", () => {
     });
   });
 
-  it("requires requester organization, project, and usage context for photo requests", () => {
-    expect(() => normalizeContactSubmissionInput({
+  it("allows an empty organization while requiring project and usage context", () => {
+    const normalized = normalizeContactSubmissionInput({
       inquiry_type: "photo_request",
       name: "Buyer",
       email: "buyer@example.com",
@@ -178,7 +180,19 @@ describe("normalizeContactSubmissionInput", () => {
       usage_project: "Middle school history workbook",
       usage_context: "Chapter opener",
       deadline_at: "2026-06-10T09:00:00.000Z",
-    }, NOW)).toThrow("requester_organization");
+    }, NOW);
+    expect(normalized.requester_organization).toBeNull();
+    expect(() => normalizeContactSubmissionInput({
+      inquiry_type: "photo_request",
+      name: "Buyer",
+      email: "buyer@example.com",
+      subject: "Rooftop campaign",
+      message: "Need bright Seoul rooftop lifestyle images with morning light.",
+      requester_organization: "",
+      usage_project: "",
+      usage_context: "Chapter opener",
+      deadline_at: "2026-06-10T09:00:00.000Z",
+    }, NOW)).toThrow("usage_project");
   });
 
   it("rejects invalid deadlines while allowing omitted budget and region fields", () => {
@@ -215,16 +229,21 @@ describe("validatePhotoRequestBuyerFields", () => {
     expect(validatePhotoRequestBuyerFields(base, NOW)).toBeNull();
   });
 
-  it("explains required source context fields in Korean", () => {
+  it("allows a blank organization and explains required source context fields in Korean", () => {
     expect(validatePhotoRequestBuyerFields({
       ...base,
       requester_organization: "",
-    }, NOW)).toBe("요청자 소속을 입력해주세요. 예: ○○출판사, 국립○○박물관, 프리랜서");
+    }, NOW)).toBeNull();
 
     expect(validatePhotoRequestBuyerFields({
       ...base,
       usage_project: "",
     }, NOW)).toBe("사용 프로젝트를 입력해주세요. 예: 중학교 한국사 보조교재, 전시 리플렛, 단행본 개정판");
+  });
+
+  it("validates an optional requester phone number", () => {
+    expect(validatePhotoRequestBuyerFields({ ...base, requester_phone: "010-1234-5678" }, NOW)).toBeNull();
+    expect(validatePhotoRequestBuyerFields({ ...base, requester_phone: "123" }, NOW)).toBe("연락처는 숫자 7~15자리의 전화번호 형식으로 입력해주세요.");
   });
 
   it("explains deadline and usage context validation in Korean", () => {

@@ -47,6 +47,24 @@ export async function POST(req: NextRequest) {
       );
     }
     buyerId = user.id;
+
+    const rawBody = body as Record<string, unknown>;
+    const profileUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (rawBody.sync_profile_phone === true) {
+      profileUpdate.phone_number = submission.requester_phone;
+    }
+    if (rawBody.sync_profile_organization === true) {
+      profileUpdate.organization = submission.requester_organization;
+    }
+    if (Object.keys(profileUpdate).length > 1) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update(profileUpdate)
+        .eq("id", user.id);
+      if (profileError) {
+        return NextResponse.json({ error: profileError.message }, { status: 500 });
+      }
+    }
   }
 
   const { error } = await supabase
@@ -62,6 +80,8 @@ export async function POST(req: NextRequest) {
         email: submission.email,
         subject: submission.subject,
         message: submission.message,
+        phone: submission.requester_phone,
+        organization: submission.requester_organization,
       },
       {
         sendConfirmation: sendContactConfirmation,

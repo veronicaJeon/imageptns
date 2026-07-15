@@ -103,12 +103,16 @@ export async function notifyOpsContact(opts: {
   email:   string;
   subject: string;
   message: string;
+  phone?: string | null;
+  organization?: string | null;
 }) {
   assertSmtpCredentials();
   const name = escapeHtml(opts.name);
   const email = escapeHtml(opts.email);
   const subject = escapeHtml(opts.subject);
   const message = escapeHtml(opts.message);
+  const phone = opts.phone ? escapeHtml(opts.phone) : null;
+  const organization = opts.organization ? escapeHtml(opts.organization) : null;
   const transport = createTransport();
   // Reply-To 설정으로 수신 후 바로 답장 가능
   await transport.sendMail({
@@ -119,9 +123,41 @@ export async function notifyOpsContact(opts: {
     html: `
       <p><strong>이름:</strong> ${name}</p>
       <p><strong>이메일:</strong> <a href="mailto:${email}">${email}</a></p>
+      ${phone ? `<p><strong>연락처:</strong> ${phone}</p>` : ""}
+      ${organization ? `<p><strong>소속:</strong> ${organization}</p>` : ""}
       <p><strong>제목:</strong> ${subject}</p>
       <p><strong>내용:</strong></p>
       <pre style="white-space:pre-wrap;font-family:inherit">${message}</pre>
+    `,
+  });
+}
+
+export async function sendSupportStatusUpdate(opts: {
+  name: string;
+  email: string;
+  subject: string;
+  status: "in_progress" | "resolved";
+  inquiryType: "general" | "photo_request" | string;
+}) {
+  assertSmtpCredentials();
+  const name = escapeHtml(opts.name || "고객");
+  const subject = escapeHtml(opts.subject);
+  const isResolved = opts.status === "resolved";
+  const statusLabel = isResolved ? "답변 완료" : "검토 중";
+  const destination = opts.inquiryType === "photo_request" ? "/dashboard/sourcing" : "/contact";
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://imageptns.vercel.app").replace(/\/$/, "");
+  const transport = createTransport();
+
+  await transport.sendMail({
+    from: `"Image Partners" <${SMTP_USER}>`,
+    to: opts.email,
+    subject: `[Image Partners] 문의 상태가 ${statusLabel}으로 변경되었습니다 — ${opts.subject}`,
+    html: `
+      <p>${name}님, 안녕하세요.</p>
+      <p>문의 <strong>${subject}</strong>의 처리 상태가 <strong>${statusLabel}</strong>으로 변경되었습니다.</p>
+      <p>${isResolved ? "답변 내용을 확인해 주세요." : "담당자가 내용을 확인하고 있습니다. 처리가 완료되면 다시 알려드리겠습니다."}</p>
+      <p><a href="${baseUrl}${destination}">Image Partners에서 확인하기 →</a></p>
+      <br><p>Image Partners 팀 드림</p>
     `,
   });
 }

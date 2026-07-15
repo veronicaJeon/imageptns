@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   full_name: string;
   organization: string | null;
+  phone_number: string | null;
   role: "buyer" | "photographer";
   roles: Array<"buyer" | "photographer">;
   photographer_status: "none" | "pending" | "approved" | "suspended";
@@ -18,6 +19,7 @@ type PhotographerStatus = AuthUser["photographer_status"];
 type ProfileRow = {
   full_name?: string | null;
   organization?: string | null;
+  phone_number?: string | null;
   role?: string | null;
   roles?: unknown;
   photographer_status?: string | null;
@@ -63,6 +65,7 @@ function buildAuthUser(user: { id: string; email?: string | null }, profile: Pro
     email: user.email ?? "",
     full_name: profile?.full_name ?? "",
     organization: profile?.organization ?? null,
+    phone_number: profile?.phone_number ?? null,
     role,
     roles: normalizeProfileRoles(profile, photographerStatus),
     photographer_status: photographerStatus,
@@ -87,7 +90,7 @@ export const useAuth = create<AuthStore>((set) => ({
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name, organization, role, roles, photographer_status, avatar_url, is_admin")
+        .select("full_name, organization, phone_number, role, roles, photographer_status, avatar_url, is_admin")
         .eq("id", user.id)
         .single();
 
@@ -101,7 +104,7 @@ export const useAuth = create<AuthStore>((set) => ({
         }
         const { data: p } = await supabase
           .from("profiles")
-          .select("full_name, organization, role, roles, photographer_status, avatar_url, is_admin")
+          .select("full_name, organization, phone_number, role, roles, photographer_status, avatar_url, is_admin")
           .eq("id", session.user.id)
           .single();
 

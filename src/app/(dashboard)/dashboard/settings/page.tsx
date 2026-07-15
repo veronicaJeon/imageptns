@@ -152,10 +152,11 @@ export default function SettingsPage() {
         body: JSON.stringify({
           full_name: name,
           organization,
+          phone_number: phoneNumber,
           bio,
           wallet_address: walletAddress,
           ...(photographerStatus !== "none"
-            ? { phone_number: phoneNumber, primary_activity_regions: activityRegions }
+            ? { primary_activity_regions: activityRegions }
             : {}),
         }),
       });
@@ -334,6 +335,14 @@ export default function SettingsPage() {
             placeholder="예: ○○출판사, 국립○○박물관, 프리랜서"
           />
           <Input label={s.emailLabel} type="email" value={email} disabled icon="mail" />
+          <Input
+            label="연락처"
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            icon="phone"
+            placeholder="010-1234-5678"
+          />
 
           <div className="flex flex-col gap-2">
             <label className="text-xs font-bold text-outline uppercase tracking-widest">{s.bioLabel}</label>
@@ -348,15 +357,6 @@ export default function SettingsPage() {
 
           {photographerStatus === "approved" && (
             <div className="flex flex-col gap-5">
-              <Input
-                label={s.phoneLabel}
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                icon="phone"
-                placeholder="+82 10 1234 5678"
-              />
-
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold text-outline uppercase tracking-widest">{s.regionsLabel}</label>
                 <textarea

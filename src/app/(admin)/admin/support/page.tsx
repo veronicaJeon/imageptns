@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 
 type SupportStatus = "pending" | "in_progress" | "resolved";
@@ -10,15 +11,9 @@ type SupportKind = "all" | "general" | "photo";
 
 const TABS: { key: SupportTab; label: string; icon: string }[] = [
   { key: "pending", label: "대기 중", icon: "pending_actions" },
-  { key: "in_progress", label: "처리 중", icon: "support_agent" },
-  { key: "resolved", label: "해결됨", icon: "check_circle" },
+  { key: "in_progress", label: "검토 중", icon: "support_agent" },
+  { key: "resolved", label: "답변 완료", icon: "check_circle" },
   { key: "all", label: "전체", icon: "grid_view" },
-];
-
-const KIND_FILTERS: { key: SupportKind; label: string; icon: string }[] = [
-  { key: "all", label: "전체", icon: "inbox" },
-  { key: "general", label: "일반 문의", icon: "support_agent" },
-  { key: "photo", label: "사진 의뢰", icon: "add_photo_alternate" },
 ];
 
 const STATUS_STYLES: Record<string, string> = {
@@ -34,11 +29,11 @@ const STATUS_STYLES: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "대기 중",
-  in_progress: "처리 중",
-  resolved: "해결됨",
+  in_progress: "검토 중",
+  resolved: "답변 완료",
   submitted: "접수됨",
   matching: "매칭 중",
-  fulfilled: "완료",
+  fulfilled: "답변 완료",
   rejected: "거절",
   cancelled: "취소",
 };
@@ -130,6 +125,7 @@ interface PhotoRequestDetail {
   reference_note: string | null;
   non_copying_attested: boolean | null;
   requester_organization: string | null;
+  requester_phone: string | null;
   usage_project: string | null;
   usage_context: string | null;
   sourcing_purposes: string[] | null;
@@ -154,6 +150,14 @@ interface SupportSubmission {
   resolved_at: string | null;
   assignee?: { id: string; full_name: string | null } | null;
   photo_request?: PhotoRequestDetail;
+}
+
+interface PhotographerCandidate {
+  id: string;
+  full_name: string | null;
+  organization: string | null;
+  bio: string | null;
+  primary_activity_regions: string[] | null;
 }
 
 function formatDate(iso?: string | null) {
@@ -212,9 +216,142 @@ function latestSourcingAnswer(answers?: SourcingAnswer[] | null) {
   )[0] ?? null;
 }
 
+function PhotographerCandidatePicker({
+  requestId,
+  disabled,
+  onAdded,
+}: {
+  requestId: string;
+  disabled: boolean;
+  onAdded: () => Promise<void>;
+}) {
+  const [region, setRegion] = useState("");
+  const [query, setQuery] = useState("");
+  const [photographers, setPhotographers] = useState<PhotographerCandidate[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [adding, setAdding] = useState(false);
+
+  async function searchPhotographers() {
+    setSearching(true);
+    try {
+      const params = new URLSearchParams({ region, q: query });
+      const response = await fetch(`/api/admin/photographers/search?${params}`);
+      const body = await response.json().catch(() => null) as { photographers?: PhotographerCandidate[]; error?: string } | null;
+      if (!response.ok) throw new Error(body?.error ?? "사진가 목록을 불러오지 못했습니다.");
+      setPhotographers(body?.photographers ?? []);
+      setSelectedIds([]);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "사진가 목록을 불러오지 못했습니다.");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function addSelected() {
+    if (selectedIds.length === 0) return;
+    setAdding(true);
+    try {
+      const response = await fetch("/api/admin/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_selected_photo_request_matches",
+          requestId,
+          photographerIds: selectedIds,
+          targetRegions: region.split(/[,\n]/).map((item) => item.trim()).filter(Boolean),
+        }),
+      });
+      const body = await response.json().catch(() => null) as { inserted?: number; skipped?: number; error?: string } | null;
+      if (!response.ok) throw new Error(body?.error ?? "선택한 사진가를 후보로 추가하지 못했습니다.");
+      alert(`사진가 ${body?.inserted ?? 0}명을 후보로 추가했습니다.${body?.skipped ? ` 중복/제외 ${body.skipped}명` : ""}`);
+      setSelectedIds([]);
+      await onAdded();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "선택한 사진가를 후보로 추가하지 못했습니다.");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-3">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+        <input
+          value={region}
+          onChange={(event) => setRegion(event.target.value)}
+          placeholder="지역 조건 (예: 서울, 경기)"
+          className="h-10 rounded-lg bg-surface-container-lowest px-3 text-sm outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+        />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); searchPhotographers(); } }}
+          placeholder="이름·소속·특징 검색 (선택)"
+          className="h-10 rounded-lg bg-surface-container-lowest px-3 text-sm outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+        />
+        <button
+          type="button"
+          onClick={searchPhotographers}
+          disabled={disabled || searching}
+          className="flex h-10 items-center justify-center gap-1.5 rounded bg-on-surface px-4 text-xs font-bold text-surface disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-base">search</span>
+          {searching ? "검색 중" : "사진가 검색"}
+        </button>
+      </div>
+
+      {photographers.length > 0 && (
+        <div className="mt-3 max-h-72 divide-y divide-outline-variant/30 overflow-y-auto rounded-lg border border-outline-variant/30">
+          {photographers.map((photographer) => (
+            <label key={photographer.id} className="flex cursor-pointer items-start gap-3 p-3 hover:bg-surface-container-low">
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(photographer.id)}
+                onChange={(event) => setSelectedIds((current) => event.target.checked
+                  ? [...current, photographer.id]
+                  : current.filter((id) => id !== photographer.id))}
+                className="mt-1 h-4 w-4 accent-primary"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold text-on-surface">
+                  {photographer.full_name || "이름 미등록"}
+                  {photographer.organization ? ` · ${photographer.organization}` : ""}
+                </span>
+                <span className="mt-0.5 block text-xs text-primary">
+                  소속 지역: {(photographer.primary_activity_regions ?? []).join(", ") || "미등록"}
+                </span>
+                <span className="mt-1 line-clamp-2 block text-xs text-on-surface-variant">
+                  특징: {photographer.bio || "등록된 소개가 없습니다."}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {photographers.length > 0 && (
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="text-xs text-outline">{photographers.length}명 확인 · {selectedIds.length}명 선택</p>
+          <button
+            type="button"
+            onClick={addSelected}
+            disabled={disabled || adding || selectedIds.length === 0}
+            className="rounded bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+          >
+            {adding ? "추가 중..." : "선택 사진가를 후보로 추가"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminSupportPage() {
+  const pathname = usePathname();
+  const fixedKind: SupportKind = pathname.startsWith("/admin/photo-requests") ? "photo" : "general";
   const [tab, setTab] = useState<SupportTab>("pending");
-  const [kind, setKind] = useState<SupportKind>("all");
+  const [kind] = useState<SupportKind>(fixedKind);
   const [submissions, setSubmissions] = useState<SupportSubmission[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -289,8 +426,14 @@ export default function AdminSupportPage() {
         throw new Error(body?.error ?? "문의 상태를 저장하지 못했습니다.");
       }
 
-      const { submission: updated } = await res.json() as { submission: SupportSubmission };
+      const { submission: updated, emailDelivery } = await res.json() as {
+        submission: SupportSubmission;
+        emailDelivery?: "sent" | "failed" | "skipped" | "unchanged";
+      };
       setNotes((prev) => ({ ...prev, [updated.id]: updated.admin_note ?? "" }));
+      if (emailDelivery === "failed") {
+        alert("상태는 저장되었지만 고객 알림 이메일 발송에 실패했습니다. 이메일 설정을 확인해주세요.");
+      }
       await fetchSubmissions(tab, kind);
     } catch (error) {
       alert(error instanceof Error ? error.message : "문의 상태를 저장하지 못했습니다.");
@@ -456,7 +599,9 @@ export default function AdminSupportPage() {
   return (
     <div className="p-6 md:p-10">
       <div className="mb-8">
-        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">고객 문의</h1>
+        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">
+          {fixedKind === "photo" ? "사진 문의 운영" : "일반 문의"}
+        </h1>
         <p className="text-sm text-outline mt-1">
           {!loading && `${submissions.length}건의 항목이 표시됩니다`}
         </p>
@@ -472,23 +617,6 @@ export default function AdminSupportPage() {
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 whitespace-nowrap",
                 tab === key
                   ? "bg-primary text-white shadow-sm"
-                  : "text-on-surface-variant hover:text-on-surface"
-              )}
-            >
-              <span className="material-symbols-outlined text-base">{icon}</span>
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-1 bg-surface-container-lowest p-1 rounded-xl w-fit shadow-ghost overflow-x-auto max-w-full">
-          {KIND_FILTERS.map(({ key, label, icon }) => (
-            <button
-              key={key}
-              onClick={() => setKind(key)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 whitespace-nowrap",
-                kind === key
-                  ? "bg-on-surface text-surface"
                   : "text-on-surface-variant hover:text-on-surface"
               )}
             >
@@ -604,6 +732,10 @@ export default function AdminSupportPage() {
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-outline">요청자 소속</p>
                         <p className="mt-1 text-on-surface">{photoRequest.requester_organization ?? "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">휴대전화번호</p>
+                        <p className="mt-1 text-on-surface">{photoRequest.requester_phone ?? "-"}</p>
                       </div>
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사용 프로젝트</p>
@@ -810,6 +942,12 @@ export default function AdminSupportPage() {
                         )}
                       </div>
 
+                      <PhotographerCandidatePicker
+                        requestId={submission.id}
+                        disabled={isBusy}
+                        onAdded={() => fetchSubmissions(tab, kind)}
+                      />
+
                       {matchCount === 0 ? (
                         <p className="text-sm text-outline">아직 생성된 후보가 없습니다. 대상 지역 기반으로 후보를 생성하세요.</p>
                       ) : (
@@ -897,7 +1035,7 @@ export default function AdminSupportPage() {
                         ) : (
                           <span className="material-symbols-outlined text-sm">support_agent</span>
                         )}
-                        {isPhotoRequest ? "검토 시작" : "처리 중"}
+                        검토 시작
                       </button>
                     )}
                     {submission.status_group !== "resolved" && (
@@ -911,7 +1049,7 @@ export default function AdminSupportPage() {
                         ) : (
                           <span className="material-symbols-outlined text-sm">check_circle</span>
                         )}
-                        {isPhotoRequest ? "의뢰 완료" : "해결"}
+                        답변 완료
                       </button>
                     )}
                     {isPhotoRequest && submission.status_group !== "pending" && (

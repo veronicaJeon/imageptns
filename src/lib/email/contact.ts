@@ -3,6 +3,8 @@ export interface ContactEmailPayload {
   email: string;
   subject: string;
   message: string;
+  phone?: string | null;
+  organization?: string | null;
 }
 
 export interface PhotoRequestInviteEmailPayload {

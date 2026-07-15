@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/lib/store/auth";
 import {
   ADMIN_NAV_GROUPS,
+  ADMIN_NAV_PRIMARY_ITEMS,
   adminNavGroupIsActive,
   adminNavItemIsActive,
   defaultOpenAdminGroups,
@@ -18,12 +19,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, init, signOut } = useAuth();
   const [openGroupIds, setOpenGroupIds] = useState<string[]>(() => defaultOpenAdminGroups(ADMIN_NAV_GROUPS, pathname));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [inquiryCounts, setInquiryCounts] = useState({ general: 0, photo: 0 });
   const visibleOpenGroupIds = useMemo(() => {
     const activeGroups = defaultOpenAdminGroups(ADMIN_NAV_GROUPS, pathname);
     return Array.from(new Set([...openGroupIds, ...activeGroups]));
   }, [openGroupIds, pathname]);
 
   useEffect(() => { init(); }, [init]);
+  useEffect(() => {
+    let active = true;
+    const loadCounts = () => fetch("/api/admin/support/counts")
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (active && data) setInquiryCounts({ general: data.general ?? 0, photo: data.photo ?? 0 });
+      })
+      .catch(() => {});
+    loadCounts();
+    const timer = window.setInterval(loadCounts, 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [pathname]);
 
   function toggleGroup(groupId: string) {
     setOpenGroupIds((current) => (
@@ -81,6 +95,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     });
   }
 
+  function renderPrimaryItems(mode: "desktop" | "mobile") {
+    return ADMIN_NAV_PRIMARY_ITEMS.map(({ href, icon, label }) => {
+      const isActive = adminNavItemIsActive(href, pathname);
+      const count = href === "/admin/support" ? inquiryCounts.general : inquiryCounts.photo;
+      return (
+        <Link
+          key={href}
+          href={href}
+          onClick={() => setMobileMenuOpen(false)}
+          className={cn(
+            "flex items-center gap-2 px-3 py-2.5 text-sm font-bold transition-colors",
+            mode === "desktop" ? "rounded-lg" : "border-b border-outline-variant/20",
+            isActive ? "bg-primary/10 text-primary" : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
+          )}
+        >
+          <span className="material-symbols-outlined text-lg">{icon}</span>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {count > 0 && (
+            <span className="min-w-5 rounded-full bg-error px-1.5 py-0.5 text-center text-[10px] font-black text-white" aria-label={`신규 ${count}건`}>
+              {count > 99 ? "99+" : count}
+            </span>
+          )}
+        </Link>
+      );
+    });
+  }
+
   return (
     <div className="min-h-screen flex bg-surface-container-low">
 
@@ -96,6 +137,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
+          {renderPrimaryItems("desktop")}
+          <div className="my-2 border-t border-outline-variant/20" />
           {renderNavGroups("desktop")}
         </nav>
 
@@ -135,6 +178,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-container-lowest border-t border-outline-variant/20 shadow-ghost">
           {mobileMenuOpen && (
             <div className="max-h-[70vh] overflow-y-auto border-b border-outline-variant/20">
+              {renderPrimaryItems("mobile")}
               {renderNavGroups("mobile")}
             </div>
           )}

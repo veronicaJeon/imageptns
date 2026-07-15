@@ -4,6 +4,11 @@ export interface AdminNavItem {
   label: string;
 }
 
+export const ADMIN_NAV_PRIMARY_ITEMS: AdminNavItem[] = [
+  { href: "/admin/support", icon: "support_agent", label: "일반 문의" },
+  { href: "/admin/photo-requests", icon: "add_photo_alternate", label: "사진 문의" },
+];
+
 export interface AdminNavGroup {
   id: string;
   icon: string;
@@ -54,6 +59,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/commission", icon: "percent", label: "수수료정책" },
       { href: "/admin/pricing", icon: "sell", label: "상품가격" },
       { href: "/admin/data-lifecycle", icon: "data_usage", label: "데이터 운영주기 관리" },
+      { href: "/admin/notices", icon: "campaign", label: "공지사항" },
     ],
   },
   {
@@ -75,15 +81,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/activity", icon: "timeline", label: "방문 로그" },
       { href: "/admin/audit", icon: "policy", label: "감사 로그" },
       { href: "/admin/stats", icon: "bar_chart", label: "통계" },
-    ],
-  },
-  {
-    id: "content",
-    icon: "campaign",
-    label: "고객/콘텐츠관리",
-    items: [
-      { href: "/admin/support", icon: "support_agent", label: "고객 문의" },
-      { href: "/admin/notices", icon: "campaign", label: "공지사항" },
     ],
   },
 ];

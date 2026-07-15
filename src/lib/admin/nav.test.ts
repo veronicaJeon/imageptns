@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ADMIN_NAV_GROUPS, adminNavGroupIsActive, defaultOpenAdminGroups } from "./nav";
+import { ADMIN_NAV_GROUPS, ADMIN_NAV_PRIMARY_ITEMS, adminNavGroupIsActive, defaultOpenAdminGroups } from "./nav";
 
 describe("admin navigation groups", () => {
   it("marks a group active when the current path belongs to one of its items", () => {
@@ -16,7 +16,16 @@ describe("admin navigation groups", () => {
       "/admin/commission",
       "/admin/pricing",
       "/admin/data-lifecycle",
+      "/admin/notices",
     ]);
+  });
+
+  it("shows general and photo inquiries as separate primary links", () => {
+    expect(ADMIN_NAV_PRIMARY_ITEMS.map((item) => item.href)).toEqual([
+      "/admin/support",
+      "/admin/photo-requests",
+    ]);
+    expect(ADMIN_NAV_GROUPS.some((group) => group.id === "content")).toBe(false);
   });
 
   it("opens the matching group by default", () => {
