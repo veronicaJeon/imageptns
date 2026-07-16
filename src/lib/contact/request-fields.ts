@@ -82,7 +82,7 @@ type BuyerValidationLocale = "ko" | "en";
 
 const BUYER_VALIDATION_MESSAGES = {
   ko: {
-    requesterPhone: "연락처는 숫자 7~15자리의 전화번호 형식으로 입력해주세요.",
+    requesterPhone: "휴대전화번호를 입력해주세요. 숫자 7~15자리의 전화번호 형식이어야 합니다.",
     usageProject: "사용 프로젝트를 입력해주세요. 예: 중학교 한국사 보조교재, 전시 리플렛, 단행본 개정판",
     usageContextTooLong: "사용 맥락은 1000자 이내로 입력해주세요.",
     usageContextRequired: "사용 맥락을 입력해주세요. 이미지가 어떤 내용 옆에서 어떤 역할로 쓰이는지 적어주세요.",
@@ -90,7 +90,7 @@ const BUYER_VALIDATION_MESSAGES = {
     referenceUrl: "참고 URL은 http:// 또는 https://로 시작하는 웹 주소만 입력할 수 있습니다.",
   },
   en: {
-    requesterPhone: "Enter a phone number containing 7 to 15 digits.",
+    requesterPhone: "Enter a mobile phone number containing 7 to 15 digits.",
     usageProject: "Enter the project where this image will be used. For example: a textbook, exhibition leaflet, or revised book edition.",
     usageContextTooLong: "Usage context must be 1,000 characters or fewer.",
     usageContextRequired: "Enter the usage context. Explain what content the image will appear next to and what role it should play.",
@@ -312,11 +312,9 @@ export function validatePhotoRequestBuyerFields(
   if (organization.length > 160) return locale === "ko" ? "요청자 소속은 160자 이내로 입력해주세요." : "Organization must be 160 characters or fewer.";
 
   const phone = typeof input.requester_phone === "string" ? input.requester_phone.trim() : "";
-  if (phone) {
-    const digits = phone.replace(/\D/g, "");
-    if (!/^[+\d\s().-]+$/.test(phone) || digits.length < 7 || digits.length > 15) {
-      return messages.requesterPhone;
-    }
+  const digits = phone.replace(/\D/g, "");
+  if (!phone || !/^[+\d\s().-]+$/.test(phone) || digits.length < 7 || digits.length > 15) {
+    return messages.requesterPhone;
   }
 
   try {
@@ -408,7 +406,7 @@ export function normalizeContactSubmissionInput(
     reference_note: normalizeOptionalText(body.reference_note, "reference_note", 1000),
     non_copying_attested: body.non_copying_attested === true,
     requester_organization: normalizeOptionalText(body.requester_organization, "requester_organization", 160),
-    requester_phone: normalizePhoneNumber(body.requester_phone),
+    requester_phone: normalizePhoneNumber(body.requester_phone) ?? (() => { throw new Error("requester_phone is required"); })(),
     usage_project: normalizeText(body.usage_project, "usage_project", 240),
     usage_context: normalizeText(body.usage_context, "usage_context", 1000),
     sourcing_purposes: normalizeSourcingPurposes(body.sourcing_purposes),

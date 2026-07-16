@@ -29,7 +29,7 @@ describe("photo request draft helpers", () => {
     }));
 
     expect(draft.mode).toBe("photo");
-    expect(draft.title).toBe("전북 익산 석탑 낮 사진 이미지 소싱 요청");
+    expect(draft.title).toBe("전북 익산 석탑 낮 사진 이미지(사진)요청");
     expect(draft.brief).toBe("전북 익산 석탑 낮 사진");
     expect(draft.brief).not.toContain("마감일, 예산");
     expect(draft.usage_context).toBe("검색 조건과 동일한 사용 조건 검토: 교육용 무료 사용 가능, 상업 사용 가능, 원 저작물 변경 가능");
@@ -45,7 +45,7 @@ describe("photo request draft helpers", () => {
     }), "en");
 
     expect(draft.mode).toBe("photo");
-    expect(draft.title).toBe("winter landscape of Jirisan Cheonwangbong image sourcing request");
+    expect(draft.title).toBe("winter landscape of Jirisan Cheonwangbong image request");
     expect(draft.brief).toBe("winter landscape of Jirisan Cheonwangbong");
     expect(draft.brief).not.toContain("이미지 소싱 요청");
     expect(draft.usage_context).toBe("Review the same usage terms as the search filters: Free for education, Commercial use");

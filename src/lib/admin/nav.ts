@@ -60,6 +60,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/pricing", icon: "sell", label: "상품가격" },
       { href: "/admin/data-lifecycle", icon: "data_usage", label: "데이터 운영주기 관리" },
       { href: "/admin/notices", icon: "campaign", label: "공지사항" },
+      { href: "/admin/library-guidance", icon: "format_quote", label: "안내글 관리" },
     ],
   },
   {

@@ -13,8 +13,8 @@ type SourcingPurpose = "rights_check" | "similar_search" | "supply_check" | "con
 
 const CONTACT_PHOTO_COPY = {
   ko: {
-    tabs: { general: "일반 문의", photo: "이미지 소싱 요청" },
-    success: "이미지 소싱 요청이 접수되었습니다.",
+    tabs: { general: "일반 문의", photo: "이미지(사진)요청" },
+    success: "이미지(사진)요청이 접수되었습니다.",
     composeNew: "새로 작성",
     errors: {
       generalFailed: "문의 접수에 실패했습니다.",
@@ -30,7 +30,7 @@ const CONTACT_PHOTO_COPY = {
       link: "로그인하러 가기",
     },
     introTitle: "필요한 이미지를 편하게 설명해주세요.",
-    introBody: "담당자가 후보 이미지, 권리 확인 가능성, 필요한 경우 촬영 의뢰 가능성을 검토해 답변합니다.",
+    introBody: "필요한 이미지에 대해 최대한 알려주세요! 저희가 유사 이미지 서치, 권리 확인, 촬영 가능여부까지 종합적으로 검토해드립니다.",
     fields: {
       title: "요청 제목",
       titlePlaceholder: "예: 백제 금동대향로 사진 후보 요청",
@@ -53,7 +53,7 @@ const CONTACT_PHOTO_COPY = {
       referenceNoteHelp: "참고자료에서 따라가야 할 점과 피해야 할 점을 적어주세요.",
       purposes: "참고자료를 어떻게 활용하면 될까요?",
       advanced: "알고 있다면 추가 입력",
-      submit: "이미지 소싱 요청 접수",
+      submit: "이미지(사진)요청 접수",
     },
     purposes: [
       { value: "rights_check", label: "이 이미지와 완전히 같은 사진의 권리 확인이 필요합니다" },
@@ -69,7 +69,7 @@ const CONTACT_PHOTO_COPY = {
     ] as const,
   },
   en: {
-    tabs: { general: "General inquiry", photo: "Image sourcing request" },
+    tabs: { general: "General inquiry", photo: "Image (photo) request" },
     success: "Your image sourcing request has been received.",
     composeNew: "Write another",
     errors: {
@@ -530,9 +530,10 @@ function ContactPageContent() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.phone}</label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.phone} <span className="text-error">*</span></label>
                   <input
                     type="tel"
+                    required
                     value={photoForm.requester_phone}
                     onChange={setPhoto("requester_phone")}
                     placeholder={photoCopy.fields.phonePlaceholder}

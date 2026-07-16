@@ -55,6 +55,10 @@ export async function GET(req: NextRequest) {
   const educationFreeOnly = searchParams.get("educationFree") === "true";
   const commercialOnly = searchParams.get("commercial") === "true";
   const derivativesOnly = searchParams.get("derivatives") === "true";
+  const orientation = searchParams.get("orientation") ?? "all";
+  if (!["all", "landscape", "portrait", "square"].includes(orientation)) {
+    return NextResponse.json({ error: "orientation is not supported" }, { status: 400 });
+  }
   const hasUsageFilters = freeOnly || educationFreeOnly || commercialOnly || derivativesOnly;
 
   const supabase = createAdminClient();
@@ -84,6 +88,10 @@ export async function GET(req: NextRequest) {
 
   if (query) {
     q = q.textSearch("fts", query, { type: "plain" });
+  }
+
+  if (orientation !== "all") {
+    q = q.eq("orientation_class", orientation);
   }
 
   if (educationFreeOnly) {

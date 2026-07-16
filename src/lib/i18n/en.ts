@@ -261,7 +261,7 @@ export const en: Translations = {
     hero: {
       headline: "EXPLORE THE ARCHIVE",
       sub: "Curated imagery for the world's leading publishers",
-      searchPlaceholder: "Search by keyword, subject, or photographer…",
+      searchPlaceholder: "Keyword, subject",
     },
     stats: { assets: "1.2M+ Assets", photographers: "4,800+ Photographers", countries: "40+ Countries" },
     categories: {

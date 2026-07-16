@@ -17,6 +17,8 @@ const TOP_NAV_COPY = {
     darkMode: "다크 모드",
     mobileMenu: "모바일 메뉴",
     logout: "로그아웃",
+    photoRequest: "사진요청",
+    photoRequestHint: "원하는 이미지가 없다면?",
   },
   en: {
     notices: "Notices",
@@ -25,6 +27,8 @@ const TOP_NAV_COPY = {
     darkMode: "Dark mode",
     mobileMenu: "Mobile menu",
     logout: "Log out",
+    photoRequest: "Photo request",
+    photoRequestHint: "Can't find the right image?",
   },
 } as const;
 
@@ -73,6 +77,7 @@ export function TopNavBar() {
 
   const NAV_LINKS = [
     { href: "/library", label: t.nav.library },
+    { href: "/contact?mode=photo", label: copy.photoRequest, highlight: true },
     { href: "/notices", label: copy.notices },
     { href: "/about",   label: t.nav.company },
   ];
@@ -97,19 +102,23 @@ export function TopNavBar() {
 
         {/* Nav links */}
         <div className="hidden md:flex items-center gap-10">
-          {NAV_LINKS.map(({ href, label }) => {
-            const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+          {NAV_LINKS.map(({ href, label, highlight }) => {
+            const baseHref = href.split("?")[0];
+            const isActive = pathname === baseHref || (baseHref !== "/" && pathname.startsWith(baseHref));
             return (
               <Link
                 key={href}
                 href={href}
                 className={cn(
-                  "text-sm font-medium transition-all duration-200 pb-1",
-                  isActive
+                  "relative text-sm font-medium transition-all duration-200 pb-1",
+                  highlight
+                    ? "rounded-full bg-primary-container px-4 py-2 font-extrabold text-on-primary-container shadow-sm hover:-translate-y-0.5"
+                    : isActive
                     ? "text-primary border-b-2 border-primary"
                     : "text-on-surface-variant hover:text-on-surface"
                 )}
               >
+                {highlight && <span className="absolute -top-5 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded-full bg-on-surface px-2 py-0.5 text-[9px] font-bold text-surface shadow-sm lg:block after:absolute after:left-1/2 after:top-full after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-on-surface">{copy.photoRequestHint}</span>}
                 {label}
               </Link>
             );
@@ -240,8 +249,9 @@ export function TopNavBar() {
       {mobileMenuOpen && (
         <div className="border-t border-outline-variant/20 bg-surface/98 px-4 py-3 shadow-ghost backdrop-blur-md md:hidden">
           <div className="flex flex-col gap-1">
-            {NAV_LINKS.map(({ href, label }) => {
-              const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+            {NAV_LINKS.map(({ href, label, highlight }) => {
+              const baseHref = href.split("?")[0];
+              const isActive = pathname === baseHref || (baseHref !== "/" && pathname.startsWith(baseHref));
               return (
                 <Link
                   key={href}
@@ -249,7 +259,7 @@ export function TopNavBar() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex h-11 items-center justify-between rounded-lg px-3 text-sm font-semibold transition-colors",
-                    isActive ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-surface-container-low"
+                    highlight ? "bg-primary-container text-on-primary-container" : isActive ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-surface-container-low"
                   )}
                 >
                   {label}

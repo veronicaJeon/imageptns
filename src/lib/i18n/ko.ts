@@ -59,7 +59,7 @@ export const ko: Translations = {
     hero: {
       headline: "아카이브 탐색",
       sub: "퍼블리셔를 위한 정확한 이미지",
-      searchPlaceholder: "키워드, 주제 또는 사진작가 검색…",
+      searchPlaceholder: "키워드, 주제",
     },
     stats: { assets: "120만+ 에셋", photographers: "4,800+ 사진작가", countries: "40+ 국가" },
     categories: {

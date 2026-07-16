@@ -133,6 +133,7 @@ describe("normalizeContactSubmissionInput", () => {
       subject: "Rooftop campaign",
       message: "Need bright Seoul rooftop lifestyle images with morning light.",
       requester_organization: " Image Partners Books ",
+      requester_phone: "010-1234-5678",
       usage_project: " Middle school history workbook ",
       usage_context: " Opening spread about modern Seoul lifestyles ",
       deadline_at: "2026-06-10T09:00:00.000Z",
@@ -158,7 +159,7 @@ describe("normalizeContactSubmissionInput", () => {
       reference_note: "Use the composition only.",
       non_copying_attested: false,
       requester_organization: "Image Partners Books",
-      requester_phone: null,
+      requester_phone: "010-1234-5678",
       usage_project: "Middle school history workbook",
       usage_context: "Opening spread about modern Seoul lifestyles",
       buyer_id: null,
@@ -177,6 +178,7 @@ describe("normalizeContactSubmissionInput", () => {
       subject: "Rooftop campaign",
       message: "Need bright Seoul rooftop lifestyle images with morning light.",
       requester_organization: "",
+      requester_phone: "010-1234-5678",
       usage_project: "Middle school history workbook",
       usage_context: "Chapter opener",
       deadline_at: "2026-06-10T09:00:00.000Z",
@@ -189,6 +191,7 @@ describe("normalizeContactSubmissionInput", () => {
       subject: "Rooftop campaign",
       message: "Need bright Seoul rooftop lifestyle images with morning light.",
       requester_organization: "",
+      requester_phone: "010-1234-5678",
       usage_project: "",
       usage_context: "Chapter opener",
       deadline_at: "2026-06-10T09:00:00.000Z",
@@ -203,6 +206,7 @@ describe("normalizeContactSubmissionInput", () => {
       subject: "Rooftop campaign",
       message: "Need bright Seoul rooftop lifestyle images with morning light.",
       requester_organization: "Image Partners Books",
+      requester_phone: "010-1234-5678",
       usage_project: "Middle school history workbook",
       usage_context: "Chapter opener",
       deadline_at: "2026-06-10T09:00:00.000Z",
@@ -219,6 +223,7 @@ describe("normalizeContactSubmissionInput", () => {
 describe("validatePhotoRequestBuyerFields", () => {
   const base = {
     requester_organization: "Image Partners Books",
+    requester_phone: "010-1234-5678",
     usage_project: "중학교 한국사 보조교재",
     usage_context: "백제 문화 설명 본문 옆 삽입 이미지",
     deadline_at: "2026-06-10T23:59:59.000Z",
@@ -241,9 +246,10 @@ describe("validatePhotoRequestBuyerFields", () => {
     }, NOW)).toBe("사용 프로젝트를 입력해주세요. 예: 중학교 한국사 보조교재, 전시 리플렛, 단행본 개정판");
   });
 
-  it("validates an optional requester phone number", () => {
+  it("requires and validates a requester phone number", () => {
     expect(validatePhotoRequestBuyerFields({ ...base, requester_phone: "010-1234-5678" }, NOW)).toBeNull();
-    expect(validatePhotoRequestBuyerFields({ ...base, requester_phone: "123" }, NOW)).toBe("연락처는 숫자 7~15자리의 전화번호 형식으로 입력해주세요.");
+    expect(validatePhotoRequestBuyerFields({ ...base, requester_phone: "" }, NOW)).toBe("휴대전화번호를 입력해주세요. 숫자 7~15자리의 전화번호 형식이어야 합니다.");
+    expect(validatePhotoRequestBuyerFields({ ...base, requester_phone: "123" }, NOW)).toBe("휴대전화번호를 입력해주세요. 숫자 7~15자리의 전화번호 형식이어야 합니다.");
   });
 
   it("explains deadline and usage context validation in Korean", () => {

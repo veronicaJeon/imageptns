@@ -17,6 +17,7 @@ describe("admin navigation groups", () => {
       "/admin/pricing",
       "/admin/data-lifecycle",
       "/admin/notices",
+      "/admin/library-guidance",
     ]);
   });
 
