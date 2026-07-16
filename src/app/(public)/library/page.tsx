@@ -77,10 +77,7 @@ export default function LibraryPage() {
   const [commercialOnly, setCommercialOnly] = useState(false);
   const [derivativesOnly, setDerivativesOnly] = useState(false);
   const [images, setImages]           = useState<ImageCardData[]>([]);
-  const [offset, setOffset]           = useState(0);
-  const [hasMore, setHasMore]         = useState(true);
   const [loading, setLoading]         = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [guidance, setGuidance]       = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -88,9 +85,6 @@ export default function LibraryPage() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const blurTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sentinelRef   = useRef<HTMLDivElement | null>(null);
-  const observerRef   = useRef<IntersectionObserver | null>(null);
-  const isFetchingRef = useRef(false); // prevents concurrent fetches
   const requestSeqRef = useRef(0);
 
   useEffect(() => {
@@ -132,22 +126,12 @@ export default function LibraryPage() {
     return () => clearTimeout(t);
   }, [query]);
 
-  // Fetch a single page of images
-  const fetchPage = useCallback(async (currentOffset: number, replace: boolean) => {
-    if (!replace && isFetchingRef.current) return;
-
+  const fetchImages = useCallback(async () => {
     const requestSeq = ++requestSeqRef.current;
-    isFetchingRef.current = true;
-
-    if (replace) {
-      setLoading(true);
-      setLoadingMore(false);
-    } else {
-      setLoadingMore(true);
-    }
+    setLoading(true);
 
     try {
-      const params = new URLSearchParams({ sort, limit: String(pageSize), offset: String(currentOffset), orientation });
+      const params = new URLSearchParams({ sort, limit: String(pageSize), offset: "0", orientation });
       if (category !== "all") params.set("category", category);
       if (debouncedQuery)     params.set("query", debouncedQuery);
       if (freeOnly) params.set("free", "true");
@@ -157,54 +141,24 @@ export default function LibraryPage() {
 
       const res = await fetch(`/api/images?${params}`);
       if (!res.ok) throw new Error();
-      const { images: data, hasMore: more } = await res.json();
+      const { images: data } = await res.json();
 
       if (requestSeq !== requestSeqRef.current) return;
 
-      setImages((prev) => replace ? (data ?? []) : [...prev, ...(data ?? [])]);
-      setHasMore(!!more);
-      setOffset(currentOffset + pageSize);
+      setImages((data ?? []).slice(0, pageSize));
     } catch {
       if (requestSeq !== requestSeqRef.current) return;
-
-      if (replace) setImages([]);
+      setImages([]);
     } finally {
       if (requestSeq === requestSeqRef.current) {
-        if (replace) {
-          setLoading(false);
-          setLoadingMore(false);
-        } else {
-          setLoadingMore(false);
-        }
-        isFetchingRef.current = false;
+        setLoading(false);
       }
     }
   }, [category, sort, orientation, pageSize, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly]);
 
-  // Reset whenever filters change
   useEffect(() => {
-    setOffset(0);
-    setHasMore(true);
-    fetchPage(0, true);
+    fetchImages();
   }, [category, sort, orientation, pageSize, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // IntersectionObserver: fires when the sentinel enters the viewport
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect();
-
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isFetchingRef.current) {
-          fetchPage(offset, false);
-        }
-      },
-      { rootMargin: "300px" }
-    );
-
-    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
-
-    return () => observerRef.current?.disconnect();
-  }, [hasMore, offset, fetchPage]);
 
   function handleCategoryChange(key: string) {
     setCategory(key);
@@ -232,15 +186,19 @@ export default function LibraryPage() {
 
   return (
     <>
-      <section className="bg-surface px-4 pb-8 pt-28 md:px-8 md:pb-10 md:pt-36">
+      <section className="bg-surface px-4 pb-6 pt-28 md:px-8 md:pb-8 md:pt-36">
         <div className="mx-auto max-w-6xl text-center">
           <h1 className="font-headline text-4xl md:text-6xl font-extrabold text-on-surface mb-4">
             {l.hero.headline}
           </h1>
-          <p className="mb-8 text-lg text-on-surface-variant">{guidance || l.hero.sub}</p>
+          <p className="text-lg text-on-surface-variant">{guidance || l.hero.sub}</p>
+        </div>
+      </section>
 
-          <div className="grid grid-cols-1 items-stretch gap-2 md:grid-cols-[160px_minmax(0,1fr)_220px]">
-            <label className="flex h-14 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-4 text-left md:h-16">
+      <div data-testid="library-sticky-controls" className="sticky top-16 z-40 border-b border-outline-variant/20 bg-surface/95 shadow-sm backdrop-blur-md md:top-20">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 md:px-8 md:py-4">
+          <div className="grid grid-cols-2 items-stretch gap-2 md:grid-cols-[160px_minmax(0,1fr)_220px]">
+            <label className="flex h-11 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-4 text-left md:h-16">
               <span className="material-symbols-outlined text-xl text-outline">swap_vert</span>
               <span className="sr-only">{l.sort.label}</span>
               <select value={sort} onChange={(event) => setSort(event.target.value as SortKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={l.sort.label}>
@@ -248,7 +206,7 @@ export default function LibraryPage() {
               </select>
             </label>
 
-            <div className="relative">
+            <div className="relative order-first col-span-2 md:order-none md:col-span-1">
               <div className="relative overflow-hidden rounded-lg border border-outline-variant/60 bg-surface-container-low shadow-ghost ring-1 ring-black/5 transition-colors focus-within:border-primary/60 focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary/20">
                 <span className="material-symbols-outlined pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-2xl text-outline">search</span>
                 <input type="text" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={l.hero.searchPlaceholder} className="h-14 w-full bg-transparent pl-14 pr-12 text-base text-on-surface placeholder:text-outline outline-none md:h-16" onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }} onBlur={() => { blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 150); }} onKeyDown={(event) => { if (event.key === "Escape") setShowSuggestions(false); }} />
@@ -257,7 +215,7 @@ export default function LibraryPage() {
               {showSuggestions && suggestions.length > 0 && <ul className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg bg-white shadow-lg">{suggestions.map((suggestion) => <li key={suggestion}><button className="w-full px-5 py-2.5 text-left text-sm hover:bg-surface-container-low" onMouseDown={() => { if (blurTimerRef.current) clearTimeout(blurTimerRef.current); setQuery(suggestion); setShowSuggestions(false); }}>{suggestion}</button></li>)}</ul>}
             </div>
 
-            <label className="flex h-14 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-4 text-left md:h-16">
+            <label className="flex h-11 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-4 text-left md:h-16">
               <span className="material-symbols-outlined text-xl text-outline">crop_rotate</span>
               <span className="sr-only">{copy.orientation}</span>
               <select value={orientation} onChange={(event) => setOrientation(event.target.value as OrientationKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={copy.orientation}>
@@ -266,16 +224,12 @@ export default function LibraryPage() {
             </label>
           </div>
 
-          <div className="mt-4 flex flex-wrap justify-center gap-2" aria-label="카테고리">
-            {categoryOptions.map((item) => <CategoryPill key={item.code} label={item.label} active={category === item.code} onClick={() => handleCategoryChange(item.code)} />)}
+          <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 md:justify-center" aria-label="카테고리">
+            {categoryOptions.map((item) => <CategoryPill key={item.code} label={item.label} active={category === item.code} onClick={() => handleCategoryChange(item.code)} className="shrink-0" />)}
           </div>
-        </div>
-      </section>
 
-      <div className="sticky top-16 z-40 border-b border-outline-variant/20 bg-surface/95 backdrop-blur-md md:top-20 md:bg-surface/80">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 md:px-8">
           <div className="flex items-center justify-between gap-2 md:hidden">
-            <span className="text-xs font-medium text-outline">{loading ? "…" : `${images.length}${hasMore ? "+" : ""}`} {l.results}</span>
+            <span className="text-xs font-medium text-outline">{loading ? "…" : images.length} {l.results}</span>
             <button type="button" onClick={() => setMobileFiltersOpen((value) => !value)} className={`relative inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-bold ${mobileFiltersOpen || activeFilterCount > 0 ? "border-primary bg-primary/10 text-primary" : "border-outline-variant"}`} aria-expanded={mobileFiltersOpen}><span className="material-symbols-outlined text-base">tune</span>{copy.filter}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button>
           </div>
 
@@ -292,7 +246,7 @@ export default function LibraryPage() {
               <div className="ml-auto flex items-center gap-2">
                 <span className="text-xs font-semibold text-outline">{copy.pageSize}</span>
                 <div className="flex rounded-full bg-surface-container-low p-1">{PAGE_SIZE_OPTIONS.map((size) => <button key={size} type="button" onClick={() => setPageSize(size)} className={`h-7 min-w-9 rounded-full px-2 text-xs font-bold ${pageSize === size ? "bg-primary text-white" : "text-on-surface-variant"}`}>{size}</button>)}</div>
-                <span className="hidden text-xs text-outline md:inline">{loading ? "…" : `${images.length}${hasMore ? "+" : ""}`} {l.results}</span>
+                <span className="hidden text-xs text-outline md:inline">{loading ? "…" : images.length} {l.results}</span>
               </div>
             </div>
           </div>
@@ -314,35 +268,16 @@ export default function LibraryPage() {
                 <p className="text-base">{l.noResults}</p>
               </div>
             ) : (
-              <>
-                <MasonryGrid>
-                  {images.map((img) => (
-                    <Link key={img.id} href={`/library/${img.id}`}>
-                      <ImageCard
-                        image={img}
-                        className="mb-4 break-inside-avoid"
-                      />
-                    </Link>
-                  ))}
-                </MasonryGrid>
-
-                {/* Sentinel — IntersectionObserver target */}
-                <div ref={sentinelRef} className="h-px" />
-
-                {/* Loading more spinner */}
-                {loadingMore && (
-                  <div className="flex justify-center py-12">
-                    <span className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
-
-                {/* End of results */}
-                {!hasMore && images.length > 0 && (
-                  <p className="text-center text-xs text-outline py-12">
-                    — {images.length} {l.results} —
-                  </p>
-                )}
-              </>
+              <MasonryGrid>
+                {images.map((img) => (
+                  <Link key={img.id} href={`/library/${img.id}`}>
+                    <ImageCard
+                      image={img}
+                      className="mb-4 break-inside-avoid"
+                    />
+                  </Link>
+                ))}
+              </MasonryGrid>
             )}
           </div>
           <AdRail side="right" />

@@ -76,10 +76,10 @@ export function TopNavBar() {
   }
 
   const NAV_LINKS = [
-    { href: "/library", label: t.nav.library },
-    { href: "/contact?mode=photo", label: copy.photoRequest, highlight: true },
-    { href: "/notices", label: copy.notices },
     { href: "/about",   label: t.nav.company },
+    { href: "/library", label: t.nav.library },
+    { href: "/notices", label: copy.notices },
+    { href: "/contact?mode=photo", label: copy.photoRequest, highlight: true },
   ];
 
   return (
@@ -110,16 +110,19 @@ export function TopNavBar() {
                 key={href}
                 href={href}
                 className={cn(
-                  "relative text-sm font-medium transition-all duration-200 pb-1",
+                  "relative pb-1 text-sm font-medium leading-5 transition-colors duration-200",
                   highlight
-                    ? "rounded-full bg-primary-container px-4 py-2 font-extrabold text-on-primary-container shadow-sm hover:-translate-y-0.5"
+                    ? "font-extrabold text-primary hover:text-primary/80"
                     : isActive
                     ? "text-primary border-b-2 border-primary"
                     : "text-on-surface-variant hover:text-on-surface"
                 )}
               >
-                {highlight && <span className="absolute -top-5 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded-full bg-on-surface px-2 py-0.5 text-[9px] font-bold text-surface shadow-sm lg:block after:absolute after:left-1/2 after:top-full after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-on-surface">{copy.photoRequestHint}</span>}
-                {label}
+                {highlight && <span className="absolute bottom-[calc(100%+7px)] left-1/2 hidden -translate-x-1/2 whitespace-nowrap text-[9px] font-bold leading-none text-primary/80 lg:block">{copy.photoRequestHint}</span>}
+                <span className="inline-flex items-center gap-1.5">
+                  {label}
+                  {highlight && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />}
+                </span>
               </Link>
             );
           })}
@@ -259,10 +262,13 @@ export function TopNavBar() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex h-11 items-center justify-between rounded-lg px-3 text-sm font-semibold transition-colors",
-                    highlight ? "bg-primary-container text-on-primary-container" : isActive ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-surface-container-low"
+                    highlight ? "text-primary" : isActive ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-surface-container-low"
                   )}
                 >
-                  {label}
+                  <span className="inline-flex items-center gap-2">
+                    {label}
+                    {highlight && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />}
+                  </span>
                   <span className="material-symbols-outlined text-base text-outline">chevron_right</span>
                 </Link>
               );
