@@ -119,10 +119,7 @@ export function TopNavBar() {
                 )}
               >
                 {highlight && <span className="absolute bottom-[calc(100%+7px)] left-1/2 hidden -translate-x-1/2 whitespace-nowrap text-[9px] font-bold leading-none text-primary/80 lg:block">{copy.photoRequestHint}</span>}
-                <span className="inline-flex items-center gap-1.5">
-                  {label}
-                  {highlight && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />}
-                </span>
+                <span>{label}</span>
               </Link>
             );
           })}
@@ -265,11 +262,11 @@ export function TopNavBar() {
                     highlight ? "text-primary" : isActive ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-surface-container-low"
                   )}
                 >
-                  <span className="inline-flex items-center gap-2">
-                    {label}
-                    {highlight && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />}
+                  <span>{label}</span>
+                  <span className="ml-auto inline-flex min-w-0 items-center gap-2 pl-3">
+                    {highlight && <span className="truncate text-[10px] font-medium text-primary/70">{copy.photoRequestHint}</span>}
+                    <span className="material-symbols-outlined shrink-0 text-base text-outline">chevron_right</span>
                   </span>
-                  <span className="material-symbols-outlined text-base text-outline">chevron_right</span>
                 </Link>
               );
             })}
