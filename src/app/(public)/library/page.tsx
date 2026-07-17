@@ -9,6 +9,7 @@ import { CategoryPill } from "@/components/ui/CategoryPill";
 import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
 
 const PAGE_SIZE_OPTIONS = [20, 40, 60] as const;
+const FILTER_PANEL_STORAGE_KEY = "imagepartners.library.filters-collapsed";
 
 const SORT_KEYS = ["newest", "popular", "relevant"] as const;
 type SortKey = typeof SORT_KEYS[number];
@@ -37,12 +38,16 @@ const LIBRARY_PAGE_COPY = {
     orientation: "방향",
     orientations: { all: "전체", landscape: "가로", portrait: "세로", square: "정사각형" },
     pageSize: "표시 수",
+    collapseFilters: "필터 영역 접기",
+    expandFilters: "필터 영역 펼치기",
   },
   en: {
     filter: "Filters",
     orientation: "Orientation",
     orientations: { all: "All", landscape: "Landscape", portrait: "Portrait", square: "Square" },
     pageSize: "Per load",
+    collapseFilters: "Collapse filters",
+    expandFilters: "Expand filters",
   },
 } as const;
 
@@ -83,9 +88,18 @@ export default function LibraryPage() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
 
   const blurTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestSeqRef = useRef(0);
+
+  useEffect(() => {
+    try {
+      setFiltersCollapsed(localStorage.getItem(FILTER_PANEL_STORAGE_KEY) === "true");
+    } catch {
+      // Keep the default expanded state when browser storage is unavailable.
+    }
+  }, []);
 
   useEffect(() => {
     fetch(`/api/library-guidance?lang=${lang}&refresh=${Date.now()}`, { cache: "no-store" })
@@ -165,6 +179,18 @@ export default function LibraryPage() {
     setShowSuggestions(false);
   }
 
+  function toggleFilterPanel() {
+    setFiltersCollapsed((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem(FILTER_PANEL_STORAGE_KEY, String(next));
+      } catch {
+        // The toggle still works for the current page when storage is unavailable.
+      }
+      return next;
+    });
+  }
+
   const activeFilterCount = [
     category !== "all",
     orientation !== "all",
@@ -196,8 +222,8 @@ export default function LibraryPage() {
       </section>
 
       <div data-testid="library-sticky-controls" className="sticky top-16 z-40 border-b border-outline-variant/20 bg-surface/95 shadow-sm backdrop-blur-md md:top-20">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 md:px-8 md:py-4">
-          <div className="grid grid-cols-2 items-stretch gap-2 md:grid-cols-[160px_minmax(0,1fr)_220px]">
+        <div className="mx-auto max-w-7xl px-4 py-3 md:px-8 md:py-4">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] items-stretch gap-2 md:grid-cols-[160px_minmax(0,1fr)_220px_48px]">
             <label className="flex h-11 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-4 text-left md:h-16">
               <span className="material-symbols-outlined text-xl text-outline">swap_vert</span>
               <span className="sr-only">{l.sort.label}</span>
@@ -222,31 +248,54 @@ export default function LibraryPage() {
                 {(Object.keys(copy.orientations) as OrientationKey[]).map((key) => <option key={key} value={key}>{copy.orientations[key]}</option>)}
               </select>
             </label>
+
+            <button
+              type="button"
+              onClick={toggleFilterPanel}
+              className="order-2 inline-flex h-14 items-center justify-center rounded-lg border border-outline-variant/60 bg-surface-container-low text-on-surface-variant transition-colors hover:border-primary/40 hover:bg-surface-container-high hover:text-primary md:order-none md:h-16"
+              aria-expanded={!filtersCollapsed}
+              aria-controls="library-secondary-filters"
+              aria-label={filtersCollapsed ? copy.expandFilters : copy.collapseFilters}
+              title={filtersCollapsed ? copy.expandFilters : copy.collapseFilters}
+            >
+              <span className="material-symbols-outlined text-xl" aria-hidden="true">{filtersCollapsed ? "expand_more" : "expand_less"}</span>
+            </button>
           </div>
 
-          <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 md:justify-center" aria-label="카테고리">
-            {categoryOptions.map((item) => <CategoryPill key={item.code} label={item.label} active={category === item.code} onClick={() => handleCategoryChange(item.code)} className="shrink-0" />)}
-          </div>
+          <div
+            id="library-secondary-filters"
+            className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-300 ease-out ${filtersCollapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"}`}
+            aria-hidden={filtersCollapsed}
+            inert={filtersCollapsed ? true : undefined}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div className="flex flex-col gap-3 pt-3">
+                <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 md:justify-center" aria-label="카테고리">
+                  {categoryOptions.map((item) => <CategoryPill key={item.code} label={item.label} active={category === item.code} onClick={() => handleCategoryChange(item.code)} className="shrink-0" />)}
+                </div>
 
-          <div className="flex items-center justify-between gap-2 md:hidden">
-            <span className="text-xs font-medium text-outline">{loading ? "…" : images.length} {l.results}</span>
-            <button type="button" onClick={() => setMobileFiltersOpen((value) => !value)} className={`relative inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-bold ${mobileFiltersOpen || activeFilterCount > 0 ? "border-primary bg-primary/10 text-primary" : "border-outline-variant"}`} aria-expanded={mobileFiltersOpen}><span className="material-symbols-outlined text-base">tune</span>{copy.filter}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button>
-          </div>
+                <div className="flex items-center justify-between gap-2 md:hidden">
+                  <span className="text-xs font-medium text-outline">{loading ? "…" : images.length} {l.results}</span>
+                  <button type="button" onClick={() => setMobileFiltersOpen((value) => !value)} className={`relative inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-bold ${mobileFiltersOpen || activeFilterCount > 0 ? "border-primary bg-primary/10 text-primary" : "border-outline-variant"}`} aria-expanded={mobileFiltersOpen}><span className="material-symbols-outlined text-base">tune</span>{copy.filter}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button>
+                </div>
 
-          <div className={`${mobileFiltersOpen ? "flex" : "hidden"} flex-col gap-3 md:flex`}>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-outline">{usageLabels.title}</span>
-              {usageFilters.map((filter) => (
-                <label key={filter.label} className={`flex h-8 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-bold ${filter.checked ? "border-primary bg-primary/10 text-primary" : "border-outline-variant bg-surface-container-low text-on-surface-variant"}`}>
-                  <input type="checkbox" checked={filter.checked} onChange={(event) => filter.onChange(event.target.checked)} className="sr-only" />
-                  <span className="material-symbols-outlined text-sm">{filter.icon}</span>
-                  {filter.label}
-                </label>
-              ))}
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-xs font-semibold text-outline">{copy.pageSize}</span>
-                <div className="flex rounded-full bg-surface-container-low p-1">{PAGE_SIZE_OPTIONS.map((size) => <button key={size} type="button" onClick={() => setPageSize(size)} className={`h-7 min-w-9 rounded-full px-2 text-xs font-bold ${pageSize === size ? "bg-primary text-white" : "text-on-surface-variant"}`}>{size}</button>)}</div>
-                <span className="hidden text-xs text-outline md:inline">{loading ? "…" : images.length} {l.results}</span>
+                <div className={`${mobileFiltersOpen ? "flex" : "hidden"} flex-col gap-3 md:flex`}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-outline">{usageLabels.title}</span>
+                    {usageFilters.map((filter) => (
+                      <label key={filter.label} className={`flex h-8 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-bold ${filter.checked ? "border-primary bg-primary/10 text-primary" : "border-outline-variant bg-surface-container-low text-on-surface-variant"}`}>
+                        <input type="checkbox" checked={filter.checked} onChange={(event) => filter.onChange(event.target.checked)} className="sr-only" />
+                        <span className="material-symbols-outlined text-sm">{filter.icon}</span>
+                        {filter.label}
+                      </label>
+                    ))}
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="text-xs font-semibold text-outline">{copy.pageSize}</span>
+                      <div className="flex rounded-full bg-surface-container-low p-1">{PAGE_SIZE_OPTIONS.map((size) => <button key={size} type="button" onClick={() => setPageSize(size)} className={`h-7 min-w-9 rounded-full px-2 text-xs font-bold ${pageSize === size ? "bg-primary text-white" : "text-on-surface-variant"}`}>{size}</button>)}</div>
+                      <span className="hidden text-xs text-outline md:inline">{loading ? "…" : images.length} {l.results}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

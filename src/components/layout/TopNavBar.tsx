@@ -110,15 +110,15 @@ export function TopNavBar() {
                 key={href}
                 href={href}
                 className={cn(
-                  "relative pb-1 text-sm font-medium leading-5 transition-colors duration-200",
+                  "group relative pb-1 text-sm font-medium leading-5 transition-colors duration-200",
                   highlight
-                    ? "font-extrabold text-primary hover:text-primary/80"
+                    ? "font-extrabold text-primary hover:text-primary-highlight"
                     : isActive
                     ? "text-primary border-b-2 border-primary"
                     : "text-on-surface-variant hover:text-on-surface"
                 )}
               >
-                {highlight && <span className="absolute bottom-[calc(100%+7px)] left-1/2 hidden -translate-x-1/2 whitespace-nowrap text-[9px] font-bold leading-none text-primary/80 lg:block">{copy.photoRequestHint}</span>}
+                {highlight && <span className="absolute bottom-[calc(100%+7px)] left-1/2 hidden -translate-x-1/2 whitespace-nowrap text-[9px] font-bold leading-none text-primary transition-colors group-hover:text-primary-highlight lg:block">{copy.photoRequestHint}</span>}
                 <span>{label}</span>
               </Link>
             );
@@ -259,12 +259,12 @@ export function TopNavBar() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex h-11 items-center justify-between rounded-lg px-3 text-sm font-semibold transition-colors",
-                    highlight ? "text-primary" : isActive ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-surface-container-low"
+                    highlight ? "group text-primary hover:text-primary-highlight" : isActive ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-surface-container-low"
                   )}
                 >
                   <span>{label}</span>
                   <span className="ml-auto inline-flex min-w-0 items-center gap-2 pl-3">
-                    {highlight && <span className="truncate text-[10px] font-medium text-primary/70">{copy.photoRequestHint}</span>}
+                    {highlight && <span className="truncate text-[10px] font-medium text-primary/70 transition-colors group-hover:text-primary-highlight">{copy.photoRequestHint}</span>}
                     <span className="material-symbols-outlined shrink-0 text-base text-outline">chevron_right</span>
                   </span>
                 </Link>

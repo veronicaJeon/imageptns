@@ -11,6 +11,7 @@
 @theme {
   /* ── Colors ── */
   --color-primary:            #006d31;
+  --color-primary-highlight:  #00a84f;
   --color-primary-container:  #00ff7b;
   --color-on-primary:         #ffffff;
   --color-on-primary-container: #002110;
@@ -95,6 +96,7 @@
 
   /* primary / accent는 유지 */
   --color-primary:           #00c957;
+  --color-primary-highlight: #00ff7b;
   --color-primary-container: #00ff7b;
 }
 
