@@ -7,6 +7,8 @@ import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
 import { useCart } from "@/lib/store/cart";
 
+const ONCHAIN_ENABLED = process.env.NEXT_PUBLIC_ONCHAIN_ENABLED === "true";
+
 function StatCard({ icon, label, value, color, href }: { icon: string; label: string; value: string; color: string; href?: string }) {
   const content = (
     <div className={`bg-surface-container-lowest p-6 shadow-ghost flex flex-col gap-3 ${href ? "hover:bg-surface-container-low transition-colors cursor-pointer" : ""}`}>
@@ -284,6 +286,7 @@ export default function DashboardPage() {
             <StatCard icon="pending"      label={d.statPending}  value={String(photographerStats?.pending_review_count ?? 0)}       color="bg-amber-50 text-amber-400 dark:bg-amber-900/20" href="/dashboard/uploads" />
           </div>
 
+          {ONCHAIN_ENABLED && <>
           <p className="text-xs text-outline uppercase tracking-widest font-bold mb-4">Onchain Settlement</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
             <StatCard
@@ -326,6 +329,7 @@ export default function DashboardPage() {
               )}
             </div>
           )}
+          </>}
 
           <p className="text-xs text-outline uppercase tracking-widest font-bold mb-4">{d.recentTitle}</p>
           {(stats?.recent ?? []).length === 0 ? (

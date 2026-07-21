@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeEventLog, decodeFunctionData, getAddress, isHex, type Address, type Hex } from "viem";
 import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
-import { getOnchainServerConfig } from "@/lib/onchain/env";
+import { getOnchainServerConfig, isOnchainEnabled } from "@/lib/onchain/env";
 import { recordOnchainEvent } from "@/lib/onchain/events";
 import { getOnchainPublicClient } from "@/lib/onchain/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -42,6 +42,10 @@ function decimalToUnits(value: number | string, decimals: number) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isOnchainEnabled()) {
+    return NextResponse.json({ error: "Onchain features are disabled" }, { status: 503 });
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

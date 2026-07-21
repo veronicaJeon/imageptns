@@ -12,6 +12,15 @@ interface StaleImageRow {
   photographer_id: string | null;
 }
 
+async function runRetentionCleanup(admin: ReturnType<typeof createAdminClient>) {
+  const { data, error } = await admin.rpc("run_data_retention_cleanup", { dry_run: false });
+  if (error) {
+    console.error("[auto-reject-stale] retention cleanup failed:", error.message);
+    return { ok: false as const };
+  }
+  return { ok: true as const, result: data };
+}
+
 export async function GET(request: Request) {
   const cronAuthorization = authorizeCronRequest(request.headers);
   if (!cronAuthorization.authorized) {
@@ -35,7 +44,8 @@ export async function GET(request: Request) {
 
   const staleImages = (stale ?? []) as StaleImageRow[];
   if (staleImages.length === 0) {
-    return NextResponse.json({ rejected: 0 });
+    const retention = await runRetentionCleanup(admin);
+    return NextResponse.json({ rejected: 0, retention });
   }
 
   const reason = "검토 기간(7일)이 초과되어 자동 거절되었습니다. 내용을 수정한 후 재제출해 주세요.";
@@ -78,5 +88,6 @@ export async function GET(request: Request) {
   }
 
   console.log(`[auto-reject-stale] rejected ${rejected} stale images`);
-  return NextResponse.json({ rejected });
+  const retention = await runRetentionCleanup(admin);
+  return NextResponse.json({ rejected, retention });
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
+import { isOnchainEnabled } from "@/lib/onchain/env";
 
 interface FeeOrderItemRow {
   image_id: string;
@@ -10,6 +11,10 @@ interface FeeOrderItemRow {
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isOnchainEnabled()) {
+    return NextResponse.json({ error: "Onchain features are disabled" }, { status: 503 });
+  }
+
   const { id } = await params;
 
   const supabase = await createClient();

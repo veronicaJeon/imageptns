@@ -29,6 +29,8 @@ const NAV_ITEMS_PHOTOGRAPHER: NavItem[] = [
   { href: "/dashboard/settings",  icon: "settings",         key: "settings"   },
 ];
 
+const ONCHAIN_ENABLED = process.env.NEXT_PUBLIC_ONCHAIN_ENABLED === "true";
+
 type DashboardUser = AuthUser | null;
 type DashboardMode = "buyer" | "photographer";
 
@@ -142,7 +144,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       : "buyer"
     : demoRole;
   const effectiveMode = user ? viewMode : demoRole;
-  const navItems = effectiveMode === "photographer" ? NAV_ITEMS_PHOTOGRAPHER : NAV_ITEMS_BUYER;
+  const navItems = (effectiveMode === "photographer" ? NAV_ITEMS_PHOTOGRAPHER : NAV_ITEMS_BUYER)
+    .filter((item) => ONCHAIN_ENABLED || item.key !== "blockchain");
 
   return (
     <div className="min-h-screen flex bg-surface-container-low">

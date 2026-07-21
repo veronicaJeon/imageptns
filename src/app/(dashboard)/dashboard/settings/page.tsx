@@ -41,6 +41,7 @@ interface PhotographerApplication {
 }
 
 const BASE_SEPOLIA_CHAIN_ID_HEX = "0x14a34";
+const ONCHAIN_ENABLED = process.env.NEXT_PUBLIC_ONCHAIN_ENABLED === "true";
 
 export default function SettingsPage() {
   const { t } = useLang();
@@ -154,7 +155,7 @@ export default function SettingsPage() {
           organization,
           phone_number: phoneNumber,
           bio,
-          wallet_address: walletAddress,
+          ...(ONCHAIN_ENABLED ? { wallet_address: walletAddress } : {}),
           ...(photographerStatus !== "none"
             ? { primary_activity_regions: activityRegions }
             : {}),
@@ -357,7 +358,7 @@ export default function SettingsPage() {
 
           {photographerStatus === "approved" && (
             <div className="flex flex-col gap-5">
-              <div className="flex flex-col gap-2">
+              {ONCHAIN_ENABLED && <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold text-outline uppercase tracking-widest">{s.regionsLabel}</label>
                 <textarea
                   value={activityRegions}
@@ -367,7 +368,7 @@ export default function SettingsPage() {
                   placeholder={s.regionsPlaceholder}
                 />
                 <p className="text-xs text-outline">{s.regionsHint}</p>
-              </div>
+              </div>}
 
               <div className="flex flex-col gap-2">
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-end">

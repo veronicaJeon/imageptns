@@ -28,7 +28,7 @@ describe("legal content helpers", () => {
     expect(privacy).toContain("명칭: 이미지파트너스");
     expect(privacy).toContain("Supabase, Inc.");
     expect(privacy).toContain("Mistral AI SAS");
-    expect(privacy).toContain("Groq, Inc.");
+    expect(privacy).not.toContain("Groq, Inc.");
     expect(privacy).not.toContain("Gemini AI");
     expect(privacy).not.toContain("Resend");
     expect(terms).toContain("별도 사업자정보 화면");

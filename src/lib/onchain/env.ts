@@ -59,7 +59,7 @@ function positiveNumberEnv(name: string, fallback: string): number {
 }
 
 export function getOnchainPublicConfig(): OnchainPublicConfig {
-  const enabled = process.env.NEXT_PUBLIC_ONCHAIN_ENABLED === "true";
+  const enabled = isOnchainEnabled();
   return {
     enabled,
     chainId: baseChainIdEnv("NEXT_PUBLIC_BASE_CHAIN_ID"),
@@ -67,6 +67,10 @@ export function getOnchainPublicConfig(): OnchainPublicConfig {
     usdcAddress: optionalAddress("NEXT_PUBLIC_USDC_ADDRESS"),
     escrowAddress: optionalAddress("NEXT_PUBLIC_IMAGEPARTNERS_ESCROW_ADDRESS"),
   };
+}
+
+export function isOnchainEnabled() {
+  return process.env.NEXT_PUBLIC_ONCHAIN_ENABLED === "true";
 }
 
 export function getOnchainServerConfig() {

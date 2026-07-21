@@ -6,7 +6,7 @@ import { calculateCommission, selectCommissionPolicy, type CommissionPolicy } fr
 import { createClient } from "@/lib/supabase/server";
 import { bigintToDecimalString, krwToUsdcAmount } from "@/lib/onchain/amounts";
 import { createOnchainConfirmToken } from "@/lib/onchain/checkout-auth";
-import { getOnchainServerConfig } from "@/lib/onchain/env";
+import { getOnchainServerConfig, isOnchainEnabled } from "@/lib/onchain/env";
 import { recordOnchainEvent } from "@/lib/onchain/events";
 import { orderBytes32 } from "@/lib/onchain/ids";
 import { createStaticKrwUsdcQuote } from "@/lib/onchain/quote";
@@ -58,6 +58,10 @@ function profileWallet(photographer: ImageRow["photographer"]) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isOnchainEnabled()) {
+    return NextResponse.json({ error: "Onchain checkout is disabled" }, { status: 503 });
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -10,6 +10,7 @@ import {
 } from "@/lib/onchain/registration-fee";
 import { recordOnchainEvent } from "@/lib/onchain/events";
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
+import { isOnchainEnabled } from "@/lib/onchain/env";
 
 interface FeeImageRow {
   id: string;
@@ -22,6 +23,10 @@ interface FeeImageRow {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isOnchainEnabled()) {
+    return NextResponse.json({ error: "Onchain features are disabled" }, { status: 503 });
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

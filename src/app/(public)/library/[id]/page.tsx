@@ -48,6 +48,7 @@ const IMAGE_DETAIL_COPY = {
 } as const;
 
 type LicenseKey = "editorial" | "commercial" | "extended";
+const COMMERCE_ENABLED = process.env.NEXT_PUBLIC_COMMERCE_ENABLED === "true";
 
 interface ImageDetailData {
   id: string;
@@ -329,6 +330,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
 
             {/* Actions */}
             <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+              {COMMERCE_ENABLED ? <>
               <button
                 onClick={handleBuyNow}
                 className="w-full rounded bg-on-surface px-4 py-4 text-xs font-bold uppercase tracking-widest text-surface transition-all flex items-center justify-center gap-2 hover:opacity-90"
@@ -350,6 +352,15 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
                 </span>
                 {cartFeedback === "added" ? copy.cartAdded : d.addToCart}
               </button>
+              </> : (
+                <Link
+                  href="/contact?mode=photo"
+                  className="flex w-full items-center justify-center gap-2 rounded bg-primary px-4 py-4 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 sm:col-span-2"
+                >
+                  <span className="material-symbols-outlined text-base">request_quote</span>
+                  {lang === "ko" ? "이 이미지 사용 문의" : "Request use of this image"}
+                </Link>
+              )}
               <div className="flex gap-3 sm:col-span-2">
                 <button
                   onClick={toggleFavorite}

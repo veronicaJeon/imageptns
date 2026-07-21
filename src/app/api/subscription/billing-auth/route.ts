@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { randomUUID } from "crypto";
 import { PLAN_PRICES, nextPeriodEnd, subscriptionAmount } from "@/lib/subscription/plans";
+import { isCommerceEnabled } from "@/lib/commerce/availability";
 
 const TOSS_BASE = "https://api.tosspayments.com/v1";
 
@@ -23,6 +24,10 @@ function tossAuthHeader() {
  *  3. subscriptions 테이블에 저장
  */
 export async function POST(req: NextRequest) {
+  if (!isCommerceEnabled()) {
+    return NextResponse.json({ error: "Commerce is not available yet" }, { status: 503 });
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

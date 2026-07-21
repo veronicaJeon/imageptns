@@ -4,7 +4,7 @@ import { bigintToDecimalString } from "@/lib/onchain/amounts";
 import { IMAGE_PARTNERS_ESCROW_ABI } from "@/lib/onchain/abi";
 import { authorizeOnchainCheckoutConfirmation } from "@/lib/onchain/checkout-auth";
 import { getConfirmAttemptDecision, getNextConfirmBackoffUntil } from "@/lib/onchain/confirm-attempts";
-import { getOnchainServerConfig } from "@/lib/onchain/env";
+import { getOnchainServerConfig, isOnchainEnabled } from "@/lib/onchain/env";
 import { recordOnchainEvent } from "@/lib/onchain/events";
 import { imageAssetBytes32 } from "@/lib/onchain/ids";
 import { getOnchainPublicClient } from "@/lib/onchain/server";
@@ -206,6 +206,10 @@ async function updateLedgerClaimable(
 }
 
 export async function POST(req: NextRequest) {
+  if (!isOnchainEnabled()) {
+    return NextResponse.json({ error: "Onchain checkout is disabled" }, { status: 503 });
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 

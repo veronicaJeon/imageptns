@@ -6,6 +6,7 @@ import { priceCartItemsFromLicenses, type LicensePriceRow } from "@/lib/commerce
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadSubscriptionCoverageForCheckout } from "@/lib/subscription/checkout";
 import { getBankTransferAccount } from "@/lib/payments/bank-transfer";
+import { isCommerceEnabled } from "@/lib/commerce/availability";
 
 interface CartItemInput {
   id: string;           // image id
@@ -29,6 +30,10 @@ interface CheckoutImageRow {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isCommerceEnabled()) {
+    return NextResponse.json({ error: "Commerce is not available yet" }, { status: 503 });
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

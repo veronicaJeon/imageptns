@@ -9,6 +9,7 @@ import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 import { imageCategoryLabel } from "@/lib/images/categories";
 
 const LICENSE_KEYS: LicenseType[] = ["editorial", "commercial", "extended"];
+const COMMERCE_ENABLED = process.env.NEXT_PUBLIC_COMMERCE_ENABLED === "true";
 
 const CART_PAGE_COPY = {
   ko: {
@@ -193,18 +194,25 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                <Link
+                {COMMERCE_ENABLED ? <Link
                   href="/checkout"
                   onClick={startCartCheckout}
                   className="block w-full py-4 bg-primary text-white text-xs font-bold uppercase tracking-widest text-center rounded hover:opacity-90 transition-opacity"
                 >
                   {c.checkoutBtn}
-                </Link>
+                </Link> : (
+                  <Link
+                    href="/contact?mode=photo"
+                    className="block w-full rounded bg-primary py-4 text-center text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90"
+                  >
+                    {lang === "ko" ? "사진 사용 문의" : "Request image use"}
+                  </Link>
+                )}
 
-                <div className="mt-4 flex items-center justify-center gap-1 text-[10px] text-outline">
+                {COMMERCE_ENABLED && <div className="mt-4 flex items-center justify-center gap-1 text-[10px] text-outline">
                   <span className="material-symbols-outlined text-sm">lock</span>
                   Secured by Toss Payments
-                </div>
+                </div>}
               </div>
             </div>
           </div>

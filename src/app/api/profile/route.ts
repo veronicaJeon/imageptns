@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAddress } from "viem";
 import { normalizePhoneNumber, normalizePrimaryActivityRegions } from "@/lib/profile/contact";
 import { createClient } from "@/lib/supabase/server";
+import { isOnchainEnabled } from "@/lib/onchain/env";
 
 export async function GET() {
   const supabase = await createClient();
@@ -62,6 +63,9 @@ export async function PATCH(req: NextRequest) {
     );
   }
   if ("wallet_address" in body) {
+    if (!isOnchainEnabled()) {
+      return NextResponse.json({ error: "Wallet profile updates are disabled" }, { status: 409 });
+    }
     const rawWallet = typeof body.wallet_address === "string" ? body.wallet_address.trim() : "";
     if (rawWallet) {
       try {

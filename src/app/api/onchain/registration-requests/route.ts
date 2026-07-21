@@ -9,6 +9,7 @@ import {
 import { recordOnchainEvent } from "@/lib/onchain/events";
 import { normalizeCommerceSettings, type CommerceSettingsRow } from "@/lib/commerce/settings";
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
+import { isOnchainEnabled } from "@/lib/onchain/env";
 
 interface RegistrationImageRow {
   id: string;
@@ -55,6 +56,10 @@ function normalizeImage(row: RegistrationImageRow, commerceSettings?: ReturnType
 }
 
 export async function GET() {
+  if (!isOnchainEnabled()) {
+    return NextResponse.json({ error: "Onchain features are disabled" }, { status: 503 });
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -96,6 +101,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isOnchainEnabled()) {
+    return NextResponse.json({ error: "Onchain features are disabled" }, { status: 503 });
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

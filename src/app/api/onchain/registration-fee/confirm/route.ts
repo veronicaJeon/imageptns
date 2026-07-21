@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordOnchainEvent } from "@/lib/onchain/events";
+import { isOnchainEnabled } from "@/lib/onchain/env";
 
 function redirectTo(req: NextRequest, params: Record<string, string>) {
   const url = new URL("/dashboard/blockchain", req.url);
@@ -9,6 +10,10 @@ function redirectTo(req: NextRequest, params: Record<string, string>) {
 }
 
 export async function GET(req: NextRequest) {
+  if (!isOnchainEnabled()) {
+    return NextResponse.json({ error: "Onchain features are disabled" }, { status: 503 });
+  }
+
   const { searchParams } = new URL(req.url);
   const paymentKey = searchParams.get("paymentKey");
   const orderId = searchParams.get("orderId"); // toss_order_id
