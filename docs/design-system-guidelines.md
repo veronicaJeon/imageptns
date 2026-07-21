@@ -15,3 +15,11 @@
 - Collapse category and usage-condition rows as one secondary-filter group so their information hierarchy remains intact.
 - Animate height and opacity together, and clip collapsed content to prevent focusable or visible remnants.
 - Default to expanded for new users. Persist an explicit user preference locally so returning to the library restores the last chosen state.
+
+## Admin data list policy
+
+- Simple metrics and metadata must default to inline typography, not filled containers. Prefer patterns such as `Views 0 · Sales 0` over separate gray boxes for each value.
+- Status values must use compact chips with a shared height, border, and tone scale. Keep related states inline with the record title or row header whenever possible.
+- Action buttons must communicate hierarchy consistently: primary for the most common task, secondary for supporting inspection or navigation, and danger for destructive or irreversible actions.
+- Data-heavy admin screens should use a bounded page width and either a dense table or a responsive record list. Avoid cards that stretch uncomfortably when there are few results or create excessive vertical bulk when there are many.
+- Admin screens should use the shared primitives in `src/components/admin/AdminPrimitives.tsx` before adding page-local badge, button, metric, or list-surface styles.

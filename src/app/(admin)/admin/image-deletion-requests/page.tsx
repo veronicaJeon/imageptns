@@ -2,6 +2,13 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
+import {
+  AdminButton,
+  AdminChip,
+  AdminInlineMetrics,
+  AdminListSurface,
+  adminStatusTone,
+} from "@/components/admin/AdminPrimitives";
 
 interface DeletionRequest {
   id: string;
@@ -82,7 +89,7 @@ export default function AdminImageDeletionRequestsPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Deletion Review</p>
@@ -101,7 +108,7 @@ export default function AdminImageDeletionRequestsPage() {
         </select>
       </div>
 
-      <div className="overflow-x-auto bg-surface-container-lowest shadow-ghost">
+      <AdminListSurface className="overflow-x-auto">
         <table className="w-full min-w-[980px] text-sm">
           <thead>
             <tr className="border-b border-outline-variant/20">
@@ -139,40 +146,45 @@ export default function AdminImageDeletionRequestsPage() {
                   <p className="mt-1 max-w-xs text-sm leading-relaxed text-on-surface-variant">{request.reason}</p>
                 </td>
                 <td className="px-5 py-4 text-xs text-on-surface-variant">
-                  <p>판매 {request.image?.sales_count ?? 0}건</p>
-                  <p className="mt-1">증명 {request.image?.proof_status ?? "-"}</p>
+                  <AdminInlineMetrics
+                    className="max-w-40"
+                    items={[
+                      { label: "판매", value: `${request.image?.sales_count ?? 0}건` },
+                      { label: "증명", value: request.image?.proof_status ?? "-" },
+                    ]}
+                  />
                 </td>
                 <td className="px-5 py-4 text-xs text-on-surface-variant">
                   <p className="font-semibold text-on-surface">{formatKRW(request.estimated_fee_krw)}</p>
                   <p className="mt-1">{request.fee_status}</p>
                 </td>
                 <td className="px-5 py-4">
-                  <span className="rounded-full bg-surface-container-high px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">{request.status}</span>
+                  <AdminChip tone={adminStatusTone(request.status)}>{request.status}</AdminChip>
                 </td>
                 <td className="px-5 py-4">
                   {request.status === "pending" && (
                     <div className="flex flex-col gap-2">
-                      <button
+                      <AdminButton
                         onClick={() => decide(request.id, "approved")}
                         disabled={processingId === request.id}
-                        className="rounded bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                        variant="primary"
                       >
                         승인/청구
-                      </button>
-                      <button
+                      </AdminButton>
+                      <AdminButton
                         onClick={() => decide(request.id, "approved", true)}
                         disabled={processingId === request.id}
-                        className="rounded border border-outline-variant px-3 py-2 text-xs font-bold text-on-surface disabled:opacity-50"
+                        variant="secondary"
                       >
                         수수료 면제 승인
-                      </button>
-                      <button
+                      </AdminButton>
+                      <AdminButton
                         onClick={() => decide(request.id, "rejected")}
                         disabled={processingId === request.id}
-                        className="rounded bg-error/10 px-3 py-2 text-xs font-bold text-error disabled:opacity-50"
+                        variant="danger"
                       >
                         거절
-                      </button>
+                      </AdminButton>
                     </div>
                   )}
                 </td>
@@ -180,7 +192,7 @@ export default function AdminImageDeletionRequestsPage() {
             ))}
           </tbody>
         </table>
-      </div>
+      </AdminListSurface>
     </div>
   );
 }

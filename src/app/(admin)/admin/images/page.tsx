@@ -3,6 +3,14 @@
 import Image from "next/image";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AdminButton,
+  AdminChip,
+  AdminChipButton,
+  AdminInlineMetrics,
+  AdminListSurface,
+  adminStatusTone,
+} from "@/components/admin/AdminPrimitives";
 import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
 
 type ImageStatus = "all" | "pending" | "approved" | "rejected" | "draft";
@@ -100,13 +108,6 @@ const STATUS_LABELS: Record<string, string> = {
   approved: "승인됨",
   rejected: "거절됨",
   draft: "임시저장",
-};
-
-const STATUS_CLASSES: Record<string, string> = {
-  pending: "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-200",
-  approved: "bg-primary/10 text-primary",
-  rejected: "bg-error/10 text-error",
-  draft: "bg-surface-container-high text-outline",
 };
 
 function formatDate(value: string) {
@@ -412,21 +413,21 @@ export default function AdminImagesPage() {
   }
 
   return (
-    <div className="p-4 md:p-10">
-      <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
+      <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">이미지 상세 관리</h1>
           <p className="mt-1 text-sm text-outline">이미지 목록을 검색하고 선택한 원본 파일을 관리자 권한으로 다운로드합니다.</p>
         </div>
 
-        <form onSubmit={submitSearch} className="flex flex-col gap-2 lg:flex-row">
+        <form onSubmit={submitSearch} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_160px_auto] xl:w-[640px]">
           <div className="relative">
             <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg text-outline">search</span>
             <input
               value={queryInput}
               onChange={(event) => setQueryInput(event.target.value)}
               placeholder="제목, 키워드, 에셋ID 검색"
-              className="h-11 w-full rounded-lg bg-surface-container-lowest pl-10 pr-4 text-sm outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary lg:w-80"
+              className="h-11 w-full rounded-lg bg-surface-container-lowest pl-10 pr-4 text-sm outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
             />
           </div>
           <select
@@ -438,7 +439,7 @@ export default function AdminImagesPage() {
               <option key={value} value={value}>{STATUS_LABELS[value]}</option>
             ))}
           </select>
-          <button className="h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-white">검색</button>
+          <button className="h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary/90">검색</button>
         </form>
       </div>
 
@@ -448,45 +449,47 @@ export default function AdminImagesPage() {
           {query && <span> · 검색어 <span className="font-semibold text-on-surface">{query}</span></span>}
         </p>
         <div className="flex flex-wrap gap-2">
-          <button
+          <AdminButton
             onClick={deleteSelected}
             disabled={selectedIds.length === 0 || deleting}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-error px-4 text-xs font-semibold text-on-error transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            variant="danger"
+            size="md"
           >
             <span className="material-symbols-outlined text-base">delete</span>
             {deleting ? "처리 중..." : `선택 삭제/아카이브 (${selectedIds.length})`}
-          </button>
-          <button
+          </AdminButton>
+          <AdminButton
             onClick={downloadSelected}
             disabled={selectedIds.length === 0 || downloading}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-on-surface px-4 text-xs font-semibold text-surface-container-lowest transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            variant="secondary"
+            size="md"
           >
             <span className="material-symbols-outlined text-base">download</span>
             {downloading ? "준비 중..." : `선택 원본 다운로드 (${selectedIds.length})`}
-          </button>
+          </AdminButton>
         </div>
       </div>
 
-      <div className="rounded-xl bg-surface-container-lowest shadow-ghost md:overflow-x-auto">
-        <table className="w-full text-sm md:min-w-[920px]">
+      <AdminListSurface className="md:overflow-x-auto">
+        <table className="w-full text-sm md:min-w-[960px]">
           <thead className="hidden md:table-header-group">
             <tr className="border-b border-outline-variant/20">
               <th className="w-12 px-5 py-4 text-left">
                 <input type="checkbox" checked={allPageSelected} onChange={toggleAllPage} aria-label="현재 페이지 전체 선택" />
               </th>
-              {["이미지 정보", "상태", "성과", "등록 정보"].map((head) => (
+              {["이미지 정보", "지표", "등록/액션"].map((head) => (
                 <th key={head} className="px-5 py-4 text-left text-[11px] font-semibold text-outline">{head}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="grid gap-3 p-3 md:table-row-group md:divide-y md:divide-outline-variant/20 md:p-0">
+          <tbody className="grid gap-3 bg-surface-container-low p-3 md:table-row-group md:divide-y md:divide-outline-variant/20 md:bg-transparent md:p-0">
             {loading ? (
-              <tr><td colSpan={5} className="px-5 py-20 text-center text-outline">이미지 목록을 불러오는 중...</td></tr>
+              <tr><td colSpan={4} className="px-5 py-20 text-center text-outline">이미지 목록을 불러오는 중...</td></tr>
             ) : images.length === 0 ? (
-              <tr><td colSpan={5} className="px-5 py-20 text-center text-outline">조건에 맞는 이미지가 없습니다.</td></tr>
+              <tr><td colSpan={4} className="px-5 py-20 text-center text-outline">조건에 맞는 이미지가 없습니다.</td></tr>
             ) : images.map((image) => (
-              <tr key={image.id} className="grid grid-cols-2 overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest hover:bg-surface-container-low md:table-row md:rounded-none md:border-0">
-                <td className="col-span-2 flex justify-end px-4 pt-4 align-top md:table-cell md:w-12 md:px-5 md:py-5">
+              <tr key={image.id} className="grid grid-cols-1 overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest transition-colors hover:bg-surface-container-low sm:grid-cols-2 md:table-row md:rounded-none md:border-0">
+                <td className="flex justify-end px-4 pt-4 align-top sm:col-span-2 md:table-cell md:w-12 md:px-5 md:py-5">
                   <input
                     type="checkbox"
                     checked={selectedSet.has(image.id)}
@@ -494,7 +497,7 @@ export default function AdminImagesPage() {
                     aria-label={`${image.title} 선택`}
                   />
                 </td>
-                <td className="col-span-2 px-4 pb-4 pt-2 align-top md:px-5 md:py-5">
+                <td className="px-4 pb-4 pt-2 align-top sm:col-span-2 md:px-5 md:py-5">
                   <div className="flex items-start gap-3 md:gap-4">
                     <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low md:h-28 md:w-28">
                       {image.storage_path_preview ? (
@@ -504,7 +507,25 @@ export default function AdminImagesPage() {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="max-w-[360px] truncate font-semibold text-on-surface">{image.title}</p>
+                      <div className="flex max-w-[460px] flex-wrap items-center gap-1.5">
+                        <p className="min-w-0 max-w-[220px] truncate font-semibold text-on-surface md:max-w-[280px] lg:max-w-[340px]">{image.title}</p>
+                        <AdminChip tone={adminStatusTone(image.status)}>
+                          {STATUS_LABELS[image.status] ?? image.status}
+                        </AdminChip>
+                        {image.lifecycle_status && image.lifecycle_status !== "active" && (
+                          <AdminChip tone="danger">
+                            {image.lifecycle_status === "deletion_requested" ? "삭제요청" : image.lifecycle_status}
+                          </AdminChip>
+                        )}
+                        <AdminChipButton
+                          type="button"
+                          onClick={() => togglePublished(image)}
+                          tone={image.is_published ? "primary" : "danger"}
+                          title={image.unpublished_reason ?? undefined}
+                        >
+                          {image.is_published ? "게시 ON" : "게시 OFF"}
+                        </AdminChipButton>
+                      </div>
                       {displayKo(image.title_ko, "") !== "-" && image.title_ko !== image.title && (
                         <p className="mt-0.5 max-w-[360px] truncate text-xs text-outline">KO · {image.title_ko}</p>
                       )}
@@ -530,71 +551,49 @@ export default function AdminImagesPage() {
                         <span className="mx-1 text-outline">·</span>
                         {formatSize(image.file_size_mb)}
                       </p>
-                      <button
+                    </div>
+                  </div>
+                </td>
+                <td data-label="지표" className="border-t border-outline-variant/20 px-4 py-4 align-top text-xs text-on-surface-variant before:block before:pb-2 before:text-xs before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-5 md:py-5 md:before:hidden">
+                  <AdminInlineMetrics
+                    className="md:w-28"
+                    items={[
+                      { label: "조회", value: (image.views_count ?? 0).toLocaleString("ko-KR") },
+                      { label: "판매", value: (image.sales_count ?? 0).toLocaleString("ko-KR") },
+                    ]}
+                  />
+                </td>
+                <td data-label="등록/액션" className="border-t border-outline-variant/20 px-4 py-4 align-top text-xs text-on-surface-variant before:block before:pb-2 before:text-xs before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-5 md:py-5 md:before:hidden">
+                  <div className="md:w-40">
+                    <p className="max-w-40 truncate font-medium text-on-surface">{image.photographer?.full_name ?? "-"}</p>
+                    <p className="mt-1 text-outline">{formatDate(image.created_at)}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <AdminButton
                         type="button"
                         onClick={() => openEdit(image)}
                         disabled={editLoadingId === image.id}
-                        className="mt-3 inline-flex items-center gap-1 rounded border border-outline-variant px-2 py-1 text-[10px] font-bold text-on-surface-variant hover:border-primary hover:text-primary disabled:opacity-50"
+                        variant="primary"
                       >
                         <span className="material-symbols-outlined text-sm">edit</span>
                         {editLoadingId === image.id ? "로딩" : "상세 편집"}
-                      </button>
+                      </AdminButton>
+                      <AdminButton
+                        type="button"
+                        onClick={() => openTransactions(image)}
+                        disabled={transactionLoadingId === image.id}
+                        variant="secondary"
+                      >
+                        <span className="material-symbols-outlined text-sm">receipt_long</span>
+                        {transactionLoadingId === image.id ? "로딩" : "거래내역"}
+                      </AdminButton>
                     </div>
-                  </div>
-                </td>
-                <td data-label="상태" className="border-t border-outline-variant/20 px-4 py-4 align-top before:block before:pb-2 before:text-xs before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-5 md:py-5 md:before:hidden">
-                  <div className="flex flex-col items-start gap-2 md:w-32">
-                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${STATUS_CLASSES[image.status] ?? "bg-surface-container-high text-outline"}`}>
-                      {STATUS_LABELS[image.status] ?? image.status}
-                    </span>
-                    {image.lifecycle_status && image.lifecycle_status !== "active" && (
-                      <span className="rounded-full bg-error/10 px-2.5 py-1 text-[10px] font-bold text-error">
-                        {image.lifecycle_status === "deletion_requested" ? "삭제요청" : image.lifecycle_status}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => togglePublished(image)}
-                      className={`inline-flex h-8 items-center rounded-full px-3 text-[10px] font-bold ${
-                        image.is_published ? "bg-primary/10 text-primary" : "bg-error/10 text-error"
-                      }`}
-                      title={image.unpublished_reason ?? undefined}
-                    >
-                      {image.is_published ? "게시 ON" : "게시 OFF"}
-                    </button>
-                  </div>
-                </td>
-                <td data-label="성과" className="border-t border-outline-variant/20 px-4 py-4 align-top text-xs text-on-surface-variant before:block before:pb-2 before:text-xs before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-5 md:py-5 md:before:hidden">
-                  <div className="grid grid-cols-2 gap-2 md:w-32">
-                    <div className="rounded-lg bg-surface-container-low p-2">
-                      <p className="text-[10px] text-outline">조회</p>
-                      <p className="font-semibold text-on-surface">{(image.views_count ?? 0).toLocaleString("ko-KR")}</p>
-                    </div>
-                    <div className="rounded-lg bg-surface-container-low p-2">
-                      <p className="text-[10px] text-outline">판매</p>
-                      <p className="font-semibold text-on-surface">{(image.sales_count ?? 0).toLocaleString("ko-KR")}</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => openTransactions(image)}
-                    disabled={transactionLoadingId === image.id}
-                    className="mt-2 inline-flex items-center gap-1 rounded border border-outline-variant px-2 py-1 text-[10px] font-bold text-on-surface-variant hover:border-primary hover:text-primary disabled:opacity-50"
-                  >
-                    {transactionLoadingId === image.id ? "로딩" : "거래내역"}
-                  </button>
-                </td>
-                <td data-label="등록 정보" className="col-span-2 grid grid-cols-[72px_minmax(0,1fr)] gap-3 border-t border-outline-variant/20 px-4 py-4 align-top text-xs text-on-surface-variant before:text-xs before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-5 md:py-5 md:before:hidden">
-                  <div>
-                  <p className="max-w-40 truncate font-medium text-on-surface">{image.photographer?.full_name ?? "-"}</p>
-                  <p className="mt-1 text-outline">{formatDate(image.created_at)}</p>
                   </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </AdminListSurface>
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-outline">

@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import {
+  AdminButton,
+  AdminChip,
+  AdminInlineMetrics,
+  AdminListSurface,
+  adminStatusTone,
+} from "@/components/admin/AdminPrimitives";
 import type { ProfileWithdrawalAssessment } from "@/lib/profiles/withdrawal";
 
 type PhotographerStatus = "none" | "pending" | "approved" | "suspended";
@@ -130,23 +137,10 @@ const PHOTOGRAPHER_STATUS_LABELS: Record<UserSummary["photographer_status"], str
   suspended: "중지됨",
 };
 
-const PHOTOGRAPHER_STATUS_STYLES: Record<UserSummary["photographer_status"], string> = {
-  none: "bg-surface-container-low text-outline",
-  pending: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-200",
-  approved: "bg-primary/10 text-primary",
-  suspended: "bg-error/10 text-error",
-};
-
 const APPLICATION_STATUS_LABELS: Record<PhotographerApplicationSummary["status"], string> = {
   pending: "신청대기",
   approved: "신청승인",
   rejected: "신청거절",
-};
-
-const APPLICATION_STATUS_STYLES: Record<PhotographerApplicationSummary["status"], string> = {
-  pending: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-200",
-  approved: "bg-primary/10 text-primary",
-  rejected: "bg-error/10 text-error",
 };
 
 function formatKRW(amount: number) {
@@ -363,7 +357,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">회원관리</h1>
@@ -396,12 +390,12 @@ export default function AdminUsersPage() {
             <option value="suspended">중지됨</option>
             <option value="none">미신청</option>
           </select>
-          <button onClick={loadUsers} className="h-11 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-widest text-white">조회</button>
+          <AdminButton onClick={loadUsers} variant="primary" size="md" className="h-11">조회</AdminButton>
         </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-ghost">
+        <AdminListSurface>
           <table className="w-full table-fixed text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
@@ -432,18 +426,18 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex flex-wrap gap-1.5">
-                      <span className="rounded-full bg-surface-container-low px-2.5 py-1 text-xs font-bold text-on-surface-variant">
+                      <AdminChip tone="neutral">
                         {user.role === "photographer" ? "사진작가" : "바이어"}
-                      </span>
+                      </AdminChip>
                       {user.photographer_status !== "none" && (
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${PHOTOGRAPHER_STATUS_STYLES[user.photographer_status]}`}>
+                        <AdminChip tone={adminStatusTone(user.photographer_status)}>
                           {PHOTOGRAPHER_STATUS_LABELS[user.photographer_status]}
-                        </span>
+                        </AdminChip>
                       )}
                       {user.pending_photographer_application && (
-                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-600 dark:bg-amber-900/20 dark:text-amber-200">
+                        <AdminChip tone="warning">
                           신청서 대기
-                        </span>
+                        </AdminChip>
                       )}
                     </div>
                   </td>
@@ -459,9 +453,9 @@ export default function AdminUsersPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </AdminListSurface>
 
-        <aside className="bg-surface-container-lowest p-5 shadow-ghost">
+        <aside className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-ghost">
           {!selectedSummary && !detailLoading ? (
             <div className="flex min-h-96 flex-col items-center justify-center gap-3 text-center text-outline">
               <span className="material-symbols-outlined text-5xl">manage_accounts</span>
@@ -479,18 +473,18 @@ export default function AdminUsersPage() {
                 <p className="mt-1 text-sm text-outline">{detail.email || detail.id}</p>
                 {detail.photographer_status !== "none" && (
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${PHOTOGRAPHER_STATUS_STYLES[detail.photographer_status]}`}>
+                    <AdminChip tone={adminStatusTone(detail.photographer_status)}>
                       사진가 {PHOTOGRAPHER_STATUS_LABELS[detail.photographer_status]}
-                    </span>
+                    </AdminChip>
                     {detail.photographer_status === "approved" && (
-                      <button
+                      <AdminButton
                         type="button"
                         onClick={suspendPhotographerAccess}
                         disabled={suspendingPhotographer}
-                        className="rounded-full border border-error/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-error transition-colors hover:bg-error/10 disabled:opacity-50"
+                        variant="danger"
                       >
                         {suspendingPhotographer ? "처리 중" : "사진가 권한 회수"}
-                      </button>
+                      </AdminButton>
                     )}
                   </div>
                 )}
@@ -509,9 +503,9 @@ export default function AdminUsersPage() {
                             : ""}
                         </p>
                       </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${APPLICATION_STATUS_STYLES[detail.latest_photographer_application.status]}`}>
+                      <AdminChip tone={adminStatusTone(detail.latest_photographer_application.status)} className="shrink-0">
                         {APPLICATION_STATUS_LABELS[detail.latest_photographer_application.status]}
-                      </span>
+                      </AdminChip>
                     </div>
 
                     <div className="mt-3 grid gap-2 text-xs text-on-surface-variant">
@@ -520,9 +514,9 @@ export default function AdminUsersPage() {
                       {(detail.latest_photographer_application.primary_activity_regions?.length ?? 0) > 0 && (
                         <div className="flex flex-wrap gap-1.5">
                           {detail.latest_photographer_application.primary_activity_regions?.map((region) => (
-                            <span key={region} className="rounded-full bg-surface-container-lowest px-2 py-1 text-[10px] font-bold text-on-surface-variant">
+                            <AdminChip key={region} tone="neutral">
                               {region}
-                            </span>
+                            </AdminChip>
                           ))}
                         </div>
                       )}
@@ -539,50 +533,57 @@ export default function AdminUsersPage() {
 
                     {detail.pending_photographer_application && (
                       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                        <button
+                        <AdminButton
                           type="button"
                           onClick={() => reviewPhotographerApplication("approve")}
                           disabled={reviewingPhotographerApplication}
-                          className="rounded-lg bg-primary px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-opacity disabled:opacity-50"
+                          variant="primary"
+                          size="md"
                         >
                           {reviewingPhotographerApplication ? "처리 중" : "사진가 승인"}
-                        </button>
-                        <button
+                        </AdminButton>
+                        <AdminButton
                           type="button"
                           onClick={() => reviewPhotographerApplication("reject")}
                           disabled={reviewingPhotographerApplication}
-                          className="rounded-lg border border-error/30 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-error transition-colors hover:bg-error/10 disabled:opacity-50"
+                          variant="danger"
+                          size="md"
                         >
                           거절
-                        </button>
+                        </AdminButton>
                       </div>
                     )}
                   </div>
                 )}
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-lg bg-surface-container-low p-3"><p className="text-xs text-outline">최종 로그인</p><p className="mt-1 font-semibold">{formatDate(detail.last_login_at ?? detail.authLastSignInAt)}</p></div>
-                  <div className="rounded-lg bg-surface-container-low p-3"><p className="text-xs text-outline">총 로그인</p><p className="mt-1 font-semibold">{detail.login_count ?? 0}회</p></div>
-                  <div className="rounded-lg bg-surface-container-low p-3"><p className="text-xs text-outline">결제 수</p><p className="mt-1 font-semibold">{selectedSummary?.paymentCount ?? 0}회</p></div>
-                  <div className="rounded-lg bg-surface-container-low p-3"><p className="text-xs text-outline">누적 결제</p><p className="mt-1 font-semibold">{formatKRW(selectedSummary?.totalPaidKrw ?? 0)}</p></div>
-                </div>
+                <AdminInlineMetrics
+                  className="mt-4"
+                  items={[
+                    { label: "최종 로그인", value: formatDate(detail.last_login_at ?? detail.authLastSignInAt) },
+                    { label: "총 로그인", value: `${detail.login_count ?? 0}회` },
+                    { label: "결제 수", value: `${selectedSummary?.paymentCount ?? 0}회` },
+                    { label: "누적 결제", value: formatKRW(selectedSummary?.totalPaidKrw ?? 0) },
+                  ]}
+                />
                 {detail.wallet_address && <p className="mt-3 truncate text-xs text-outline">지갑 {detail.wallet_address}</p>}
                 {detail.phone_number && <p className="mt-2 truncate text-xs text-outline">전화 {detail.phone_number}</p>}
                 {(detail.primary_activity_regions?.length ?? 0) > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {detail.primary_activity_regions?.map((region) => (
-                      <span key={region} className="rounded-full bg-surface-container-low px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
+                      <AdminChip key={region} tone="neutral">
                         {region}
-                      </span>
+                      </AdminChip>
                     ))}
                   </div>
                 )}
-                <button
+                <AdminButton
                   onClick={deleteUser}
                   disabled={deleting}
-                  className="mt-5 w-full rounded-lg border border-error/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-error transition-colors hover:bg-error/10 disabled:opacity-50"
+                  variant="danger"
+                  size="md"
+                  className="mt-5 h-11 w-full"
                 >
                   {deleteActionLabel}
-                </button>
+                </AdminButton>
                 {withdrawalAssessment && !withdrawalAssessment.canDeleteImmediately && (
                   <div className="mt-4 rounded-lg border border-error/30 bg-error/5 p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -593,9 +594,9 @@ export default function AdminUsersPage() {
                         </p>
                       </div>
                       {withdrawalRequest && (
-                        <span className="shrink-0 rounded-full bg-surface-container-lowest px-2 py-1 text-[10px] font-bold text-error">
+                        <AdminChip tone={adminStatusTone(withdrawalRequest.status)} className="shrink-0">
                           {withdrawalRequest.status}
-                        </span>
+                        </AdminChip>
                       )}
                     </div>
                     {withdrawalRequest && (
@@ -603,17 +604,16 @@ export default function AdminUsersPage() {
                         요청 {withdrawalRequest.id.slice(0, 8)} · {formatDate(withdrawalRequest.created_at)}
                       </p>
                     )}
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      {(Object.entries(withdrawalAssessment.impactSnapshot) as Array<[
+                    <AdminInlineMetrics
+                      className="mt-3"
+                      items={(Object.entries(withdrawalAssessment.impactSnapshot) as Array<[
                         keyof ProfileWithdrawalAssessment["impactSnapshot"],
                         number,
-                      ]>).map(([key, value]) => (
-                        <div key={key} className="rounded-lg bg-surface-container-lowest p-2">
-                          <p className="text-[10px] font-bold text-outline">{WITHDRAWAL_METRIC_LABELS[key]}</p>
-                          <p className="mt-1 text-xs font-semibold text-on-surface">{formatWithdrawalMetric(key, value)}</p>
-                        </div>
-                      ))}
-                    </div>
+                      ]>).map(([key, value]) => ({
+                        label: WITHDRAWAL_METRIC_LABELS[key],
+                        value: formatWithdrawalMetric(key, value),
+                      }))}
+                    />
                     <div className="mt-3 space-y-2">
                       {withdrawalAssessment.blockingReasons.map((reason) => (
                         <div key={reason.code} className="text-xs text-on-surface-variant">
@@ -624,9 +624,9 @@ export default function AdminUsersPage() {
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {withdrawalAssessment.requiredActions.map((action) => (
-                        <span key={action.code} className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
+                        <AdminChip key={action.code} tone="neutral">
                           {WITHDRAWAL_ACTION_LABELS[action.code] ?? action.label}
-                        </span>
+                        </AdminChip>
                       ))}
                     </div>
                   </div>
@@ -645,7 +645,7 @@ export default function AdminUsersPage() {
                           <p className="font-mono text-xs font-bold text-on-surface">{order.order_number}</p>
                           <p className="mt-1 text-xs text-outline">{formatDate(order.completed_at ?? order.created_at)} · {order.payment_provider ?? "toss"}</p>
                         </div>
-                        <span className="rounded-full bg-surface-container-lowest px-2 py-1 text-[10px] font-bold text-on-surface-variant">{order.status}</span>
+                        <AdminChip tone={adminStatusTone(order.status)}>{order.status}</AdminChip>
                       </div>
                       <p className="mt-3 font-bold text-primary">{formatKRW(order.total_krw)}</p>
                       <div className="mt-3 space-y-2">

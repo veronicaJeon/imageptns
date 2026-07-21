@@ -2,6 +2,11 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
+import {
+  AdminButton,
+  AdminChip,
+  adminStatusTone,
+} from "@/components/admin/AdminPrimitives";
 
 interface PaymentRequest {
   id: string;
@@ -89,7 +94,7 @@ export default function AdminPaymentRequestsPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8">
         <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">결제요청목록</h1>
         <p className="mt-1 text-sm text-outline">계좌결제 요청을 확인하고 입금 확인 후 구매확정 또는 취소 처리합니다.</p>
@@ -109,14 +114,14 @@ export default function AdminPaymentRequestsPage() {
           {requests.map((request) => {
             const pending = request.status === "pending" && request.offline_payment_status === "requested";
             return (
-              <article key={request.id} className="rounded-xl bg-surface-container-lowest p-5 shadow-ghost">
+              <article key={request.id} className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-ghost">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-headline text-lg font-extrabold text-on-surface">{request.order_number}</p>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${pending ? "bg-amber-50 text-amber-700" : request.offline_payment_status === "approved" ? "bg-primary/10 text-primary" : "bg-error/10 text-error"}`}>
+                      <AdminChip tone={adminStatusTone(request.offline_payment_status)}>
                         {STATUS_LABELS[request.offline_payment_status] ?? request.offline_payment_status}
-                      </span>
+                      </AdminChip>
                     </div>
                     <p className="mt-1 text-sm text-on-surface-variant">
                       {request.billing_name || request.buyer?.full_name || "이름 없음"} · {request.billing_email || "이메일 없음"}
@@ -133,7 +138,7 @@ export default function AdminPaymentRequestsPage() {
 
                 <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {request.order_items.map((item) => (
-                    <div key={item.id} className="flex gap-3 rounded-lg bg-surface-container-low p-3">
+                    <div key={item.id} className="flex gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-3">
                       <div className="h-14 w-20 shrink-0 overflow-hidden rounded bg-surface-container-high">
                         {item.image?.storage_path_preview ? (
                           <Image src={item.image.storage_path_preview} alt={item.image.title ?? ""} width={120} height={80} className="h-full w-full object-cover" unoptimized />
@@ -155,22 +160,24 @@ export default function AdminPaymentRequestsPage() {
                 <div className="mt-5 flex flex-wrap justify-end gap-2">
                   {pending ? (
                     <>
-                      <button
+                      <AdminButton
                         type="button"
                         onClick={() => handleAction(request.id, "cancel")}
                         disabled={processingId === request.id}
-                        className="rounded-lg border border-error/40 px-4 py-2 text-xs font-bold uppercase tracking-widest text-error hover:bg-error/5 disabled:opacity-50"
+                        variant="danger"
+                        size="md"
                       >
                         취소
-                      </button>
-                      <button
+                      </AdminButton>
+                      <AdminButton
                         type="button"
                         onClick={() => handleAction(request.id, "approve")}
                         disabled={processingId === request.id}
-                        className="rounded-lg bg-primary px-4 py-2 text-xs font-bold uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
+                        variant="primary"
+                        size="md"
                       >
                         구매확정 승인
-                      </button>
+                      </AdminButton>
                     </>
                   ) : (
                     <p className="text-xs text-outline">처리일 {formatDate(request.offline_payment_reviewed_at ?? request.completed_at)}</p>
@@ -184,4 +191,3 @@ export default function AdminPaymentRequestsPage() {
     </div>
   );
 }
-
