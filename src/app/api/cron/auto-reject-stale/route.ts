@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendImageRejected } from "@/lib/email/resend";
 import { authorizeCronRequest } from "@/lib/security/cron";
-import { runAiSyntheticCheck } from "@/lib/monitoring/ai-synthetic";
 
 export const maxDuration = 60;
 
@@ -23,12 +22,9 @@ async function runRetentionCleanup(admin: ReturnType<typeof createAdminClient>) 
 }
 
 async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient>) {
-  const [retention, monitoringRetention, ai] = await Promise.all([
+  const [retention, monitoringRetention] = await Promise.all([
     runRetentionCleanup(admin),
     admin.rpc("purge_old_operational_events"),
-    process.env.VERCEL_ENV === "production" && process.env.AI_SYNTHETIC_MONITOR_ENABLED !== "false"
-      ? runAiSyntheticCheck("cron")
-      : Promise.resolve({ ok: true as const, skipped: true as const }),
   ]);
   if (monitoringRetention.error) {
     console.error("[auto-reject-stale] monitoring retention failed:", monitoringRetention.error.message);
@@ -38,7 +34,6 @@ async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient
     monitoringRetention: monitoringRetention.error
       ? { ok: false as const }
       : { ok: true as const, deleted: monitoringRetention.data ?? 0 },
-    ai,
   };
 }
 

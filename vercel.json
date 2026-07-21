@@ -10,7 +10,7 @@
       "schedule": "0 2 * * *"
     },
     {
-      "path": "/api/cron/renew-subscriptions",
+      "path": "/api/cron/ai-synthetic",
       "schedule": "0 3 * * *"
     }
   ]
