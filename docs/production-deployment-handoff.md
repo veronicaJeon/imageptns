@@ -4,14 +4,14 @@
 
 ## 현재 운영 기준점
 
-- 배포 시각: 2026-07-21 22:13:58 KST
+- 배포 시각: 2026-07-21 23:06:58 KST
 - 릴리스 브랜치: `main`
-- 릴리스 커밋 SHA: `2ff0c24f4cb33d3826293a0c453d5cde7999e76a`
-- 배포 소스 문서 커밋 SHA: `55ccd08387e4e6db2e4e0a7d51ede6fd81917256`
-- Production deployment ID: `dpl_4Hw7cTUvowVcpkwMjKE4hbdUGu1J`
-- Production URL: `https://imageptns-659z2guds-veronicajeons-projects.vercel.app`
+- 릴리스 커밋 SHA: `ac260666499d816523641b82d17e3fb2ef4b2cb6`
+- 배포 소스 문서 커밋 SHA: `ac260666499d816523641b82d17e3fb2ef4b2cb6`
+- Production deployment ID: `dpl_Ba7SzL6JYBMoeMkQbt4Qof3Xm31p`
+- Production URL: `https://imageptns-8garzffy8-veronicajeons-projects.vercel.app`
 - 운영 상태: `Ready`, `https://www.imagepartners.kr` alias 연결 확인
-- 검증 기준: 58개 테스트 파일·245개 테스트 통과, 린트 오류 0(기존 경고 11건), TypeScript·프로덕션 빌드 통과
+- 검증 기준: 58개 테스트 파일·246개 테스트 통과, 린트 오류 0(기존 경고 11건), TypeScript·프로덕션 빌드 통과
 
 다음 배포 담당자는 이 기준점과 새 배포의 ID·생성 시각·alias를 비교해 실제 전환 여부를 판단한다.
 
@@ -40,6 +40,18 @@
 - `nodemailer`, `resend`, `viem`, `wagmi` 및 하위 의존성 보안 업데이트
 
 이번 릴리스에는 Supabase 마이그레이션 `049_security_and_legal_hardening.sql`이 포함되며 운영 DB 적용을 완료했다. 운영 환경변수 변경은 없고, AI 사용량은 코드 기본값인 시간당 60회·일간 300회를 적용한다.
+
+2026-07-21 23:06 릴리스에서는 운영 데이터 흐름을 기준으로 국내용 개인정보처리방침을 확정하고 마이그레이션 `050_finalize_domestic_privacy_notice.sql`을 운영 DB에 적용했다. 대표자명과 사업자등록번호는 약관 본문에 넣지 않았으며, 유료 전자상거래 개시 전에 별도 사업자정보 화면에 법정 표시사항을 공개하도록 약관을 정리했다. 종료된 Groq 비전·Gemini 경로를 제거하고 Mistral 비전 및 Groq 메타데이터 보조 분석 모델명을 현재 모델로 갱신했다.
+
+현재 Vercel Project Settings의 `MISTRAL_API_KEY`, `GROQ_API_KEY` 값은 공급자 API에서 인증되지 않는 임시값이다. 승인된 사진가 전용 권한과 사용량 제한은 정상이나 AI 분석 자체는 실제 키 교체와 인증 계정 E2E 검증 전까지 운영 준비 완료로 간주하지 않는다. 이는 2주차 첫 후속 항목이다.
+
+## 2주차 착수 순서
+
+1. AI 공급자 실제 키를 교체하고 승인·미승인 사진가, 쿼터 초과, 대용량 요청을 포함한 운영 E2E 검사를 완료한다.
+2. 개인정보처리방침에 약속한 보유기간을 실제로 집행하도록 만료 대상 조회, 삭제 전 보고서, 단계적 자동 파기 작업을 만든다.
+3. 결제·온체인·정산처럼 아직 공개하지 않을 기능을 서버와 UI 모두에서 하나의 운영 기능 플래그로 차단한다.
+4. 가용성·응답속도·5xx·DB 연결·스토리지 실패율에 대한 모니터링과 알림 기준을 정하고 백업 복구 훈련을 수행한다.
+5. ELK 기반 감사 로그 고도화는 이벤트 스키마와 보존·마스킹 기준을 먼저 확정한 뒤 별도 구축한다.
 
 배포 직전 아래 명령으로 실제 범위를 다시 확인한다.
 
