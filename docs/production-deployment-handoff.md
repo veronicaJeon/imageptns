@@ -4,14 +4,14 @@
 
 ## 현재 운영 기준점
 
-- 배포 시각: 2026-07-21 23:06:58 KST
+- 배포 시각: 2026-07-21 23:30:17 KST
 - 릴리스 브랜치: `main`
-- 릴리스 커밋 SHA: `ac260666499d816523641b82d17e3fb2ef4b2cb6`
-- 배포 소스 문서 커밋 SHA: `ac260666499d816523641b82d17e3fb2ef4b2cb6`
-- Production deployment ID: `dpl_Ba7SzL6JYBMoeMkQbt4Qof3Xm31p`
-- Production URL: `https://imageptns-8garzffy8-veronicajeons-projects.vercel.app`
+- 릴리스 커밋 SHA: `3af7044712ff18e8a1737cbf6899e6b1f2f27a7f`
+- 배포 소스 문서 커밋 SHA: `3af7044712ff18e8a1737cbf6899e6b1f2f27a7f` (운영 기준점 갱신은 문서 전용 후속 커밋)
+- Production deployment ID: `dpl_JBZFuf7Ma9v9KVzyC2a6hp3KWLAh`
+- Production URL: `https://imageptns-9lldxlzp1-veronicajeons-projects.vercel.app`
 - 운영 상태: `Ready`, `https://www.imagepartners.kr` alias 연결 확인
-- 검증 기준: 58개 테스트 파일·246개 테스트 통과, 린트 오류 0(기존 경고 11건), TypeScript·프로덕션 빌드 통과
+- 검증 기준: 60개 테스트 파일·248개 테스트 통과, 린트 오류 0(기존 경고 11건), TypeScript·프로덕션 빌드 통과, 운영 DB health `200`, 비공개 온체인·결제 API `503`
 
 다음 배포 담당자는 이 기준점과 새 배포의 ID·생성 시각·alias를 비교해 실제 전환 여부를 판단한다.
 
@@ -192,14 +192,14 @@ curl -sS -i -X POST https://www.imagepartners.kr/api/uploads/presign \
 - `/library`: `200`
 - `/api/images?limit=1`: `200` 및 JSON
 - `/api/categories`: `200` 및 JSON
-- `/api/cart/availability`: `200` 및 활성 이미지가 `purchasableIds`에 포함
+- 결제 기능 공개 전에는 결제 준비 API가 `503`; 공개 후에는 `/api/cart/availability`가 `200`이고 활성 이미지가 `purchasableIds`에 포함
 - 비로그인 `/api/uploads/presign`: `401`이며 `500`이 아님
 - 비로그인 `/api/admin/data-lifecycle-settings`: `403`이며 `500`이 아님
 
 가능하면 브라우저에서 추가로 확인한다.
 
 - 라이브러리 카드와 이미지 상세가 정상 렌더링되는가
-- 상세에 `바로 구매하고 원본 다운로드`, 장바구니 추가, 유사 이미지가 표시되는가
+- 결제 기능 공개 전에는 상세에 구매·장바구니 대신 문의 동선이 표시되고, 공개 후에는 구매·장바구니 동선이 표시되는가
 - 장바구니에 다른 사진이 있어도 ‘바로 구매’ 체크아웃에는 선택한 한 장만 표시되는가
 - 삭제된 이미지는 장바구니에서 제거되고, 기존 주문 이력에서는 썸네일 없이 `Deleted`로 표시되는가
 - 로그인한 사진가의 업로드 화면에 최대 20장 안내가 보이는가
