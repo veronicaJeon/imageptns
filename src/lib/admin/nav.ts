@@ -78,6 +78,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     icon: "monitoring",
     label: "로그/통계관리",
     items: [
+      { href: "/admin/operations", icon: "monitor_heart", label: "운영 모니터링" },
       { href: "/admin/presence", icon: "groups", label: "동시접속자" },
       { href: "/admin/activity", icon: "timeline", label: "방문 로그" },
       { href: "/admin/audit", icon: "policy", label: "감사 로그" },

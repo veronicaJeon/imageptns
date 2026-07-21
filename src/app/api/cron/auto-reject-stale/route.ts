@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendImageRejected } from "@/lib/email/resend";
 import { authorizeCronRequest } from "@/lib/security/cron";
+import { runAiSyntheticCheck } from "@/lib/monitoring/ai-synthetic";
 
 export const maxDuration = 60;
 
@@ -19,6 +20,26 @@ async function runRetentionCleanup(admin: ReturnType<typeof createAdminClient>) 
     return { ok: false as const };
   }
   return { ok: true as const, result: data };
+}
+
+async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient>) {
+  const [retention, monitoringRetention, ai] = await Promise.all([
+    runRetentionCleanup(admin),
+    admin.rpc("purge_old_operational_events"),
+    process.env.VERCEL_ENV === "production" && process.env.AI_SYNTHETIC_MONITOR_ENABLED !== "false"
+      ? runAiSyntheticCheck("cron")
+      : Promise.resolve({ ok: true as const, skipped: true as const }),
+  ]);
+  if (monitoringRetention.error) {
+    console.error("[auto-reject-stale] monitoring retention failed:", monitoringRetention.error.message);
+  }
+  return {
+    retention,
+    monitoringRetention: monitoringRetention.error
+      ? { ok: false as const }
+      : { ok: true as const, deleted: monitoringRetention.data ?? 0 },
+    ai,
+  };
 }
 
 export async function GET(request: Request) {
@@ -44,8 +65,8 @@ export async function GET(request: Request) {
 
   const staleImages = (stale ?? []) as StaleImageRow[];
   if (staleImages.length === 0) {
-    const retention = await runRetentionCleanup(admin);
-    return NextResponse.json({ rejected: 0, retention });
+    const operations = await finishOperationalTasks(admin);
+    return NextResponse.json({ rejected: 0, operations });
   }
 
   const reason = "검토 기간(7일)이 초과되어 자동 거절되었습니다. 내용을 수정한 후 재제출해 주세요.";
@@ -88,6 +109,6 @@ export async function GET(request: Request) {
   }
 
   console.log(`[auto-reject-stale] rejected ${rejected} stale images`);
-  const retention = await runRetentionCleanup(admin);
-  return NextResponse.json({ rejected, retention });
+  const operations = await finishOperationalTasks(admin);
+  return NextResponse.json({ rejected, operations });
 }

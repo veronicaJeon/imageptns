@@ -1,0 +1,70 @@
+name: Production monitor
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: production-monitor
+  cancel-in-progress: true
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check production health
+        id: monitor
+        shell: bash
+        run: |
+          response_file="$(mktemp)"
+          http_code="$(curl --silent --show-error --location --retry 2 --retry-all-errors --connect-timeout 10 --max-time 30 --output "$response_file" --write-out '%{http_code}' https://www.imagepartners.kr/api/health)"
+          node - "$response_file" "$http_code" <<'NODE'
+          const fs = require("fs");
+          const [file, code] = process.argv.slice(2);
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const coreHealthy = code === "200"
+            && payload?.checks?.database?.status === "ok"
+            && payload?.checks?.storage?.status === "ok";
+          const aiHealthy = !["error", "stale"].includes(payload?.checks?.ai?.status);
+          if (!coreHealthy || !aiHealthy) {
+            console.error(JSON.stringify({ code, status: payload?.status, checks: payload?.checks }));
+            process.exit(1);
+          }
+          console.log(JSON.stringify({ code, status: payload.status, durationMs: payload.durationMs, checks: payload.checks }));
+          NODE
+
+      - name: Open or update incident issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          title="[monitor] Production health check failed"
+          existing="$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')"
+          body="The scheduled production check failed at $(date -u +'%Y-%m-%dT%H:%M:%SZ'). Review the failed workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
+
+      - name: Close recovered incident
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          title="[monitor] Production health check failed"
+          gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[].number' | while read -r issue; do
+            if [ -n "$issue" ]; then
+              gh issue close "$issue" --comment "Production health recovered at $(date -u +'%Y-%m-%dT%H:%M:%SZ')."
+            fi
+          done
