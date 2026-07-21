@@ -4,14 +4,14 @@
 
 ## 현재 운영 기준점
 
-- 배포 시각: 2026-07-21 23:30:17 KST
+- 배포 시각: 2026-07-22 00:11:33 KST
 - 릴리스 브랜치: `main`
-- 릴리스 커밋 SHA: `3af7044712ff18e8a1737cbf6899e6b1f2f27a7f`
-- 배포 소스 문서 커밋 SHA: `3af7044712ff18e8a1737cbf6899e6b1f2f27a7f` (운영 기준점 갱신은 문서 전용 후속 커밋)
-- Production deployment ID: `dpl_JBZFuf7Ma9v9KVzyC2a6hp3KWLAh`
-- Production URL: `https://imageptns-9lldxlzp1-veronicajeons-projects.vercel.app`
+- 릴리스 커밋 SHA: `58b8b3546d2f13e3703581b290ee05cc8694964d`
+- 배포 소스 문서 커밋 SHA: `58b8b3546d2f13e3703581b290ee05cc8694964d` (운영 기준점 갱신은 문서 전용 후속 커밋)
+- Production deployment ID: `dpl_3kq6a8BrhvfwnYywCxEipzKG2GUW`
+- Production URL: `https://imageptns-dw00i8kge-veronicajeons-projects.vercel.app`
 - 운영 상태: `Ready`, `https://www.imagepartners.kr` alias 연결 확인
-- 검증 기준: 60개 테스트 파일·248개 테스트 통과, 린트 오류 0(기존 경고 11건), TypeScript·프로덕션 빌드 통과, 운영 DB health `200`, 비공개 온체인·결제 API `503`
+- 검증 기준: 63개 테스트 파일·254개 테스트 통과, 린트 오류 0(기존 경고 11건), TypeScript·프로덕션 빌드 통과, 운영 DB·스토리지·AI health `ok`, Mistral 합성 E2E 2.11초, GitHub 외부 모니터 통과
 
 다음 배포 담당자는 이 기준점과 새 배포의 ID·생성 시각·alias를 비교해 실제 전환 여부를 판단한다.
 
