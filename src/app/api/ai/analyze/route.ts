@@ -85,7 +85,7 @@ function parseJsonResponse(raw: string): AnalyzeResponse | null {
   }
 }
 
-// ── Vision: Mistral pixtral-12b ────────────────────────────────────────────
+// ── Vision: Mistral ────────────────────────────────────────────────────────
 async function analyzeWithMistral(dataUrl: string, primaryLanguage: "ko" | "en"): Promise<AnalyzeResponse> {
   const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
     method: "POST",
@@ -94,7 +94,7 @@ async function analyzeWithMistral(dataUrl: string, primaryLanguage: "ko" | "en")
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "pixtral-12b-2409",
+      model: "mistral-small-latest",
       messages: [
         {
           role: "user",
@@ -119,75 +119,6 @@ async function analyzeWithMistral(dataUrl: string, primaryLanguage: "ko" | "en")
   const parsed = parseJsonResponse(raw);
   if (!parsed || (!parsed.caption && parsed.tags.length === 0)) {
     throw new Error(`Mistral returned unusable result: ${raw.slice(0, 100)}`);
-  }
-  return parsed;
-}
-
-// ── Vision: Google Gemini flash-lite ──────────────────────────────────────
-async function analyzeWithGemini(base64Data: string, mimeType: string, primaryLanguage: "ko" | "en"): Promise<AnalyzeResponse> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { inline_data: { mime_type: mimeType, data: base64Data } },
-              { text: visionPrompt(primaryLanguage) },
-            ],
-          },
-        ],
-        generationConfig: { maxOutputTokens: 256, temperature: 0.1 },
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Gemini ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  const json = await res.json();
-  const raw: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  const parsed = parseJsonResponse(raw);
-  if (!parsed || (!parsed.caption && parsed.tags.length === 0)) {
-    throw new Error(`Gemini returned unusable result: ${raw.slice(0, 100)}`);
-  }
-  return parsed;
-}
-
-// ── Vision: Groq llama-3.2-11b-vision ────────────────────────────────────────
-async function analyzeWithGroqVision(dataUrl: string, primaryLanguage: "ko" | "en"): Promise<AnalyzeResponse> {
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "llama-3.2-11b-vision-preview",
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "image_url", image_url: { url: dataUrl } },
-            { type: "text", text: visionPrompt(primaryLanguage) },
-          ],
-        },
-      ],
-      max_tokens: 256,
-      temperature: 0.1,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Groq vision ${res.status}: ${text.slice(0, 200)}`);
-  }
-  const json = await res.json();
-  const raw: string = json?.choices?.[0]?.message?.content ?? "";
-  const parsed = parseJsonResponse(raw);
-  if (!parsed || (!parsed.caption && parsed.tags.length === 0)) {
-    throw new Error(`Groq vision returned unusable result: ${raw.slice(0, 100)}`);
   }
   return parsed;
 }
@@ -240,7 +171,7 @@ Respond with ONLY valid JSON:
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 256,
       temperature: 0.2,
@@ -300,7 +231,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
       { status: message.includes("too large") ? 413 : 400 },
     );
   }
-  const { dataUrl, base64Data, mimeType } = imageInput;
+  const { dataUrl } = imageInput;
 
   if (!dataUrl && !filename && !exifData) {
     return NextResponse.json({ error: "Image or metadata is required" }, { status: 400 });
@@ -326,19 +257,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
 
   const errors: string[] = [];
 
-  // 1. Try Groq vision (llama-3.2-11b-vision-preview) — free tier, primary
-  if (process.env.GROQ_API_KEY && dataUrl) {
-    try {
-      const result = await analyzeWithGroqVision(dataUrl, primaryLanguage);
-      return NextResponse.json(result);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error("[ai/analyze] Groq vision failed:", msg);
-      errors.push(`Groq vision: ${msg}`);
-    }
-  }
-
-  // 2. Try Mistral vision (pixtral-12b) — backup
+  // 1. Analyze image with Mistral. Images are not sent to metadata fallbacks.
   if (process.env.MISTRAL_API_KEY && dataUrl) {
     try {
       const result = await analyzeWithMistral(dataUrl, primaryLanguage);
@@ -350,19 +269,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
     }
   }
 
-  // 3. Try Gemini vision (gemini-2.0-flash-lite)
-  if (process.env.GEMINI_API_KEY && base64Data) {
-    try {
-      const result = await analyzeWithGemini(base64Data, mimeType, primaryLanguage);
-      return NextResponse.json(result);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error("[ai/analyze] Gemini failed:", msg);
-      errors.push(`Gemini: ${msg}`);
-    }
-  }
-
-  // 4. Last resort: Groq text + filename/EXIF (no vision)
+  // 2. Last resort: Groq text + filename/EXIF (no image transfer)
   if (process.env.GROQ_API_KEY && (filename || exifData)) {
     try {
       const result = await analyzeWithGroqText({ filename, exifData, primaryLanguage });

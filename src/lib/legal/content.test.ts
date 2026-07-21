@@ -20,4 +20,19 @@ describe("legal content helpers", () => {
     expect(doc.title).toBe(DEFAULT_LEGAL_DOCUMENTS.privacy.title);
     expect(doc.body).toBe(DEFAULT_LEGAL_DOCUMENTS.privacy.body);
   });
+
+  it("publishes the active processors and domestic operator details", () => {
+    const privacy = DEFAULT_LEGAL_DOCUMENTS.privacy.body;
+    const terms = DEFAULT_LEGAL_DOCUMENTS.terms.body;
+
+    expect(privacy).toContain("명칭: 이미지파트너스");
+    expect(privacy).toContain("Supabase, Inc.");
+    expect(privacy).toContain("Mistral AI SAS");
+    expect(privacy).toContain("Groq, Inc.");
+    expect(privacy).not.toContain("Gemini AI");
+    expect(privacy).not.toContain("Resend");
+    expect(terms).toContain("별도 사업자정보 화면");
+    expect(terms).not.toContain("대표자");
+    expect(terms).not.toContain("사업자등록번호");
+  });
 });
