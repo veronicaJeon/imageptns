@@ -4,11 +4,12 @@
 
 ## 현재 운영 기준점
 
-- 배포 시각: 2026-07-21 22:09:20 KST
+- 배포 시각: 2026-07-21 22:13:58 KST
 - 릴리스 브랜치: `main`
 - 릴리스 커밋 SHA: `2ff0c24f4cb33d3826293a0c453d5cde7999e76a`
-- Production deployment ID: `dpl_96izPqHWdBX4aYfZXnHmhtH2eAFA`
-- Production URL: `https://imageptns-5kz1l6lda-veronicajeons-projects.vercel.app`
+- 배포 소스 문서 커밋 SHA: `55ccd08387e4e6db2e4e0a7d51ede6fd81917256`
+- Production deployment ID: `dpl_4Hw7cTUvowVcpkwMjKE4hbdUGu1J`
+- Production URL: `https://imageptns-659z2guds-veronicajeons-projects.vercel.app`
 - 운영 상태: `Ready`, `https://www.imagepartners.kr` alias 연결 확인
 - 검증 기준: 58개 테스트 파일·245개 테스트 통과, 린트 오류 0(기존 경고 11건), TypeScript·프로덕션 빌드 통과
 
@@ -38,7 +39,7 @@
 - 개인정보처리방침, 이용약관, 라이선스 안내, 쿠키 정책 운영 초안 게시
 - `nodemailer`, `resend`, `viem`, `wagmi` 및 하위 의존성 보안 업데이트
 
-이번 릴리스에는 Supabase 마이그레션 `049_security_and_legal_hardening.sql`이 포함되며 운영 DB 적용을 완료했다. 운영 환경변수 변경은 없고, AI 사용량은 코드 기본값인 시간당 60회·일간 300회를 적용한다.
+이번 릴리스에는 Supabase 마이그레이션 `049_security_and_legal_hardening.sql`이 포함되며 운영 DB 적용을 완료했다. 운영 환경변수 변경은 없고, AI 사용량은 코드 기본값인 시간당 60회·일간 300회를 적용한다.
 
 배포 직전 아래 명령으로 실제 범위를 다시 확인한다.
 
