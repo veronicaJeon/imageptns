@@ -223,8 +223,8 @@ export default function LibraryPage() {
 
       <div data-testid="library-sticky-controls" className="sticky top-16 z-40 border-b border-outline-variant/20 bg-surface/95 shadow-sm backdrop-blur-md md:top-20">
         <div className="mx-auto max-w-7xl px-4 py-3 md:px-8 md:py-4">
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] items-stretch gap-2 md:grid-cols-[160px_minmax(0,1fr)_220px_48px]">
-            <label className="flex h-11 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-4 text-left md:h-16">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_48px] items-stretch gap-2 md:grid-cols-[160px_minmax(0,1fr)_220px_48px]">
+            <label className="order-2 flex h-12 min-w-0 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-3 text-left md:order-none md:h-16 md:px-4">
               <span className="material-symbols-outlined text-xl text-outline">swap_vert</span>
               <span className="sr-only">{l.sort.label}</span>
               <select value={sort} onChange={(event) => setSort(event.target.value as SortKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={l.sort.label}>
@@ -232,7 +232,7 @@ export default function LibraryPage() {
               </select>
             </label>
 
-            <div className="relative order-first col-span-2 md:order-none md:col-span-1">
+            <div className="relative order-1 col-span-3 md:order-none md:col-span-1">
               <div className="relative overflow-hidden rounded-lg border border-outline-variant/60 bg-surface-container-low shadow-ghost ring-1 ring-black/5 transition-colors focus-within:border-primary/60 focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary/20">
                 <span className="material-symbols-outlined pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-2xl text-outline">search</span>
                 <input type="text" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={l.hero.searchPlaceholder} className="h-14 w-full bg-transparent pl-14 pr-12 text-base text-on-surface placeholder:text-outline outline-none md:h-16" onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }} onBlur={() => { blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 150); }} onKeyDown={(event) => { if (event.key === "Escape") setShowSuggestions(false); }} />
@@ -241,7 +241,7 @@ export default function LibraryPage() {
               {showSuggestions && suggestions.length > 0 && <ul className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg bg-white shadow-lg">{suggestions.map((suggestion) => <li key={suggestion}><button className="w-full px-5 py-2.5 text-left text-sm hover:bg-surface-container-low" onMouseDown={() => { if (blurTimerRef.current) clearTimeout(blurTimerRef.current); setQuery(suggestion); setShowSuggestions(false); }}>{suggestion}</button></li>)}</ul>}
             </div>
 
-            <label className="flex h-11 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-4 text-left md:h-16">
+            <label className="order-2 flex h-12 min-w-0 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-3 text-left md:order-none md:h-16 md:px-4">
               <span className="material-symbols-outlined text-xl text-outline">crop_rotate</span>
               <span className="sr-only">{copy.orientation}</span>
               <select value={orientation} onChange={(event) => setOrientation(event.target.value as OrientationKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={copy.orientation}>
@@ -252,7 +252,7 @@ export default function LibraryPage() {
             <button
               type="button"
               onClick={toggleFilterPanel}
-              className="order-2 inline-flex h-14 items-center justify-center rounded-lg border border-outline-variant/60 bg-surface-container-low text-on-surface-variant transition-colors hover:border-primary/40 hover:bg-surface-container-high hover:text-primary md:order-none md:h-16"
+              className="order-2 inline-flex h-12 w-12 items-center justify-center rounded-lg border border-outline-variant/60 bg-surface-container-low text-on-surface-variant transition-colors hover:border-primary/40 hover:bg-surface-container-high hover:text-primary md:order-none md:h-16 md:w-auto"
               aria-expanded={!filtersCollapsed}
               aria-controls="library-secondary-filters"
               aria-label={filtersCollapsed ? copy.expandFilters : copy.collapseFilters}
@@ -271,27 +271,29 @@ export default function LibraryPage() {
             <div className="min-h-0 overflow-hidden">
               <div className="flex flex-col gap-3 pt-3">
                 <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 md:justify-center" aria-label="카테고리">
-                  {categoryOptions.map((item) => <CategoryPill key={item.code} label={item.label} active={category === item.code} onClick={() => handleCategoryChange(item.code)} className="shrink-0" />)}
+                  {categoryOptions.map((item) => <CategoryPill key={item.code} label={item.label} active={category === item.code} onClick={() => handleCategoryChange(item.code)} className="h-10 shrink-0" />)}
                 </div>
 
-                <div className="flex items-center justify-between gap-2 md:hidden">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:hidden">
                   <span className="text-xs font-medium text-outline">{loading ? "…" : images.length} {l.results}</span>
-                  <button type="button" onClick={() => setMobileFiltersOpen((value) => !value)} className={`relative inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-bold ${mobileFiltersOpen || activeFilterCount > 0 ? "border-primary bg-primary/10 text-primary" : "border-outline-variant"}`} aria-expanded={mobileFiltersOpen}><span className="material-symbols-outlined text-base">tune</span>{copy.filter}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button>
+                  <button type="button" onClick={() => setMobileFiltersOpen((value) => !value)} className={`relative inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-4 text-xs font-bold ${mobileFiltersOpen || activeFilterCount > 0 ? "border-primary bg-primary/10 text-primary" : "border-outline-variant bg-surface-container-low text-on-surface-variant"}`} aria-expanded={mobileFiltersOpen}><span className="material-symbols-outlined text-base">tune</span>{copy.filter}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button>
                 </div>
 
                 <div className={`${mobileFiltersOpen ? "flex" : "hidden"} flex-col gap-3 md:flex`}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-semibold text-outline">{usageLabels.title}</span>
+                  <div className="grid gap-2 md:flex md:flex-wrap md:items-center">
+                    <span className="text-xs font-semibold text-outline md:mr-1">{usageLabels.title}</span>
+                    <div className="grid grid-cols-2 gap-2 md:contents">
                     {usageFilters.map((filter) => (
-                      <label key={filter.label} className={`flex h-8 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-bold ${filter.checked ? "border-primary bg-primary/10 text-primary" : "border-outline-variant bg-surface-container-low text-on-surface-variant"}`}>
+                      <label key={filter.label} className={`flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-bold md:h-8 md:justify-start md:rounded-full md:px-3 ${filter.checked ? "border-primary bg-primary/10 text-primary" : "border-outline-variant bg-surface-container-low text-on-surface-variant"}`}>
                         <input type="checkbox" checked={filter.checked} onChange={(event) => filter.onChange(event.target.checked)} className="sr-only" />
                         <span className="material-symbols-outlined text-sm">{filter.icon}</span>
-                        {filter.label}
+                        <span className="min-w-0 truncate">{filter.label}</span>
                       </label>
                     ))}
-                    <div className="ml-auto flex items-center gap-2">
+                    </div>
+                    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg bg-surface-container-low p-2 md:ml-auto md:flex md:bg-transparent md:p-0">
                       <span className="text-xs font-semibold text-outline">{copy.pageSize}</span>
-                      <div className="flex rounded-full bg-surface-container-low p-1">{PAGE_SIZE_OPTIONS.map((size) => <button key={size} type="button" onClick={() => setPageSize(size)} className={`h-7 min-w-9 rounded-full px-2 text-xs font-bold ${pageSize === size ? "bg-primary text-white" : "text-on-surface-variant"}`}>{size}</button>)}</div>
+                      <div className="grid grid-cols-3 rounded-full bg-surface-container-lowest p-1 md:flex md:bg-surface-container-low">{PAGE_SIZE_OPTIONS.map((size) => <button key={size} type="button" onClick={() => setPageSize(size)} className={`h-10 min-w-0 rounded-full px-2 text-xs font-bold md:h-7 md:min-w-9 ${pageSize === size ? "bg-primary text-white" : "text-on-surface-variant"}`}>{size}</button>)}</div>
                       <span className="hidden text-xs text-outline md:inline">{loading ? "…" : images.length} {l.results}</span>
                     </div>
                   </div>

@@ -27,6 +27,7 @@ export const useLang = create<LangStore>()(
     }),
     {
       name: "imageptns-lang-v2",
+      skipHydration: true,
       partialize: (state) => ({ lang: state.lang }),
       merge: (persisted, current) => {
         const persistedLang = (persisted as Partial<LangStore> | undefined)?.lang;

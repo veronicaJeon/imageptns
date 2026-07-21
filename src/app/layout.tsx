@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Epilogue, Inter } from "next/font/google";
 import { Suspense } from "react";
 import { ActivityTracker } from "@/components/analytics/ActivityTracker";
+import { LangHydrator } from "@/components/i18n/LangHydrator";
 import "./globals.css";
 
 // Material Symbols는 globals.css에서 @import 또는 head link로 추가
@@ -50,6 +51,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-surface text-on-surface font-body">
+        <LangHydrator />
         <Suspense fallback={null}>
           <ActivityTracker />
         </Suspense>

@@ -36,9 +36,7 @@ const COMMERCE_ENABLED = process.env.NEXT_PUBLIC_COMMERCE_ENABLED === "true";
 
 export function TopNavBar() {
   const pathname = usePathname();
-  const [isDark, setIsDark] = useState(() =>
-    typeof window !== "undefined" ? localStorage.getItem("theme") === "dark" : false,
-  );
+  const [isDark, setIsDark] = useState(false);
   const { lang, t, toggle } = useLang();
   const copy = TOP_NAV_COPY[lang];
   const cartCount = useCart((s) => s.items.length);
@@ -48,6 +46,14 @@ export function TopNavBar() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { init(); }, [init]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setIsDark(localStorage.getItem("theme") === "dark");
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
