@@ -445,12 +445,9 @@ function NewUploadContent() {
 
   async function resizeForAI(file: File): Promise<string> {
     if (file.type === "image/tiff") {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-      });
+      // Browsers cannot reliably resize TIFF files. Sending the original TIFF as
+      // base64 can exceed the route body limit, so use filename/EXIF fallback.
+      return "";
     }
 
     return new Promise((resolve, reject) => {

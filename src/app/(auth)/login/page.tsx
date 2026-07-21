@@ -6,6 +6,7 @@ import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/i18n/store";
 import { createClient } from "@/lib/supabase/client";
+import { getSafeRelativePath } from "@/lib/routing/canonical";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
@@ -22,8 +23,9 @@ function LoginForm() {
   const queryError =
     !hideQueryError && searchParams.get("error") === "oauth" ? a.errorOAuth : null;
   const displayedError = error ?? queryError;
+  const safeNext = getSafeRelativePath(searchParams.get("next"), "/library");
   const googleLoginUrl = `/api/auth/google?next=${encodeURIComponent(
-    searchParams.get("next") ?? "/library",
+    safeNext,
   )}`;
 
   async function handleEmailLogin(e: React.FormEvent) {
@@ -38,8 +40,7 @@ function LoginForm() {
       setLoading(false);
     } else {
       await fetch("/api/auth/login-event", { method: "POST" }).catch(() => {});
-      const next = searchParams.get("next") ?? "/library";
-      window.location.href = next;
+      window.location.href = safeNext;
     }
   }
 

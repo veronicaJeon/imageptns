@@ -51,6 +51,12 @@ describe("canonical routing helpers", () => {
     expect(getSafeRelativePath("//evil.example", "/dashboard")).toBe(
       "/dashboard"
     );
+    expect(getSafeRelativePath("/\\evil.example", "/dashboard")).toBe(
+      "/dashboard"
+    );
+    expect(getSafeRelativePath("/library?q=seoul#results", "/dashboard")).toBe(
+      "/library?q=seoul#results"
+    );
   });
 
   it("builds client redirect URLs from canonicalized origins", () => {

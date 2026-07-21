@@ -39,7 +39,15 @@ export function getSafeRelativePath(
     return fallback;
   }
 
-  return path;
+  try {
+    const safeOrigin = "https://redirect-check.invalid";
+    const parsed = new URL(path, safeOrigin);
+    if (parsed.origin !== safeOrigin) return fallback;
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return fallback;
+  }
 }
 
 export function buildSiteUrl(path: string, origin?: string): string {

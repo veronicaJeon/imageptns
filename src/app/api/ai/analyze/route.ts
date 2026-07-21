@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  MAX_AI_ANALYZE_REQUEST_BYTES,
+  normalizePositiveLimit,
+  parseAiImageInput,
+  requestBodyTooLarge,
+  type AiImageInput,
+  type AiAnalyzeBody,
+} from "@/lib/ai/analyze-security";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { imageCategoryPromptList, isImageCategoryCode } from "@/lib/images/categories";
+import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 
 export const maxDuration = 60;
 
@@ -251,34 +261,67 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeRespon
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: {
-    imageBase64?: string;
-    filename?: string;
-    language?: "ko" | "en";
-    exifData?: { locationLabel?: string; camera?: string; takenAt?: string; lat?: number; lng?: number };
-  };
+  const admin = createAdminClient();
+  const authorization = await requireApprovedPhotographer(admin, user.id);
+  if (!authorization.ok) {
+    return authorization.response as NextResponse<AnalyzeResponse | { error: string }>;
+  }
+
+  if (requestBodyTooLarge(req.headers.get("content-length"))) {
+    return NextResponse.json({ error: "AI analysis request is too large" }, { status: 413 });
+  }
+
+  let body: AiAnalyzeBody;
 
   try {
-    body = await req.json();
+    const rawBody = await req.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_AI_ANALYZE_REQUEST_BYTES) {
+      return NextResponse.json({ error: "AI analysis request is too large" }, { status: 413 });
+    }
+    const parsedBody: unknown = JSON.parse(rawBody);
+    if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
+      throw new Error("Invalid JSON body");
+    }
+    body = parsedBody as AiAnalyzeBody;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { imageBase64, filename, exifData } = body;
+  const { filename, exifData } = body;
   const primaryLanguage = body.language === "en" ? "en" : "ko";
 
-  // Parse data URL once (shared by vision providers)
-  let dataUrl = "";
-  let base64Data = "";
-  let mimeType = "image/jpeg";
+  let imageInput: AiImageInput;
+  try {
+    imageInput = parseAiImageInput(body.imageBase64);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid AI image input";
+    return NextResponse.json(
+      { error: message },
+      { status: message.includes("too large") ? 413 : 400 },
+    );
+  }
+  const { dataUrl, base64Data, mimeType } = imageInput;
 
-  if (imageBase64) {
-    const comma = imageBase64.indexOf(",");
-    if (comma !== -1) {
-      mimeType = imageBase64.slice(5, comma).split(";")[0] || "image/jpeg";
-      base64Data = imageBase64.slice(comma + 1);
-      dataUrl = `data:${mimeType};base64,${base64Data}`;
-    }
+  if (!dataUrl && !filename && !exifData) {
+    return NextResponse.json({ error: "Image or metadata is required" }, { status: 400 });
+  }
+
+  const hourlyLimit = normalizePositiveLimit(process.env.AI_ANALYSIS_HOURLY_LIMIT, 60);
+  const dailyLimit = normalizePositiveLimit(process.env.AI_ANALYSIS_DAILY_LIMIT, 300);
+  const { data: quotaAllowed, error: quotaError } = await admin.rpc("consume_ai_analysis_quota", {
+    target_user_id: user.id,
+    hourly_limit: hourlyLimit,
+    daily_limit: dailyLimit,
+  });
+  if (quotaError) {
+    console.error("[ai/analyze] quota check failed", quotaError.message);
+    return NextResponse.json({ error: "AI analysis quota is unavailable" }, { status: 503 });
+  }
+  if (quotaAllowed !== true) {
+    return NextResponse.json(
+      { error: "AI analysis usage limit exceeded" },
+      { status: 429, headers: { "Retry-After": "3600" } },
+    );
   }
 
   const errors: string[] = [];
