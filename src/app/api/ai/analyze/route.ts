@@ -12,6 +12,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import { analyzeWithMistral, type AnalyzeResponse } from "@/lib/ai/mistral";
 import { recordOperationalEvent } from "@/lib/monitoring/events";
+import { bearerToken } from "@/lib/auth/bearer";
 
 export const maxDuration = 60;
 
@@ -19,10 +20,18 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest): Promise<NextResponse<AnalyzeResponse | { error: string }>> {
   const startedAt = Date.now();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user: cookieUser } } = await supabase.auth.getUser();
+  const admin = createAdminClient();
+  let user = cookieUser;
+  if (!user) {
+    const token = bearerToken(req.headers.get("authorization"));
+    if (token) {
+      const { data } = await admin.auth.getUser(token);
+      user = data.user ?? null;
+    }
+  }
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const admin = createAdminClient();
   const authorization = await requireApprovedPhotographer(admin, user.id);
   if (!authorization.ok) {
     return authorization.response as NextResponse<AnalyzeResponse | { error: string }>;
