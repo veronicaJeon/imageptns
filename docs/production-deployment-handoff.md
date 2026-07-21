@@ -4,13 +4,13 @@
 
 ## 현재 운영 기준점
 
-- 배포 시각: 2026-07-14 23:42:29 KST
+- 배포 시각: 2026-07-21 22:09:20 KST
 - 릴리스 브랜치: `main`
-- 릴리스 커밋 SHA: `7d25ded353c09ff5f567d2e9b6e392b01e66a349`
-- Production deployment ID: `dpl_DbcyawdXE6UNuLFLaw7VN7xxBP6r`
-- Production URL: `https://imageptns-ie3k2zegb-veronicajeons-projects.vercel.app`
+- 릴리스 커밋 SHA: `2ff0c24f4cb33d3826293a0c453d5cde7999e76a`
+- Production deployment ID: `dpl_96izPqHWdBX4aYfZXnHmhtH2eAFA`
+- Production URL: `https://imageptns-5kz1l6lda-veronicajeons-projects.vercel.app`
 - 운영 상태: `Ready`, `https://www.imagepartners.kr` alias 연결 확인
-- 검증 기준: 57개 테스트 파일·240개 테스트 통과, 린트 오류 0(기존 경고 11건), TypeScript·프로덕션 빌드 통과
+- 검증 기준: 58개 테스트 파일·245개 테스트 통과, 린트 오류 0(기존 경고 11건), TypeScript·프로덕션 빌드 통과
 
 다음 배포 담당자는 이 기준점과 새 배포의 ID·생성 시각·alias를 비교해 실제 전환 여부를 판단한다.
 
@@ -30,18 +30,15 @@
 
 ## 2. 현재 릴리스 범위
 
-2026-07-14 23:14 릴리스에는 다음 변경이 포함된다.
+2026-07-21 22:09 릴리스에는 다음 변경이 포함된다.
 
-- ‘바로 구매’ 결제 대상을 선택한 한 장으로 분리하고 일반 장바구니 결제와 상태를 독립
-- 삭제·비공개 이미지의 장바구니 자동 제거 API와 클라이언트 동기화 추가
-- 삭제된 구매 이미지의 주문 이력·에셋 번호는 유지하고 미리보기 대신 `Deleted` 표시
-- 관리자에 `운영정책관리` 대메뉴와 법률정보·수수료정책·상품가격·데이터 운영주기 관리 페이지 추가
-- 개인정보, 다운로드, 거래내역, 휴면계정, 감사로그, 삭제요청 보관 주기를 관리자 설정으로 관리
-- 사진가 및 관리자 이미지 제목·설명 편집 저장 동작 보완, 관리자 메뉴를 `이미지 상세 관리`로 변경
-- 업로드를 JPEG, 이미지당 500MB, 1회 20장 이하로 제한하고 한·영 안내 및 버튼 용어 변경
-- 업로드 대기창의 대표 이미지 정보 일괄 적용·개별 수정·업로드 안내를 3단계로 정리
+- 로그인 후 `next` 값을 동일 출처 상대 경로로 제한해 open redirect 차단
+- `images-full` 버킷의 전체 로그인 사용자 읽기 정책 제거
+- AI 이미지 분석 API에 승인된 사진가 권한, 요청 크기·형식 검증, 시간·일간 쿼터 추가
+- 개인정보처리방침, 이용약관, 라이선스 안내, 쿠키 정책 운영 초안 게시
+- `nodemailer`, `resend`, `viem`, `wagmi` 및 하위 의존성 보안 업데이트
 
-이번 릴리스에는 Supabase 마이그레이션 `043`~`046`이 포함되며 운영 DB 적용을 완료했다. `046_data_lifecycle_settings.sql`이 데이터 운영주기 설정 컬럼과 기본값을 추가한다. 운영 환경변수 변경은 없다.
+이번 릴리스에는 Supabase 마이그레션 `049_security_and_legal_hardening.sql`이 포함되며 운영 DB 적용을 완료했다. 운영 환경변수 변경은 없고, AI 사용량은 코드 기본값인 시간당 60회·일간 300회를 적용한다.
 
 배포 직전 아래 명령으로 실제 범위를 다시 확인한다.
 
