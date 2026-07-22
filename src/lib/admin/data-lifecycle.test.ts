@@ -18,6 +18,7 @@ describe("data lifecycle settings", () => {
       inactive_account_retention_days: 400,
       audit_log_retention_days: 800,
       deletion_request_retention_days: 900,
+      rejected_image_retention_days: 7,
     };
     expect(normalizeDataLifecycleSettingsPatch(input)).toEqual(input);
     expect(() => normalizeDataLifecycleSettingsPatch({ ...input, download_access_days: 0 })).toThrow(/download_access_days/);

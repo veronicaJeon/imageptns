@@ -21,22 +21,38 @@ export async function GET() {
   const authorization = await requireApprovedPhotographer(admin, user.id);
   if (!authorization.ok) return authorization.response;
 
-  const { data, error } = await supabase
-    .from("images")
-    .select("id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, lifecycle_status, deletion_requested_at, deletion_fee_krw, deletion_fee_status, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at, chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at, proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
-    .eq("photographer_id", user.id)
-    .order("created_at", { ascending: false });
+  const [imagesResult, settingsResult] = await Promise.all([
+    admin
+      .from("images")
+      .select("id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, rejected_at, lifecycle_status, deletion_requested_at, deletion_fee_krw, deletion_fee_status, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at, chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at, proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
+      .eq("photographer_id", user.id)
+      .eq("lifecycle_status", "active")
+      .order("created_at", { ascending: false }),
+    admin
+      .from("platform_commerce_settings")
+      .select("rejected_image_retention_days")
+      .eq("id", true)
+      .maybeSingle(),
+  ]);
+  const { data, error } = imagesResult;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const categoryMap = await getImageCategoryCodeMap(admin, (data ?? []).map((img) => img.id));
-  const uploads = (data ?? []).map((img) => ({
+  const rejectedImageRetentionDays = Math.min(365, Math.max(1, Number(settingsResult.data?.rejected_image_retention_days ?? 7)));
+  const rejectedCutoff = Date.now() - rejectedImageRetentionDays * 24 * 60 * 60 * 1000;
+  const visibleData = (data ?? []).filter((image) => (
+    image.status !== "rejected" ||
+    new Date(image.rejected_at ?? image.created_at).getTime() >= rejectedCutoff
+  ));
+
+  const categoryMap = await getImageCategoryCodeMap(admin, visibleData.map((img) => img.id));
+  const uploads = visibleData.map((img) => ({
     ...img,
     category_codes: categoryCodesForImage(categoryMap, img.id, img.category),
     storage_path_preview: previewUrl(img.storage_path_preview),
   }));
 
-  return NextResponse.json({ uploads });
+  return NextResponse.json({ uploads, rejectedImageRetentionDays });
 }
 
 export async function POST(req: NextRequest) {

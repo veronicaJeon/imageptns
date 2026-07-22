@@ -24,6 +24,7 @@ export interface ImageDeletionRow {
   proof_arweave_original_tx_id: string | null;
   proof_arweave_metadata_tx_id: string | null;
   proof_arweave_manifest_tx_id: string | null;
+  proof_arweave_confirmed_at: string | null;
 }
 
 export interface ImageDeletionResult {

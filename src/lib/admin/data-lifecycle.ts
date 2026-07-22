@@ -5,6 +5,7 @@ export interface DataLifecycleSettings {
   inactiveAccountRetentionDays: number;
   auditLogRetentionDays: number;
   deletionRequestRetentionDays: number;
+  rejectedImageRetentionDays: number;
 }
 
 export interface DataLifecycleSettingsRow {
@@ -14,6 +15,7 @@ export interface DataLifecycleSettingsRow {
   inactive_account_retention_days?: number | null;
   audit_log_retention_days?: number | null;
   deletion_request_retention_days?: number | null;
+  rejected_image_retention_days?: number | null;
 }
 
 export type DataLifecycleSettingsPatch = Required<DataLifecycleSettingsRow>;
@@ -25,6 +27,7 @@ export const DEFAULT_DATA_LIFECYCLE_SETTINGS: DataLifecycleSettings = {
   inactiveAccountRetentionDays: 365,
   auditLogRetentionDays: 730,
   deletionRequestRetentionDays: 730,
+  rejectedImageRetentionDays: 7,
 };
 
 const FIELD_BOUNDS: Record<keyof DataLifecycleSettingsPatch, { min: number; max: number }> = {
@@ -34,6 +37,7 @@ const FIELD_BOUNDS: Record<keyof DataLifecycleSettingsPatch, { min: number; max:
   inactive_account_retention_days: { min: 30, max: 3650 },
   audit_log_retention_days: { min: 30, max: 3650 },
   deletion_request_retention_days: { min: 30, max: 3650 },
+  rejected_image_retention_days: { min: 1, max: 365 },
 };
 
 function boundedInteger(value: unknown, fallback: number, min: number, max: number) {
@@ -49,6 +53,7 @@ export function normalizeDataLifecycleSettings(row?: DataLifecycleSettingsRow | 
     inactiveAccountRetentionDays: boundedInteger(row?.inactive_account_retention_days, DEFAULT_DATA_LIFECYCLE_SETTINGS.inactiveAccountRetentionDays, 30, 3650),
     auditLogRetentionDays: boundedInteger(row?.audit_log_retention_days, DEFAULT_DATA_LIFECYCLE_SETTINGS.auditLogRetentionDays, 30, 3650),
     deletionRequestRetentionDays: boundedInteger(row?.deletion_request_retention_days, DEFAULT_DATA_LIFECYCLE_SETTINGS.deletionRequestRetentionDays, 30, 3650),
+    rejectedImageRetentionDays: boundedInteger(row?.rejected_image_retention_days, DEFAULT_DATA_LIFECYCLE_SETTINGS.rejectedImageRetentionDays, 1, 365),
   };
 }
 

@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
       id, asset_id, title, status, lifecycle_status,
       storage_path_preview, storage_path_full, storage_path_original, original_filename,
       sales_count, proof_status, proof_tx_hash,
-      proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id
+      proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
+      proof_arweave_confirmed_at
     `)
     .in("id", uniqueIds));
 

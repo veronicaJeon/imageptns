@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { assessImageDeletion, deletionImpactMessage } from "@/lib/images/deletion";
+import { assessImageDeletion, deletionImpactMessage, hasArweaveCredential } from "@/lib/images/deletion";
 import { normalizeDeletionFeeConfig, type DeletionFeeSettingRow } from "@/lib/images/deletion-fees";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -17,6 +17,7 @@ interface RequestImageRow {
   proof_arweave_original_tx_id: string | null;
   proof_arweave_metadata_tx_id: string | null;
   proof_arweave_manifest_tx_id: string | null;
+  proof_arweave_confirmed_at: string | null;
 }
 
 function normalizeReasonCategory(value: unknown) {
@@ -49,7 +50,8 @@ export async function POST(
     .select(`
       id, asset_id, title, status, photographer_id, lifecycle_status,
       sales_count, proof_status, proof_tx_hash,
-      proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id
+      proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
+      proof_arweave_confirmed_at
     `)
     .eq("id", id)
     .eq("photographer_id", user.id)
@@ -60,6 +62,38 @@ export async function POST(
   const row = image as RequestImageRow;
   if (row.lifecycle_status && row.lifecycle_status !== "active") {
     return NextResponse.json({ error: "이미 삭제 절차가 진행 중이거나 완료된 이미지입니다." }, { status: 409 });
+  }
+
+  if (!hasArweaveCredential(row)) {
+    const { data: result, error: archiveError } = await admin.rpc(
+      "archive_unregistered_photographer_image",
+      {
+        target_image_id: id,
+        target_user_id: user.id,
+        deletion_reason_text: reason,
+        reason_category_text: reasonCategory,
+      },
+    );
+
+    if (archiveError) {
+      const status = archiveError.message.includes("already") ? 409 : 500;
+      return NextResponse.json({ error: archiveError.message }, { status });
+    }
+
+    return NextResponse.json({
+      immediate: true,
+      result,
+      impact: {
+        action: "archive",
+        lifecycleStatus: "archived",
+        buyerNoticeRequired: (row.sales_count ?? 0) > 0,
+        onchainNoticeRequired: false,
+        storagePurgeAllowed: false,
+        reasons: ["photographer_immediate_archive"],
+        estimatedFeeKrw: 0,
+      },
+      notice: "검색과 신규 판매에서 즉시 제외했습니다. 구매이력에는 비활성 상태로 보존되며, 실제 데이터 완전삭제는 관리자가 별도로 처리합니다.",
+    });
   }
 
   const { data: existing } = await admin

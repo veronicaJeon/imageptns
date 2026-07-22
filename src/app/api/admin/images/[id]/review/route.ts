@@ -83,6 +83,7 @@ export async function PATCH(
         status: "approved",
         approved_at: approvedAt,
         rejection_reason: null,
+        rejected_at: null,
       })
       .eq("id", id)
       .eq("status", "pending")
@@ -103,7 +104,7 @@ export async function PATCH(
   } else {
     const { data: rejected, error } = await admin
       .from("images")
-      .update({ status: "rejected", rejection_reason: rejection_reason!.trim(), approved_at: null })
+      .update({ status: "rejected", rejection_reason: rejection_reason!.trim(), rejected_at: new Date().toISOString(), approved_at: null })
       .eq("id", id)
       .eq("status", "pending")
       .select(REVIEW_SELECT)

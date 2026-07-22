@@ -37,7 +37,10 @@ const LIBRARY_PAGE_COPY = {
     filter: "필터",
     orientation: "방향",
     orientations: { all: "전체", landscape: "가로", portrait: "세로", square: "정사각형" },
-    pageSize: "표시 수",
+    pageSize: "보이는 이미지",
+    loadMore: (count: number) => `더보기 (+${count}개 더 보기)`,
+    loadingMore: "이미지를 불러오는 중입니다",
+    endOfResults: "모든 이미지를 확인했습니다.",
     collapseFilters: "필터 영역 접기",
     expandFilters: "필터 영역 펼치기",
   },
@@ -45,7 +48,10 @@ const LIBRARY_PAGE_COPY = {
     filter: "Filters",
     orientation: "Orientation",
     orientations: { all: "All", landscape: "Landscape", portrait: "Portrait", square: "Square" },
-    pageSize: "Per load",
+    pageSize: "Visible images",
+    loadMore: (count: number) => `Load more (+${count})`,
+    loadingMore: "Loading more images",
+    endOfResults: "You have reached the end.",
     collapseFilters: "Collapse filters",
     expandFilters: "Expand filters",
   },
@@ -83,6 +89,8 @@ export default function LibraryPage() {
   const [derivativesOnly, setDerivativesOnly] = useState(false);
   const [images, setImages]           = useState<ImageCardData[]>([]);
   const [loading, setLoading]         = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore]         = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [guidance, setGuidance]       = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -92,6 +100,8 @@ export default function LibraryPage() {
 
   const blurTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestSeqRef = useRef(0);
+  const loadingMoreRef = useRef(false);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     try {
@@ -140,12 +150,20 @@ export default function LibraryPage() {
     return () => clearTimeout(t);
   }, [query]);
 
-  const fetchImages = useCallback(async () => {
+  const fetchImages = useCallback(async (offset = 0, append = false) => {
+    if (append && loadingMoreRef.current) return;
     const requestSeq = ++requestSeqRef.current;
-    setLoading(true);
+    if (append) {
+      loadingMoreRef.current = true;
+      setLoadingMore(true);
+    } else {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+      setLoading(true);
+    }
 
     try {
-      const params = new URLSearchParams({ sort, limit: String(pageSize), offset: "0", orientation });
+      const params = new URLSearchParams({ sort, limit: String(pageSize), offset: String(offset), orientation });
       if (category !== "all") params.set("category", category);
       if (debouncedQuery)     params.set("query", debouncedQuery);
       if (freeOnly) params.set("free", "true");
@@ -155,24 +173,52 @@ export default function LibraryPage() {
 
       const res = await fetch(`/api/images?${params}`);
       if (!res.ok) throw new Error();
-      const { images: data } = await res.json();
+      const { images: data, hasMore: moreAvailable } = await res.json() as { images?: ImageCardData[]; hasMore?: boolean };
 
       if (requestSeq !== requestSeqRef.current) return;
 
-      setImages((data ?? []).slice(0, pageSize));
+      const nextImages = (data ?? []).slice(0, pageSize);
+      setImages((current) => {
+        if (!append) return nextImages;
+        const existingIds = new Set(current.map((image) => image.id));
+        return [...current, ...nextImages.filter((image) => !existingIds.has(image.id))];
+      });
+      setHasMore(Boolean(moreAvailable));
     } catch {
       if (requestSeq !== requestSeqRef.current) return;
-      setImages([]);
+      if (!append) setImages([]);
+      setHasMore(false);
     } finally {
+      if (append) loadingMoreRef.current = false;
       if (requestSeq === requestSeqRef.current) {
-        setLoading(false);
+        if (append) setLoadingMore(false);
+        else setLoading(false);
       }
     }
   }, [category, sort, orientation, pageSize, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly]);
 
   useEffect(() => {
-    fetchImages();
+    setHasMore(false);
+    void fetchImages(0, false);
   }, [category, sort, orientation, pageSize, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore || loadingMoreRef.current || !hasMore) return;
+    void fetchImages(images.length, true);
+  }, [fetchImages, hasMore, images.length, loading, loadingMore]);
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMore();
+      },
+      { rootMargin: "240px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
   function handleCategoryChange(key: string) {
     setCategory(key);
@@ -319,16 +365,37 @@ export default function LibraryPage() {
                 <p className="text-base">{l.noResults}</p>
               </div>
             ) : (
-              <MasonryGrid>
-                {images.map((img) => (
-                  <Link key={img.id} href={`/library/${img.id}`}>
-                    <ImageCard
-                      image={img}
-                      className="mb-4 break-inside-avoid"
-                    />
-                  </Link>
-                ))}
-              </MasonryGrid>
+              <>
+                <MasonryGrid>
+                  {images.map((img) => (
+                    <Link key={img.id} href={`/library/${img.id}`}>
+                      <ImageCard
+                        image={img}
+                        className="mb-4 break-inside-avoid"
+                      />
+                    </Link>
+                  ))}
+                </MasonryGrid>
+                <div ref={loadMoreSentinelRef} className="flex min-h-28 flex-col items-center justify-center gap-3 pt-8" aria-live="polite">
+                  {loadingMore ? (
+                    <div className="flex flex-col items-center gap-2 text-outline">
+                      <span className="h-9 w-9 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-hidden="true" />
+                      <span className="text-xs font-semibold">{copy.loadingMore}</span>
+                    </div>
+                  ) : hasMore ? (
+                    <button
+                      type="button"
+                      onClick={loadMore}
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-primary/30 bg-surface-container-lowest px-6 text-sm font-bold text-primary shadow-ghost transition-all hover:border-primary hover:bg-primary/5 active:scale-[0.98]"
+                    >
+                      <span className="material-symbols-outlined text-xl" aria-hidden="true">add_circle</span>
+                      {copy.loadMore(pageSize)}
+                    </button>
+                  ) : (
+                    <p className="text-xs font-medium text-outline">{copy.endOfResults}</p>
+                  )}
+                </div>
+              </>
             )}
           </div>
           <AdRail side="right" />

@@ -15,6 +15,7 @@ const SELECT_COLUMNS = `
   inactive_account_retention_days,
   audit_log_retention_days,
   deletion_request_retention_days,
+  rejected_image_retention_days,
   updated_at
 `;
 

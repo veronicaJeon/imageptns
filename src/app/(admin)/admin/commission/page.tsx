@@ -71,8 +71,8 @@ const EMPTY_FORM: PolicyForm = {
 };
 
 const DELETION_FEE_HELP: Record<DeletionFeeSetting["code"], string> = {
-  image_delete_simple: "판매/온체인 이력이 없는 사진가 삭제 요청에 적용합니다.",
-  image_delete_complex: "구매자 고지, 구매이력 보존, 온체인/Arweave 기록 확인이 필요한 요청에 적용합니다.",
+  image_delete_simple: "현재 미사용입니다. Arweave 자격증명이 없는 사진은 수수료 없이 즉시 비노출 처리됩니다.",
+  image_delete_complex: "Arweave 자격증명 기록 확인과 웹사이트 비노출 처리가 필요한 사진가 요청에만 적용합니다.",
 };
 
 function formatRate(rate: number) {

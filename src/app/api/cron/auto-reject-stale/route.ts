@@ -22,18 +22,25 @@ async function runRetentionCleanup(admin: ReturnType<typeof createAdminClient>) 
 }
 
 async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient>) {
-  const [retention, monitoringRetention] = await Promise.all([
+  const [retention, monitoringRetention, rejectedImageRetention] = await Promise.all([
     runRetentionCleanup(admin),
     admin.rpc("purge_old_operational_events"),
+    admin.rpc("archive_expired_rejected_images"),
   ]);
   if (monitoringRetention.error) {
     console.error("[auto-reject-stale] monitoring retention failed:", monitoringRetention.error.message);
+  }
+  if (rejectedImageRetention.error) {
+    console.error("[auto-reject-stale] rejected image retention failed:", rejectedImageRetention.error.message);
   }
   return {
     retention,
     monitoringRetention: monitoringRetention.error
       ? { ok: false as const }
       : { ok: true as const, deleted: monitoringRetention.data ?? 0 },
+    rejectedImageRetention: rejectedImageRetention.error
+      ? { ok: false as const }
+      : { ok: true as const, archived: rejectedImageRetention.data ?? 0 },
   };
 }
 
@@ -70,7 +77,7 @@ export async function GET(request: Request) {
   for (const img of staleImages) {
     const { error: updateErr } = await admin
       .from("images")
-      .update({ status: "rejected", rejection_reason: reason })
+      .update({ status: "rejected", rejection_reason: reason, rejected_at: new Date().toISOString() })
       .eq("id", img.id)
       .eq("status", "pending"); // guard against race condition
 

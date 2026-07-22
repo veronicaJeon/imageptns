@@ -8,6 +8,7 @@ import { getCopyrightLicense, getFreeUsagePolicy, getLocalizedCopyrightLicense, 
 import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
 import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
+import { useCart } from "@/lib/store/cart";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 
@@ -23,11 +24,18 @@ const UPLOADS_PAGE_COPY = {
     },
     proof: { not_registered: "증명 전", available: "등록가능", requested: "요청됨", pending: "Arweave 등록 중", registered: "증명 완료", failed: "증명 실패" },
     alreadyDeleting: "이미 삭제 절차가 진행 중이거나 완료된 이미지입니다.",
-    deleteReasonPrompt: "관리자에게 전달할 삭제 요청 사유를 입력하세요.",
     deleteReasonDefault: "포트폴리오 정리",
     deleteRequestFailed: "삭제 요청을 생성하지 못했습니다.",
     deleteRequestAccepted: (fee: string) => `삭제 요청이 접수되었습니다. 예상 삭제 수수료: ₩${fee}`,
-    deleteConfirm: "미공개 이미지를 완전삭제하시겠습니까?",
+    deleteImmediateAccepted: "검색과 신규 판매에서 즉시 제외했습니다.",
+    deleteDialogTitle: "사진을 삭제하시겠습니까?",
+    arweaveDeletionNotice: "이 사진은 Arweave 자격증명이 발급되어 원본 증명 기록이 영구 저장되어 있습니다. 해당 기록 자체는 삭제할 수 없으며, 웹사이트 비노출·구매자 기록 보존·자격증명 연결 검토를 관리자가 처리해야 하므로 삭제 수수료가 발생할 수 있습니다. 비용은 Arweave 자격증명 사진에만 적용됩니다.",
+    immediateDeletionNotice: "이 사진에는 Arweave 자격증명이 없습니다. 확인하면 검색과 신규 판매에서 즉시 제외되고, 장바구니에서는 사라지며, 기존 구매이력에서는 비활성 상태로 표시됩니다. 원본 파일과 데이터베이스 기록의 완전삭제는 관리자가 별도로 처리합니다.",
+    deletionReasonLabel: "삭제 사유",
+    deletionReasonPlaceholder: "예: 포트폴리오 정리",
+    confirmDeleteRequest: "삭제 요청",
+    confirmImmediateDelete: "즉시 비노출",
+    rejectedRetention: (days: number) => `${days}일 이후 해당 기록은 사라집니다.`,
     latestSort: "최신순 정렬",
     deletionRequested: (fee: string) => `삭제 요청됨 · 수수료 ₩${fee}`,
     aiImage: "AI 이미지",
@@ -70,11 +78,18 @@ const UPLOADS_PAGE_COPY = {
     },
     proof: { not_registered: "Not proven", available: "Eligible", requested: "Requested", pending: "Arweave registering", registered: "Proof complete", failed: "Proof failed" },
     alreadyDeleting: "This image is already in or past the deletion process.",
-    deleteReasonPrompt: "Enter the deletion request reason for the admin team.",
     deleteReasonDefault: "Portfolio cleanup",
     deleteRequestFailed: "Could not create the deletion request.",
     deleteRequestAccepted: (fee: string) => `Deletion request submitted. Estimated deletion fee: ₩${fee}`,
-    deleteConfirm: "Permanently delete this unpublished image?",
+    deleteImmediateAccepted: "The image was immediately removed from search and new sales.",
+    deleteDialogTitle: "Delete this image?",
+    arweaveDeletionNotice: "This image has an Arweave credential, so its proof record is permanent and cannot itself be deleted. An administrator must handle site removal, buyer-history preservation, and credential-link review, which may incur a deletion fee. Fees apply only to Arweave-credentialed images.",
+    immediateDeletionNotice: "This image has no Arweave credential. It will immediately disappear from search and carts, and any purchase history will be marked unavailable. Permanent removal of the source file and database record is handled separately by an administrator.",
+    deletionReasonLabel: "Reason for deletion",
+    deletionReasonPlaceholder: "Example: Portfolio cleanup",
+    confirmDeleteRequest: "Request deletion",
+    confirmImmediateDelete: "Remove now",
+    rejectedRetention: (days: number) => `This record disappears after ${days} days.`,
     latestSort: "Newest first",
     deletionRequested: (fee: string) => `Deletion requested · fee ₩${fee}`,
     aiImage: "AI image",
@@ -150,6 +165,7 @@ interface UploadRow {
   deletion_fee_krw: number | null;
   deletion_fee_status: string | null;
   rejection_reason: string | null;
+  rejected_at: string | null;
   views_count: number | null;
   sales_count: number | null;
   created_at: string;
@@ -227,15 +243,22 @@ function UploadsPageContent() {
   const [uploads, setUploads] = useState<UploadRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deletionTarget, setDeletionTarget] = useState<UploadRow | null>(null);
+  const [deletionReason, setDeletionReason] = useState<string>(copy.deleteReasonDefault);
   const [editing, setEditing] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeFilter, setActiveFilter] = useState<StatusFilter>("all");
   const [categories, setCategories] = useState<ImageCategory[]>(() => [...DEFAULT_IMAGE_CATEGORIES]);
+  const [rejectedImageRetentionDays, setRejectedImageRetentionDays] = useState(7);
+  const removeUnavailableItems = useCart((state) => state.removeUnavailableItems);
 
   useEffect(() => {
     fetch("/api/uploads")
       .then((r) => r.json())
-      .then(({ uploads }) => setUploads(uploads ?? []))
+      .then((data: { uploads?: UploadRow[]; rejectedImageRetentionDays?: number }) => {
+        setUploads(data.uploads ?? []);
+        setRejectedImageRetentionDays(data.rejectedImageRetentionDays ?? 7);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -260,56 +283,58 @@ function UploadsPageContent() {
     });
   }
 
-  function requiresAdminDeletionRequest(img: UploadRow) {
+  function hasArweaveCredential(img: UploadRow) {
     return (
-      img.status === "approved" ||
-      (img.sales_count ?? 0) > 0 ||
-      ["requested", "pending", "registered"].includes(img.proof_status ?? "") ||
-      Boolean(img.proof_tx_hash || img.proof_arweave_original_tx_id || img.proof_arweave_manifest_tx_id)
+      Boolean(img.proof_arweave_confirmed_at) ||
+      Boolean(img.proof_arweave_original_tx_id) ||
+      Boolean(img.proof_arweave_metadata_tx_id) ||
+      Boolean(img.proof_arweave_manifest_tx_id)
     );
   }
 
-  async function handleDelete(img: UploadRow) {
+  function openDeletionDialog(img: UploadRow) {
     if (img.lifecycle_status && img.lifecycle_status !== "active") {
       alert(copy.alreadyDeleting);
       return;
     }
+    setDeletionReason(copy.deleteReasonDefault);
+    setDeletionTarget(img);
+  }
 
+  async function handleDelete() {
+    if (!deletionTarget) return;
+    const img = deletionTarget;
     setDeleting(img.id);
     try {
-      if (requiresAdminDeletionRequest(img)) {
-        const reason = prompt(copy.deleteReasonPrompt, copy.deleteReasonDefault);
-        if (reason === null) return;
-        const res = await fetch(`/api/images/${img.id}/deletion-request`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason, reasonCategory: "portfolio_cleanup" }),
-        });
-        const data = await res.json().catch(() => null) as {
-          request?: { estimated_fee_krw?: number };
-          impact?: { estimatedFeeKrw?: number };
-          error?: string;
-        } | null;
-        if (!res.ok) {
-          alert(data?.error ?? copy.deleteRequestFailed);
-          return;
-        }
+      const res = await fetch(`/api/images/${img.id}/deletion-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: deletionReason.trim() || copy.deleteReasonDefault, reasonCategory: "portfolio_cleanup" }),
+      });
+      const data = await res.json().catch(() => null) as {
+        immediate?: boolean;
+        request?: { estimated_fee_krw?: number };
+        impact?: { estimatedFeeKrw?: number };
+        error?: string;
+      } | null;
+      if (!res.ok) {
+        alert(data?.error ?? copy.deleteRequestFailed);
+        return;
+      }
+
+      if (data?.immediate) {
+        setUploads((prev) => prev.filter((upload) => upload.id !== img.id));
+        removeUnavailableItems([img.id]);
+        setDeletionTarget(null);
+        alert(copy.deleteImmediateAccepted);
+      } else {
         const fee = data?.impact?.estimatedFeeKrw ?? data?.request?.estimated_fee_krw ?? 0;
         alert(copy.deleteRequestAccepted(fee.toLocaleString(copy.locale)));
         setUploads((prev) => prev.map((u) => u.id === img.id
           ? { ...u, lifecycle_status: "deletion_requested", deletion_fee_krw: fee, deletion_fee_status: fee > 0 ? "quoted" : "waived" }
           : u));
-        return;
+        setDeletionTarget(null);
       }
-
-      if (!confirm(copy.deleteConfirm)) return;
-      const res = await fetch(`/api/uploads/${img.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const { error } = await res.json();
-        alert(error);
-        return;
-      }
-      setUploads((prev) => prev.filter((u) => u.id !== img.id));
     } finally {
       setDeleting(null);
     }
@@ -452,6 +477,13 @@ function UploadsPageContent() {
             })}
           </div>
 
+          {activeFilter === "rejected" && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-error/20 bg-error/5 px-4 py-3 text-xs font-semibold text-error">
+              <span className="material-symbols-outlined text-base">schedule</span>
+              <p>{copy.rejectedRetention(rejectedImageRetentionDays)}</p>
+            </div>
+          )}
+
           {filteredUploads.length === 0 ? (
             <div className="flex flex-col items-center py-24 gap-3 text-outline">
               <span className="material-symbols-outlined text-5xl">
@@ -589,15 +621,15 @@ function UploadsPageContent() {
                           )}
                           {canEdit && (
                             <button
-                              onClick={() => handleDelete(img)}
+                              onClick={() => openDeletionDialog(img)}
                               disabled={deleting === img.id}
                               className="text-outline hover:text-error transition-colors disabled:opacity-50"
-                              title={requiresAdminDeletionRequest(img) ? copy.deleteRequestTitle : copy.deleteTitle}
-                              aria-label={requiresAdminDeletionRequest(img) ? copy.deleteRequestTitle : copy.deleteTitle}
+                              title={copy.deleteTitle}
+                              aria-label={copy.deleteTitle}
                             >
                               {deleting === img.id
                                 ? <span className="w-4 h-4 border-2 border-error border-t-transparent rounded-full animate-spin inline-block" />
-                                : <span className="material-symbols-outlined text-base">{requiresAdminDeletionRequest(img) ? "assignment_late" : "delete"}</span>
+                                : <span className="material-symbols-outlined text-base">delete</span>
                               }
                             </button>
                           )}
@@ -806,6 +838,67 @@ function UploadsPageContent() {
             </div>
           )}
         </>
+      )}
+
+      {deletionTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target && !deleting) setDeletionTarget(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deletion-dialog-title"
+            className="w-full max-w-lg rounded-xl bg-surface-container-lowest p-5 shadow-2xl md:p-6"
+          >
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined rounded-full bg-error/10 p-2 text-error">delete</span>
+              <div className="min-w-0">
+                <h2 id="deletion-dialog-title" className="text-lg font-bold text-on-surface">{copy.deleteDialogTitle}</h2>
+                <p className="mt-1 truncate text-sm text-outline">{localizedText(lang, deletionTarget.title, deletionTarget.title_ko, deletionTarget.title_en)}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-lg bg-surface-container-low px-4 py-3 text-sm leading-relaxed text-on-surface-variant">
+              {hasArweaveCredential(deletionTarget) ? copy.arweaveDeletionNotice : copy.immediateDeletionNotice}
+            </div>
+
+            <label className="mt-4 block text-xs font-semibold text-outline" htmlFor="deletion-reason">
+              {copy.deletionReasonLabel}
+            </label>
+            <textarea
+              id="deletion-reason"
+              value={deletionReason}
+              onChange={(event) => setDeletionReason(event.target.value)}
+              placeholder={copy.deletionReasonPlaceholder}
+              rows={3}
+              className="mt-1.5 w-full resize-none rounded-lg bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
+            />
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeletionTarget(null)}
+                disabled={Boolean(deleting)}
+                className="rounded px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50"
+              >
+                {copy.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={Boolean(deleting)}
+                className="inline-flex items-center gap-2 rounded bg-error px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {deleting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                {hasArweaveCredential(deletionTarget) ? copy.confirmDeleteRequest : copy.confirmImmediateDelete}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

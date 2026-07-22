@@ -15,6 +15,7 @@ export interface ImageDeletionInput {
   proof_arweave_original_tx_id?: string | null;
   proof_arweave_metadata_tx_id?: string | null;
   proof_arweave_manifest_tx_id?: string | null;
+  proof_arweave_confirmed_at?: string | null;
 }
 
 export interface ImageDeletionContext {
@@ -54,8 +55,9 @@ function hasOnchainProof(image: ImageDeletionInput) {
   );
 }
 
-function hasArweaveProof(image: ImageDeletionInput) {
+export function hasArweaveCredential(image: ImageDeletionInput) {
   return (
+    hasValue(image.proof_arweave_confirmed_at) ||
     hasValue(image.proof_arweave_original_tx_id) ||
     hasValue(image.proof_arweave_metadata_tx_id) ||
     hasValue(image.proof_arweave_manifest_tx_id)
@@ -63,12 +65,10 @@ function hasArweaveProof(image: ImageDeletionInput) {
 }
 
 export function defaultDeletionFeeKrw(
-  impact: Pick<ImageDeletionImpact, "buyerNoticeRequired" | "onchainNoticeRequired">,
+  impact: Pick<ImageDeletionImpact, "reasons">,
   config: DeletionFeeConfig = DEFAULT_DELETION_FEE_CONFIG,
 ) {
-  return impact.buyerNoticeRequired || impact.onchainNoticeRequired
-    ? config.complexFeeKrw
-    : config.simpleFeeKrw;
+  return impact.reasons.includes("arweave_registered") ? config.complexFeeKrw : 0;
 }
 
 export function assessImageDeletion(
@@ -78,7 +78,7 @@ export function assessImageDeletion(
   const salesCount = Math.max(0, Number(image.sales_count ?? 0));
   const sold = salesCount > 0;
   const onchain = hasOnchainProof(image);
-  const arweave = hasArweaveProof(image);
+  const arweave = hasArweaveCredential(image);
   const archiveRequired = sold || onchain || arweave;
   const reasons: DeletionReason[] = [];
 

@@ -47,7 +47,8 @@ export async function GET(req: NextRequest) {
         id, asset_id, title, status, lifecycle_status,
         storage_path_preview, storage_path_full, storage_path_original, original_filename,
         sales_count, proof_status, proof_tx_hash,
-        proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id
+        proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
+        proof_arweave_confirmed_at
       ),
       requester:profiles!requester_id(full_name, avatar_url)
     `)
@@ -99,7 +100,8 @@ export async function PATCH(req: NextRequest) {
         id, asset_id, title, status, lifecycle_status,
         storage_path_preview, storage_path_full, storage_path_original, original_filename,
         sales_count, proof_status, proof_tx_hash,
-        proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id
+        proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
+        proof_arweave_confirmed_at
       )
     `)
     .eq("id", id)

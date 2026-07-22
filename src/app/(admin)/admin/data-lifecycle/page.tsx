@@ -9,6 +9,7 @@ interface DataLifecycleRow {
   inactive_account_retention_days: number;
   audit_log_retention_days: number;
   deletion_request_retention_days: number;
+  rejected_image_retention_days: number;
 }
 
 const FIELDS: Array<{
@@ -52,6 +53,14 @@ const FIELDS: Array<{
     required: false,
   },
   {
+    key: "rejected_image_retention_days",
+    label: "반려된 이미지 보관주기",
+    description: "반려 시점부터 사진가의 업로드 목록에 보관할 기간입니다. 기간이 지나면 자동으로 아카이브되어 목록에서 사라집니다.",
+    min: 1,
+    max: 365,
+    required: true,
+  },
+  {
     key: "audit_log_retention_days",
     label: "관리자 감사로그 보관주기",
     description: "관리자 정책 변경과 중요 운영 작업의 감사로그 최대 보관 기간입니다.",
@@ -76,6 +85,7 @@ const DEFAULTS: DataLifecycleRow = {
   inactive_account_retention_days: 365,
   audit_log_retention_days: 730,
   deletion_request_retention_days: 730,
+  rejected_image_retention_days: 7,
 };
 
 export default function DataLifecycleAdminPage() {

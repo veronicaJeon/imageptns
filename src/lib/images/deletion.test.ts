@@ -50,7 +50,7 @@ describe("image deletion policy", () => {
     expect(impact.reasons).toContain("onchain_registered");
   });
 
-  it("charges a higher default fee for photographer requests that affect buyers or onchain records", () => {
+  it("charges photographer deletion fees only for Arweave credentials", () => {
     const simple = assessImageDeletion({
       sales_count: 0,
       proof_status: "not_registered",
@@ -67,9 +67,20 @@ describe("image deletion policy", () => {
       proof_arweave_manifest_tx_id: "manifest",
     }, { requesterRole: "photographer" });
 
-    expect(defaultDeletionFeeKrw(simple)).toBe(5000);
+    expect(defaultDeletionFeeKrw(simple)).toBe(0);
     expect(defaultDeletionFeeKrw(complex)).toBe(30000);
     expect(complex.estimatedFeeKrw).toBe(30000);
+  });
+
+  it("recognizes a confirmed Arweave credential even when transaction ids are absent", () => {
+    const impact = assessImageDeletion({
+      sales_count: 0,
+      proof_status: "not_registered",
+      proof_arweave_confirmed_at: "2026-07-22T00:00:00.000Z",
+    }, { requesterRole: "photographer" });
+
+    expect(impact.reasons).toContain("arweave_registered");
+    expect(impact.estimatedFeeKrw).toBe(30000);
   });
 
   it("uses administrator-configured photographer deletion fees", () => {
@@ -88,14 +99,14 @@ describe("image deletion policy", () => {
       sales_count: 2,
       proof_status: "registered",
       proof_tx_hash: "0xabc",
-      proof_arweave_original_tx_id: null,
+      proof_arweave_original_tx_id: "arweave-original",
       proof_arweave_manifest_tx_id: null,
     }, {
       requesterRole: "photographer",
       feeConfig: { simpleFeeKrw: 7000, complexFeeKrw: 45000 },
     });
 
-    expect(simple.estimatedFeeKrw).toBe(7000);
+    expect(simple.estimatedFeeKrw).toBe(0);
     expect(complex.estimatedFeeKrw).toBe(45000);
     expect(defaultDeletionFeeKrw(complex, { simpleFeeKrw: 7000, complexFeeKrw: 45000 })).toBe(45000);
   });

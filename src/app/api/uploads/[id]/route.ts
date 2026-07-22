@@ -5,6 +5,7 @@ import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/l
 import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryInput, syncImageCategoryAssignments } from "@/lib/images/category-server";
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
+import { hasArweaveCredential } from "@/lib/images/deletion";
 
 interface ImagePatchRow {
   id: string;
@@ -15,7 +16,11 @@ interface ImagePatchRow {
 interface ImageDeleteRow {
   id: string;
   status: string;
-  storage_path_original: string | null;
+  lifecycle_status: string | null;
+  proof_arweave_original_tx_id: string | null;
+  proof_arweave_metadata_tx_id: string | null;
+  proof_arweave_manifest_tx_id: string | null;
+  proof_arweave_confirmed_at: string | null;
 }
 
 export async function PATCH(
@@ -99,6 +104,7 @@ export async function PATCH(
   if (resubmit && ["rejected", "draft"].includes(image.status)) {
     update.status = "pending";
     update.rejection_reason = null;
+    update.rejected_at = null;
   }
 
   const { data, error } = await admin
@@ -106,7 +112,7 @@ export async function PATCH(
     .update(update)
     .eq("id", id)
     .eq("photographer_id", user.id)
-    .select("id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, exif_location, exif_taken_at, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
+    .select("id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, rejected_at, exif_location, exif_taken_at, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -137,28 +143,31 @@ export async function DELETE(
   const authorization = await requireApprovedPhotographer(admin, user.id);
   if (!authorization.ok) return authorization.response;
 
-  // Only allow deleting own pending/rejected images
+  // Legacy DELETE callers use the same archive-only policy as the deletion request endpoint.
+  // Physical storage/database deletion remains an administrator operation.
   const { data: img } = await admin
     .from("images")
-    .select("id, status, storage_path_original")
+    .select("id, status, lifecycle_status, proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id, proof_arweave_confirmed_at")
     .eq("id", id)
     .eq("photographer_id", user.id)
     .single();
 
   if (!img) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const image = img as ImageDeleteRow;
-  if (!["pending", "rejected", "draft"].includes(image.status)) {
-    return NextResponse.json({ error: "Cannot delete approved images" }, { status: 403 });
+  if (image.lifecycle_status && image.lifecycle_status !== "active") {
+    return NextResponse.json({ error: "이미 삭제 절차가 진행 중이거나 완료된 이미지입니다." }, { status: 409 });
+  }
+  if (hasArweaveCredential(image)) {
+    return NextResponse.json({ error: "Arweave 자격증명 이미지는 안내 확인 후 삭제 요청을 접수해야 합니다." }, { status: 409 });
   }
 
-  // Remove from both original and preview storage if path exists.
-  if (image.storage_path_original) {
-    await admin.storage.from("images-original").remove([image.storage_path_original]);
-    await admin.storage.from("images-preview").remove([image.storage_path_original]);
-  }
-
-  const { error } = await admin.from("images").delete().eq("id", id).eq("photographer_id", user.id);
+  const { data: result, error } = await admin.rpc("archive_unregistered_photographer_image", {
+    target_image_id: id,
+    target_user_id: user.id,
+    deletion_reason_text: "사진가 직접 삭제",
+    reason_category_text: "portfolio_cleanup",
+  });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, immediate: true, result });
 }
