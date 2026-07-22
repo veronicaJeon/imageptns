@@ -210,6 +210,22 @@ export function localizedFreeUsagePolicies(lang: LicenseDisplayLang = "ko") {
   return FREE_USAGE_POLICIES.map((policy) => ({ ...policy, ...FREE_USAGE_POLICY_TRANSLATIONS[lang][policy.code] }));
 }
 
+export function copyrightLicenseFromConditions(input: {
+  allowsCommercialUse: boolean;
+  allowsDerivatives: boolean;
+  requiresShareAlike: boolean;
+}): Exclude<CopyrightLicenseCode, "standard" | "cc0"> {
+  const shareAlike = input.allowsDerivatives && input.requiresShareAlike;
+
+  if (!input.allowsDerivatives) {
+    return input.allowsCommercialUse ? "cc_by_nd" : "cc_by_nc_nd";
+  }
+  if (input.allowsCommercialUse) {
+    return shareAlike ? "cc_by_sa" : "cc_by";
+  }
+  return shareAlike ? "cc_by_nc_sa" : "cc_by_nc";
+}
+
 export type BuyerUsageConditionKey =
   | "free"
   | "education_free"

@@ -88,4 +88,22 @@ describe("batch upload client helpers", () => {
       busy: false,
     })).toBe(false);
   });
+
+  it("blocks a batch containing a future shooting date", () => {
+    expect(canSubmitUploadBatch({
+      drafts: [{
+        id: "future",
+        title: "Title",
+        description: "Description",
+        categoryCodes: ["nature"],
+        tags: "tag",
+        takenAt: "2999-01-01",
+        location: "서울특별시",
+        uploadStatus: "idle",
+      }],
+      authorshipDeclaration: "human_original",
+      factualityAgreed: true,
+      busy: false,
+    })).toBe(false);
+  });
 });

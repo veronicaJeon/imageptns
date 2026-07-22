@@ -6,6 +6,7 @@ import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryI
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 import { hasArweaveCredential } from "@/lib/images/deletion";
+import { dateValueInTimeZone, takenAtIsAllowed } from "@/lib/uploads/taken-at";
 
 interface ImagePatchRow {
   id: string;
@@ -70,6 +71,9 @@ export async function PATCH(
 
   if (title !== undefined && !title.trim()) {
     return NextResponse.json({ error: "Title cannot be empty" }, { status: 400 });
+  }
+  if (exif_taken_at && !takenAtIsAllowed(exif_taken_at, dateValueInTimeZone())) {
+    return NextResponse.json({ error: "exif_taken_at must be a valid date that is not in the future" }, { status: 400 });
   }
 
   const image = img as ImagePatchRow;

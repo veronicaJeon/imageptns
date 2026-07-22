@@ -13,6 +13,8 @@ export interface AnalyzeResponse {
   category: string;
 }
 
+const MISTRAL_MAX_OUTPUT_TOKENS = 768;
+
 function visionPrompt(primaryLanguage: "ko" | "en") {
   const primary = primaryLanguage === "ko" ? "Korean" : "English";
   const secondary = primaryLanguage === "ko" ? "English" : "Korean";
@@ -83,6 +85,7 @@ export async function analyzeWithMistral(dataUrl: string, primaryLanguage: "ko" 
     },
     body: JSON.stringify({
       model: "mistral-small-latest",
+      response_format: { type: "json_object" },
       messages: [{
         role: "user",
         content: [
@@ -90,7 +93,7 @@ export async function analyzeWithMistral(dataUrl: string, primaryLanguage: "ko" 
           { type: "text", text: visionPrompt(primaryLanguage) },
         ],
       }],
-      max_tokens: 256,
+      max_tokens: MISTRAL_MAX_OUTPUT_TOKENS,
       temperature: 0.1,
     }),
     signal: AbortSignal.timeout(45_000),
@@ -98,10 +101,19 @@ export async function analyzeWithMistral(dataUrl: string, primaryLanguage: "ko" 
 
   if (!response.ok) throw new Error(`Mistral request failed with status ${response.status}`);
 
-  const json = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const raw = json.choices?.[0]?.message?.content ?? "";
+  const json = await response.json() as {
+    choices?: Array<{
+      finish_reason?: string;
+      message?: { content?: string };
+    }>;
+  };
+  const choice = json.choices?.[0];
+  const raw = choice?.message?.content ?? "";
   const parsed = parseMistralAnalyzeResponse(raw);
   if (!parsed || (!parsed.caption && parsed.tags.length === 0)) {
+    if (choice?.finish_reason === "length") {
+      throw new Error(`Mistral output exceeded ${MISTRAL_MAX_OUTPUT_TOKENS} tokens`);
+    }
     throw new Error("Mistral returned an unusable result");
   }
   return parsed;

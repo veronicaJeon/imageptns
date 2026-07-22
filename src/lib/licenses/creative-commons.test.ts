@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buyerUsageConditions,
+  copyrightLicenseFromConditions,
   creditLineForName,
   getCopyrightLicense,
   getFreeUsagePolicy,
@@ -116,5 +117,31 @@ describe("creative commons metadata", () => {
       { key: "derivatives", label: "Modifications restricted", allowed: false },
       { key: "attribution", label: "Credit required", allowed: true },
     ]);
+  });
+
+  it.each([
+    [true, true, false, "cc_by"],
+    [true, true, true, "cc_by_sa"],
+    [false, true, false, "cc_by_nc"],
+    [false, true, true, "cc_by_nc_sa"],
+    [true, false, false, "cc_by_nd"],
+    [false, false, false, "cc_by_nc_nd"],
+  ] as const)(
+    "maps commercial=%s derivatives=%s share-alike=%s to %s",
+    (allowsCommercialUse, allowsDerivatives, requiresShareAlike, expected) => {
+      expect(copyrightLicenseFromConditions({
+        allowsCommercialUse,
+        allowsDerivatives,
+        requiresShareAlike,
+      })).toBe(expected);
+    },
+  );
+
+  it("ignores share-alike when derivatives are not allowed", () => {
+    expect(copyrightLicenseFromConditions({
+      allowsCommercialUse: false,
+      allowsDerivatives: false,
+      requiresShareAlike: true,
+    })).toBe("cc_by_nc_nd");
   });
 });

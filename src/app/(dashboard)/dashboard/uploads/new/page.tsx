@@ -7,9 +7,11 @@ import Link from "next/link";
 import { useLang } from "@/lib/i18n/store";
 import { extractExif, type ExifData } from "@/lib/utils/exif";
 import { normalizeRotationDegrees, rotatedDimensions } from "@/lib/images/orientation";
-import { localizedCopyrightLicenses, localizedFreeUsagePolicies, type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
+import { type CopyrightLicenseCode, type FreeUsagePolicyCode } from "@/lib/licenses/creative-commons";
 import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
 import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
+import { CopyrightLicenseStepper } from "@/components/uploads/CopyrightLicenseStepper";
+import { LocationAutocomplete } from "@/components/uploads/LocationAutocomplete";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 import {
   ACCEPTED_UPLOAD_TYPES,
@@ -21,6 +23,7 @@ import {
   uploadFileClientId,
   type UploadDraftReadiness,
 } from "@/lib/uploads/batch-client";
+import { localTodayDateValue, takenAtIsFuture } from "@/lib/uploads/taken-at";
 
 const UNKNOWN = "unknown";
 
@@ -86,14 +89,11 @@ const NEW_UPLOAD_COPY = {
     unknown: "미상",
     manualInput: "직접입력",
     shotAtError: "촬영일시를 입력하거나 '미상'을 선택하세요.",
-    locationPlaceholder: "예: Seoul, Korea",
+    shotAtFutureError: "날짜를 다시 확인해 주세요. 미래의 날짜는 설정할 수 없습니다.",
+    locationPlaceholder: "예: 서교동",
     locationError: "촬영장소를 입력하거나 '미상'을 선택하세요.",
     copyrightTitle: "공통 저작권 및 공개 범위 *",
     copyrightHelp: "이번 대기열에 있는 모든 사진에 같은 저작권 등급과 무료 사용 조건을 적용합니다.",
-    freeHelpBefore: "무료로 공개하려면 무료 사용 정책에서",
-    freeAll: "전체 무료",
-    freeEducation: "교육용 무료",
-    freeHelpAfter: "를 선택하세요. CC0/CC BY 계열을 선택하면 라이브러리에서도 해당 저작권 등급이 함께 표시됩니다.",
     attributionName: "공통 출처 표기명",
     attributionPlaceholder: "예: 작가명 또는 스튜디오명",
     attributionUrl: "공통 출처 URL",
@@ -171,14 +171,11 @@ const NEW_UPLOAD_COPY = {
     unknown: "Unknown",
     manualInput: "Manual input",
     shotAtError: "Enter the date taken or choose Unknown.",
+    shotAtFutureError: "Check the date again. A future date cannot be selected.",
     locationPlaceholder: "Example: Seoul, Korea",
     locationError: "Enter the location taken or choose Unknown.",
     copyrightTitle: "Shared copyright and release scope *",
     copyrightHelp: "Apply the same Creative Commons level and free-use policy to every photo in this queue.",
-    freeHelpBefore: "To publish this as free, choose",
-    freeAll: "Free for all uses",
-    freeEducation: "Free for education",
-    freeHelpAfter: "in the free-use policy. CC0/CC BY-family choices will also be shown in the library.",
     attributionName: "Shared credit name",
     attributionPlaceholder: "Example: photographer or studio name",
     attributionUrl: "Shared credit URL",
@@ -334,11 +331,10 @@ function fileFormat(file: File) {
 function NewUploadContent() {
   const { lang } = useLang();
   const copy = NEW_UPLOAD_COPY[lang];
+  const todayDate = localTodayDateValue();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewUrlsRef = useRef(new Set<string>());
-  const copyrightLicenses = localizedCopyrightLicenses(lang);
-  const freeUsagePolicies = localizedFreeUsagePolicies(lang);
 
   const [categories, setCategories] = useState<ImageCategory[]>(() => [...DEFAULT_IMAGE_CATEGORIES]);
   const [drafts, setDrafts] = useState<UploadDraft[]>([]);
@@ -368,6 +364,7 @@ function NewUploadContent() {
     factualityAgreed,
     busy: batchBusy,
   });
+  const activeTakenAtIsFuture = Boolean(activeDraft && takenAtIsFuture(activeDraft.takenAt, todayDate));
 
   useEffect(() => {
     const previewUrls = previewUrlsRef.current;
@@ -726,8 +723,8 @@ function NewUploadContent() {
         exif_camera: draft.exifData?.camera ?? null,
         copyright_license: copyrightLicense,
         free_usage_policy: freeUsagePolicy,
-        attribution_name: attributionName.trim() || null,
-        attribution_url: attributionUrl.trim() || null,
+        attribution_name: copyrightLicense !== "standard" && copyrightLicense !== "cc0" ? attributionName.trim() || null : null,
+        attribution_url: copyrightLicense !== "standard" && copyrightLicense !== "cc0" ? attributionUrl.trim() || null : null,
         authorship_declaration: authorshipDeclaration,
         factuality_attested: factualityAgreed,
       }),
@@ -1072,9 +1069,11 @@ function NewUploadContent() {
                       <div className="flex items-center gap-2">
                         <input
                           type="date"
+                          max={todayDate}
                           value={activeDraft.takenAt}
                           onChange={(e) => patchActiveDraft({ takenAt: e.target.value, takenAtSource: "manual" })}
-                          className="h-12 flex-1 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all focus:ring-2 focus:ring-primary"
+                          aria-invalid={activeTakenAtIsFuture}
+                          className={`h-12 flex-1 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 transition-all focus:ring-2 ${activeTakenAtIsFuture ? "ring-error focus:ring-error" : "ring-outline-variant focus:ring-primary"}`}
                         />
                         <button
                           type="button"
@@ -1085,7 +1084,9 @@ function NewUploadContent() {
                         </button>
                       </div>
                     )}
-                    {!activeDraft.takenAt && activeDraft.aiStatus !== "analyzing" && <p className="text-xs text-error">{copy.shotAtError}</p>}
+                    {activeTakenAtIsFuture
+                      ? <p className="text-xs text-error">{copy.shotAtFutureError}</p>
+                      : !activeDraft.takenAt && activeDraft.aiStatus !== "analyzing" && <p className="text-xs text-error">{copy.shotAtError}</p>}
                   </div>
 
                   <div className="flex flex-col gap-2">
@@ -1109,13 +1110,12 @@ function NewUploadContent() {
                         </button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
+                      <div className="flex items-start gap-2">
+                        <LocationAutocomplete
+                          lang={lang}
                           value={activeDraft.location}
-                          onChange={(e) => patchActiveDraft({ location: e.target.value, locationSource: "manual" })}
+                          onChange={(location) => patchActiveDraft({ location, locationSource: "manual" })}
                           placeholder={copy.locationPlaceholder}
-                          className="h-12 flex-1 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
                         />
                         <button
                           type="button"
@@ -1141,80 +1141,38 @@ function NewUploadContent() {
                   <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{copy.copyrightHelp}</p>
                 </div>
 
-                <div className="grid gap-3">
-                  {copyrightLicenses.map((license) => (
-                    <label
-                      key={license.code}
-                      className={[
-                        "flex cursor-pointer gap-3 rounded-lg border px-4 py-3 transition-colors",
-                        copyrightLicense === license.code ? "border-primary bg-primary/5" : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
-                      ].join(" ")}
-                    >
+                <CopyrightLicenseStepper
+                  lang={lang}
+                  copyrightLicense={copyrightLicense}
+                  freeUsagePolicy={freeUsagePolicy}
+                  onCopyrightLicenseChange={setCopyrightLicense}
+                  onFreeUsagePolicyChange={setFreeUsagePolicy}
+                />
+
+                {copyrightLicense !== "standard" && copyrightLicense !== "cc0" && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-outline">{copy.attributionName}</label>
                       <input
-                        type="radio"
-                        name="copyright_license"
-                        value={license.code}
-                        checked={copyrightLicense === license.code}
-                        onChange={() => setCopyrightLicense(license.code)}
-                        className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                        type="text"
+                        value={attributionName}
+                        onChange={(e) => setAttributionName(e.target.value)}
+                        placeholder={copy.attributionPlaceholder}
+                        className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
                       />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-bold text-on-surface">{license.label}</span>
-                        <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">{license.summary}</span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {freeUsagePolicies.map((policy) => (
-                    <label
-                      key={policy.code}
-                      className={[
-                        "cursor-pointer rounded-lg border px-4 py-3 transition-colors",
-                        freeUsagePolicy === policy.code ? "border-primary bg-primary/5" : "border-outline-variant/40 bg-surface-container-low hover:border-outline",
-                      ].join(" ")}
-                    >
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-outline">{copy.attributionUrl}</label>
                       <input
-                        type="radio"
-                        name="free_usage_policy"
-                        value={policy.code}
-                        checked={freeUsagePolicy === policy.code}
-                        onChange={() => setFreeUsagePolicy(policy.code)}
-                        className="sr-only"
+                        type="url"
+                        value={attributionUrl}
+                        onChange={(e) => setAttributionUrl(e.target.value)}
+                        placeholder="https://..."
+                        className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
                       />
-                      <span className="block text-sm font-bold text-on-surface">{policy.label}</span>
-                      <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{policy.summary}</span>
-                    </label>
-                  ))}
-                </div>
-
-                <p className="text-xs leading-relaxed text-on-surface-variant">
-                  {copy.freeHelpBefore} <span className="font-semibold text-on-surface">{copy.freeAll}</span> {lang === "ko" ? "또는" : "or"} <span className="font-semibold text-on-surface">{copy.freeEducation}</span>{lang === "ko" ? "" : " "} {copy.freeHelpAfter}
-                </p>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-outline">{copy.attributionName}</label>
-                    <input
-                      type="text"
-                      value={attributionName}
-                      onChange={(e) => setAttributionName(e.target.value)}
-                      placeholder={copy.attributionPlaceholder}
-                      className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
-                    />
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-outline">{copy.attributionUrl}</label>
-                    <input
-                      type="url"
-                      value={attributionUrl}
-                      onChange={(e) => setAttributionUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5">

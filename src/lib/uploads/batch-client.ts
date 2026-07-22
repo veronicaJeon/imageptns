@@ -83,7 +83,7 @@ export function uploadDraftIsReady(draft: UploadDraftReadiness) {
     draft.description.trim().length > 0 &&
     draft.categoryCodes.length > 0 &&
     draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean).length > 0 &&
-    draft.takenAt.trim().length > 0 &&
+    takenAtIsAllowed(draft.takenAt, localTodayDateValue()) &&
     draft.location.trim().length > 0
   );
 }
@@ -100,3 +100,4 @@ export function canSubmitUploadBatch({
   const pendingDrafts = drafts.filter((draft) => draft.uploadStatus !== "done");
   return pendingDrafts.length > 0 && pendingDrafts.every(uploadDraftIsReady);
 }
+import { localTodayDateValue, takenAtIsAllowed } from "./taken-at";

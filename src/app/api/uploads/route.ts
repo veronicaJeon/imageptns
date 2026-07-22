@@ -9,6 +9,7 @@ import { normalizeRotationDegrees } from "@/lib/images/orientation";
 import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryInput, syncImageCategoryAssignments } from "@/lib/images/category-server";
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
+import { dateValueInTimeZone, takenAtIsAllowed } from "@/lib/uploads/taken-at";
 
 export const maxDuration = 60;
 
@@ -86,6 +87,9 @@ export async function POST(req: NextRequest) {
   }
   if (factuality_attested !== true) {
     return NextResponse.json({ error: "factuality_attested must be true" }, { status: 400 });
+  }
+  if (exif_taken_at && !takenAtIsAllowed(exif_taken_at, dateValueInTimeZone())) {
+    return NextResponse.json({ error: "exif_taken_at must be a valid date that is not in the future" }, { status: 400 });
   }
 
   const uploadRotationDegrees = normalizeRotationDegrees(upload_rotation_degrees);
