@@ -93,13 +93,57 @@ function ledgerImage(row: LedgerEarning) {
   return Array.isArray(image) ? image[0] : image;
 }
 
-function StatCard({ icon, label, value, sub }: { icon: string; label: string; value: string; sub?: string }) {
+interface SummaryMetric {
+  icon: string;
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: "primary" | "green" | "warning";
+}
+
+interface DetailMetric {
+  label: string;
+  value: string;
+  note?: string;
+}
+
+const METRIC_TONE_CLASS: Record<NonNullable<SummaryMetric["tone"]>, string> = {
+  primary: "text-primary",
+  green: "text-green-500 dark:text-green-300",
+  warning: "text-amber-500 dark:text-amber-300",
+};
+
+function SummaryMetricGrid({ items }: { items: SummaryMetric[] }) {
   return (
-    <div className="bg-surface-container-lowest shadow-ghost p-6 flex flex-col gap-2">
-      <span className="material-symbols-outlined text-2xl text-primary">{icon}</span>
-      <p className="text-2xl font-headline font-extrabold text-on-surface">{value}</p>
-      <p className="text-xs text-outline uppercase tracking-widest font-bold">{label}</p>
-      {sub && <p className="text-xs text-on-surface-variant">{sub}</p>}
+    <div className="mb-8 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-4 shadow-ghost">
+      <div className="grid gap-4 sm:grid-cols-3">
+        {items.map((item) => (
+          <div key={item.label} className="flex min-w-0 items-center gap-3">
+            <span className={`material-symbols-outlined shrink-0 text-xl ${METRIC_TONE_CLASS[item.tone ?? "primary"]}`}>{item.icon}</span>
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-bold uppercase tracking-widest text-outline">{item.label}</p>
+              <p className="mt-0.5 truncate font-headline text-xl font-extrabold text-on-surface">{item.value}</p>
+              {item.sub && <p className="mt-0.5 truncate text-xs text-on-surface-variant">{item.sub}</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DetailMetricList({ items }: { items: DetailMetric[] }) {
+  return (
+    <div className="mb-8 overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost">
+      {items.map((item) => (
+        <div key={item.label} className="grid gap-1 border-b border-outline-variant/20 px-4 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-bold uppercase tracking-widest text-outline">{item.label}</p>
+            {item.note && <p className="mt-1 text-xs text-on-surface-variant">{item.note}</p>}
+          </div>
+          <p className="font-headline text-lg font-extrabold text-on-surface sm:text-right">{item.value}</p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -271,7 +315,7 @@ function EarningsInner() {
   const chartData = [...periods].reverse().slice(-5);
 
   return (
-    <div className="p-4 md:p-10">
+    <div className="mx-auto w-full max-w-6xl p-4 md:p-8 lg:p-10">
       <div className="flex items-center justify-between gap-3 mb-6 md:mb-8">
         <h1 className="font-headline text-xl font-extrabold text-on-surface tracking-tight md:text-2xl">{e.title}</h1>
         {currentPeriodData && !currentPeriodData.paid && (
@@ -286,29 +330,21 @@ function EarningsInner() {
         )}
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-        <StatCard icon="account_balance_wallet" label={e.statTotal}   value={formatKRW(totalNet)}   sub="All time" />
-        <StatCard icon="trending_up"            label={e.statMonth}   value={formatKRW(currentPeriodData?.net ?? 0)} sub={currentPeriod} />
-        <StatCard icon="pending"                label={e.statPending} value={formatKRW(pendingNet)} sub={`평균 수수료 ${formatRate(totalGross, totalCommission)}`} />
-      </div>
+      <SummaryMetricGrid
+        items={[
+          { icon: "account_balance_wallet", label: e.statTotal, value: formatKRW(totalNet), sub: "All time", tone: "primary" },
+          { icon: "trending_up", label: e.statMonth, value: formatKRW(currentPeriodData?.net ?? 0), sub: currentPeriod, tone: "green" },
+          { icon: "pending", label: e.statPending, value: formatKRW(pendingNet), sub: `평균 수수료 ${formatRate(totalGross, totalCommission)}`, tone: "warning" },
+        ]}
+      />
 
-      <div className="mb-8 grid gap-4 md:grid-cols-3">
-        <div className="bg-surface-container-lowest shadow-ghost p-5">
-          <p className="text-xs font-bold uppercase tracking-widest text-outline">Gross Sales</p>
-          <p className="mt-2 text-xl font-headline font-extrabold text-on-surface">{formatKRW(totalGross)}</p>
-        </div>
-        <div className="bg-surface-container-lowest shadow-ghost p-5">
-          <p className="text-xs font-bold uppercase tracking-widest text-outline">Platform Commission</p>
-          <p className="mt-2 text-xl font-headline font-extrabold text-on-surface">{formatKRW(totalCommission)}</p>
-          <p className="mt-1 text-xs text-on-surface-variant">판매 시점에 적용된 정책 기준</p>
-        </div>
-        <div className="bg-surface-container-lowest shadow-ghost p-5">
-          <p className="text-xs font-bold uppercase tracking-widest text-outline">Onchain Claimable</p>
-          <p className="mt-2 text-xl font-headline font-extrabold text-on-surface">{formatUSDC(onchainClaimable)}</p>
-          <p className="mt-1 text-xs text-on-surface-variant">Base USDC escrow 기준</p>
-        </div>
-      </div>
+      <DetailMetricList
+        items={[
+          { label: "Gross Sales", value: formatKRW(totalGross) },
+          { label: "Platform Commission", value: formatKRW(totalCommission), note: "판매 시점에 적용된 정책 기준" },
+          { label: "Onchain Claimable", value: formatUSDC(onchainClaimable), note: "Base USDC escrow 기준" },
+        ]}
+      />
 
       {/* Bar chart */}
       {chartData.length > 0 && (

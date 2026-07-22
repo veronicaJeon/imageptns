@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n/store";
@@ -9,31 +9,76 @@ import { useCart } from "@/lib/store/cart";
 
 const ONCHAIN_ENABLED = process.env.NEXT_PUBLIC_ONCHAIN_ENABLED === "true";
 
-function StatCard({ icon, label, value, color, href }: { icon: string; label: string; value: string; color: string; href?: string }) {
-  const content = (
-    <div className={`bg-surface-container-lowest p-6 shadow-ghost flex flex-col gap-3 ${href ? "hover:bg-surface-container-low transition-colors cursor-pointer" : ""}`}>
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${color}`}>
-        <span className="material-symbols-outlined text-xl">{icon}</span>
+type MetricTone = "primary" | "neutral" | "warning" | "danger" | "blue" | "green" | "red";
+
+interface MetricItem {
+  icon: string;
+  label: string;
+  value: string;
+  href?: string;
+  tone?: MetricTone;
+}
+
+const METRIC_TONE_STYLE: Record<MetricTone, string> = {
+  primary: "text-primary",
+  neutral: "text-on-surface-variant",
+  warning: "text-amber-500 dark:text-amber-300",
+  danger: "text-error",
+  blue: "text-blue-500 dark:text-blue-300",
+  green: "text-green-500 dark:text-green-300",
+  red: "text-red-400 dark:text-red-200",
+};
+
+function MetricStrip({ items, className = "", gridClass = "sm:grid-cols-3" }: { items: MetricItem[]; className?: string; gridClass?: string }) {
+  return (
+    <div className={`rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 shadow-ghost ${className}`}>
+      <div className={`grid gap-4 ${gridClass}`}>
+        {items.map((item) => {
+          const tone = METRIC_TONE_STYLE[item.tone ?? "neutral"];
+          const content = (
+            <>
+              <span className={`material-symbols-outlined shrink-0 text-xl ${tone}`}>{item.icon}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[11px] font-bold uppercase tracking-widest text-outline">{item.label}</span>
+                <span className="mt-0.5 block truncate font-headline text-xl font-extrabold text-on-surface">{item.value}</span>
+              </span>
+            </>
+          );
+
+          return item.href ? (
+            <Link key={`${item.label}-${item.href}`} href={item.href} className="flex min-w-0 items-center gap-3 rounded-md px-1 py-2 transition-colors hover:text-primary">
+              {content}
+            </Link>
+          ) : (
+            <div key={item.label} className="flex min-w-0 items-center gap-3 rounded-md px-1 py-2">
+              {content}
+            </div>
+          );
+        })}
       </div>
-      <p className="text-2xl font-headline font-extrabold text-on-surface">{value}</p>
-      <p className="text-xs text-outline uppercase tracking-widest font-bold">{label}</p>
     </div>
   );
-  if (href) return <Link href={href}>{content}</Link>;
-  return content;
 }
 
 const ACTION_STYLE: Record<string, string> = {
-  Licensed:       "bg-primary/10 text-primary",
-  Approved:       "bg-primary/10 text-primary",
-  "Under Review": "bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-300",
-  Rejected:       "bg-error/10 text-error",
-  Draft:          "bg-surface-container-high text-outline",
-  Favorited:      "bg-red-50 text-red-400 dark:bg-red-900/20 dark:text-red-200",
-  "Base Pending": "bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-300",
-  "Base Confirmed": "bg-blue-50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-200",
-  "Base Failed": "bg-error/10 text-error",
+  Licensed:       "border-primary/20 bg-primary/10 text-primary",
+  Approved:       "border-primary/20 bg-primary/10 text-primary",
+  "Under Review": "border-amber-200/70 bg-amber-50 text-amber-600 dark:border-amber-400/20 dark:bg-amber-900/20 dark:text-amber-300",
+  Rejected:       "border-error/20 bg-error/10 text-error",
+  Draft:          "border-outline-variant/60 bg-surface-container-low text-outline",
+  Favorited:      "border-red-200/70 bg-red-50 text-red-400 dark:border-red-400/20 dark:bg-red-900/20 dark:text-red-200",
+  "Base Pending": "border-amber-200/70 bg-amber-50 text-amber-600 dark:border-amber-400/20 dark:bg-amber-900/20 dark:text-amber-300",
+  "Base Confirmed": "border-blue-200/70 bg-blue-50 text-blue-500 dark:border-blue-400/20 dark:bg-blue-900/20 dark:text-blue-200",
+  "Base Failed": "border-error/20 bg-error/10 text-error",
 };
+
+function ActivityBadge({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <span className={`inline-flex h-6 max-w-[8rem] items-center truncate rounded-full border px-2.5 text-[10px] font-bold leading-none sm:max-w-none ${className}`}>
+      {children}
+    </span>
+  );
+}
 
 interface RecentItem {
   title: string;
@@ -44,6 +89,53 @@ interface RecentItem {
   cryptoStatus?: string | null;
   cryptoAmount?: number | string | null;
   proofStatus?: string | null;
+}
+
+function RecentActivityList({
+  items,
+  emptyIcon,
+  emptyText,
+  fallbackStyle = "border-outline-variant/60 bg-surface-container-low text-on-surface-variant",
+}: {
+  items: RecentItem[];
+  emptyIcon: string;
+  emptyText: string;
+  fallbackStyle?: string;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-8 text-outline shadow-ghost">
+        <span className="material-symbols-outlined text-4xl">{emptyIcon}</span>
+        <p className="text-sm">{emptyText}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost">
+      {items.map((item, i) => (
+        <div key={`${item.title}-${item.date}-${i}`} className="grid grid-cols-[56px_minmax(0,1fr)] items-center gap-3 border-b border-outline-variant/20 px-4 py-3 last:border-b-0 sm:grid-cols-[60px_minmax(0,1fr)_120px_auto] sm:gap-4 sm:px-5">
+          <div className="flex h-10 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-container-low">
+            {item.src ? (
+              <Image src={item.src} alt={item.title} width={60} height={40} className="h-full w-full object-cover" />
+            ) : (
+              <span className="material-symbols-outlined text-sm text-outline">image</span>
+            )}
+          </div>
+          <p className="min-w-0 truncate text-sm font-semibold text-on-surface">{item.title}</p>
+          <p className="col-start-2 text-xs text-outline sm:col-start-auto sm:text-right">{item.date}</p>
+          <div className="col-start-2 flex min-w-0 flex-wrap gap-1.5 sm:col-start-auto sm:justify-end">
+            <ActivityBadge className={ACTION_STYLE[item.action] ?? fallbackStyle}>{item.action}</ActivityBadge>
+            {item.proofStatus && item.proofStatus !== "not_registered" && (
+              <ActivityBadge className="border-outline-variant/60 bg-surface-container-low text-on-surface-variant">
+                credential {item.proofStatus}
+              </ActivityBadge>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 interface BuyerDashboardStats {
@@ -194,12 +286,12 @@ export default function DashboardPage() {
   const photographerWalletReady = photographerStats?.onchain.walletReady ?? false;
 
   return (
-    <div className="p-6 md:p-10 max-w-6xl">
+    <div className="mx-auto w-full max-w-6xl p-4 md:p-8 lg:p-10">
 
       {/* ── Greeting ── */}
-      <div className="mb-10">
+      <div className="mb-8">
         <h1 className="font-headline text-2xl md:text-3xl font-extrabold text-on-surface tracking-tight">
-          {greeting} 👋
+          {greeting}
         </h1>
         <p className="text-on-surface-variant text-sm mt-1">Image Partners Dashboard</p>
       </div>
@@ -212,18 +304,25 @@ export default function DashboardPage() {
         /* ── BUYER VIEW ── */
         <section>
           <p className="text-xs text-outline uppercase tracking-widest font-bold mb-4">Buyer Overview</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
-            <StatCard icon="favorite"      label={d.statFavorites} value={String(buyerStats?.favorites_count ?? 0)} color="bg-red-50 text-red-400 dark:bg-red-900/20"   href="/dashboard/favorites" />
-            <StatCard icon="receipt_long"  label={d.statOrders}    value={String(buyerStats?.orders_count ?? 0)}    color="bg-blue-50 text-blue-400 dark:bg-blue-900/20" href="/dashboard/orders" />
-            <StatCard icon="shopping_cart" label={d.statCart}      value={String(cartCount)}                    color="bg-primary/10 text-primary"                  href="/cart" />
-          </div>
+          <MetricStrip
+            className="mb-8"
+            items={[
+              { icon: "favorite", label: d.statFavorites, value: String(buyerStats?.favorites_count ?? 0), tone: "red", href: "/dashboard/favorites" },
+              { icon: "receipt_long", label: d.statOrders, value: String(buyerStats?.orders_count ?? 0), tone: "blue", href: "/dashboard/orders" },
+              { icon: "shopping_cart", label: d.statCart, value: String(cartCount), tone: "primary", href: "/cart" },
+            ]}
+          />
 
           <p className="text-xs text-outline uppercase tracking-widest font-bold mb-4">Base USDC Payments</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-            <StatCard icon="pending_actions" label={copy.basePending} value={String(buyerOnchain.pending)} color="bg-amber-50 text-amber-500 dark:bg-amber-900/20" href="/dashboard/orders" />
-            <StatCard icon="verified" label={copy.baseConfirmed} value={String(buyerOnchain.confirmed)} color="bg-blue-50 text-blue-500 dark:bg-blue-900/20" href="/dashboard/orders" />
-            <StatCard icon="error" label={copy.baseFailed} value={String(buyerOnchain.failed)} color="bg-error/10 text-error" href="/dashboard/orders" />
-          </div>
+          <MetricStrip
+            className="mb-8"
+            gridClass="sm:grid-cols-2 lg:grid-cols-4"
+            items={[
+              { icon: "pending_actions", label: copy.basePending, value: String(buyerOnchain.pending), tone: "warning", href: "/dashboard/orders" },
+              { icon: "verified", label: copy.baseConfirmed, value: String(buyerOnchain.confirmed), tone: "blue", href: "/dashboard/orders" },
+              { icon: "error", label: copy.baseFailed, value: String(buyerOnchain.failed), tone: "danger", href: "/dashboard/orders" },
+            ]}
+          />
 
           {buyerOnchain.pending > 0 && (
             <div className="mb-10 bg-surface-container-lowest border border-amber-300/40 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -239,35 +338,7 @@ export default function DashboardPage() {
           )}
 
           <p className="text-xs text-outline uppercase tracking-widest font-bold mb-4">{d.recentTitle}</p>
-          {(stats?.recent ?? []).length === 0 ? (
-            <div className="bg-surface-container-lowest shadow-ghost p-8 flex flex-col items-center gap-3 text-outline">
-              <span className="material-symbols-outlined text-4xl">receipt_long</span>
-              <p className="text-sm">No recent activity</p>
-            </div>
-          ) : (
-            <div className="bg-surface-container-lowest shadow-ghost overflow-hidden">
-              {(stats?.recent ?? []).map((item, i, arr) => (
-                <div key={i} className={`flex items-start gap-3 px-4 py-4 sm:items-center sm:gap-4 sm:px-6 ${i < arr.length - 1 ? "border-b border-outline-variant/20" : ""}`}>
-                  <div className="w-15 h-10 bg-surface-container-low rounded shrink-0 overflow-hidden flex items-center justify-center" style={{ width: 60, height: 40 }}>
-                    {item.src ? (
-                      <Image src={item.src} alt={item.title} width={60} height={40} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="material-symbols-outlined text-outline text-sm">image</span>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-on-surface truncate">{item.title}</p>
-                    <p className="text-xs text-outline">{item.date}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center">
-                    <span className={`max-w-[7rem] truncate rounded-full px-2.5 py-1 text-[10px] font-bold sm:max-w-none sm:px-3 sm:text-xs ${ACTION_STYLE[item.action] ?? "bg-surface-container-high text-on-surface-variant"}`}>
-                      {item.action}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <RecentActivityList items={stats?.recent ?? []} emptyIcon="receipt_long" emptyText="No recent activity" />
 
           <div className="mt-6">
             <Link href="/library" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity">
@@ -280,26 +351,32 @@ export default function DashboardPage() {
         /* ── PHOTOGRAPHER VIEW ── */
         <section>
           <p className="text-xs text-outline uppercase tracking-widest font-bold mb-4">Photographer Overview</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
-            <StatCard icon="cloud_upload" label={d.statUploads}  value={String(photographerStats?.uploads_count ?? 0)}              color="bg-primary/10 text-primary" href="/dashboard/uploads" />
-            <StatCard icon="payments"     label={d.statEarnings} value={formatKRW(photographerStats?.earnings_total ?? 0)}          color="bg-green-50 text-green-500 dark:bg-green-900/20" href="/dashboard/earnings" />
-            <StatCard icon="pending"      label={d.statPending}  value={String(photographerStats?.pending_review_count ?? 0)}       color="bg-amber-50 text-amber-400 dark:bg-amber-900/20" href="/dashboard/uploads" />
-          </div>
+          <MetricStrip
+            className="mb-8"
+            items={[
+              { icon: "cloud_upload", label: d.statUploads, value: String(photographerStats?.uploads_count ?? 0), tone: "primary", href: "/dashboard/uploads" },
+              { icon: "payments", label: d.statEarnings, value: formatKRW(photographerStats?.earnings_total ?? 0), tone: "green", href: "/dashboard/earnings" },
+              { icon: "pending", label: d.statPending, value: String(photographerStats?.pending_review_count ?? 0), tone: "warning", href: "/dashboard/uploads" },
+            ]}
+          />
 
           {ONCHAIN_ENABLED && <>
           <p className="text-xs text-outline uppercase tracking-widest font-bold mb-4">Onchain Settlement</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-            <StatCard
-              icon={photographerWalletReady ? "account_balance_wallet" : "wallet"}
-              label={copy.baseWallet}
-              value={photographerWalletReady ? copy.walletReady : copy.walletMissing}
-              color={photographerWalletReady ? "bg-blue-50 text-blue-500 dark:bg-blue-900/20" : "bg-error/10 text-error"}
-              href="/dashboard/settings"
-            />
-            <StatCard icon="verified" label={copy.proofRegistered} value={String(photographerProof.registered)} color="bg-primary/10 text-primary" href="/dashboard/blockchain" />
-            <StatCard icon="sync_problem" label={copy.proofProgress} value={`${photographerProof.available}/${photographerProof.requested + photographerProof.pending}`} color="bg-amber-50 text-amber-500 dark:bg-amber-900/20" href="/dashboard/blockchain" />
-            <StatCard icon="savings" label={copy.claimReady} value={formatUSDC(photographerClaims.claimableUsdc)} color="bg-green-50 text-green-500 dark:bg-green-900/20" href="/dashboard/earnings" />
-          </div>
+          <MetricStrip
+            className="mb-8"
+            items={[
+              {
+                icon: photographerWalletReady ? "account_balance_wallet" : "wallet",
+                label: copy.baseWallet,
+                value: photographerWalletReady ? copy.walletReady : copy.walletMissing,
+                tone: photographerWalletReady ? "blue" : "danger",
+                href: "/dashboard/settings",
+              },
+              { icon: "verified", label: copy.proofRegistered, value: String(photographerProof.registered), tone: "primary", href: "/dashboard/blockchain" },
+              { icon: "sync_problem", label: copy.proofProgress, value: `${photographerProof.available}/${photographerProof.requested + photographerProof.pending}`, tone: "warning", href: "/dashboard/blockchain" },
+              { icon: "savings", label: copy.claimReady, value: formatUSDC(photographerClaims.claimableUsdc), tone: "green", href: "/dashboard/earnings" },
+            ]}
+          />
 
           {(!photographerWalletReady || photographerProof.available > 0 || photographerProof.failed > 0 || photographerClaims.claimableUsdc > 0) && (
             <div className="mb-10 grid grid-cols-1 lg:grid-cols-3 gap-3">
@@ -332,40 +409,12 @@ export default function DashboardPage() {
           </>}
 
           <p className="text-xs text-outline uppercase tracking-widest font-bold mb-4">{d.recentTitle}</p>
-          {(stats?.recent ?? []).length === 0 ? (
-            <div className="bg-surface-container-lowest shadow-ghost p-8 flex flex-col items-center gap-3 text-outline">
-              <span className="material-symbols-outlined text-4xl">cloud_upload</span>
-              <p className="text-sm">No uploads yet</p>
-            </div>
-          ) : (
-            <div className="bg-surface-container-lowest shadow-ghost overflow-hidden">
-              {(stats?.recent ?? []).map((item, i, arr) => (
-                <div key={i} className={`flex items-start gap-3 px-4 py-4 sm:items-center sm:gap-4 sm:px-6 ${i < arr.length - 1 ? "border-b border-outline-variant/20" : ""}`}>
-                  <div className="bg-surface-container-low rounded shrink-0 overflow-hidden flex items-center justify-center" style={{ width: 60, height: 40 }}>
-                    {item.src ? (
-                      <Image src={item.src} alt={item.title} width={60} height={40} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="material-symbols-outlined text-outline text-sm">image</span>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-on-surface truncate">{item.title}</p>
-                    <p className="text-xs text-outline">{item.date}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center">
-                    <span className={`max-w-[7rem] truncate rounded-full px-2.5 py-1 text-[10px] font-bold sm:max-w-none sm:px-3 sm:text-xs ${ACTION_STYLE[item.action] ?? "bg-amber-50 text-amber-400"}`}>
-                      {item.action}
-                    </span>
-                    {item.proofStatus && item.proofStatus !== "not_registered" && (
-                      <span className="max-w-[7rem] truncate rounded-full bg-surface-container-high px-2.5 py-1 text-[10px] font-bold text-on-surface-variant sm:max-w-none">
-                        credential {item.proofStatus}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <RecentActivityList
+            items={stats?.recent ?? []}
+            emptyIcon="cloud_upload"
+            emptyText="No uploads yet"
+            fallbackStyle="border-amber-200/70 bg-amber-50 text-amber-500 dark:border-amber-400/20 dark:bg-amber-900/20 dark:text-amber-300"
+          />
 
           <div className="mt-6">
             <Link href="/dashboard/uploads" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity">

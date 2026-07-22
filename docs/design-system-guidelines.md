@@ -23,3 +23,10 @@
 - Action buttons must communicate hierarchy consistently: primary for the most common task, secondary for supporting inspection or navigation, and danger for destructive or irreversible actions.
 - Data-heavy admin screens should use a bounded page width and either a dense table or a responsive record list. Avoid cards that stretch uncomfortably when there are few results or create excessive vertical bulk when there are many.
 - Admin screens should use the shared primitives in `src/components/admin/AdminPrimitives.tsx` before adding page-local badge, button, metric, or list-surface styles.
+
+## Dashboard summary policy
+
+- Dashboard overview metrics should be grouped into a single compact strip or slim summary card, not separated into large independent statistic boxes.
+- Primary metric values should rely on typographic hierarchy and small icon color accents. Avoid heavy borders or filled backgrounds around each individual number.
+- Recent activity rows should align thumbnail, title, date, and status chips in a dense row on desktop, with compact stacked fallbacks on narrow screens.
+- Secondary financial metrics should be grouped as a key-value list or compact table instead of separate statistic cards.
