@@ -32,8 +32,6 @@ const TOP_NAV_COPY = {
   },
 } as const;
 
-const COMMERCE_ENABLED = process.env.NEXT_PUBLIC_COMMERCE_ENABLED === "true";
-
 export function TopNavBar() {
   const pathname = usePathname();
   const [isDark, setIsDark] = useState(false);
@@ -158,14 +156,14 @@ export function TopNavBar() {
           </button>
 
           {/* Cart */}
-          {COMMERCE_ENABLED && <Link href="/cart" className="relative inline-flex items-center justify-center h-9 w-9 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200">
+          <Link href="/cart" className="relative inline-flex items-center justify-center h-9 w-9 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all duration-200">
             <span className="material-symbols-outlined text-xl">shopping_cart</span>
             {cartCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-white text-[9px] font-black flex items-center justify-center">
                 {cartCount > 9 ? "9+" : cartCount}
               </span>
             )}
-          </Link>}
+          </Link>
 
           <div className="hidden md:block w-px h-5 bg-outline-variant/40 mx-1" />
 
