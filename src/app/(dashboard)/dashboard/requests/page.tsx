@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { cn } from "@/lib/utils/cn";
 import { useLang } from "@/lib/i18n/store";
 import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 
@@ -42,11 +41,13 @@ interface PhotoRequestMatch {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  candidate: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300",
-  invited: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300",
-  interested: "bg-primary/10 text-primary",
-  declined: "bg-surface-container text-outline",
+  candidate: "border-amber-200/70 bg-amber-50 text-amber-600 dark:border-amber-400/20 dark:bg-amber-900/20 dark:text-amber-300",
+  invited: "border-amber-200/70 bg-amber-50 text-amber-600 dark:border-amber-400/20 dark:bg-amber-900/20 dark:text-amber-300",
+  interested: "border-primary/20 bg-primary/10 text-primary",
+  declined: "border-outline-variant/60 bg-surface-container-low text-outline",
 };
+
+const CHIP_CLASS = "inline-flex h-6 max-w-full items-center rounded-full border px-2.5 text-[10px] font-bold leading-none";
 
 const PHOTOGRAPHER_REQUESTS_COPY = {
   ko: {
@@ -210,7 +211,7 @@ function DashboardRequestsContent() {
           <span className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : matches.length === 0 ? (
-        <div className="flex flex-col items-center py-32 gap-4 text-outline bg-surface-container-lowest shadow-ghost">
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-outline-variant/30 bg-surface-container-lowest py-32 text-outline shadow-ghost">
           <span className="material-symbols-outlined text-6xl">assignment</span>
           <p className="text-base">{copy.empty}</p>
         </div>
@@ -222,14 +223,14 @@ function DashboardRequestsContent() {
             if (!request) return null;
 
             return (
-              <article key={match.id} className="bg-surface-container-lowest shadow-ghost rounded-xl overflow-hidden">
+              <article key={match.id} className="overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost">
                 <div className="p-5 flex flex-col gap-5">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="material-symbols-outlined text-primary text-xl">add_photo_alternate</span>
                         <h2 className="font-headline text-lg font-bold text-on-surface">{request.subject ?? copy.fallbackTitle}</h2>
-                        <span className={cn("rounded-full px-3 py-1 text-[10px] font-bold", STATUS_STYLES[match.status] ?? "bg-surface-container text-outline")}>
+                        <span className={`${CHIP_CLASS} ${STATUS_STYLES[match.status] ?? "border-outline-variant/60 bg-surface-container-low text-outline"}`}>
                           {copy.statuses[match.status as keyof typeof copy.statuses] ?? match.status}
                         </span>
                       </div>
@@ -237,13 +238,13 @@ function DashboardRequestsContent() {
                         {request.message ?? copy.noBrief}
                       </p>
                     </div>
-                    <div className="shrink-0 rounded-lg bg-surface-container-low px-4 py-3 text-xs text-on-surface-variant">
+                    <div className="shrink-0 rounded-lg border border-outline-variant/30 px-4 py-3 text-xs text-on-surface-variant">
                       <p className="font-bold text-on-surface">{copy.fitScore} {match.score ?? "-"}</p>
                       {match.reason && <p className="mt-1 max-w-56">{match.reason}</p>}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-low p-4 text-sm md:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-3 rounded-lg border border-outline-variant/30 p-4 text-sm md:grid-cols-4">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.organization}</p>
                       <p className="mt-1 text-on-surface">{request.requester_organization ?? "-"}</p>

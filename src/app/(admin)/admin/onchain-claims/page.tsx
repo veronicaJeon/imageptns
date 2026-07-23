@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
+import { AdminButton, AdminChip, AdminInlineMetrics } from "@/components/admin/AdminPrimitives";
 import { cn } from "@/lib/utils/cn";
 
 type ReviewStatus = "pending" | "approved" | "rejected" | "reviewed" | "all";
@@ -14,14 +15,6 @@ const TABS: { key: ReviewStatus; label: string; icon: string }[] = [
   { key: "all", label: "전체", icon: "grid_view" },
 ];
 
-const REVIEW_STYLES: Record<string, string> = {
-  pending: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300",
-  approved: "bg-primary/10 text-primary",
-  rejected: "bg-error/10 text-error",
-  reviewed: "bg-surface-container-high text-on-surface-variant",
-  not_required: "bg-surface-container-high text-outline",
-};
-
 const REVIEW_LABELS: Record<string, string> = {
   pending: "검토 대기",
   approved: "승인됨",
@@ -29,6 +22,13 @@ const REVIEW_LABELS: Record<string, string> = {
   reviewed: "확인됨",
   not_required: "검토 불필요",
 };
+
+function reviewTone(status: string | null | undefined) {
+  if (status === "approved") return "success" as const;
+  if (status === "pending") return "warning" as const;
+  if (status === "rejected") return "danger" as const;
+  return "neutral" as const;
+}
 
 const CLAIM_LABELS: Record<string, string> = {
   claimable: "청구 가능",
@@ -144,7 +144,7 @@ export default function AdminOnchainClaimsPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8">
         <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">온체인 클레임 검토</h1>
         <p className="text-sm text-outline mt-1">
@@ -152,7 +152,7 @@ export default function AdminOnchainClaimsPage() {
         </p>
       </div>
 
-      <div className="flex gap-1 mb-6 bg-surface-container-lowest p-1 rounded-xl w-fit max-w-full overflow-x-auto shadow-ghost">
+      <div className="mb-6 flex max-w-full w-fit gap-1 overflow-x-auto rounded-lg bg-surface-container-lowest p-1 shadow-ghost">
         {TABS.map(({ key, label, icon }) => (
           <button
             key={key}
@@ -182,7 +182,7 @@ export default function AdminOnchainClaimsPage() {
       ) : (
         <div className="flex flex-col gap-4">
           {claims.map((claim) => (
-            <div key={claim.id} className="bg-surface-container-lowest shadow-ghost rounded-xl overflow-hidden">
+            <div key={claim.id} className="overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost">
               <div className="flex flex-col sm:flex-row">
                 <div className="relative w-full sm:w-44 h-32 sm:h-auto shrink-0 bg-surface-container-low flex items-center justify-center overflow-hidden">
                   {claim.order_item?.image?.storage_path_preview ? (
@@ -215,62 +215,40 @@ export default function AdminOnchainClaimsPage() {
                         {claim.photographer?.full_name ?? "Unknown photographer"}
                       </p>
                     </div>
-                    <span
-                      className={cn(
-                        "text-[10px] font-bold px-3 py-1 rounded-full shrink-0",
-                        REVIEW_STYLES[claim.claim_review_status] ?? "bg-surface-container text-outline"
-                      )}
-                    >
+                    <AdminChip tone={reviewTone(claim.claim_review_status)} className="shrink-0">
                       {REVIEW_LABELS[claim.claim_review_status] ?? claim.claim_review_status}
-                    </span>
+                    </AdminChip>
                   </div>
 
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
-                    <div className="bg-surface-container-low rounded-lg px-3 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">청구 상태</p>
-                      <p className="font-semibold text-on-surface">{CLAIM_LABELS[claim.claim_status] ?? claim.claim_status}</p>
-                    </div>
-                    <div className="bg-surface-container-low rounded-lg px-3 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">클레임 금액</p>
-                      <p className="font-semibold text-on-surface">{formatClaimAmount(claim.claimable_amount)}</p>
-                    </div>
-                    <div className="bg-surface-container-low rounded-lg px-3 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">원화 정산액</p>
-                      <p className="font-semibold text-on-surface">{formatKrw(claim.net_krw)}</p>
-                    </div>
-                    <div className="bg-surface-container-low rounded-lg px-3 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-outline">기간</p>
-                      <p className="font-semibold text-on-surface">{claim.period}</p>
-                    </div>
-                  </div>
+                  <AdminInlineMetrics
+                    className="text-sm"
+                    items={[
+                      { label: "청구 상태", value: CLAIM_LABELS[claim.claim_status] ?? claim.claim_status },
+                      { label: "클레임 금액", value: formatClaimAmount(claim.claimable_amount) },
+                      { label: "원화 정산액", value: formatKrw(claim.net_krw) },
+                      { label: "기간", value: claim.period },
+                    ]}
+                  />
 
-                  <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                      주문 {claim.order_item?.order?.order_number ?? claim.order_item?.order?.id ?? "-"}
-                    </span>
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                      라이선스 {claim.order_item?.license_code ?? "-"}
-                    </span>
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                      판매가 {formatKrw(claim.order_item?.price_krw ?? claim.gross_krw)}
-                    </span>
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                      수수료 {formatKrw(claim.commission_krw)}
-                    </span>
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                      생성일 {formatDate(claim.created_at)}
-                    </span>
-                  </div>
+                  <AdminInlineMetrics
+                    items={[
+                      { label: "주문", value: claim.order_item?.order?.order_number ?? claim.order_item?.order?.id ?? "-" },
+                      { label: "라이선스", value: claim.order_item?.license_code ?? "-" },
+                      { label: "판매가", value: formatKrw(claim.order_item?.price_krw ?? claim.gross_krw) },
+                      { label: "수수료", value: formatKrw(claim.commission_krw) },
+                      { label: "생성일", value: formatDate(claim.created_at) },
+                    ]}
+                  />
 
                   {claim.claim_tx_hash && (
-                    <div className="flex items-center gap-2 bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2 min-w-0">
+                    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-outline-variant/30 px-3 py-2">
                       <span className="material-symbols-outlined text-outline text-sm">receipt_long</span>
                       <p className="text-xs font-mono text-on-surface-variant truncate">{claim.claim_tx_hash}</p>
                     </div>
                   )}
 
                   {(claim.claim_review_note || claim.reviewer) && (
-                    <div className="flex items-start gap-2 bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2">
+                    <div className="flex items-start gap-2 rounded-lg border border-outline-variant/30 px-3 py-2">
                       <span className="material-symbols-outlined text-outline text-sm mt-0.5">fact_check</span>
                       <p className="text-xs text-on-surface-variant">
                         {claim.claim_review_note ?? "메모 없음"}
@@ -285,7 +263,7 @@ export default function AdminOnchainClaimsPage() {
                   )}
 
                   {editingId === claim.id && (
-                    <div className="flex flex-col gap-2 p-3 bg-surface-container-low border border-outline-variant/40 rounded-lg">
+                    <div className="flex flex-col gap-2 rounded-lg border border-outline-variant/40 p-3">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-outline">검토 메모</label>
                       <textarea
                         value={note}
@@ -296,30 +274,32 @@ export default function AdminOnchainClaimsPage() {
                         autoFocus
                       />
                       <div className="flex flex-wrap gap-2">
-                        <button
+                        <AdminButton
                           onClick={() => handleReview(claim.id, "approve", note)}
                           disabled={actioning === claim.id}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+                          variant="primary"
+                          size="md"
                         >
                           <span className="material-symbols-outlined text-sm">check_circle</span>
                           승인
-                        </button>
-                        <button
+                        </AdminButton>
+                        <AdminButton
                           onClick={() => handleReview(claim.id, "reject", note)}
                           disabled={actioning === claim.id}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-error text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+                          variant="danger"
+                          size="md"
                         >
                           <span className="material-symbols-outlined text-sm">cancel</span>
                           반려
-                        </button>
-                        <button
+                        </AdminButton>
+                        <AdminButton
                           onClick={() => handleReview(claim.id, "mark_reviewed", note)}
                           disabled={actioning === claim.id}
-                          className="flex items-center gap-1.5 px-4 py-2 border border-outline-variant text-on-surface-variant text-xs font-bold uppercase tracking-widest rounded hover:bg-surface-container-high transition-colors disabled:opacity-50"
+                          size="md"
                         >
                           <span className="material-symbols-outlined text-sm">task_alt</span>
                           확인 처리
-                        </button>
+                        </AdminButton>
                         <button
                           onClick={() => {
                             setEditingId(null);
@@ -335,20 +315,21 @@ export default function AdminOnchainClaimsPage() {
 
                   {editingId !== claim.id && (
                     <div className="flex gap-2 flex-wrap">
-                      <button
+                      <AdminButton
                         onClick={() => {
                           setEditingId(claim.id);
                           setNote(claim.claim_review_note ?? "");
                         }}
-                        className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
+                        variant="primary"
+                        size="md"
                       >
                         <span className="material-symbols-outlined text-sm">rate_review</span>
                         검토하기
-                      </button>
-                      <button
+                      </AdminButton>
+                      <AdminButton
                         onClick={() => handleReview(claim.id, "mark_reviewed", claim.claim_review_note ?? undefined)}
                         disabled={actioning === claim.id}
-                        className="flex items-center gap-1.5 px-5 py-2.5 border border-outline-variant text-on-surface-variant text-xs font-bold uppercase tracking-widest rounded hover:bg-surface-container-high transition-colors disabled:opacity-50"
+                        size="md"
                       >
                         {actioning === claim.id ? (
                           <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -356,7 +337,7 @@ export default function AdminOnchainClaimsPage() {
                           <span className="material-symbols-outlined text-sm">task_alt</span>
                         )}
                         확인 처리
-                      </button>
+                      </AdminButton>
                     </div>
                   )}
                 </div>

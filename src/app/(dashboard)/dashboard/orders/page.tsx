@@ -8,11 +8,13 @@ import { buildOrderReceiptHtml, type ReceiptOrder } from "@/lib/receipts/order";
 import { buildOrderStatusSteps, type TimelineState } from "@/lib/ux/status";
 
 const STATUS_STYLES: Record<string, string> = {
-  completed: "bg-primary/10 text-primary",
-  pending:   "bg-amber-50 text-amber-500 dark:bg-amber-900/20",
-  refunded:  "bg-surface-container-high text-outline",
-  failed:    "bg-error/10 text-error",
+  completed: "border-primary/20 bg-primary/10 text-primary",
+  pending:   "border-amber-200/70 bg-amber-50 text-amber-600 dark:border-amber-400/20 dark:bg-amber-900/20 dark:text-amber-300",
+  refunded:  "border-outline-variant/60 bg-surface-container-low text-outline",
+  failed:    "border-error/20 bg-error/10 text-error",
 };
+
+const CHIP_CLASS = "inline-flex h-6 items-center rounded-full border px-2.5 text-[10px] font-bold leading-none";
 
 function formatKRW(n: number) {
   return "₩" + n.toLocaleString("ko-KR");
@@ -414,7 +416,7 @@ export default function OrdersPage() {
             const isConfirming = Boolean(confirmingOrderIds[row.orderId]);
             const order = orders.find((item) => item.id === row.orderId);
             return (
-              <article key={row.itemId} className="rounded-xl bg-surface-container-lowest p-4 shadow-ghost">
+              <article key={row.itemId} className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-ghost">
                 <div className="flex gap-3">
                   {row.src && !imageUnavailable ? (
                     <Image src={row.src} alt={row.title} width={88} height={64} className="h-16 w-24 shrink-0 rounded object-cover" />
@@ -435,32 +437,27 @@ export default function OrdersPage() {
                     )}
                     <p className="mt-1 font-mono text-[11px] text-outline">{row.orderNumber}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLES[row.status] ?? ""}`}>
+                      <span className={`${CHIP_CLASS} ${STATUS_STYLES[row.status] ?? "border-outline-variant/60 bg-surface-container-low text-on-surface-variant"}`}>
                         {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
                       </span>
-                      <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-[10px] font-bold text-on-surface-variant">
+                      <span className={`${CHIP_CLASS} border-outline-variant/60 bg-surface-container-low text-on-surface-variant`}>
                         {row.license}
                       </span>
                       {row.paymentProvider === "bank_transfer" && (
-                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">계좌결제</span>
+                        <span className={`${CHIP_CLASS} border-amber-200/70 bg-amber-50 text-amber-700`}>계좌결제</span>
                       )}
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-surface-container-low p-3 text-xs">
-                  <div>
-                    <p className="text-outline">{c.date}</p>
-                    <p className="mt-1 font-semibold text-on-surface">{row.date}</p>
-                  </div>
-                  <div>
-                    <p className="text-outline">{c.amount}</p>
-                    <p className="mt-1 font-semibold text-primary">{formatKRW(row.totalKrw)}</p>
-                  </div>
+                <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-on-surface-variant">
+                  <span>{c.date} <strong className="font-semibold text-on-surface">{row.date}</strong></span>
+                  <span className="text-outline">·</span>
+                  <span>{c.amount} <strong className="font-semibold text-on-surface">{formatKRW(row.totalKrw)}</strong></span>
                   {row.downloadExpiresAt && (
-                    <div className="col-span-2">
-                      <p className="text-outline">{copy.downloadExpires}</p>
-                      <p className="mt-1 font-semibold text-on-surface">{new Date(row.downloadExpiresAt).toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", { year: "numeric", month: "short", day: "numeric" })}</p>
-                    </div>
+                    <>
+                      <span className="text-outline">·</span>
+                      <span>{copy.downloadExpires} <strong className="font-semibold text-on-surface">{new Date(row.downloadExpiresAt).toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", { year: "numeric", month: "short", day: "numeric" })}</strong></span>
+                    </>
                   )}
                 </div>
                 {row.imageDeletionNotice && (
@@ -471,7 +468,7 @@ export default function OrdersPage() {
                     <button
                       onClick={() => handleDownload(row.itemId)}
                       disabled={downloading === row.itemId}
-                      className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                      className="inline-flex h-9 items-center gap-1 rounded-lg bg-primary px-3 text-xs font-bold text-white disabled:opacity-50"
                     >
                       <span className="material-symbols-outlined text-base">download</span>
                       {ord.download}
@@ -480,7 +477,7 @@ export default function OrdersPage() {
                       <button
                         type="button"
                         onClick={() => handlePrintReceipt(order)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-outline-variant px-3 py-2 text-xs font-bold text-on-surface-variant"
+                        className="inline-flex h-9 items-center gap-1 rounded-lg border border-outline-variant px-3 text-xs font-bold text-on-surface-variant"
                       >
                         <span className="material-symbols-outlined text-base">print</span>
                         {copy.receiptPdf}
@@ -513,7 +510,7 @@ export default function OrdersPage() {
             );
           })}
         </div>
-        <div className="hidden bg-surface-container-lowest shadow-ghost overflow-x-auto xl:block">
+        <div className="hidden overflow-x-auto rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost xl:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
@@ -593,7 +590,7 @@ export default function OrdersPage() {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_STYLES[row.status] ?? ""}`}>
+                    <span className={`${CHIP_CLASS} ${STATUS_STYLES[row.status] ?? "border-outline-variant/60 bg-surface-container-low text-on-surface-variant"}`}>
                       {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
                     </span>
                     {row.paymentProvider === "base_usdc" && (

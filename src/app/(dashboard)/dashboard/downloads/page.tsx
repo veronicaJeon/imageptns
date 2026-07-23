@@ -188,7 +188,7 @@ export default function DownloadsPage() {
           </Link>
         </div>
       ) : (
-        <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost">
           {items.length > visibleItems.length && (
             <p className="px-6 pt-4 text-xs text-outline">
               {copy.limitNotice(visibleItems.length, items.length)}

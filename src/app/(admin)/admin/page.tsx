@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { AdminButton, AdminChip, AdminInlineMetrics, adminStatusTone } from "@/components/admin/AdminPrimitives";
 import { cn } from "@/lib/utils/cn";
 import { imageCategoryLabel } from "@/lib/images/categories";
 
@@ -14,26 +15,11 @@ const TABS: { key: Status; label: string; icon: string }[] = [
   { key: "all",      label: "전체",      icon: "grid_view"       },
 ];
 
-const STATUS_STYLES: Record<string, string> = {
-  approved: "bg-primary/10 text-primary",
-  pending:  "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300",
-  rejected: "bg-error/10 text-error",
-  draft:    "bg-surface-container-high text-outline",
-};
-
 const STATUS_LABELS: Record<string, string> = {
   approved: "승인됨",
   pending:  "검토 대기",
   rejected: "거절됨",
   draft:    "임시저장",
-};
-
-const PROOF_STYLES: Record<string, string> = {
-  available: "bg-primary/10 text-primary",
-  requested: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200",
-  pending: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200",
-  registered: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200",
-  failed: "bg-error/10 text-error",
 };
 
 const PROOF_LABELS: Record<string, string> = {
@@ -43,6 +29,13 @@ const PROOF_LABELS: Record<string, string> = {
   registered: "자격증명 완료",
   failed: "자격증명 실패",
 };
+
+function proofTone(status: string | null | undefined) {
+  if (status === "registered" || status === "available") return "success" as const;
+  if (status === "requested" || status === "pending") return "warning" as const;
+  if (status === "failed") return "danger" as const;
+  return "neutral" as const;
+}
 
 interface ImageRow {
   id: string;
@@ -141,7 +134,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="p-4 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
 
       {/* Header */}
       <div className="mb-8">
@@ -152,7 +145,7 @@ export default function AdminPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl bg-surface-container-lowest p-1 shadow-ghost sm:inline-grid sm:w-fit sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg bg-surface-container-lowest p-1 shadow-ghost sm:inline-grid sm:w-fit sm:grid-cols-4">
         {TABS.map(({ key, label, icon }) => (
           <button
             key={key}
@@ -185,7 +178,7 @@ export default function AdminPage() {
       ) : (
         <div className="flex flex-col gap-4">
           {images.map((img) => (
-            <div key={img.id} className="bg-surface-container-lowest shadow-ghost rounded-xl overflow-hidden">
+            <div key={img.id} className="overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost">
               <div className="flex gap-0 flex-col xl:flex-row">
 
                 {/* Thumbnail */}
@@ -220,41 +213,25 @@ export default function AdminPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                       {img.proof_status && img.proof_status !== "not_registered" && (
-                        <span className={cn(
-                          "text-[10px] font-bold px-3 py-1 rounded-full",
-                          PROOF_STYLES[img.proof_status] ?? "bg-surface-container text-outline"
-                        )}>
+                        <AdminChip tone={proofTone(img.proof_status)}>
                           {PROOF_LABELS[img.proof_status] ?? `증명: ${img.proof_status}`}
-                        </span>
+                        </AdminChip>
                       )}
-                      <span className={cn(
-                        "text-[10px] font-bold px-3 py-1 rounded-full",
-                        STATUS_STYLES[img.status] ?? "bg-surface-container text-outline"
-                      )}>
+                      <AdminChip tone={adminStatusTone(img.status)}>
                         {STATUS_LABELS[img.status] ?? img.status}
-                      </span>
+                      </AdminChip>
                     </div>
                   </div>
 
-                  {/* Meta chips */}
-                  <div className="flex flex-wrap gap-2 text-[10px] font-semibold">
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[12px]">category</span>
-                      {imageCategoryLabel(img.category, "ko")}
-                    </span>
-                    {img.file_format && (
-                      <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">{img.file_format}</span>
-                    )}
-                    {img.file_size_mb && (
-                      <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">{img.file_size_mb} MB</span>
-                    )}
-                    {img.resolution_mp && (
-                      <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">{img.resolution_mp} MP</span>
-                    )}
-                    {img.width && img.height && (
-                      <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">{img.width} × {img.height}</span>
-                    )}
-                  </div>
+                  <AdminInlineMetrics
+                    items={[
+                      { label: "카테고리", value: imageCategoryLabel(img.category, "ko") },
+                      ...(img.file_format ? [{ label: "포맷", value: img.file_format }] : []),
+                      ...(img.file_size_mb ? [{ label: "용량", value: `${img.file_size_mb} MB` }] : []),
+                      ...(img.resolution_mp ? [{ label: "해상도", value: `${img.resolution_mp} MP` }] : []),
+                      ...(img.width && img.height ? [{ label: "크기", value: `${img.width} × ${img.height}` }] : []),
+                    ]}
+                  />
 
                   {/* Tags */}
                   {img.tags && img.tags.length > 0 && (
@@ -317,17 +294,18 @@ export default function AdminPage() {
                         autoFocus
                       />
                       <div className="flex gap-2">
-                        <button
+                        <AdminButton
                           onClick={() => handleAction(img.id, "reject", rejectReason)}
                           disabled={!rejectReason.trim() || actioning === img.id}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-error text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+                          variant="danger"
+                          size="md"
                         >
                           {actioning === img.id
                             ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             : <span className="material-symbols-outlined text-sm">cancel</span>
                           }
                           거절 확정
-                        </button>
+                        </AdminButton>
                         <button
                           onClick={() => { setRejectingId(null); setRejectReason(""); }}
                           className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-outline hover:text-on-surface transition-colors"
@@ -341,36 +319,39 @@ export default function AdminPage() {
                   {/* Action buttons */}
                   {img.status !== "approved" && rejectingId !== img.id && (
                     <div className="flex gap-2 flex-wrap">
-                      <button
+                      <AdminButton
                         onClick={() => handleAction(img.id, "approve")}
                         disabled={actioning === img.id || img.status !== "pending"}
-                        className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+                        variant="primary"
+                        size="md"
                       >
                         {actioning === img.id
                           ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           : <span className="material-symbols-outlined text-sm">check_circle</span>
                         }
                         승인
-                      </button>
+                      </AdminButton>
                       {img.status !== "rejected" && (
-                        <button
+                        <AdminButton
                           onClick={() => { setRejectingId(img.id); setRejectReason(""); }}
-                          className="flex items-center gap-1.5 px-5 py-2.5 border border-error/40 text-error text-xs font-bold uppercase tracking-widest rounded hover:bg-error/5 transition-colors"
+                          variant="danger"
+                          size="md"
                         >
                           <span className="material-symbols-outlined text-sm">cancel</span>
                           거절
-                        </button>
+                        </AdminButton>
                       )}
                     </div>
                   )}
                   {img.status === "approved" && (
-                    <button
+                    <AdminButton
                       onClick={() => { setRejectingId(img.id); setRejectReason(""); }}
-                      className="flex items-center gap-1.5 w-fit px-5 py-2.5 border border-outline-variant text-on-surface-variant text-xs font-bold uppercase tracking-widest rounded hover:bg-surface-container-low transition-colors"
+                      className="w-fit"
+                      size="md"
                     >
                       <span className="material-symbols-outlined text-sm">undo</span>
                       승인 취소 (거절로 변경)
-                    </button>
+                    </AdminButton>
                   )}
                 </div>
               </div>

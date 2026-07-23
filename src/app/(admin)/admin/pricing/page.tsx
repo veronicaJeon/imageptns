@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AdminButton, AdminChip, AdminListSurface } from "@/components/admin/AdminPrimitives";
 import { cn } from "@/lib/utils/cn";
 
 interface LicenseTypeRow {
@@ -167,7 +168,7 @@ export default function AdminPricingPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8">
         <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">상품 가격정책</h1>
         <p className="text-sm text-outline mt-1">
@@ -175,7 +176,7 @@ export default function AdminPricingPage() {
         </p>
       </div>
 
-      <section className="mb-8 bg-surface-container-lowest p-5 shadow-ghost">
+      <AdminListSurface className="mb-8 p-5">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h2 className="font-headline text-lg font-extrabold text-on-surface">구매/구독 운영 정책</h2>
@@ -183,11 +184,12 @@ export default function AdminPricingPage() {
               구독 플랜별 무료다운 개수와 판매 전 Arweave 셀프 등록 요청 수수료를 조정합니다. 다운로드 기간은 데이터 운영주기 관리에서 설정합니다.
             </p>
           </div>
-          <button
+          <AdminButton
             type="button"
             onClick={saveCommerceSettings}
             disabled={commerceSaving || commerceLoading || !commerceSettings}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            variant="primary"
+            size="md"
           >
             {commerceSaving ? (
               <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -195,7 +197,7 @@ export default function AdminPricingPage() {
               <span className="material-symbols-outlined text-base">save</span>
             )}
             운영 정책 저장
-          </button>
+          </AdminButton>
         </div>
 
         {commerceLoading ? (
@@ -210,7 +212,7 @@ export default function AdminPricingPage() {
               ["subscription_enterprise_downloads", "Enterprise 무료다운", "개", 0, 10000],
               ["arweave_self_funded_request_fee_krw", "Arweave 셀프등록 수수료", "KRW", 0, 10000000],
             ] as const).map(([key, label, suffix, min, max]) => (
-              <label key={key} className="flex flex-col gap-2 rounded-lg bg-surface-container-low p-4">
+              <label key={key} className="flex flex-col gap-2 rounded-lg border border-outline-variant/30 p-3">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-outline">{label}</span>
                 <div className="flex h-11 items-center overflow-hidden rounded-lg bg-surface-container-lowest ring-1 ring-outline-variant">
                   <input
@@ -228,7 +230,7 @@ export default function AdminPricingPage() {
             ))}
           </div>
         )}
-      </section>
+      </AdminListSurface>
 
       {loading ? (
         <div className="flex items-center justify-center min-h-[40vh]">
@@ -242,7 +244,7 @@ export default function AdminPricingPage() {
             const changed = Number(draft) !== license.price_krw;
 
             return (
-              <div key={license.code} className="bg-surface-container-lowest shadow-ghost p-5 flex flex-col gap-5">
+              <AdminListSurface key={license.code} className="flex flex-col gap-5 p-5">
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -250,9 +252,9 @@ export default function AdminPricingPage() {
                       <h2 className="mt-1 font-headline text-lg font-extrabold text-on-surface">{license.name_ko}</h2>
                       <p className="text-xs text-outline">{license.name_en}</p>
                     </div>
-                    <span className="rounded-full bg-surface-container-low px-3 py-1 text-[10px] font-bold text-on-surface-variant">
+                    <AdminChip tone="neutral">
                       현재 {formatKRW(license.price_krw)}
-                    </span>
+                    </AdminChip>
                   </div>
                   {(license.description_ko || license.description_en) && (
                     <p className="mt-4 text-sm leading-relaxed text-on-surface-variant">
@@ -288,7 +290,7 @@ export default function AdminPricingPage() {
                     </button>
                   </div>
                 </div>
-              </div>
+              </AdminListSurface>
             );
           })}
         </div>

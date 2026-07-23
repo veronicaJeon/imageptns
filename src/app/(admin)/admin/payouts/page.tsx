@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { AdminButton, AdminChip, AdminInlineMetrics } from "@/components/admin/AdminPrimitives";
 import { cn } from "@/lib/utils/cn";
 
 type PayoutStatus = "pending" | "paid" | "rejected" | "all";
@@ -12,17 +13,18 @@ const TABS: { key: PayoutStatus; label: string; icon: string }[] = [
   { key: "all",      label: "전체",     icon: "grid_view"       },
 ];
 
-const STATUS_STYLES: Record<string, string> = {
-  pending:  "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300",
-  paid:     "bg-primary/10 text-primary",
-  rejected: "bg-error/10 text-error",
-};
-
 const STATUS_LABELS: Record<string, string> = {
   pending:  "대기 중",
   paid:     "지급 완료",
   rejected: "거절됨",
 };
+
+function payoutStatusTone(status: string | null | undefined) {
+  if (status === "paid") return "success" as const;
+  if (status === "pending") return "warning" as const;
+  if (status === "rejected") return "danger" as const;
+  return "neutral" as const;
+}
 
 interface PayoutRow {
   id: string;
@@ -114,7 +116,7 @@ export default function AdminPayoutsPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
 
       {/* Header */}
       <div className="mb-8">
@@ -125,7 +127,7 @@ export default function AdminPayoutsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-surface-container-lowest p-1 rounded-xl w-fit shadow-ghost">
+      <div className="mb-6 flex w-fit gap-1 rounded-lg bg-surface-container-lowest p-1 shadow-ghost">
         {TABS.map(({ key, label, icon }) => (
           <button
             key={key}
@@ -160,7 +162,7 @@ export default function AdminPayoutsPage() {
           {payouts.map((payout) => (
             <div
               key={payout.id}
-              className="bg-surface-container-lowest shadow-ghost rounded-xl overflow-hidden"
+              className="overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost"
             >
               <div className="p-5 flex flex-col gap-4">
                 {/* Top row: name + status badge */}
@@ -176,35 +178,20 @@ export default function AdminPayoutsPage() {
                       </span>
                     </div>
                   </div>
-                  <span
-                    className={cn(
-                      "text-[10px] font-bold px-3 py-1 rounded-full shrink-0",
-                      STATUS_STYLES[payout.status] ?? "bg-surface-container text-outline"
-                    )}
-                  >
+                  <AdminChip tone={payoutStatusTone(payout.status)} className="shrink-0">
                     {STATUS_LABELS[payout.status] ?? payout.status}
-                  </span>
+                  </AdminChip>
                 </div>
 
-                {/* Detail chips */}
-                <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
-                  <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[12px]">calendar_month</span>
-                    {payout.period}
-                  </span>
-                  <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[12px]">payments</span>
-                    신청금액 {formatKrw(payout.total_net_krw)}
-                  </span>
-                  <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                    수익 {formatKrw(payout.total_gross_krw)} / 수수료 {formatKrw(payout.total_commission)}
-                  </span>
-                  {payout.payout_method && (
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                      {payout.payout_method === "bank_transfer" ? "계좌이체" : payout.payout_method}
-                    </span>
-                  )}
-                </div>
+                <AdminInlineMetrics
+                  items={[
+                    { label: "기간", value: payout.period },
+                    { label: "신청금액", value: formatKrw(payout.total_net_krw) },
+                    { label: "수익", value: formatKrw(payout.total_gross_krw) },
+                    { label: "수수료", value: formatKrw(payout.total_commission) },
+                    ...(payout.payout_method ? [{ label: "지급방식", value: payout.payout_method === "bank_transfer" ? "계좌이체" : payout.payout_method }] : []),
+                  ]}
+                />
 
                 {/* Dates */}
                 <div className="flex items-center gap-3 text-xs text-outline">
@@ -219,7 +206,7 @@ export default function AdminPayoutsPage() {
 
                 {/* Note (if any) */}
                 {payout.note && (
-                  <div className="flex items-start gap-2 bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2">
+                  <div className="flex items-start gap-2 rounded-lg border border-outline-variant/30 px-3 py-2">
                     <span className="material-symbols-outlined text-outline text-sm mt-0.5">notes</span>
                     <p className="text-xs text-on-surface-variant">{payout.note}</p>
                   </div>
@@ -238,10 +225,11 @@ export default function AdminPayoutsPage() {
                       autoFocus
                     />
                     <div className="flex gap-2">
-                      <button
+                      <AdminButton
                         onClick={() => handleAction(payout.id, "reject", rejectNote || undefined)}
                         disabled={actioning === payout.id}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-error text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+                        variant="danger"
+                        size="md"
                       >
                         {actioning === payout.id ? (
                           <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -249,7 +237,7 @@ export default function AdminPayoutsPage() {
                           <span className="material-symbols-outlined text-sm">cancel</span>
                         )}
                         거절 확정
-                      </button>
+                      </AdminButton>
                       <button
                         onClick={() => { setRejectingId(null); setRejectNote(""); }}
                         className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-outline hover:text-on-surface transition-colors"
@@ -263,10 +251,11 @@ export default function AdminPayoutsPage() {
                 {/* Action buttons — only for pending */}
                 {payout.status === "pending" && rejectingId !== payout.id && (
                   <div className="flex gap-2 flex-wrap">
-                    <button
+                    <AdminButton
                       onClick={() => handleAction(payout.id, "approve")}
                       disabled={actioning === payout.id}
-                      className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+                      variant="primary"
+                      size="md"
                     >
                       {actioning === payout.id ? (
                         <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -274,14 +263,15 @@ export default function AdminPayoutsPage() {
                         <span className="material-symbols-outlined text-sm">check_circle</span>
                       )}
                       승인 (지급 완료 처리)
-                    </button>
-                    <button
+                    </AdminButton>
+                    <AdminButton
                       onClick={() => { setRejectingId(payout.id); setRejectNote(""); }}
-                      className="flex items-center gap-1.5 px-5 py-2.5 border border-error/40 text-error text-xs font-bold uppercase tracking-widest rounded hover:bg-error/5 transition-colors"
+                      variant="danger"
+                      size="md"
                     >
                       <span className="material-symbols-outlined text-sm">cancel</span>
                       거절
-                    </button>
+                    </AdminButton>
                   </div>
                 )}
               </div>

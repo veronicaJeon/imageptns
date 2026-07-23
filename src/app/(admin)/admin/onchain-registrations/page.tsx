@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { AdminButton, AdminChip, AdminInlineMetrics, AdminListSurface } from "@/components/admin/AdminPrimitives";
 import { canAdminRegisterImage } from "@/lib/onchain/registration";
 import { buildRegistrationFeeReceiptHtml } from "@/lib/receipts/registration-fee";
 
@@ -96,13 +97,15 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  available: "bg-primary/10 text-primary",
-  requested: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-200",
-  pending: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-200",
-  registered: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200",
-  failed: "bg-error/10 text-error",
-  not_registered: "bg-surface-container-high text-outline",
+  available: "border-primary/20 bg-primary/10 text-primary",
+  requested: "border-blue-200/70 bg-blue-50 text-blue-600 dark:border-blue-400/20 dark:bg-blue-900/20 dark:text-blue-200",
+  pending: "border-amber-200/70 bg-amber-50 text-amber-600 dark:border-amber-400/20 dark:bg-amber-900/20 dark:text-amber-200",
+  registered: "border-emerald-200/70 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-900/20 dark:text-emerald-200",
+  failed: "border-error/20 bg-error/10 text-error",
+  not_registered: "border-outline-variant/60 bg-surface-container-low text-outline",
 };
+
+const CHIP_CLASS = "inline-flex h-6 items-center rounded-full border px-2.5 text-[10px] font-bold leading-none";
 
 function firstPhotographer(image: AdminRegistrationImage) {
   return Array.isArray(image.photographer) ? image.photographer[0] : image.photographer;
@@ -341,31 +344,35 @@ export default function AdminOnchainRegistrationsPage() {
         ))}
       </div>
 
-      <div className="mb-5 flex flex-col gap-3 bg-surface-container-lowest p-4 shadow-ghost lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-4 text-xs text-on-surface-variant">
-          <span>선택 {selected.length}개</span>
-          <span>총 용량 {selectedTotalMb.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} MB</span>
-          <span>총 바이트 {selectedTotalBytes.toLocaleString("ko-KR")}</span>
-        </div>
+      <AdminListSurface className="mb-5 flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+        <AdminInlineMetrics
+          items={[
+            { label: "선택", value: `${selected.length}개` },
+            { label: "총 용량", value: `${selectedTotalMb.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} MB` },
+            { label: "총 바이트", value: selectedTotalBytes.toLocaleString("ko-KR") },
+          ]}
+        />
         <div className="flex flex-wrap gap-2">
-          <button
+          <AdminButton
             onClick={() => runAction("verify")}
             disabled={selected.length === 0 || actioning !== null || !selectedImages.some(canVerify)}
-            className="inline-flex items-center justify-center gap-2 rounded border border-primary/40 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-primary hover:bg-primary/5 disabled:opacity-50"
+            variant="secondary"
+            size="md"
           >
             {actioning === "verify" ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" /> : <span className="material-symbols-outlined text-base">fact_check</span>}
             GraphQL 검증
-          </button>
-          <button
+          </AdminButton>
+          <AdminButton
             onClick={() => runAction("register")}
             disabled={selected.length === 0 || actioning !== null || !selectedImages.every(canRegister)}
-            className="inline-flex items-center justify-center gap-2 rounded bg-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
+            variant="primary"
+            size="md"
           >
             {actioning === "register" ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <span className="material-symbols-outlined text-base">upload</span>}
             Arweave 일괄 등록
-          </button>
+          </AdminButton>
         </div>
-      </div>
+      </AdminListSurface>
 
       {message && (
         <div className="mb-5 flex items-start gap-2 border border-primary/20 bg-primary/8 px-4 py-3 text-sm text-primary">
@@ -390,7 +397,7 @@ export default function AdminOnchainRegistrationsPage() {
           <p className="text-sm">현재 조건에 맞는 등록사진이 없습니다.</p>
         </div>
       ) : (
-        <div className="mb-10 overflow-x-auto bg-surface-container-lowest shadow-ghost">
+        <AdminListSurface className="mb-10 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
@@ -438,13 +445,13 @@ export default function AdminOnchainRegistrationsPage() {
                           <p className="max-w-[220px] truncate font-semibold text-on-surface">{image.title}</p>
                           <p className="mt-0.5 font-mono text-[11px] text-outline">{image.asset_id ?? "-"}</p>
                           <div className="mt-1 flex flex-wrap gap-1">
-                            <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-[10px] font-bold text-on-surface-variant">
+                            <AdminChip tone="neutral">
                               {image.authorship_declaration === "ai_generated" ? "AI 이미지" : "오리지널 보증"}
-                            </span>
+                            </AdminChip>
                             {image.file_format && (
-                              <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-[10px] font-bold text-on-surface-variant">
+                              <AdminChip tone="neutral">
                                 {image.file_format}
-                              </span>
+                              </AdminChip>
                             )}
                           </div>
                         </div>
@@ -455,7 +462,7 @@ export default function AdminOnchainRegistrationsPage() {
                       <p className="mt-0.5 max-w-[170px] truncate font-mono text-[10px] text-outline">{photographer?.wallet_address ?? "지갑 없음"}</p>
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${STATUS_STYLES[status] ?? "bg-surface-container-high text-outline"}`}>
+                      <span className={`${CHIP_CLASS} ${STATUS_STYLES[status] ?? "border-outline-variant/60 bg-surface-container-low text-outline"}`}>
                         {STATUS_LABELS[status] ?? status}
                       </span>
                       {image.proof_failure_reason && (
@@ -463,20 +470,24 @@ export default function AdminOnchainRegistrationsPage() {
                       )}
                     </td>
                     <td className="px-5 py-4 text-on-surface-variant">
-                        <p>{image.sales_count ?? 0}건</p>
-                        <p className="text-xs text-outline">{(image.file_size_mb ?? 0).toLocaleString("ko-KR", { maximumFractionDigits: 2 })} MB</p>
+                      <AdminInlineMetrics
+                        items={[
+                          { label: "판매", value: `${image.sales_count ?? 0}건` },
+                          { label: "용량", value: `${(image.file_size_mb ?? 0).toLocaleString("ko-KR", { maximumFractionDigits: 2 })} MB` },
+                        ]}
+                      />
                       {image.proof_request_kind === "self_funded" && (
                         <div className="mt-1 flex flex-col gap-1">
-                          <span className="w-fit rounded-full bg-surface-container-low px-2 py-0.5 text-[10px] font-bold text-on-surface-variant">
+                          <AdminChip tone="neutral" className="w-fit">
                             사진가 부담 ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")}
-                          </span>
+                          </AdminChip>
                           <span
-                            className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            className={`${CHIP_CLASS} w-fit ${
                               image.proof_request_payment_status === "paid"
-                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200"
+                                ? "border-emerald-200/70 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-900/20 dark:text-emerald-200"
                                 : image.proof_request_payment_status === "pending"
-                                  ? "bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-200"
-                                  : "bg-surface-container-high text-outline"
+                                  ? "border-orange-200/70 bg-orange-50 text-orange-700 dark:border-orange-400/20 dark:bg-orange-900/20 dark:text-orange-200"
+                                  : "border-outline-variant/60 bg-surface-container-low text-outline"
                             }`}
                           >
                             {PAYMENT_LABELS[image.proof_request_payment_status ?? "none"] ?? image.proof_request_payment_status}
@@ -487,17 +498,17 @@ export default function AdminOnchainRegistrationsPage() {
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-1.5">
                         {image.proof_arweave_original_tx_id && (
-                          <a href={arweaveUrl(image.proof_arweave_original_tx_id)} target="_blank" rel="noreferrer" className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary hover:opacity-70">
+                          <a href={arweaveUrl(image.proof_arweave_original_tx_id)} target="_blank" rel="noreferrer" className={`${CHIP_CLASS} border-primary/20 bg-primary/10 text-primary hover:border-primary/40`}>
                             원본
                           </a>
                         )}
                         {image.proof_arweave_metadata_tx_id && (
-                          <a href={arweaveUrl(image.proof_arweave_metadata_tx_id)} target="_blank" rel="noreferrer" className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary hover:opacity-70">
+                          <a href={arweaveUrl(image.proof_arweave_metadata_tx_id)} target="_blank" rel="noreferrer" className={`${CHIP_CLASS} border-primary/20 bg-primary/10 text-primary hover:border-primary/40`}>
                             메타데이터
                           </a>
                         )}
                         {image.proof_arweave_manifest_tx_id && (
-                          <a href={arweaveUrl(image.proof_arweave_manifest_tx_id)} target="_blank" rel="noreferrer" className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary hover:opacity-70">
+                          <a href={arweaveUrl(image.proof_arweave_manifest_tx_id)} target="_blank" rel="noreferrer" className={`${CHIP_CLASS} border-primary/20 bg-primary/10 text-primary hover:border-primary/40`}>
                             매니페스트
                           </a>
                         )}
@@ -513,12 +524,12 @@ export default function AdminOnchainRegistrationsPage() {
               })}
             </tbody>
           </table>
-        </div>
+        </AdminListSurface>
       )}
 
       <div>
         <p className="mb-4 text-xs font-bold uppercase tracking-widest text-outline">최근 등록 배치</p>
-        <div className="overflow-x-auto bg-surface-container-lowest shadow-ghost">
+        <AdminListSurface className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
@@ -539,7 +550,7 @@ export default function AdminOnchainRegistrationsPage() {
                   <tr key={batch.id} className="hover:bg-surface-container-low">
                     <td className="px-5 py-4 font-mono text-xs text-on-surface">{batch.id}</td>
                     <td className="px-5 py-4">
-                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${STATUS_STYLES[batch.status] ?? "bg-surface-container-high text-outline"}`}>
+                      <span className={`${CHIP_CLASS} ${STATUS_STYLES[batch.status] ?? "border-outline-variant/60 bg-surface-container-low text-outline"}`}>
                         {batch.status}
                       </span>
                       {batch.error_message && <p className="mt-1 max-w-[260px] text-[10px] text-error line-clamp-2">{batch.error_message}</p>}
@@ -563,12 +574,12 @@ export default function AdminOnchainRegistrationsPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </AdminListSurface>
       </div>
 
       <div className="mt-10">
         <p className="mb-4 text-xs font-bold uppercase tracking-widest text-outline">사진가 부담 셀프등록 수수료</p>
-        <div className="overflow-x-auto bg-surface-container-lowest shadow-ghost">
+        <AdminListSurface className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
@@ -599,14 +610,14 @@ export default function AdminOnchainRegistrationsPage() {
                     <td className="px-5 py-4 text-on-surface-variant">{order.imageCount}건</td>
                     <td className="px-5 py-4">
                       <span
-                        className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                        className={`${CHIP_CLASS} ${
                           order.status === "paid"
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200"
+                            ? "border-emerald-200/70 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-900/20 dark:text-emerald-200"
                             : order.status === "pending"
-                              ? "bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-200"
+                              ? "border-orange-200/70 bg-orange-50 text-orange-700 dark:border-orange-400/20 dark:bg-orange-900/20 dark:text-orange-200"
                               : order.status === "refunded"
-                                ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-200"
-                                : "bg-surface-container-high text-outline"
+                                ? "border-blue-200/70 bg-blue-50 text-blue-600 dark:border-blue-400/20 dark:bg-blue-900/20 dark:text-blue-200"
+                                : "border-outline-variant/60 bg-surface-container-low text-outline"
                         }`}
                       >
                         {FEE_STATUS_LABELS[order.status] ?? order.status}
@@ -649,7 +660,7 @@ export default function AdminOnchainRegistrationsPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </AdminListSurface>
       </div>
     </div>
   );

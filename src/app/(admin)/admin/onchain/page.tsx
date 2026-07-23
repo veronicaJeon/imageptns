@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import {
+  AdminButton,
+  AdminChip,
+  AdminInlineMetrics,
+  AdminListSurface,
+} from "@/components/admin/AdminPrimitives";
 
 interface ReconciliationSummary {
   pending: number;
@@ -118,12 +124,14 @@ function formatAge(minutes: number) {
 
 function StatTile({ icon, label, value, tone }: { icon: string; label: string; value: string | number; tone: string }) {
   return (
-    <div className="bg-surface-container-lowest shadow-ghost p-5 flex flex-col gap-3">
-      <span className={`w-10 h-10 rounded-full flex items-center justify-center ${tone}`}>
-        <span className="material-symbols-outlined text-xl">{icon}</span>
+    <div className="flex min-w-0 items-center gap-3">
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tone}`}>
+        <span className="material-symbols-outlined text-lg">{icon}</span>
       </span>
-      <p className="text-2xl font-headline font-extrabold text-on-surface">{value}</p>
-      <p className="text-xs text-outline uppercase tracking-widest font-bold">{label}</p>
+      <span className="min-w-0">
+        <span className="block truncate text-[11px] font-bold uppercase tracking-widest text-outline">{label}</span>
+        <span className="mt-0.5 block truncate font-headline text-xl font-extrabold text-on-surface">{value}</span>
+      </span>
     </div>
   );
 }
@@ -256,7 +264,7 @@ export default function AdminOnchainPage() {
   const claimReconciliation = data?.claimReconciliation ?? [];
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8 flex flex-col gap-2">
         <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">온체인 운영</h1>
         <p className="text-sm text-on-surface-variant">
@@ -264,7 +272,7 @@ export default function AdminOnchainPage() {
         </p>
       </div>
 
-      <div className="mb-10 bg-surface-container-lowest shadow-ghost p-5">
+      <AdminListSurface className="mb-8 p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div>
             <p className="text-xs font-bold text-outline uppercase tracking-widest">테스트망 배선 진단</p>
@@ -272,14 +280,16 @@ export default function AdminOnchainPage() {
               escrow 배포·USDC 주소·operator 권한(setOperator)·RPC 네트워크를 dry-run read로 점검합니다.
             </p>
           </div>
-          <button
+          <AdminButton
             type="button"
             onClick={runDiagnostics}
             disabled={diagLoading}
-            className="shrink-0 rounded-md bg-primary px-4 py-2 text-xs font-bold uppercase tracking-widest text-on-primary transition-opacity hover:opacity-80 disabled:opacity-50"
+            variant="primary"
+            size="md"
+            className="shrink-0"
           >
             {diagLoading ? "진단 중..." : "환경 진단 실행"}
-          </button>
+          </AdminButton>
         </div>
 
         {diagError && <p className="text-xs text-error mb-3">{diagError}</p>}
@@ -299,7 +309,7 @@ export default function AdminOnchainPage() {
             </div>
 
             {diag.config && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px] font-mono text-outline bg-surface-container-low px-3 py-3 rounded">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-1 rounded-lg border border-outline-variant/30 px-3 py-3 font-mono text-[11px] text-outline sm:grid-cols-2">
                 <span className="truncate">chain {diag.config.chainId}</span>
                 <span className="truncate">fee {diag.config.platformFeeBps} bps</span>
                 <span className="truncate">escrow {diag.config.escrowAddress}</span>
@@ -334,16 +344,18 @@ export default function AdminOnchainPage() {
             </div>
           </div>
         )}
-      </div>
+      </AdminListSurface>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+      <AdminListSurface className="mb-8 p-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile icon="pending_actions" label="확인 대기" value={summary.pending} tone="bg-amber-50 text-amber-600 dark:bg-amber-900/20" />
         <StatTile icon="hourglass_top" label="30분 초과" value={summary.stalePending} tone="bg-error/10 text-error" />
         <StatTile icon="error" label="실패 주문" value={summary.failed} tone="bg-error/10 text-error" />
         <StatTile icon="savings" label="Claim 대기" value={formatUSDC(summary.claimableUsdc)} tone="bg-blue-50 text-blue-600 dark:bg-blue-900/20" />
-      </div>
+        </div>
+      </AdminListSurface>
 
-      <div className="mb-10 bg-surface-container-lowest shadow-ghost p-5">
+      <AdminListSurface className="mb-8 p-5">
         <div className="flex flex-col gap-1 mb-4">
           <p className="text-xs font-bold text-outline uppercase tracking-widest">DB / Contract Claimable 대조</p>
           <p className="text-sm text-on-surface-variant">
@@ -353,20 +365,14 @@ export default function AdminOnchainPage() {
             <p className="text-xs text-error mt-1">{data?.contractReconciliationError ?? "온체인 설정이 없어 contract 값을 읽지 못했습니다."}</p>
           )}
         </div>
-        <div className="grid grid-cols-3 gap-3 mb-4 text-xs">
-          <div className="bg-surface-container-low px-3 py-2">
-            <p className="font-bold text-on-surface">{summary.claimableMismatches}</p>
-            <p className="text-outline mt-1">불일치</p>
-          </div>
-          <div className="bg-surface-container-low px-3 py-2">
-            <p className="font-bold text-on-surface">{summary.claimableMissingWallets}</p>
-            <p className="text-outline mt-1">지갑 없음</p>
-          </div>
-          <div className="bg-surface-container-low px-3 py-2">
-            <p className="font-bold text-on-surface">{summary.claimableReadErrors}</p>
-            <p className="text-outline mt-1">RPC 오류</p>
-          </div>
-        </div>
+        <AdminInlineMetrics
+          className="mb-4"
+          items={[
+            { label: "불일치", value: summary.claimableMismatches },
+            { label: "지갑 없음", value: summary.claimableMissingWallets },
+            { label: "RPC 오류", value: summary.claimableReadErrors },
+          ]}
+        />
         {claimReconciliation.length === 0 ? (
           <p className="text-sm text-outline">claimable onchain ledger가 없습니다.</p>
         ) : (
@@ -407,7 +413,7 @@ export default function AdminOnchainPage() {
             </table>
           </div>
         )}
-      </div>
+      </AdminListSurface>
 
       <div className="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
@@ -420,12 +426,12 @@ export default function AdminOnchainPage() {
       </div>
 
       {orders.length === 0 ? (
-        <div className="bg-surface-container-lowest shadow-ghost px-6 py-12 flex flex-col items-center gap-3 text-outline">
+        <AdminListSurface className="flex flex-col items-center gap-3 px-6 py-12 text-outline">
           <span className="material-symbols-outlined text-5xl">verified</span>
           <p className="text-sm">확인 필요한 Base 주문이 없습니다.</p>
-        </div>
+        </AdminListSurface>
       ) : (
-        <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
+        <AdminListSurface className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
@@ -445,11 +451,9 @@ export default function AdminOnchainPage() {
                     <p className="text-xs text-on-surface-variant mt-1">{order.itemCount} items</p>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                      order.cryptoStatus === "failed" ? "bg-error/10 text-error" : "bg-amber-50 text-amber-600 dark:bg-amber-900/20"
-                    }`}>
+                    <AdminChip tone={order.cryptoStatus === "failed" ? "danger" : "warning"}>
                       {order.cryptoStatus}
-                    </span>
+                    </AdminChip>
                     {order.stale && (
                       <p className="text-xs text-error font-bold mt-2">stale pending</p>
                     )}
@@ -527,7 +531,7 @@ export default function AdminOnchainPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </AdminListSurface>
       )}
     </div>
   );

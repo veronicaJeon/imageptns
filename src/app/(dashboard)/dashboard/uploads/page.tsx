@@ -124,11 +124,13 @@ const UPLOADS_PAGE_COPY = {
 } as const;
 
 const STATUS_STYLES: Record<string, string> = {
-  approved: "bg-primary/10 text-primary",
-  pending:  "bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-300",
-  rejected: "bg-error/10 text-error",
-  draft:    "bg-surface-container-high text-outline",
+  approved: "border-primary/20 bg-primary/10 text-primary",
+  pending:  "border-amber-200/70 bg-amber-50 text-amber-600 dark:border-amber-400/20 dark:bg-amber-900/20 dark:text-amber-300",
+  rejected: "border-error/20 bg-error/10 text-error",
+  draft:    "border-outline-variant/60 bg-surface-container-low text-outline",
 };
+
+const CHIP_CLASS = "inline-flex h-6 max-w-full items-center rounded-full border px-2.5 text-[10px] font-bold leading-none";
 
 interface EditState {
   id: string;
@@ -492,7 +494,7 @@ function UploadsPageContent() {
               <p className="text-sm">{copy.empty[activeFilter]}</p>
             </div>
           ) : (
-            <div className="-mx-4 bg-surface-container-lowest shadow-ghost md:mx-0 md:overflow-x-auto">
+            <div className="-mx-4 overflow-hidden border border-outline-variant/30 bg-surface-container-lowest shadow-ghost md:mx-0 md:overflow-x-auto md:rounded-lg">
               <table className="w-full text-sm md:min-w-[820px]">
                 <thead className="hidden md:table-header-group">
                   <tr className="border-b border-outline-variant/20">
@@ -540,32 +542,32 @@ function UploadsPageContent() {
                         </div>
                       </td>
                       <td className="col-span-3 border-t border-outline-variant/20 px-4 py-4 md:border-t-0 md:px-6 md:py-4">
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_STYLES[img.status] ?? ""}`}>
+                        <span className={`${CHIP_CLASS} ${STATUS_STYLES[img.status] ?? "border-outline-variant/60 bg-surface-container-low text-outline"}`}>
                           {up.statuses[img.status as keyof typeof up.statuses] ?? img.status}
                         </span>
                         {img.status === "rejected" && img.rejection_reason && (
                           <p className="text-[10px] text-error mt-1 max-w-[180px] line-clamp-2 leading-relaxed">{img.rejection_reason}</p>
                         )}
-                        <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold">
-                          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <span className={`${CHIP_CLASS} border-primary/20 bg-primary/10 text-primary`}>
                             {getLocalizedCopyrightLicense(img.copyright_license, lang).label}
                           </span>
                           {getLocalizedFreeUsagePolicy(img.free_usage_policy, lang).code !== "none" && (
-                            <span className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-200 px-2 py-0.5 rounded-full">
+                            <span className={`${CHIP_CLASS} border-primary/20 bg-primary/10 text-primary`}>
                               {getLocalizedFreeUsagePolicy(img.free_usage_policy, lang).label}
                             </span>
                           )}
-                          <span className="bg-surface-container-low text-on-surface-variant px-2 py-0.5 rounded-full">
+                          <span className={`${CHIP_CLASS} border-outline-variant/60 bg-surface-container-low text-on-surface-variant`}>
                             {copy.proof[(img.proof_status ?? "not_registered") as keyof typeof copy.proof] ?? img.proof_status}
                           </span>
                           {img.lifecycle_status && img.lifecycle_status !== "active" && (
-                            <span className="bg-error/10 text-error px-2 py-0.5 rounded-full">
+                            <span className={`${CHIP_CLASS} border-error/20 bg-error/10 text-error`}>
                               {deletionPending
                                 ? copy.deletionRequested((img.deletion_fee_krw ?? 0).toLocaleString(copy.locale))
                                 : img.lifecycle_status}
                             </span>
                           )}
-                          <span className="bg-surface-container-low text-on-surface-variant px-2 py-0.5 rounded-full">
+                          <span className={`${CHIP_CLASS} border-outline-variant/60 bg-surface-container-low text-on-surface-variant`}>
                             {img.authorship_declaration === "ai_generated" ? copy.aiImage : copy.original}
                           </span>
                           {img.proof_arweave_original_tx_id && (
@@ -573,7 +575,7 @@ function UploadsPageContent() {
                               href={`https://arweave.net/${img.proof_arweave_original_tx_id}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:opacity-70"
+                              className={`${CHIP_CLASS} border-primary/20 bg-primary/10 text-primary hover:border-primary/40`}
                             >
                               {copy.arweaveOriginal}
                             </a>
@@ -583,7 +585,7 @@ function UploadsPageContent() {
                               href={`https://arweave.net/${img.proof_arweave_metadata_tx_id}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:opacity-70"
+                              className={`${CHIP_CLASS} border-primary/20 bg-primary/10 text-primary hover:border-primary/40`}
                             >
                               {copy.metadata}
                             </a>
@@ -593,7 +595,7 @@ function UploadsPageContent() {
                               href={explorerTxUrl(img.chain_id, img.proof_tx_hash) ?? undefined}
                               target="_blank"
                               rel="noreferrer"
-                              className="bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:opacity-70"
+                              className={`${CHIP_CLASS} border-primary/20 bg-primary/10 text-primary hover:border-primary/40`}
                             >
                               proof tx
                             </a>

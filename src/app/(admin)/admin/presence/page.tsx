@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AdminButton, AdminChip, AdminInlineMetrics, AdminListSurface } from "@/components/admin/AdminPrimitives";
 
 interface PresenceRow {
   session_id: string;
@@ -92,7 +93,7 @@ export default function AdminPresencePage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">동시접속자</h1>
@@ -104,35 +105,28 @@ export default function AdminPresencePage() {
           {lastRefreshedAt && (
             <span className="text-xs text-outline">갱신 {formatTime(lastRefreshedAt.toISOString())}</span>
           )}
-          <button
+          <AdminButton
             type="button"
             onClick={loadPresence}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-bold uppercase tracking-widest text-white hover:opacity-90"
+            variant="primary"
+            size="md"
           >
             <span className="material-symbols-outlined text-sm">refresh</span>
             새로고침
-          </button>
+          </AdminButton>
         </div>
       </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <div className="bg-surface-container-lowest shadow-ghost p-5">
-          <p className="text-xs font-bold uppercase tracking-widest text-outline">Active Sessions</p>
-          <p className="mt-2 text-3xl font-headline font-extrabold text-on-surface">{rows.length}</p>
-        </div>
-        <div className="bg-surface-container-lowest shadow-ghost p-5">
-          <p className="text-xs font-bold uppercase tracking-widest text-outline">Signed In</p>
-          <p className="mt-2 text-3xl font-headline font-extrabold text-on-surface">
-            {rows.filter((row) => row.user_id).length}
-          </p>
-        </div>
-        <div className="bg-surface-container-lowest shadow-ghost p-5">
-          <p className="text-xs font-bold uppercase tracking-widest text-outline">Guests</p>
-          <p className="mt-2 text-3xl font-headline font-extrabold text-on-surface">
-            {rows.filter((row) => !row.user_id).length}
-          </p>
-        </div>
-      </div>
+      <AdminListSurface className="mb-6 px-4 py-3">
+        <AdminInlineMetrics
+          className="text-sm"
+          items={[
+            { label: "Active Sessions", value: rows.length },
+            { label: "Signed In", value: rows.filter((row) => row.user_id).length },
+            { label: "Guests", value: rows.filter((row) => !row.user_id).length },
+          ]}
+        />
+      </AdminListSurface>
 
       {loading ? (
         <div className="flex items-center justify-center min-h-[40vh]">
@@ -144,7 +138,7 @@ export default function AdminPresencePage() {
           <p className="text-base">현재 접속 중인 사용자가 없습니다.</p>
         </div>
       ) : (
-        <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
+        <AdminListSurface className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
@@ -172,7 +166,9 @@ export default function AdminPresencePage() {
                         <p className="font-semibold text-on-surface truncate">
                           {row.user?.full_name || shortId(row.user_id)}
                         </p>
-                        <p className="text-xs text-outline">{row.user?.role ?? (row.user_id ? "signed in" : "guest")}</p>
+                        <AdminChip tone={row.user_id ? "primary" : "neutral"} className="mt-1">
+                          {row.user?.role ?? (row.user_id ? "signed in" : "guest")}
+                        </AdminChip>
                       </div>
                     </div>
                   </td>
@@ -185,9 +181,9 @@ export default function AdminPresencePage() {
                     {row.user_agent && <p className="mt-1 max-w-[220px] truncate text-[10px] text-outline">{row.user_agent}</p>}
                   </td>
                   <td className="px-6 py-4">
-                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                    <AdminChip tone="primary">
                       {secondsAgo(row.last_seen_at)}초 전
-                    </span>
+                    </AdminChip>
                     <p className="mt-1 text-xs text-outline">첫 접속 {formatTime(row.first_seen_at)}</p>
                   </td>
                   <td className="px-6 py-4 font-mono text-[10px] text-outline">
@@ -197,7 +193,7 @@ export default function AdminPresencePage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </AdminListSurface>
       )}
     </div>
   );

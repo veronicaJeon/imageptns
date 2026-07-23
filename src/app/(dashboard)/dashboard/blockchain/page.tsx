@@ -246,7 +246,7 @@ function PhotographerBlockchainContent() {
         </Link>
       </div>
 
-      <div className="mb-5 flex flex-col gap-3 bg-surface-container-lowest p-4 shadow-ghost md:flex-row md:items-center md:justify-between">
+      <div className="mb-5 flex flex-col gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-ghost md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap gap-4 text-xs text-on-surface-variant">
           <span>선택 {selected.length}개</span>
           <span>예상 원본 용량 {selectedTotalMb.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} MB</span>
@@ -312,7 +312,7 @@ function PhotographerBlockchainContent() {
           <p className="text-sm">아직 블록체인 등록 대상 사진이 없습니다.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto bg-surface-container-lowest shadow-ghost">
+        <div className="overflow-x-auto rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">

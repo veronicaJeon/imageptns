@@ -2,18 +2,21 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { AdminChip, AdminListSurface } from "@/components/admin/AdminPrimitives";
 
 function StatCard({ icon, label, value, sub, color }: {
   icon: string; label: string; value: string | number; sub?: string; color: string;
 }) {
   return (
-    <div className="bg-surface-container-lowest shadow-ghost p-6 flex flex-col gap-3">
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${color}`}>
-        <span className="material-symbols-outlined text-xl">{icon}</span>
+    <div className="flex min-w-0 items-center gap-3">
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${color}`}>
+        <span className="material-symbols-outlined text-lg">{icon}</span>
       </div>
-      <p className="text-2xl font-headline font-extrabold text-on-surface">{value}</p>
-      <p className="text-xs text-outline uppercase tracking-widest font-bold">{label}</p>
-      {sub && <p className="text-xs text-on-surface-variant">{sub}</p>}
+      <div className="min-w-0">
+        <p className="truncate text-[11px] font-bold uppercase tracking-widest text-outline">{label}</p>
+        <p className="mt-0.5 truncate font-headline text-xl font-extrabold text-on-surface">{value}</p>
+        {sub && <p className="mt-0.5 truncate text-xs text-on-surface-variant">{sub}</p>}
+      </div>
     </div>
   );
 }
@@ -184,29 +187,34 @@ export default function AdminStatsPage() {
   ].filter((item) => item.value > 0);
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight mb-8">통계</h1>
 
       {/* Image stats */}
       <p className="text-xs font-bold text-outline uppercase tracking-widest mb-4">이미지</p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+      <AdminListSurface className="mb-8 p-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon="photo_library" label="전체 이미지"  value={img.total    ?? 0} color="bg-surface-container-high text-on-surface-variant" />
         <StatCard icon="pending"       label="검토 대기"    value={img.pending  ?? 0} color="bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-300" />
         <StatCard icon="check_circle"  label="승인됨"       value={img.approved ?? 0} sub={`승인율 ${reviewRate}%`} color="bg-primary/10 text-primary" />
         <StatCard icon="cancel"        label="거절됨"       value={img.rejected ?? 0} color="bg-error/10 text-error" />
-      </div>
+        </div>
+      </AdminListSurface>
 
       {/* User & revenue stats */}
       <p className="text-xs font-bold text-outline uppercase tracking-widest mb-4">유저 & 매출</p>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
+      <AdminListSurface className="mb-8 p-4">
+        <div className="grid gap-4 sm:grid-cols-3">
         <StatCard icon="group"        label="전체 회원"    value={data?.users?.total ?? 0}          color="bg-blue-50 text-blue-500 dark:bg-blue-900/20" />
         <StatCard icon="receipt_long" label="완료된 주문"  value={data?.orders?.total ?? 0}         color="bg-green-50 text-green-500 dark:bg-green-900/20" />
         <StatCard icon="payments"     label="누적 매출"    value={formatKRW(data?.orders?.revenue ?? 0)} color="bg-green-50 text-green-600 dark:bg-green-900/20" />
-      </div>
+        </div>
+      </AdminListSurface>
 
       {/* Onchain ops stats */}
       <p className="text-xs font-bold text-outline uppercase tracking-widest mb-4">온체인 운영</p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+      <AdminListSurface className="mb-8 p-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon="verified"
           label="증명 등록 완료"
@@ -235,10 +243,11 @@ export default function AdminStatsPage() {
           sub={`${claims.claimableRows ?? 0}개 정산 항목`}
           color="bg-blue-50 text-blue-500 dark:bg-blue-900/20"
         />
-      </div>
+        </div>
+      </AdminListSurface>
 
       <p className="text-xs font-bold text-outline uppercase tracking-widest mb-4">운영 주의 항목</p>
-      <div className="bg-surface-container-lowest shadow-ghost mb-10 overflow-hidden">
+      <AdminListSurface className="mb-8">
         {attentionItems.length === 0 ? (
           <div className="px-6 py-8 flex items-center gap-3 text-on-surface-variant">
             <span className="material-symbols-outlined text-primary">verified</span>
@@ -264,13 +273,13 @@ export default function AdminStatsPage() {
             ))}
           </div>
         )}
-      </div>
+      </AdminListSurface>
 
       {/* Image approval bar */}
       {img.total > 0 && (
         <>
           <p className="text-xs font-bold text-outline uppercase tracking-widest mb-4">이미지 상태 분포</p>
-          <div className="bg-surface-container-lowest shadow-ghost p-6 mb-10">
+          <AdminListSurface className="mb-8 p-5">
             <div className="flex h-4 rounded-full overflow-hidden gap-0.5">
               {img.approved > 0 && (
                 <div className="bg-primary transition-all" style={{ width: `${(img.approved / img.total) * 100}%` }} title={`승인: ${img.approved}`} />
@@ -287,7 +296,7 @@ export default function AdminStatsPage() {
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />대기 {img.pending}</span>
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-error/60 inline-block" />거절 {img.rejected}</span>
             </div>
-          </div>
+          </AdminListSurface>
         </>
       )}
 
@@ -299,7 +308,7 @@ export default function AdminStatsPage() {
           <p className="text-sm">가입 회원이 없습니다</p>
         </div>
       ) : (
-        <div className="bg-surface-container-lowest shadow-ghost overflow-x-auto">
+        <AdminListSurface className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
@@ -313,11 +322,9 @@ export default function AdminStatsPage() {
                 <tr key={u.id} className="hover:bg-surface-container-low transition-colors">
                   <td className="px-6 py-4 font-medium text-on-surface">{u.full_name || "—"}</td>
                   <td className="px-6 py-4">
-                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                      u.role === "photographer" ? "bg-primary/10 text-primary" : "bg-surface-container-high text-on-surface-variant"
-                    }`}>
+                    <AdminChip tone={u.role === "photographer" ? "primary" : "neutral"}>
                       {u.role === "photographer" ? "사진작가" : "바이어"}
-                    </span>
+                    </AdminChip>
                   </td>
                   <td className="px-6 py-4 text-on-surface-variant">
                     {new Date(u.created_at).toLocaleDateString("ko-KR", { year: "numeric", month: "short", day: "numeric" })}
@@ -326,7 +333,7 @@ export default function AdminStatsPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </AdminListSurface>
       )}
     </div>
   );

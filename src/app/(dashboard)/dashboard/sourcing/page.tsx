@@ -89,6 +89,15 @@ const BUYER_SOURCING_COPY = {
   },
 } as const;
 
+const CHIP_CLASS = "inline-flex h-6 items-center rounded-full border px-2.5 text-[10px] font-bold leading-none";
+
+function sourcingStatusClass(status: string) {
+  if (status === "closed") return "border-outline-variant/60 bg-surface-container-low text-outline";
+  if (status === "answer_ready") return "border-primary/20 bg-primary/10 text-primary";
+  if (status === "under_review") return "border-amber-200/70 bg-amber-50 text-amber-700 dark:border-amber-400/20 dark:bg-amber-900/20 dark:text-amber-200";
+  return "border-outline-variant/60 bg-surface-container-low text-on-surface-variant";
+}
+
 interface CandidateImage {
   id: string;
   asset_id: string | null;
@@ -255,13 +264,13 @@ export default function BuyerSourcingPage() {
             const revisionDraft = revisionDrafts[request.id] ?? { reasons: [], message: "" };
             const canRevise = !!answer && status === "answer_ready" && revisionCount < 3;
             return (
-              <article key={request.id} className="rounded-xl bg-surface-container-lowest p-5 shadow-ghost">
+              <article key={request.id} className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-ghost">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
                     <h2 className="font-headline text-lg font-bold text-on-surface">{request.subject ?? copy.untitled}</h2>
                     <p className="mt-1 text-xs text-outline">{copy.receivedAt} {new Date(request.created_at).toLocaleString(copy.locale)}</p>
                   </div>
-                  <span className="w-fit rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold text-primary">
+                  <span className={`${CHIP_CLASS} w-fit ${sourcingStatusClass(status)}`}>
                     {copy.statuses[status as keyof typeof copy.statuses] ?? status}
                   </span>
                 </div>
@@ -270,27 +279,27 @@ export default function BuyerSourcingPage() {
                   {request.message ?? copy.noMessage}
                 </p>
 
-                <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-surface-container-low p-4 text-sm md:grid-cols-3">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.organization}</p>
-                    <p className="mt-1 text-on-surface">{request.requester_organization ?? "-"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.project}</p>
-                    <p className="mt-1 text-on-surface">{request.usage_project ?? "-"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.deadline}</p>
-                    <p className="mt-1 text-on-surface">{request.deadline_at ? new Date(request.deadline_at).toLocaleDateString(copy.locale) : "-"}</p>
-                  </div>
-                  <div className="md:col-span-3">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-outline">{copy.context}</p>
-                    <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{request.usage_context ?? "-"}</p>
-                  </div>
+                <div className="mt-4 grid gap-x-6 gap-y-2 text-sm md:grid-cols-3">
+                  <p className="min-w-0">
+                    <span className="block text-[10px] font-bold uppercase tracking-widest text-outline">{copy.organization}</span>
+                    <span className="mt-1 block truncate text-on-surface">{request.requester_organization ?? "-"}</span>
+                  </p>
+                  <p className="min-w-0">
+                    <span className="block text-[10px] font-bold uppercase tracking-widest text-outline">{copy.project}</span>
+                    <span className="mt-1 block truncate text-on-surface">{request.usage_project ?? "-"}</span>
+                  </p>
+                  <p className="min-w-0">
+                    <span className="block text-[10px] font-bold uppercase tracking-widest text-outline">{copy.deadline}</span>
+                    <span className="mt-1 block text-on-surface">{request.deadline_at ? new Date(request.deadline_at).toLocaleDateString(copy.locale) : "-"}</span>
+                  </p>
+                  <p className="md:col-span-3">
+                    <span className="block text-[10px] font-bold uppercase tracking-widest text-outline">{copy.context}</span>
+                    <span className="mt-1 block whitespace-pre-wrap text-on-surface-variant">{request.usage_context ?? "-"}</span>
+                  </p>
                 </div>
 
                 {answer ? (
-                  <section className="mt-5 rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
+                  <section className="mt-5 rounded-lg border border-outline-variant/30 p-4">
                     <p className="font-bold text-on-surface">{copy.answerTitle}</p>
                     {answer.rights_result && (
                       <p className="mt-2 text-xs font-bold text-primary">
@@ -305,7 +314,7 @@ export default function BuyerSourcingPage() {
                     )}
                   </section>
                 ) : (
-                  <p className="mt-5 rounded-lg bg-surface-container-low p-4 text-sm text-outline">
+                  <p className="mt-5 rounded-lg border border-outline-variant/30 px-4 py-3 text-sm text-outline">
                     {copy.pending}
                   </p>
                 )}
@@ -361,7 +370,7 @@ export default function BuyerSourcingPage() {
                     <div className="mt-3 flex flex-col gap-3">
                       <div className="flex flex-wrap gap-2">
                         {copy.revisionReasons.map((reason) => (
-                          <label key={reason.value} className="flex items-center gap-2 rounded-full bg-surface-container-lowest px-3 py-2 text-[10px] font-bold text-on-surface-variant">
+                          <label key={reason.value} className="flex h-9 items-center gap-2 rounded-lg border border-outline-variant/40 px-3 text-[10px] font-bold text-on-surface-variant">
                             <input
                               type="checkbox"
                               checked={revisionDraft.reasons.includes(reason.value)}

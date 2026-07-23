@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { AdminButton, AdminChip, AdminInlineMetrics } from "@/components/admin/AdminPrimitives";
 import { cn } from "@/lib/utils/cn";
 
 type SupportStatus = "pending" | "in_progress" | "resolved";
@@ -16,17 +17,6 @@ const TABS: { key: SupportTab; label: string; icon: string }[] = [
   { key: "all", label: "전체", icon: "grid_view" },
 ];
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300",
-  in_progress: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300",
-  resolved: "bg-primary/10 text-primary",
-  submitted: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300",
-  matching: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300",
-  fulfilled: "bg-primary/10 text-primary",
-  rejected: "bg-error/10 text-error",
-  cancelled: "bg-surface-container text-outline",
-};
-
 const STATUS_LABELS: Record<string, string> = {
   pending: "대기 중",
   in_progress: "검토 중",
@@ -38,25 +28,11 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "취소",
 };
 
-const PRIORITY_STYLES: Record<string, string> = {
-  low: "bg-surface-container text-outline",
-  normal: "bg-surface-container-low text-on-surface-variant",
-  high: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300",
-  urgent: "bg-error/10 text-error",
-};
-
 const PRIORITY_LABELS: Record<string, string> = {
   low: "낮음",
   normal: "보통",
   high: "높음",
   urgent: "긴급",
-};
-
-const MATCH_STATUS_STYLES: Record<string, string> = {
-  candidate: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300",
-  invited: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300",
-  interested: "bg-primary/10 text-primary",
-  declined: "bg-surface-container text-outline",
 };
 
 const MATCH_STATUS_LABELS: Record<string, string> = {
@@ -72,6 +48,26 @@ const RIGHTS_RESULT_LABELS: Record<string, string> = {
   unverified: "확인 불가",
   not_recommended: "사용 비권장",
 };
+
+function supportStatusTone(status: string | null | undefined) {
+  if (!status) return "neutral" as const;
+  if (["resolved", "fulfilled"].includes(status)) return "success" as const;
+  if (["pending", "submitted", "in_progress", "matching"].includes(status)) return "warning" as const;
+  if (["rejected", "cancelled"].includes(status)) return "danger" as const;
+  return "neutral" as const;
+}
+
+function priorityTone(priority: string | null | undefined) {
+  if (priority === "urgent") return "danger" as const;
+  if (priority === "high") return "warning" as const;
+  return "neutral" as const;
+}
+
+function matchStatusTone(status: string | null | undefined) {
+  if (status === "interested") return "success" as const;
+  if (status === "candidate" || status === "invited") return "warning" as const;
+  return "neutral" as const;
+}
 
 interface PhotoMatch {
   id: string;
@@ -608,7 +604,7 @@ export default function AdminSupportPage() {
       </div>
 
       <div className="mb-6 flex flex-col gap-3">
-        <div className="flex gap-1 bg-surface-container-lowest p-1 rounded-xl w-fit shadow-ghost overflow-x-auto max-w-full">
+        <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-surface-container-lowest p-1 shadow-ghost">
           {TABS.map(({ key, label, icon }) => (
             <button
               key={key}
@@ -652,7 +648,7 @@ export default function AdminSupportPage() {
               <div
                 key={submission.id}
                 className={cn(
-                  "bg-surface-container-lowest shadow-ghost rounded-xl overflow-hidden border",
+                  "overflow-hidden rounded-lg border bg-surface-container-lowest shadow-ghost",
                   isPhotoRequest ? "border-primary/30 border-l-4" : "border-transparent"
                 )}
               >
@@ -681,18 +677,15 @@ export default function AdminSupportPage() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                      <span className={cn(
-                        "text-[10px] font-bold px-3 py-1 rounded-full",
-                        isPhotoRequest ? "bg-primary/10 text-primary" : "bg-surface-container text-on-surface-variant"
-                      )}>
+                      <AdminChip tone={isPhotoRequest ? "primary" : "neutral"}>
                         {isPhotoRequest ? "사진 의뢰" : "일반 문의"}
-                      </span>
-                      <span className={cn("text-[10px] font-bold px-3 py-1 rounded-full", PRIORITY_STYLES[submission.priority ?? "normal"] ?? PRIORITY_STYLES.normal)}>
+                      </AdminChip>
+                      <AdminChip tone={priorityTone(submission.priority)}>
                         {PRIORITY_LABELS[submission.priority ?? "normal"] ?? submission.priority}
-                      </span>
-                      <span className={cn("text-[10px] font-bold px-3 py-1 rounded-full", STATUS_STYLES[submission.status] ?? STATUS_STYLES[submission.status_group] ?? "bg-surface-container text-outline")}>
+                      </AdminChip>
+                      <AdminChip tone={supportStatusTone(submission.status)}>
                         {STATUS_LABELS[submission.status] ?? submission.status}
-                      </span>
+                      </AdminChip>
                     </div>
                   </div>
 
@@ -707,23 +700,23 @@ export default function AdminSupportPage() {
                   </div>
 
                   {isPhotoRequest && photoRequest && (
-                    <div className="rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
+                    <div className="rounded-lg border border-outline-variant/30 p-4">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-widest text-outline">의뢰 운영 정보</p>
                           <p className="mt-1 text-xs text-on-surface-variant">request_status: {submission.status}</p>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold", STATUS_STYLES[submission.status] ?? "bg-surface-container text-outline")}>
+                          <AdminChip tone={supportStatusTone(submission.status)}>
                             {STATUS_LABELS[submission.status] ?? submission.status}
-                          </span>
-                          <span className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
+                          </AdminChip>
+                          <AdminChip tone="neutral">
                             후보 {matchCount}명
-                          </span>
+                          </AdminChip>
                           {candidateCount > 0 && (
-                            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-600 dark:bg-amber-900/20 dark:text-amber-300">
+                            <AdminChip tone="warning">
                               초대 가능 {candidateCount}명
-                            </span>
+                            </AdminChip>
                           )}
                         </div>
                       </div>
@@ -778,7 +771,7 @@ export default function AdminSupportPage() {
                         </div>
                       )}
                       {(photoRequest.location_label || photoRequest.category || photoRequest.usage_intent || photoRequest.license_intent || formatBudget(photoRequest) !== "-" || displayList(photoRequest.target_regions).length > 0 || displayList(photoRequest.tags).length > 0) && (
-                        <div className="md:col-span-4 rounded-lg bg-surface-container-lowest p-3">
+                        <div className="border-t border-outline-variant/30 pt-3 md:col-span-4">
                           <p className="text-[10px] font-bold uppercase tracking-widest text-outline">기존 보조정보</p>
                           <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
                             위치 {photoRequest.location_label ?? "-"} · 카테고리 {photoRequest.category ?? "-"} · 예산 {formatBudget(photoRequest)} · 사용/라이선스 {[photoRequest.usage_intent, photoRequest.license_intent].filter(Boolean).join(" / ") || "-"}
@@ -804,9 +797,9 @@ export default function AdminSupportPage() {
                           </p>
                         </div>
                         {latestSourcingAnswer(photoRequest.answers) && (
-                          <span className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold text-on-surface-variant">
+                          <AdminChip tone="neutral">
                             최근 답변 {latestSourcingAnswer(photoRequest.answers)?.status === "published" ? "발송됨" : "초안"}
-                          </span>
+                          </AdminChip>
                         )}
                       </div>
 
@@ -892,7 +885,7 @@ export default function AdminSupportPage() {
                           type="button"
                           onClick={() => saveSourcingDraft(submission)}
                           disabled={isBusy}
-                          className="flex items-center gap-1.5 rounded border border-primary/40 bg-surface-container-lowest px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+                          className="flex h-9 items-center gap-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 text-[11px] font-bold text-on-surface-variant transition-colors hover:border-primary/50 hover:text-primary disabled:opacity-50"
                         >
                           <span className="material-symbols-outlined text-sm">save</span>
                           초안 저장
@@ -911,7 +904,7 @@ export default function AdminSupportPage() {
                   )}
 
                   {isPhotoRequest && photoRequest && (
-                    <div className="rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
+                    <div className="rounded-lg border border-outline-variant/30 p-4">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-outline">후보 사진가 매칭</p>
                         <button
@@ -966,9 +959,9 @@ export default function AdminSupportPage() {
                               </div>
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold", MATCH_STATUS_STYLES[match.status] ?? "bg-surface-container text-outline")}>
+                                  <AdminChip tone={matchStatusTone(match.status)}>
                                     {MATCH_STATUS_LABELS[match.status] ?? match.status}
-                                  </span>
+                                  </AdminChip>
                                   <p className="min-w-0 text-on-surface-variant">{match.reason || "매칭 사유 없음"}</p>
                                 </div>
                               </div>
@@ -979,26 +972,15 @@ export default function AdminSupportPage() {
                     </div>
                   )}
 
-                  <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[12px]">schedule</span>
-                      수정일 {formatDate(submission.updated_at)}
-                    </span>
-                    {submission.resolved_at && (
-                      <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]">task_alt</span>
-                        해결일 {formatDate(submission.resolved_at)}
-                      </span>
-                    )}
-                    {submission.assignee?.full_name && (
-                      <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]">assignment_ind</span>
-                        {submission.assignee.full_name}
-                      </span>
-                    )}
-                  </div>
+                  <AdminInlineMetrics
+                    items={[
+                      { label: "수정일", value: formatDate(submission.updated_at) },
+                      ...(submission.resolved_at ? [{ label: "해결일", value: formatDate(submission.resolved_at) }] : []),
+                      ...(submission.assignee?.full_name ? [{ label: "담당자", value: submission.assignee.full_name }] : []),
+                    ]}
+                  />
 
-                  <div className="flex flex-col gap-2 p-3 bg-surface-container-low border border-outline-variant/30 rounded-lg">
+                  <div className="flex flex-col gap-2 rounded-lg border border-outline-variant/30 p-3">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">관리자 메모</label>
                     <textarea
                       value={noteValue}
@@ -1008,10 +990,9 @@ export default function AdminSupportPage() {
                       className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-3 py-2 text-sm text-on-surface placeholder:text-outline outline-none resize-y min-h-24"
                     />
                     <div className="flex justify-end">
-                      <button
+                      <AdminButton
                         onClick={() => updateSubmission(submission, { admin_note: noteValue })}
                         disabled={isBusy}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-surface-container-lowest border border-outline-variant text-xs font-bold text-on-surface-variant rounded hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
                       >
                         {isBusy ? (
                           <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -1019,7 +1000,7 @@ export default function AdminSupportPage() {
                           <span className="material-symbols-outlined text-sm">save</span>
                         )}
                         메모 저장
-                      </button>
+                      </AdminButton>
                     </div>
                   </div>
 

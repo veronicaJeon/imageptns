@@ -24,6 +24,8 @@ const earningsQueryClient = new QueryClient();
 
 type BaseChainId = typeof base.id | typeof baseSepolia.id;
 
+const CHIP_CLASS = "inline-flex h-6 items-center rounded-full border px-2.5 text-[10px] font-bold leading-none";
+
 interface PeriodEarnings {
   period: string;
   sales: number;
@@ -348,7 +350,7 @@ function EarningsInner() {
 
       {/* Bar chart */}
       {chartData.length > 0 && (
-        <div className="bg-surface-container-lowest shadow-ghost p-6 mb-8">
+        <div className="mb-8 rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-ghost">
           <p className="text-xs font-bold text-outline uppercase tracking-widest mb-6">Monthly Net (Last {chartData.length} months)</p>
           <div className="flex items-end gap-3 h-32">
             {chartData.map((row) => {
@@ -400,7 +402,7 @@ function EarningsInner() {
               <p className="text-xs font-bold text-outline uppercase tracking-widest">Base USDC Settlement</p>
               <p className="text-sm text-on-surface-variant mt-1">온체인 escrow로 정산되는 판매 항목입니다.</p>
             </div>
-            <div className="flex gap-1 bg-surface-container-lowest p-1 shadow-ghost w-fit">
+            <div className="flex w-fit gap-1 rounded-lg bg-surface-container-lowest p-1 shadow-ghost">
               {(["claimable", "claimed", "all"] as const).map((filter) => (
                 <button
                   key={filter}
@@ -416,7 +418,7 @@ function EarningsInner() {
             </div>
           </div>
 
-          <div className="-mx-4 overflow-x-auto bg-surface-container-lowest shadow-ghost md:mx-0">
+          <div className="-mx-4 overflow-x-auto border border-outline-variant/30 bg-surface-container-lowest shadow-ghost md:mx-0 md:rounded-lg">
             <table className="min-w-[920px] w-full text-sm">
               <thead>
                 <tr className="border-b border-outline-variant/20">
@@ -431,19 +433,21 @@ function EarningsInner() {
                   return (
                     <tr key={row.id ?? index} className="hover:bg-surface-container-low transition-colors">
                       <td className="px-6 py-4">
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                          row.claim_status === "claimed" ? "bg-primary/10 text-primary" : "bg-amber-50 text-amber-600 dark:bg-amber-900/20"
+                        <span className={`${CHIP_CLASS} ${
+                          row.claim_status === "claimed"
+                            ? "border-primary/20 bg-primary/10 text-primary"
+                            : "border-amber-200/70 bg-amber-50 text-amber-600 dark:border-amber-400/20 dark:bg-amber-900/20 dark:text-amber-300"
                         }`}>
                           {row.claim_status ?? "unknown"}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                        <span className={`${CHIP_CLASS} ${
                           row.claim_review_status === "approved"
-                            ? "bg-primary/10 text-primary"
+                            ? "border-primary/20 bg-primary/10 text-primary"
                             : row.claim_review_status === "rejected"
-                            ? "bg-error/10 text-error"
-                            : "bg-surface-container-high text-on-surface-variant"
+                            ? "border-error/20 bg-error/10 text-error"
+                            : "border-outline-variant/60 bg-surface-container-low text-on-surface-variant"
                         }`}>
                           {row.claim_review_status ?? "not_required"}
                         </span>
@@ -492,7 +496,7 @@ function EarningsInner() {
           <p>No earnings yet</p>
         </div>
       ) : (
-        <div className="-mx-4 overflow-x-auto bg-surface-container-lowest shadow-ghost md:mx-0">
+        <div className="-mx-4 overflow-x-auto border border-outline-variant/30 bg-surface-container-lowest shadow-ghost md:mx-0 md:rounded-lg">
           <table className="min-w-[720px] w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
@@ -511,12 +515,12 @@ function EarningsInner() {
                   <td className="px-6 py-4 font-semibold text-on-surface">{formatKRW(row.net)}</td>
                   <td className="px-6 py-4">
                     {row.paid ? (
-                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-primary/10 text-primary">Paid</span>
+                      <span className={`${CHIP_CLASS} border-primary/20 bg-primary/10 text-primary`}>Paid</span>
                     ) : (
                       <button
                         onClick={() => requestPayout(row.period)}
                         disabled={payoutLoading && payoutPeriod === row.period}
-                        className="text-xs font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300 hover:opacity-70 transition-opacity disabled:opacity-50"
+                        className={`${CHIP_CLASS} border-amber-200/70 bg-amber-50 text-amber-600 transition-opacity hover:opacity-70 disabled:opacity-50 dark:border-amber-400/20 dark:bg-amber-900/20 dark:text-amber-300`}
                       >
                         Request Payout
                       </button>

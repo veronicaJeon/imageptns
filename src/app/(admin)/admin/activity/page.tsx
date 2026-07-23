@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AdminChip, AdminInlineMetrics } from "@/components/admin/AdminPrimitives";
 import { cn } from "@/lib/utils/cn";
 
 type EventType =
@@ -47,14 +48,12 @@ const EVENT_LABELS: Record<string, string> = {
   download: "다운로드",
 };
 
-const EVENT_STYLES: Record<string, string> = {
-  page_view: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200",
-  image_view: "bg-primary/10 text-primary",
-  search: "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-200",
-  cart_add: "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-200",
-  checkout_started: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200",
-  download: "bg-surface-container-high text-on-surface-variant",
-};
+function eventTone(eventType: string | null | undefined) {
+  if (eventType === "checkout_started") return "success" as const;
+  if (eventType === "cart_add") return "warning" as const;
+  if (eventType === "image_view" || eventType === "search") return "primary" as const;
+  return "neutral" as const;
+}
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("ko-KR", {
@@ -119,7 +118,7 @@ export default function AdminActivityPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8">
         <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">활동 로그</h1>
         <p className="text-sm text-outline mt-1">
@@ -128,7 +127,7 @@ export default function AdminActivityPage() {
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6">
-        <div className="hidden md:flex gap-1 bg-surface-container-lowest p-1 rounded-xl w-fit shadow-ghost">
+        <div className="hidden w-fit gap-1 rounded-lg bg-surface-container-lowest p-1 shadow-ghost md:flex">
           {FILTERS.map(({ key, label, icon }) => (
             <button
               key={key}
@@ -143,7 +142,7 @@ export default function AdminActivityPage() {
             </button>
           ))}
         </div>
-        <label className="md:hidden flex items-center gap-2 bg-surface-container-lowest shadow-ghost rounded-xl px-3 py-2">
+        <label className="flex items-center gap-2 rounded-lg bg-surface-container-lowest px-3 py-2 shadow-ghost md:hidden">
           <span className="material-symbols-outlined text-base text-outline">filter_list</span>
           <select
             value={eventType}
@@ -169,7 +168,7 @@ export default function AdminActivityPage() {
       ) : (
         <div className="flex flex-col gap-4">
           {events.map((event) => (
-            <div key={event.id} className="bg-surface-container-lowest shadow-ghost rounded-xl overflow-hidden">
+            <div key={event.id} className="overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost">
               <div className="p-5 flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -182,32 +181,19 @@ export default function AdminActivityPage() {
                     </div>
                     <p className="text-xs text-outline mt-1">{formatDateTime(event.created_at)}</p>
                   </div>
-                  <span className={cn("text-[10px] font-bold px-3 py-1 rounded-full shrink-0", EVENT_STYLES[event.event_type] ?? "bg-surface-container text-outline")}>
+                  <AdminChip tone={eventTone(event.event_type)} className="shrink-0">
                     {event.event_type}
-                  </span>
+                  </AdminChip>
                 </div>
 
-                <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
-                  <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[12px]">person</span>
-                    {event.user?.full_name ?? shortId(event.user_id) ?? "Guest"}
-                  </span>
-                  {event.session_id && (
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                      Session {shortId(event.session_id)}
-                    </span>
-                  )}
-                  {event.image && (
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                      {event.image.title ?? event.image.asset_id ?? shortId(event.image_id)}
-                    </span>
-                  )}
-                  {event.order_id && (
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                      Order {shortId(event.order_id)}
-                    </span>
-                  )}
-                </div>
+                <AdminInlineMetrics
+                  items={[
+                    { label: "사용자", value: event.user?.full_name ?? shortId(event.user_id) ?? "Guest" },
+                    ...(event.session_id ? [{ label: "Session", value: shortId(event.session_id) }] : []),
+                    ...(event.image ? [{ label: "이미지", value: event.image.title ?? event.image.asset_id ?? shortId(event.image_id) }] : []),
+                    ...(event.order_id ? [{ label: "Order", value: shortId(event.order_id) }] : []),
+                  ]}
+                />
 
                 <div className="grid gap-3 lg:grid-cols-[1fr_1.3fr]">
                   <div className="flex flex-col gap-2 text-xs text-on-surface-variant min-w-0">

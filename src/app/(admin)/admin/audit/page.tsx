@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AdminChip, AdminInlineMetrics } from "@/components/admin/AdminPrimitives";
 import { cn } from "@/lib/utils/cn";
 
 type TargetType = "all" | "image" | "payout" | "commission_policy" | "contact_submission" | "order" | "user";
@@ -30,14 +31,12 @@ const FILTERS: { key: TargetType; label: string; icon: string }[] = [
   { key: "user", label: "사용자", icon: "person" },
 ];
 
-const ACTION_STYLES: Record<string, string> = {
-  create: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200",
-  update: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200",
-  approve: "bg-primary/10 text-primary",
-  reject: "bg-error/10 text-error",
-  delete: "bg-error/10 text-error",
-  resolve: "bg-primary/10 text-primary",
-};
+function actionTone(action: string | null | undefined) {
+  if (["create", "approve", "resolve"].includes(action ?? "")) return "success" as const;
+  if (action === "update") return "primary" as const;
+  if (["reject", "delete"].includes(action ?? "")) return "danger" as const;
+  return "neutral" as const;
+}
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("ko-KR", {
@@ -106,7 +105,7 @@ export default function AdminAuditPage() {
   }
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8">
         <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">감사 로그</h1>
         <p className="text-sm text-outline mt-1">
@@ -115,7 +114,7 @@ export default function AdminAuditPage() {
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6">
-        <div className="hidden md:flex gap-1 bg-surface-container-lowest p-1 rounded-xl w-fit shadow-ghost">
+        <div className="hidden w-fit gap-1 rounded-lg bg-surface-container-lowest p-1 shadow-ghost md:flex">
           {FILTERS.map(({ key, label, icon }) => (
             <button
               key={key}
@@ -130,7 +129,7 @@ export default function AdminAuditPage() {
             </button>
           ))}
         </div>
-        <label className="md:hidden flex items-center gap-2 bg-surface-container-lowest shadow-ghost rounded-xl px-3 py-2">
+        <label className="flex items-center gap-2 rounded-lg bg-surface-container-lowest px-3 py-2 shadow-ghost md:hidden">
           <span className="material-symbols-outlined text-base text-outline">filter_list</span>
           <select
             value={targetType}
@@ -156,7 +155,7 @@ export default function AdminAuditPage() {
       ) : (
         <div className="flex flex-col gap-4">
           {logs.map((log) => (
-            <div key={log.id} className="bg-surface-container-lowest shadow-ghost rounded-xl overflow-hidden">
+            <div key={log.id} className="overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost">
               <div className="p-5 flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -167,28 +166,21 @@ export default function AdminAuditPage() {
                     </div>
                     <p className="text-xs text-outline mt-1">{formatDateTime(log.created_at)}</p>
                   </div>
-                  <span className={cn("text-[10px] font-bold px-3 py-1 rounded-full shrink-0", ACTION_STYLES[log.action] ?? "bg-surface-container text-outline")}>
+                  <AdminChip tone={actionTone(log.action)} className="shrink-0">
                     {log.action}
-                  </span>
+                  </AdminChip>
                 </div>
 
-                <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
-                  <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[12px]">admin_panel_settings</span>
-                    {log.actor?.full_name ?? shortId(log.actor_id) ?? "System"}
-                  </span>
-                  <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                    {log.target_label ?? shortId(log.target_id) ?? log.target_type}
-                  </span>
-                  {log.target_id && (
-                    <span className="bg-surface-container-low text-on-surface-variant px-2.5 py-1 rounded-full">
-                      ID {shortId(log.target_id)}
-                    </span>
-                  )}
-                </div>
+                <AdminInlineMetrics
+                  items={[
+                    { label: "액터", value: log.actor?.full_name ?? shortId(log.actor_id) ?? "System" },
+                    { label: "대상", value: log.target_label ?? shortId(log.target_id) ?? log.target_type },
+                    ...(log.target_id ? [{ label: "ID", value: shortId(log.target_id) }] : []),
+                  ]}
+                />
 
                 {log.reason && (
-                  <div className="flex items-start gap-2 bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2">
+                  <div className="flex items-start gap-2 rounded-lg border border-outline-variant/30 px-3 py-2">
                     <span className="material-symbols-outlined text-outline text-sm mt-0.5">notes</span>
                     <p className="text-xs text-on-surface-variant">{log.reason}</p>
                   </div>
