@@ -9,7 +9,6 @@ import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 import { imageCategoryLabel } from "@/lib/images/categories";
 
 const LICENSE_KEYS: LicenseType[] = ["editorial", "commercial", "extended"];
-const COMMERCE_ENABLED = process.env.NEXT_PUBLIC_COMMERCE_ENABLED === "true";
 
 const CART_PAGE_COPY = {
   ko: {
@@ -18,6 +17,7 @@ const CART_PAGE_COPY = {
     printStatement: "PDF 내역서 인쇄",
     creditLine: "저작자 표시",
     purchaseOptions: "구매 옵션",
+    bankTransferNote: "계좌이체 요청 후 관리자가 입금을 확인하면 원본 사용 권한이 열립니다.",
   },
   en: {
     locale: "en-US",
@@ -25,6 +25,7 @@ const CART_PAGE_COPY = {
     printStatement: "Print PDF statement",
     creditLine: "Credit line",
     purchaseOptions: "Purchase option",
+    bankTransferNote: "Original usage rights open after an administrator confirms your bank transfer.",
   },
 } as const;
 
@@ -194,25 +195,18 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                {COMMERCE_ENABLED ? <Link
+                <Link
                   href="/checkout"
                   onClick={startCartCheckout}
                   className="block w-full py-4 bg-primary text-white text-xs font-bold uppercase tracking-widest text-center rounded hover:opacity-90 transition-opacity"
                 >
                   {c.checkoutBtn}
-                </Link> : (
-                  <Link
-                    href="/contact?mode=photo"
-                    className="block w-full rounded bg-primary py-4 text-center text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90"
-                  >
-                    {lang === "ko" ? "사진 사용 문의" : "Request image use"}
-                  </Link>
-                )}
+                </Link>
 
-                {COMMERCE_ENABLED && <div className="mt-4 flex items-center justify-center gap-1 text-[10px] text-outline">
-                  <span className="material-symbols-outlined text-sm">lock</span>
-                  Secured by Toss Payments
-                </div>}
+                <div className="mt-4 flex items-start justify-center gap-1.5 text-center text-[10px] leading-relaxed text-outline">
+                  <span className="material-symbols-outlined mt-0.5 text-sm">account_balance</span>
+                  <span>{copy.bankTransferNote}</span>
+                </div>
               </div>
             </div>
           </div>

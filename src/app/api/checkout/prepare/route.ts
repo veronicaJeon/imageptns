@@ -6,7 +6,7 @@ import { priceCartItemsFromLicenses, type LicensePriceRow } from "@/lib/commerce
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadSubscriptionCoverageForCheckout } from "@/lib/subscription/checkout";
 import { getBankTransferAccount } from "@/lib/payments/bank-transfer";
-import { isCommerceEnabled } from "@/lib/commerce/availability";
+import { isCheckoutRequestEnabled } from "@/lib/commerce/availability";
 
 interface CartItemInput {
   id: string;           // image id
@@ -30,10 +30,6 @@ interface CheckoutImageRow {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isCommerceEnabled()) {
-    return NextResponse.json({ error: "Commerce is not available yet" }, { status: 503 });
-  }
-
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -114,6 +110,9 @@ export async function POST(req: NextRequest) {
   const subtotal = payableItems.reduce((s, i) => s + i.effectivePriceKrw, 0);
   const vat      = Math.round(subtotal * 0.1);
   const total    = subtotal + vat;
+  if (!isCheckoutRequestEnabled(paymentProvider, total)) {
+    return NextResponse.json({ error: "Online payments are not available yet" }, { status: 503 });
+  }
   const tossOrderId = randomUUID();
   const isBankTransfer = paymentProvider === "bank_transfer";
   const requiresUsagePurpose = payableItems.some((item) => {

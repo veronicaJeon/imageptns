@@ -27,6 +27,7 @@ const wagmiConfig = createConfig({
 });
 
 const queryClient = new QueryClient();
+const ONLINE_PAYMENTS_ENABLED = process.env.NEXT_PUBLIC_COMMERCE_ENABLED === "true";
 
 type PaymentMethod = "toss" | "base_usdc" | "bank_transfer";
 
@@ -126,6 +127,16 @@ const CHECKOUT_PAGE_COPY = {
       { icon: "payments", title: "결제 진행", body: "카드 또는 Base USDC로 구매를 완료합니다." },
       { icon: "download", title: "원본 다운로드", body: "결제 완료 즉시 다운로드 권한이 열립니다." },
     ],
+    bankTransferSteps: [
+      { icon: "receipt_long", title: "주문 확인", body: "라이선스와 입금 금액을 확정합니다." },
+      { icon: "account_balance", title: "계좌이체", body: "안내된 계좌로 입금한 뒤 관리자 확인을 기다립니다." },
+      { icon: "download", title: "원본 다운로드", body: "관리자가 입금을 승인하면 다운로드 권한이 열립니다." },
+    ],
+    freeSteps: [
+      { icon: "receipt_long", title: "주문 확인", body: "무료 사용 조건과 사용처를 확인합니다." },
+      { icon: "redeem", title: "무료 사용 확정", body: "결제수단 입력 없이 라이선스를 확정합니다." },
+      { icon: "download", title: "원본 다운로드", body: "확정 즉시 다운로드 권한이 열립니다." },
+    ],
     freeOrderTitle: "무료 라이선스 주문",
     subscriptionFreeOrderTitle: "구독 무료다운 주문",
     freeOrderBody: "결제 수단 입력 없이 구매가 확정되고 원본 다운로드 권한이 즉시 생성됩니다.",
@@ -144,6 +155,8 @@ const CHECKOUT_PAGE_COPY = {
     bankTransferAccount: "계좌번호",
     bankTransferHolder: "예금주",
     bankTransferConfirm: "확인했습니다",
+    bankTransferSecureNote: "계좌이체 주문은 관리자 입금 확인 전까지 구매 대기 상태로 보관됩니다.",
+    freeSecureNote: "무료 라이선스는 결제수단 입력 없이 즉시 확정됩니다.",
     widgetLoading: "결제 위젯 로딩 중...",
     baseTitle: "Base USDC 결제",
     baseBody: "지갑 연결 후 Base 네트워크에서 USDC 승인과 구매 트랜잭션을 순서대로 진행합니다.",
@@ -201,6 +214,16 @@ const CHECKOUT_PAGE_COPY = {
       { icon: "payments", title: "Pay", body: "Complete purchase by card or Base USDC." },
       { icon: "download", title: "Download originals", body: "Download access opens immediately after payment." },
     ],
+    bankTransferSteps: [
+      { icon: "receipt_long", title: "Review order", body: "Confirm licenses and the transfer amount." },
+      { icon: "account_balance", title: "Bank transfer", body: "Transfer to the displayed account and wait for administrator review." },
+      { icon: "download", title: "Download originals", body: "Download access opens after the transfer is approved." },
+    ],
+    freeSteps: [
+      { icon: "receipt_long", title: "Review order", body: "Confirm the free-use terms and usage purpose." },
+      { icon: "redeem", title: "Confirm free use", body: "Confirm the license without entering a payment method." },
+      { icon: "download", title: "Download originals", body: "Download access opens immediately after confirmation." },
+    ],
     freeOrderTitle: "Free license order",
     subscriptionFreeOrderTitle: "Subscription free-download order",
     freeOrderBody: "The purchase will be confirmed without payment details and original download access will be created immediately.",
@@ -219,6 +242,8 @@ const CHECKOUT_PAGE_COPY = {
     bankTransferAccount: "Account number",
     bankTransferHolder: "Account holder",
     bankTransferConfirm: "Got it",
+    bankTransferSecureNote: "Bank-transfer orders remain pending until an administrator confirms the deposit.",
+    freeSecureNote: "Free licenses are confirmed immediately without a payment method.",
     widgetLoading: "Loading payment widget...",
     baseTitle: "Base USDC payment",
     baseBody: "After connecting your wallet, approve USDC and send the purchase transaction on Base.",
@@ -362,7 +387,9 @@ function CheckoutContent() {
   const [usagePurposeNote, setUsagePurposeNote] = useState("");
   const [loading, setLoading]   = useState(false);
   const [widgetReady, setWidgetReady] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("toss");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
+    ONLINE_PAYMENTS_ENABLED ? "toss" : "bank_transfer",
+  );
   const [baseRecovery, setBaseRecovery] = useState<BasePaymentRecovery | null>(null);
   const [bankTransferRequest, setBankTransferRequest] = useState<BankTransferRequestState | null>(null);
   const widgetRef = useRef<PaymentWidgetInstance | null>(null);
@@ -406,7 +433,7 @@ function CheckoutContent() {
 
   // Load Toss widget when total is ready
   useEffect(() => {
-    if (!total || typeof window === "undefined") return;
+    if (!ONLINE_PAYMENTS_ENABLED || paymentMethod !== "toss" || !total || typeof window === "undefined") return;
 
     let mounted = true;
     loadPaymentWidget(
@@ -422,7 +449,7 @@ function CheckoutContent() {
 
     return () => { mounted = false; };
   // Re-init if total changes
-  }, [total]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [billing.email, paymentMethod, total]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -747,7 +774,7 @@ function CheckoutContent() {
         <h1 className="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-10">{ch.title}</h1>
 
         <div className="mb-10 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {copy.steps.map((step, index) => (
+          {(isFreeCheckout ? copy.freeSteps : ONLINE_PAYMENTS_ENABLED ? copy.steps : copy.bankTransferSteps).map((step, index) => (
             <div key={step.title} className="bg-surface-container-lowest px-4 py-4 shadow-ghost">
               <div className="flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-black text-on-primary">
@@ -818,8 +845,8 @@ function CheckoutContent() {
                   </p>
                 </div>
               ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-                <button
+              <div className={`grid grid-cols-1 gap-3 mb-5 ${ONLINE_PAYMENTS_ENABLED ? "sm:grid-cols-3" : ""}`}>
+                {ONLINE_PAYMENTS_ENABLED && <button
                   type="button"
                   onClick={() => setPaymentMethod("toss")}
                   className={`p-4 ring-1 rounded-lg text-left transition-all ${
@@ -835,7 +862,7 @@ function CheckoutContent() {
                   <span className="block mt-2 text-[11px] leading-relaxed text-outline">
                     {copy.tossDescription}
                   </span>
-                </button>
+                </button>}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("bank_transfer")}
@@ -853,7 +880,7 @@ function CheckoutContent() {
                     {copy.bankTransferDescription}
                   </span>
                 </button>
-                <button
+                {ONLINE_PAYMENTS_ENABLED && <button
                   type="button"
                   onClick={() => setPaymentMethod("base_usdc")}
                   className={`p-4 ring-1 rounded-lg text-left transition-all ${
@@ -869,7 +896,7 @@ function CheckoutContent() {
                   <span className="block mt-2 text-[11px] leading-relaxed text-outline">
                     {copy.baseDescription}
                   </span>
-                </button>
+                </button>}
               </div>
               )}
 
@@ -1006,7 +1033,13 @@ function CheckoutContent() {
               </div>
             )}
 
-            <p className="text-[10px] text-outline text-center">{ch.secureNote}</p>
+            <p className="text-[10px] text-outline text-center">
+              {isFreeCheckout
+                ? copy.freeSecureNote
+                : ONLINE_PAYMENTS_ENABLED && paymentMethod === "toss"
+                  ? ch.secureNote
+                  : copy.bankTransferSecureNote}
+            </p>
             <p className="text-center text-[11px] leading-relaxed text-on-surface-variant">
               {copy.downloadAccess}
             </p>
