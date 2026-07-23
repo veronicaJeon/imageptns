@@ -34,6 +34,7 @@ export function LocationAutocomplete({ lang, value, placeholder, onChange }: Loc
   const copy = COPY[lang];
   const listId = useId();
   const requestIdRef = useRef(0);
+  const suggestionCacheRef = useRef(new Map<string, LocationSuggestion[]>());
   const [focused, setFocused] = useState(false);
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
@@ -48,18 +49,33 @@ export function LocationAutocomplete({ lang, value, placeholder, onChange }: Loc
       return;
     }
 
+    const cached = suggestionCacheRef.current.get(query);
+    if (cached) {
+      setSuggestions(cached);
+      setLoading(false);
+      setActiveIndex(-1);
+      return;
+    }
+
     const requestId = ++requestIdRef.current;
     const controller = new AbortController();
+    setLoading(true);
     const timer = window.setTimeout(async () => {
-      setLoading(true);
       try {
         const response = await fetch(`/api/locations/suggest?q=${encodeURIComponent(query)}`, {
-          cache: "no-store",
           signal: controller.signal,
         });
         const body = await response.json() as { suggestions?: LocationSuggestion[] };
         if (requestId !== requestIdRef.current) return;
-        setSuggestions(response.ok && Array.isArray(body.suggestions) ? body.suggestions : []);
+        const nextSuggestions = response.ok && Array.isArray(body.suggestions) ? body.suggestions : [];
+        if (response.ok) {
+          if (suggestionCacheRef.current.size >= 50) {
+            const oldestKey = suggestionCacheRef.current.keys().next().value;
+            if (oldestKey) suggestionCacheRef.current.delete(oldestKey);
+          }
+          suggestionCacheRef.current.set(query, nextSuggestions);
+        }
+        setSuggestions(nextSuggestions);
         setActiveIndex(-1);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
@@ -67,7 +83,7 @@ export function LocationAutocomplete({ lang, value, placeholder, onChange }: Loc
       } finally {
         if (requestId === requestIdRef.current) setLoading(false);
       }
-    }, 250);
+    }, 150);
 
     return () => {
       window.clearTimeout(timer);
