@@ -397,16 +397,16 @@ export const en: Translations = {
   home: {
     hero: {
       badge: "",
-      headline1: "ACCURATE IMAGES",
-      headline2: "FOR PUBLISHERS.",
+      headline1: "THE IMAGE YOU NEED,",
+      headline2: "WITH THE CONTEXT BEHIND IT.",
       description:
-        "A premier archival and contemporary image agency bridging the gap between historical significance and modern storytelling.",
+        "Verified source and context help publishing and media projects reach a more complete final form.",
       scroll: "Scroll to explore",
     },
     about: {
       headline1: "The Digital",
       headline2: "Curator.",
-      body: "In an era of infinite imagery, IMAGE PARTNERS stands as a filter for quality. We are not a warehouse; we are a gallery. Our mission is to provide editors and creators with more than just assets—we provide context, narrative, and soul.",
+      body: "Image Partners handles only carefully verified imagery. From the flood of visual data online, we work to provide the precise cut your project needs.",
       floatTitle: "",
       floatBody: "",
     },
@@ -450,8 +450,8 @@ export const en: Translations = {
     },
     partners: { label: "Trusted by industry leaders" },
     cta: {
-      headline1: "READY TO DEFINE YOUR",
-      headline2: "VISUAL NARRATIVE?",
+      headline1: "WE FIND THE CUT",
+      headline2: "THAT GIVES YOUR STORY LIFE.",
       browse: "Browse our library",
       contact: "Contact",
     },
@@ -467,7 +467,7 @@ export const en: Translations = {
     backToLibrary: "← Back to Library",
   },
   footer: {
-    tagline: "Accurate images for publishers.",
+    tagline: "Discover carefully selected images that give your story life.",
     copyright: "© 2026 Image Partners. All rights reserved.",
     company: {
       title: "Company",

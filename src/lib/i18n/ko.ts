@@ -195,16 +195,16 @@ export const ko: Translations = {
   home: {
     hero: {
       badge: "",
-      headline1: "퍼블리셔를 위한",
-      headline2: "정확한 이미지",
+      headline1: "찾던 이미지,",
+      headline2: "그 이상의 맥락.",
       description:
-        "프리미엄 아카이브 및 현대 이미지 에이전시. 역사적 의미와 현대적 스토리텔링 사이의 간극을 잇습니다.",
+        "출처와 맥락이 검증된 이미지로 출판·미디어 프로젝트의 완성도를 높입니다.",
       scroll: "스크롤하여 탐색",
     },
     about: {
       headline1: "디지털",
       headline2: "큐레이터.",
-      body: "무한한 이미지 속에서 가치 있는 시각 정보를 선별합니다. 이미지파트너스는 단순한 데이터 저장소가 아닌, 엄선된 작품을 선보이는 갤러리입니다. 우리는 창작자들에게 필요한 단편적인 에셋을 넘어, 이미지에 문맥과 서사, 생명력을 불어넣어 완성된 이야기를 제공합니다.",
+      body: "이미지파트너스는 엄격하게 검증된 이미지만을 취급합니다. 온라인상에 떠도는 수많은 데이터 속에서 당신의 프로젝트에 딱 맞는 컷을 제공하려 합니다.",
       floatTitle: "",
       floatBody: "",
     },
@@ -250,8 +250,8 @@ export const ko: Translations = {
       label: "파트너",
     },
     cta: {
-      headline1: "당신의 시각적 내러티브를",
-      headline2: "정의할 준비가 됐나요?",
+      headline1: "당신의 이야기에 생명력을",
+      headline2: "불어넣을 최고의 컷을 찾아드립니다.",
       browse: "라이브러리 둘러보기",
       contact: "문의",
     },
@@ -268,7 +268,7 @@ export const ko: Translations = {
     backToLibrary: "← 라이브러리로 돌아가기",
   },
   footer: {
-    tagline: "퍼블리셔를 위한 정확한 이미지를 선별합니다.",
+    tagline: "스토리에 생명력을 불어넣는 엄선된 이미지를 만나보세요.",
     copyright: "© 2026 이미지파트너스. All rights reserved.",
     company: {
       title: "회사 정보",
