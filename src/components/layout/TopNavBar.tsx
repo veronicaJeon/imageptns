@@ -124,7 +124,12 @@ export function TopNavBar() {
                     : "text-on-surface-variant hover:text-on-surface"
                 )}
               >
-                {highlight && <span className="absolute bottom-[calc(100%+7px)] left-1/2 hidden -translate-x-1/2 whitespace-nowrap text-[9px] font-bold leading-none text-primary transition-colors group-hover:text-primary-highlight lg:block">{copy.photoRequestHint}</span>}
+                {highlight && (
+                  <span className="pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded-full bg-on-surface px-2.5 py-1 text-[10px] font-extrabold leading-none text-surface shadow-lg ring-1 ring-outline-variant/20 transition-transform duration-200 group-hover:-translate-y-0.5 lg:inline-flex">
+                    {copy.photoRequestHint}
+                    <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-on-surface" />
+                  </span>
+                )}
                 <span>{label}</span>
               </Link>
             );
