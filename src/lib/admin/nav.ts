@@ -51,6 +51,16 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
+    id: "web-pages",
+    icon: "web",
+    label: "웹페이지 관리",
+    items: [
+      { href: "/admin/notices", icon: "campaign", label: "공지사항" },
+      { href: "/admin/library-guidance", icon: "format_quote", label: "안내글 관리" },
+      { href: "/admin/about-page", icon: "apartment", label: "회사소개관리" },
+    ],
+  },
+  {
     id: "operations-policy",
     icon: "policy",
     label: "운영정책관리",
@@ -59,8 +69,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/commission", icon: "percent", label: "수수료정책" },
       { href: "/admin/pricing", icon: "sell", label: "상품가격" },
       { href: "/admin/data-lifecycle", icon: "data_usage", label: "데이터 운영주기 관리" },
-      { href: "/admin/notices", icon: "campaign", label: "공지사항" },
-      { href: "/admin/library-guidance", icon: "format_quote", label: "안내글 관리" },
     ],
   },
   {

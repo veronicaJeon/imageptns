@@ -4,14 +4,14 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), "page.tsx"),
+  join(dirname(fileURLToPath(import.meta.url)), "../../../components/about/AboutPageView.tsx"),
   "utf8"
 );
 
 describe("about page hero text contrast", () => {
   it("uses fixed light text for the image-backed hero heading", () => {
     const headingClass = source.match(
-      /<h1 className="([^"]*)">[\s\S]*?\{h\.hero\.headline1\}/
+      /<h1 className="([^"]*)">[\s\S]*?\{copy\.hero\.headline1\}/
     )?.[1];
 
     expect(headingClass?.split(/\s+/)).toContain("text-white");
@@ -20,7 +20,7 @@ describe("about page hero text contrast", () => {
 
   it("uses fixed white text for the image-backed hero description", () => {
     const descriptionClass = source.match(
-      /<p className="([^"]*)">[\s\S]*?\{h\.hero\.description\}/
+      /<p className="([^"]*)">[\s\S]*?\{copy\.hero\.description\}/
     )?.[1];
 
     expect(descriptionClass?.split(/\s+/)).toContain("text-white");

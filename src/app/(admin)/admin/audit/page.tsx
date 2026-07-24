@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminChip, AdminInlineMetrics } from "@/components/admin/AdminPrimitives";
 import { cn } from "@/lib/utils/cn";
 
-type TargetType = "all" | "image" | "payout" | "commission_policy" | "contact_submission" | "order" | "user";
+type TargetType = "all" | "image" | "payout" | "commission_policy" | "contact_submission" | "order" | "user" | "about_page";
 
 interface AuditLog {
   id: string;
@@ -29,6 +29,7 @@ const FILTERS: { key: TargetType; label: string; icon: string }[] = [
   { key: "contact_submission", label: "문의", icon: "support_agent" },
   { key: "order", label: "주문", icon: "receipt_long" },
   { key: "user", label: "사용자", icon: "person" },
+  { key: "about_page", label: "회사소개", icon: "apartment" },
 ];
 
 function actionTone(action: string | null | undefined) {

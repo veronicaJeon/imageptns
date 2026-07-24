@@ -8,7 +8,17 @@ describe("admin navigation groups", () => {
     expect(adminNavGroupIsActive({ items: [{ href: "/admin/images" }] }, "/admin/users")).toBe(false);
   });
 
-  it("groups legal, fees, pricing, and lifecycle under operations policy", () => {
+  it("groups public website pages under webpage management", () => {
+    const webPages = ADMIN_NAV_GROUPS.find((group) => group.id === "web-pages");
+    expect(webPages?.label).toBe("웹페이지 관리");
+    expect(webPages?.items.map((item) => item.href)).toEqual([
+      "/admin/notices",
+      "/admin/library-guidance",
+      "/admin/about-page",
+    ]);
+  });
+
+  it("keeps legal, fees, pricing, and lifecycle under operations policy", () => {
     const policy = ADMIN_NAV_GROUPS.find((group) => group.id === "operations-policy");
     expect(policy?.label).toBe("운영정책관리");
     expect(policy?.items.map((item) => item.href)).toEqual([
@@ -16,8 +26,6 @@ describe("admin navigation groups", () => {
       "/admin/commission",
       "/admin/pricing",
       "/admin/data-lifecycle",
-      "/admin/notices",
-      "/admin/library-guidance",
     ]);
   });
 
