@@ -171,7 +171,15 @@ export default function AdminAboutPage() {
       images: { ...current.images, [key]: value },
       imageSources: {
         ...current.imageSources,
-        [key]: { source: "external", imageId: null, derivedPath: null, credit: null },
+        [key]: {
+          source: "external",
+          imageId: null,
+          derivedPath: null,
+          credit: null,
+          licenseCode: null,
+          licenseLabel: null,
+          licenseUrl: null,
+        },
       },
     }));
   }
@@ -198,6 +206,9 @@ export default function AdminAboutPage() {
         derivedPath?: string;
         url?: string;
         credit?: string | null;
+        licenseCode?: string | null;
+        licenseLabel?: string | null;
+        licenseUrl?: string | null;
         error?: string;
       };
       if (!response.ok || !body.imageId || !body.derivedPath || !body.url) {
@@ -214,6 +225,9 @@ export default function AdminAboutPage() {
             imageId: body.imageId!,
             derivedPath: body.derivedPath!,
             credit: body.credit ?? null,
+            licenseCode: body.licenseCode ?? null,
+            licenseLabel: body.licenseLabel ?? null,
+            licenseUrl: body.licenseUrl ?? null,
           },
         },
       }));

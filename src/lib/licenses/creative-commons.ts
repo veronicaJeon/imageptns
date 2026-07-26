@@ -55,12 +55,12 @@ const COPYRIGHT_LICENSE_TRANSLATIONS: Record<LicenseDisplayLang, Record<Copyrigh
 const FREE_USAGE_POLICY_TRANSLATIONS: Record<LicenseDisplayLang, Record<FreeUsagePolicyCode, { label: string; summary: string }>> = {
   ko: {
     none: { label: "무료 사용 없음", summary: "무료 사용은 허용하지 않고 선택한 라이선스/판매 정책을 따릅니다." },
-    all: { label: "전체 무료", summary: "플랫폼 방문자에게 무료 사용 가능 작품으로 표시합니다." },
+    all: { label: "전체 무료", summary: "모든 방문자 사용과 이미지파트너스 회사소개·공식 홍보용 전시본 활용을 허용합니다." },
     education: { label: "교육용 무료", summary: "수업, 연구, 비상업 교육 자료 제작 등 교육 목적 무료 사용 가능 작품으로 표시합니다." },
   },
   en: {
     none: { label: "No free use", summary: "Free use is not allowed; usage follows the selected license and sales policy." },
-    all: { label: "Free for all uses", summary: "Shown to platform visitors as an image available for free use." },
+    all: { label: "Free for all uses", summary: "Allows free visitor use and Image Partners display derivatives for company and official promotion." },
     education: { label: "Free for education", summary: "Shown as free for educational uses such as classes, research, and non-commercial learning materials." },
   },
 };
@@ -157,7 +157,7 @@ export const FREE_USAGE_POLICIES: FreeUsagePolicyOption[] = [
   {
     code: "all",
     label: "전체 무료",
-    summary: "플랫폼 방문자에게 무료 사용 가능 작품으로 표시합니다.",
+    summary: "모든 방문자 사용과 이미지파트너스 회사소개·공식 홍보용 전시본 활용을 허용합니다.",
   },
   {
     code: "education",

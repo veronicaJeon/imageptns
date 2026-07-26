@@ -8,6 +8,7 @@ import {
   type AboutImageSlot,
   type AboutPageContent,
 } from "./content";
+import { getCopyrightLicense } from "@/lib/licenses/creative-commons";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const ABOUT_IMAGE_SLOTS = ["hero", "editorial", "desk"] as const;
@@ -31,7 +32,9 @@ interface LibraryImageRow {
   promotional_use_consented_at: string | null;
   promotional_use_consent_version: string | null;
   promotional_use_revoked_at: string | null;
+  promotional_use_basis: string | null;
   attribution_name: string | null;
+  copyright_license: string | null;
   photographer?: { full_name: string | null } | { full_name: string | null }[] | null;
   storage_path_original: string | null;
   storage_path_full: string | null;
@@ -54,6 +57,7 @@ function libraryImageIsEligible(image: LibraryImageRow) {
     image.promotional_use_allowed === true &&
     Boolean(image.promotional_use_consented_at) &&
     Boolean(image.promotional_use_consent_version) &&
+    Boolean(image.promotional_use_basis) &&
     !image.promotional_use_revoked_at &&
     Boolean(image.storage_path_original ?? image.storage_path_full);
 }
@@ -65,7 +69,7 @@ export async function createAboutLibraryAsset(
 ) {
   const { data, error } = await admin
     .from("images")
-    .select("id, asset_id, title, status, lifecycle_status, is_published, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, attribution_name, storage_path_original, storage_path_full, photographer:profiles!photographer_id(full_name)")
+    .select("id, asset_id, title, status, lifecycle_status, is_published, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, promotional_use_basis, attribution_name, copyright_license, storage_path_original, storage_path_full, photographer:profiles!photographer_id(full_name)")
     .eq("id", imageId)
     .single();
 
@@ -104,6 +108,7 @@ export async function createAboutLibraryAsset(
       upsert: true,
     });
   if (uploadError) throw new Error(uploadError.message);
+  const license = getCopyrightLicense(image.copyright_license);
 
   return {
     imageId: image.id,
@@ -114,6 +119,9 @@ export async function createAboutLibraryAsset(
     credit: image.attribution_name
       ?? (Array.isArray(image.photographer) ? image.photographer[0]?.full_name : image.photographer?.full_name)
       ?? null,
+    licenseCode: license.code,
+    licenseLabel: license.label,
+    licenseUrl: license.url,
   };
 }
 
@@ -126,7 +134,7 @@ export async function validateAboutLibraryImages(admin: AdminClient, content: Ab
   const ids = Array.from(new Set(selections.map((item) => item.source.imageId!)));
   const { data, error } = await admin
     .from("images")
-    .select("id, status, lifecycle_status, is_published, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, storage_path_original, storage_path_full")
+    .select("id, status, lifecycle_status, is_published, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, promotional_use_basis, storage_path_original, storage_path_full")
     .in("id", ids);
   if (error) throw new Error(error.message);
 
@@ -185,7 +193,15 @@ export async function detachImageFromAboutPage(admin: AdminClient, imageId: stri
       if (source.source !== "library" || source.imageId !== imageId) continue;
       if (source.derivedPath) removedPaths.add(source.derivedPath);
       next.images[slot] = DEFAULT_ABOUT_PAGE_CONTENT.images[slot];
-      next.imageSources[slot] = { source: "external", imageId: null, derivedPath: null, credit: null };
+      next.imageSources[slot] = {
+        source: "external",
+        imageId: null,
+        derivedPath: null,
+        credit: null,
+        licenseCode: null,
+        licenseLabel: null,
+        licenseUrl: null,
+      };
       changed = true;
     }
     return next;

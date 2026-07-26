@@ -7,7 +7,11 @@ import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryI
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 import { hasArweaveCredential } from "@/lib/images/deletion";
-import { PROMOTIONAL_USE_CONSENT_VERSION } from "@/lib/images/promotional-use";
+import {
+  automaticPromotionalUseBasis,
+  PROMOTIONAL_USE_CONSENT_VERSION,
+  type PromotionalUseBasis,
+} from "@/lib/images/promotional-use";
 import { dateValueInTimeZone, takenAtIsAllowed } from "@/lib/uploads/taken-at";
 
 interface ImagePatchRow {
@@ -15,6 +19,9 @@ interface ImagePatchRow {
   status: string;
   photographer_id?: string | null;
   promotional_use_allowed: boolean;
+  promotional_use_basis: PromotionalUseBasis | null;
+  copyright_license: string | null;
+  free_usage_policy: string | null;
 }
 
 interface ImageDeleteRow {
@@ -42,7 +49,7 @@ export async function PATCH(
 
   const { data: img } = await admin
     .from("images")
-    .select("id, status, photographer_id, promotional_use_allowed")
+    .select("id, status, photographer_id, promotional_use_allowed, promotional_use_basis, copyright_license, free_usage_policy")
     .eq("id", id)
     .eq("photographer_id", user.id)
     .single();
@@ -79,8 +86,40 @@ export async function PATCH(
   if (exif_taken_at && !takenAtIsAllowed(exif_taken_at, dateValueInTimeZone())) {
     return NextResponse.json({ error: "exif_taken_at must be a valid date that is not in the future" }, { status: 400 });
   }
+  if (promotional_use_allowed !== undefined && typeof promotional_use_allowed !== "boolean") {
+    return NextResponse.json({ error: "promotional_use_allowed must be boolean" }, { status: 400 });
+  }
 
   const image = img as ImagePatchRow;
+  const normalizedCopyrightLicense = copyright_license !== undefined
+    ? normalizeCopyrightLicenseCode(copyright_license)
+    : normalizeCopyrightLicenseCode(image.copyright_license);
+  const normalizedFreeUsagePolicy = free_usage_policy !== undefined
+    ? normalizeFreeUsagePolicy(free_usage_policy)
+    : normalizeFreeUsagePolicy(image.free_usage_policy);
+  const automaticPromotionBasis = automaticPromotionalUseBasis({
+    copyrightLicense: normalizedCopyrightLicense,
+    freeUsagePolicy: normalizedFreeUsagePolicy,
+  });
+  const policyChanged =
+    normalizedCopyrightLicense !== normalizeCopyrightLicenseCode(image.copyright_license)
+    || normalizedFreeUsagePolicy !== normalizeFreeUsagePolicy(image.free_usage_policy);
+  let nextPromotionalUseAllowed = image.promotional_use_allowed;
+  let nextPromotionalUseBasis = image.promotional_use_basis;
+
+  if (automaticPromotionBasis) {
+    nextPromotionalUseAllowed = true;
+    nextPromotionalUseBasis = automaticPromotionBasis;
+  } else if (promotional_use_allowed !== undefined) {
+    nextPromotionalUseAllowed = promotional_use_allowed;
+    nextPromotionalUseBasis = promotional_use_allowed
+      ? (!policyChanged && image.promotional_use_allowed ? image.promotional_use_basis ?? "explicit" : "explicit")
+      : null;
+  } else if (policyChanged && ["free_all", "cc0", "cc_by"].includes(image.promotional_use_basis ?? "")) {
+    nextPromotionalUseAllowed = false;
+    nextPromotionalUseBasis = null;
+  }
+
   const categoryInput = category !== undefined || category_codes !== undefined
     ? await normalizeImageCategoryInput(admin, category_codes, category)
     : null;
@@ -97,8 +136,8 @@ export async function PATCH(
   if (Array.isArray(tags_en)) update.tags_en = tags_en.map((t) => t.trim().toLowerCase()).filter(Boolean);
   if (exif_location !== undefined) update.exif_location = exif_location || null;
   if (exif_taken_at !== undefined) update.exif_taken_at = exif_taken_at || null;
-  if (copyright_license !== undefined) update.copyright_license = normalizeCopyrightLicenseCode(copyright_license);
-  if (free_usage_policy !== undefined) update.free_usage_policy = normalizeFreeUsagePolicy(free_usage_policy);
+  if (copyright_license !== undefined) update.copyright_license = normalizedCopyrightLicense;
+  if (free_usage_policy !== undefined) update.free_usage_policy = normalizedFreeUsagePolicy;
   if (attribution_name !== undefined) update.attribution_name = attribution_name?.trim() || null;
   if (attribution_url !== undefined) update.attribution_url = attribution_url?.trim() || null;
   if (authorship_declaration !== undefined) {
@@ -108,16 +147,17 @@ export async function PATCH(
     update.authorship_declaration = authorship_declaration;
     update.authorship_declared_at = new Date().toISOString();
   }
-  if (promotional_use_allowed !== undefined && promotional_use_allowed !== image.promotional_use_allowed) {
-    if (typeof promotional_use_allowed !== "boolean") {
-      return NextResponse.json({ error: "promotional_use_allowed must be boolean" }, { status: 400 });
-    }
-    update.promotional_use_allowed = promotional_use_allowed;
-    if (promotional_use_allowed) {
+  if (
+    nextPromotionalUseAllowed !== image.promotional_use_allowed
+    || nextPromotionalUseBasis !== image.promotional_use_basis
+  ) {
+    update.promotional_use_allowed = nextPromotionalUseAllowed;
+    update.promotional_use_basis = nextPromotionalUseBasis;
+    if (nextPromotionalUseAllowed) {
       update.promotional_use_consented_at = new Date().toISOString();
       update.promotional_use_consent_version = PROMOTIONAL_USE_CONSENT_VERSION;
       update.promotional_use_revoked_at = null;
-    } else {
+    } else if (image.promotional_use_allowed) {
       update.promotional_use_revoked_at = new Date().toISOString();
     }
   }
@@ -133,7 +173,7 @@ export async function PATCH(
     .update(update)
     .eq("id", id)
     .eq("photographer_id", user.id)
-    .select("id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, rejected_at, exif_location, exif_taken_at, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at")
+    .select("id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, rejected_at, exif_location, exif_taken_at, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, promotional_use_basis")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -141,7 +181,7 @@ export async function PATCH(
   if (categoryInput) {
     await syncImageCategoryAssignments(admin, id, categoryInput.codes);
   }
-  if (promotional_use_allowed === false && image.promotional_use_allowed) {
+  if (!nextPromotionalUseAllowed && image.promotional_use_allowed) {
     await detachImageFromAboutPage(admin, id);
   }
 

@@ -16,6 +16,9 @@ describe("normalizeAboutPageContent", () => {
       imageId: null,
       derivedPath: null,
       credit: null,
+      licenseCode: null,
+      licenseLabel: null,
+      licenseUrl: null,
     });
   });
 
@@ -29,6 +32,9 @@ describe("normalizeAboutPageContent", () => {
           imageId: " image-id ",
           derivedPath: "about/hero/image-id-hash.webp",
           credit: " Photographer ",
+          licenseCode: "cc_by",
+          licenseLabel: "CC BY 4.0",
+          licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
         },
       },
     });
@@ -38,6 +44,9 @@ describe("normalizeAboutPageContent", () => {
       imageId: "image-id",
       derivedPath: "about/hero/image-id-hash.webp",
       credit: "Photographer",
+      licenseCode: "cc_by",
+      licenseLabel: "CC BY 4.0",
+      licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
     });
   });
 

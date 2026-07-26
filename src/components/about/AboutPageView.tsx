@@ -5,7 +5,41 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { NoticePopup } from "@/components/ui/NoticePopup";
 import { useLang } from "@/lib/i18n/store";
-import type { AboutPageContent, AboutPageLocale } from "@/lib/about/content";
+import type {
+  AboutImageSource,
+  AboutPageContent,
+  AboutPageLocale,
+} from "@/lib/about/content";
+
+function ImageCredit({
+  source,
+  className,
+}: {
+  source: AboutImageSource;
+  className: string;
+}) {
+  if (!source.credit) return null;
+  return (
+    <span className={className}>
+      Photo: {source.credit}
+      {source.licenseLabel && (
+        <>
+          {" · "}
+          {source.licenseUrl ? (
+            <a
+              href={source.licenseUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2"
+            >
+              {source.licenseLabel}
+            </a>
+          ) : source.licenseLabel}
+        </>
+      )}
+    </span>
+  );
+}
 
 export function AboutPageView({
   content,
@@ -35,11 +69,10 @@ export function AboutPageView({
             priority
             unoptimized
           />
-          {content.imageSources.hero.credit && (
-            <div className="absolute bottom-3 right-4 text-[10px] text-white/65">
-              Photo: {content.imageSources.hero.credit}
-            </div>
-          )}
+          <ImageCredit
+            source={content.imageSources.hero}
+            className="absolute bottom-3 right-4 text-[10px] text-white/65"
+          />
         </div>
 
         <div className="relative z-10 max-w-5xl">
@@ -81,11 +114,10 @@ export function AboutPageView({
                 className="h-full w-full object-cover"
                 unoptimized
               />
-              {content.imageSources.editorial.credit && (
-                <p className="absolute bottom-2 right-3 rounded bg-black/45 px-2 py-1 text-[10px] text-white/80">
-                  Photo: {content.imageSources.editorial.credit}
-                </p>
-              )}
+              <ImageCredit
+                source={content.imageSources.editorial}
+                className="absolute bottom-2 right-3 rounded bg-black/45 px-2 py-1 text-[10px] text-white/80"
+              />
             </div>
           </div>
         </div>
@@ -130,11 +162,10 @@ export function AboutPageView({
                   <p className="mt-1 text-sm font-semibold text-white">
                     {desk.panelMeta}
                   </p>
-                  {content.imageSources.desk.credit && (
-                    <p className="mt-2 text-[10px] text-white/70">
-                      Photo: {content.imageSources.desk.credit}
-                    </p>
-                  )}
+                  <ImageCredit
+                    source={content.imageSources.desk}
+                    className="mt-2 block text-[10px] text-white/70"
+                  />
                 </div>
               </div>
 

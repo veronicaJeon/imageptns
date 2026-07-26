@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at,
     proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
     storage_path_preview, storage_path_original,
-    promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at,
+    promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, promotional_use_basis,
     width, height, resolution_mp, file_format, file_size_mb,
     views_count, sales_count, created_at, approved_at,
     photographer:profiles!photographer_id(id, full_name, avatar_url, wallet_address)
@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
       .eq("promotional_use_allowed", true)
       .not("promotional_use_consented_at", "is", null)
       .not("promotional_use_consent_version", "is", null)
+      .not("promotional_use_basis", "is", null)
       .is("promotional_use_revoked_at", null)
       .eq("status", "approved")
       .eq("is_published", true)

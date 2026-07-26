@@ -9,6 +9,10 @@ import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categ
 import { PhotographerApprovalGate } from "@/components/dashboard/PhotographerStatusNotice";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 import { useCart } from "@/lib/store/cart";
+import {
+  automaticPromotionalUseBasis,
+  promotionalUseBasisLabel,
+} from "@/lib/images/promotional-use";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 
@@ -54,6 +58,7 @@ const UPLOADS_PAGE_COPY = {
     aiGenerated: "AI 생성 이미지",
     promotionalUse: "회사 및 서비스 홍보 활용 허용 (선택)",
     promotionalUseHelp: "허용하면 관리자가 회사소개 등에 메타데이터를 제거한 저해상도 무워터마크 전시본을 사용할 수 있습니다. 원본은 공개되지 않으며 언제든 허용을 철회할 수 있습니다.",
+    promotionalAutomatic: "홍보 활용 범위 자동 적용",
     copyright: "저작권 등급",
     freeUse: "무료 사용",
     attributionName: "출처 표기명",
@@ -110,6 +115,7 @@ const UPLOADS_PAGE_COPY = {
     aiGenerated: "AI-generated image",
     promotionalUse: "Allow company/service promotional use (optional)",
     promotionalUseHelp: "Allows an administrator to use a low-resolution, metadata-free, unwatermarked display derivative on pages such as About. The original stays private, and you may withdraw permission at any time.",
+    promotionalAutomatic: "Promotional use is included automatically",
     copyright: "Copyright license",
     freeUse: "Free use",
     attributionName: "Credit name",
@@ -199,6 +205,7 @@ interface UploadRow {
   promotional_use_consented_at: string | null;
   promotional_use_consent_version: string | null;
   promotional_use_revoked_at: string | null;
+  promotional_use_basis: string | null;
 }
 
 function localizedText(
@@ -291,6 +298,48 @@ function UploadsPageContent() {
           : current;
       }
       return { ...current, categoryCodes: [...current.categoryCodes, code] };
+    });
+  }
+
+  function updateEditingLicense(next: CopyrightLicenseCode) {
+    setEditing((current) => {
+      if (!current) return current;
+      const wasAutomatic = automaticPromotionalUseBasis({
+        copyrightLicense: current.copyright_license,
+        freeUsagePolicy: current.free_usage_policy,
+      });
+      const willBeAutomatic = automaticPromotionalUseBasis({
+        copyrightLicense: next,
+        freeUsagePolicy: current.free_usage_policy,
+      });
+      return {
+        ...current,
+        copyright_license: next,
+        promotional_use_allowed: wasAutomatic && !willBeAutomatic
+          ? false
+          : current.promotional_use_allowed,
+      };
+    });
+  }
+
+  function updateEditingFreeUsage(next: FreeUsagePolicyCode) {
+    setEditing((current) => {
+      if (!current) return current;
+      const wasAutomatic = automaticPromotionalUseBasis({
+        copyrightLicense: current.copyright_license,
+        freeUsagePolicy: current.free_usage_policy,
+      });
+      const willBeAutomatic = automaticPromotionalUseBasis({
+        copyrightLicense: current.copyright_license,
+        freeUsagePolicy: next,
+      });
+      return {
+        ...current,
+        free_usage_policy: next,
+        promotional_use_allowed: wasAutomatic && !willBeAutomatic
+          ? false
+          : current.promotional_use_allowed,
+      };
     });
   }
 
@@ -396,7 +445,10 @@ function UploadsPageContent() {
           attribution_name: editing.attribution_name.trim() || null,
           attribution_url: editing.attribution_url.trim() || null,
           authorship_declaration: editing.authorship_declaration,
-          promotional_use_allowed: editing.promotional_use_allowed,
+          promotional_use_allowed: Boolean(automaticPromotionalUseBasis({
+            copyrightLicense: editing.copyright_license,
+            freeUsagePolicy: editing.free_usage_policy,
+          })) || editing.promotional_use_allowed,
           resubmit,
         }),
       });
@@ -690,24 +742,42 @@ function UploadsPageContent() {
                                 </select>
                               </div>
 
-                              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-3 sm:col-span-2">
-                                <input
-                                  type="checkbox"
-                                  checked={editing.promotional_use_allowed}
-                                  onChange={(e) => setEditing({ ...editing, promotional_use_allowed: e.target.checked })}
-                                  className="mt-0.5 h-4 w-4 accent-primary"
-                                />
-                                <span>
-                                  <span className="block text-xs font-bold text-on-surface">{copy.promotionalUse}</span>
-                                  <span className="mt-1 block text-[11px] leading-5 text-outline">{copy.promotionalUseHelp}</span>
-                                </span>
-                              </label>
+                              {(() => {
+                                const automaticBasis = automaticPromotionalUseBasis({
+                                  copyrightLicense: editing.copyright_license,
+                                  freeUsagePolicy: editing.free_usage_policy,
+                                });
+                                return automaticBasis ? (
+                                  <div className="flex items-start gap-3 rounded-lg border border-primary/25 bg-primary/5 p-3 sm:col-span-2">
+                                    <span className="material-symbols-outlined text-lg text-primary">verified</span>
+                                    <span>
+                                      <span className="block text-xs font-bold text-on-surface">{copy.promotionalAutomatic}</span>
+                                      <span className="mt-1 block text-[11px] leading-5 text-outline">
+                                        {promotionalUseBasisLabel(automaticBasis, lang)} {copy.promotionalUseHelp}
+                                      </span>
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-3 sm:col-span-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={editing.promotional_use_allowed}
+                                      onChange={(e) => setEditing({ ...editing, promotional_use_allowed: e.target.checked })}
+                                      className="mt-0.5 h-4 w-4 accent-primary"
+                                    />
+                                    <span>
+                                      <span className="block text-xs font-bold text-on-surface">{copy.promotionalUse}</span>
+                                      <span className="mt-1 block text-[11px] leading-5 text-outline">{copy.promotionalUseHelp}</span>
+                                    </span>
+                                  </label>
+                                );
+                              })()}
 
                               <div className="flex flex-col gap-1.5">
                                 <label className="text-xs font-semibold text-outline">{copy.copyright}</label>
                                 <select
                                   value={editing.copyright_license}
-                                  onChange={(e) => setEditing({ ...editing, copyright_license: e.target.value as CopyrightLicenseCode })}
+                                  onChange={(e) => updateEditingLicense(e.target.value as CopyrightLicenseCode)}
                                   className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all"
                                 >
                                   {copyrightLicenses.map((license) => (
@@ -720,7 +790,7 @@ function UploadsPageContent() {
                                 <label className="text-xs font-semibold text-outline">{copy.freeUse}</label>
                                 <select
                                   value={editing.free_usage_policy}
-                                  onChange={(e) => setEditing({ ...editing, free_usage_policy: e.target.value as FreeUsagePolicyCode })}
+                                  onChange={(e) => updateEditingFreeUsage(e.target.value as FreeUsagePolicyCode)}
                                   className="h-10 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded px-3 text-sm text-on-surface outline-none transition-all"
                                 >
                                   {freeUsagePolicies.map((policy) => (

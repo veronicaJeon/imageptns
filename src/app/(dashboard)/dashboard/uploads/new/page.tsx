@@ -24,6 +24,10 @@ import {
   type UploadDraftReadiness,
 } from "@/lib/uploads/batch-client";
 import { localTodayDateValue, takenAtIsFuture } from "@/lib/uploads/taken-at";
+import {
+  automaticPromotionalUseBasis,
+  promotionalUseBasisLabel,
+} from "@/lib/images/promotional-use";
 
 const UNKNOWN = "unknown";
 
@@ -109,6 +113,7 @@ const NEW_UPLOAD_COPY = {
     factualityError: "사실성 보증 동의가 필요합니다.",
     promotionalTitle: "이미지파트너스 홍보 활용 허용 (선택)",
     promotionalBody: "선택하면 이미지파트너스가 서비스 소개 페이지와 공식 홍보물에 이 사진의 워터마크 없는 저해상도 파생본을 사용할 수 있습니다. 원본 파일은 공개되지 않으며, 허용은 이후 철회할 수 있습니다.",
+    promotionalAutomaticTitle: "홍보 활용 범위 자동 적용",
     submit: "선택 이미지 업로드",
     reviewHelp: "제출한 이미지는 운영팀 검토 후 라이브러리에 노출됩니다. 검토에는 1-3 영업일이 소요됩니다.",
   },
@@ -193,6 +198,7 @@ const NEW_UPLOAD_COPY = {
     factualityError: "Factuality attestation is required.",
     promotionalTitle: "Allow Image Partners promotional use (optional)",
     promotionalBody: "If selected, Image Partners may use a resized, unwatermarked derivative on service pages and official promotions. The original file remains private, and you may withdraw permission later.",
+    promotionalAutomaticTitle: "Promotional use is included automatically",
     submit: "Upload selected images",
     reviewHelp: "Submitted images appear in the library after operations review. Review usually takes 1-3 business days.",
   },
@@ -370,6 +376,10 @@ function NewUploadContent() {
     busy: batchBusy,
   });
   const activeTakenAtIsFuture = Boolean(activeDraft && takenAtIsFuture(activeDraft.takenAt, todayDate));
+  const automaticPromotionBasis = automaticPromotionalUseBasis({
+    copyrightLicense,
+    freeUsagePolicy,
+  });
 
   useEffect(() => {
     const previewUrls = previewUrlsRef.current;
@@ -732,7 +742,7 @@ function NewUploadContent() {
         attribution_url: copyrightLicense !== "standard" && copyrightLicense !== "cc0" ? attributionUrl.trim() || null : null,
         authorship_declaration: authorshipDeclaration,
         factuality_attested: factualityAgreed,
-        promotional_use_allowed: promotionalUseAllowed,
+        promotional_use_allowed: Boolean(automaticPromotionBasis) || promotionalUseAllowed,
       }),
     });
 
@@ -1244,18 +1254,32 @@ function NewUploadContent() {
                 </span>
               </label>
 
-              <label className="flex cursor-pointer gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 transition-colors hover:border-primary/50">
-                <input
-                  type="checkbox"
-                  checked={promotionalUseAllowed}
-                  onChange={(e) => setPromotionalUseAllowed(e.target.checked)}
-                  className="mt-1 h-4 w-4 shrink-0 accent-primary"
-                />
-                <span>
-                  <span className="block text-sm font-bold text-on-surface">{copy.promotionalTitle}</span>
-                  <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{copy.promotionalBody}</span>
-                </span>
-              </label>
+              {automaticPromotionBasis ? (
+                <div className="flex gap-3 rounded-xl border border-primary/25 bg-primary/5 p-5">
+                  <span className="material-symbols-outlined mt-0.5 text-lg text-primary">verified</span>
+                  <span>
+                    <span className="block text-sm font-bold text-on-surface">{copy.promotionalAutomaticTitle}</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">
+                      {promotionalUseBasisLabel(automaticPromotionBasis, lang)}
+                      {" "}
+                      {copy.promotionalBody}
+                    </span>
+                  </span>
+                </div>
+              ) : (
+                <label className="flex cursor-pointer gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 transition-colors hover:border-primary/50">
+                  <input
+                    type="checkbox"
+                    checked={promotionalUseAllowed}
+                    onChange={(e) => setPromotionalUseAllowed(e.target.checked)}
+                    className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                  />
+                  <span>
+                    <span className="block text-sm font-bold text-on-surface">{copy.promotionalTitle}</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{copy.promotionalBody}</span>
+                  </span>
+                </label>
+              )}
             </>
           )}
 

@@ -6,6 +6,9 @@ export interface AboutImageSource {
   imageId: string | null;
   derivedPath: string | null;
   credit: string | null;
+  licenseCode: string | null;
+  licenseLabel: string | null;
+  licenseUrl: string | null;
 }
 
 export interface AboutPageRecord {
@@ -66,9 +69,9 @@ const DEFAULT_IMAGES = {
 export const DEFAULT_ABOUT_PAGE_CONTENT: AboutPageContent = {
   images: DEFAULT_IMAGES,
   imageSources: {
-    hero: { source: "external", imageId: null, derivedPath: null, credit: null },
-    editorial: { source: "external", imageId: null, derivedPath: null, credit: null },
-    desk: { source: "external", imageId: null, derivedPath: null, credit: null },
+    hero: { source: "external", imageId: null, derivedPath: null, credit: null, licenseCode: null, licenseLabel: null, licenseUrl: null },
+    editorial: { source: "external", imageId: null, derivedPath: null, credit: null, licenseCode: null, licenseLabel: null, licenseUrl: null },
+    desk: { source: "external", imageId: null, derivedPath: null, credit: null, licenseCode: null, licenseLabel: null, licenseUrl: null },
   },
   locales: {
     ko: {
@@ -203,9 +206,22 @@ function normalizeImageSource(value: unknown): AboutImageSource {
       imageId: source.imageId.trim(),
       derivedPath: source.derivedPath.trim(),
       credit: typeof source.credit === "string" ? source.credit.trim().slice(0, 120) || null : null,
+      licenseCode: typeof source.licenseCode === "string" ? source.licenseCode.trim().slice(0, 40) || null : null,
+      licenseLabel: typeof source.licenseLabel === "string" ? source.licenseLabel.trim().slice(0, 80) || null : null,
+      licenseUrl: typeof source.licenseUrl === "string" && isSafeImageUrl(source.licenseUrl)
+        ? source.licenseUrl.trim().slice(0, 500)
+        : null,
     };
   }
-  return { source: "external", imageId: null, derivedPath: null, credit: null };
+  return {
+    source: "external",
+    imageId: null,
+    derivedPath: null,
+    credit: null,
+    licenseCode: null,
+    licenseLabel: null,
+    licenseUrl: null,
+  };
 }
 
 function normalizeRecords(value: unknown, fallback: AboutPageRecord[]) {
