@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
   const queryText = req.nextUrl.searchParams.get("query")?.trim() ?? "";
   const page = clampPage(req.nextUrl.searchParams.get("page"));
   const pageSize = clampPageSize(req.nextUrl.searchParams.get("pageSize"));
+  const promotionalUseOnly = req.nextUrl.searchParams.get("promotionalUse") === "true";
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const admin = createAdminClient();
@@ -49,6 +50,7 @@ export async function GET(req: NextRequest) {
     chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at,
     proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
     storage_path_preview, storage_path_original,
+    promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at,
     width, height, resolution_mp, file_format, file_size_mb,
     views_count, sales_count, created_at, approved_at,
     photographer:profiles!photographer_id(id, full_name, avatar_url, wallet_address)
@@ -58,6 +60,16 @@ export async function GET(req: NextRequest) {
 
   query = applyAdminImageListLifecycleFilter(query);
   if (status !== "all") query = query.eq("status", status);
+  if (promotionalUseOnly) {
+    query = query
+      .eq("promotional_use_allowed", true)
+      .not("promotional_use_consented_at", "is", null)
+      .not("promotional_use_consent_version", "is", null)
+      .is("promotional_use_revoked_at", null)
+      .eq("status", "approved")
+      .eq("is_published", true)
+      .eq("lifecycle_status", "active");
+  }
   if (queryText) {
     const escaped = escapeLike(queryText);
     const tag = normalizeTag(queryText);

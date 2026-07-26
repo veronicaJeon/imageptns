@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { detachImageFromAboutPage } from "@/lib/about/library-assets";
 import { sendImageApproved, sendImageRejected } from "@/lib/email/resend";
 
 async function requireAdmin() {
@@ -118,6 +119,7 @@ export async function PATCH(
       );
     }
     data = rejected;
+    await detachImageFromAboutPage(admin, id);
   }
 
   // Fire-and-forget notification — never block the response

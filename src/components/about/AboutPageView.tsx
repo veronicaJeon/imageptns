@@ -35,6 +35,11 @@ export function AboutPageView({
             priority
             unoptimized
           />
+          {content.imageSources.hero.credit && (
+            <div className="absolute bottom-3 right-4 text-[10px] text-white/65">
+              Photo: {content.imageSources.hero.credit}
+            </div>
+          )}
         </div>
 
         <div className="relative z-10 max-w-5xl">
@@ -67,7 +72,7 @@ export function AboutPageView({
           </div>
 
           <div className="md:col-span-7">
-            <div className="aspect-[16/10] overflow-hidden shadow-ghost">
+            <div className="relative aspect-[16/10] overflow-hidden shadow-ghost">
               <Image
                 src={content.images.editorial}
                 alt="Editorial image curation"
@@ -76,6 +81,11 @@ export function AboutPageView({
                 className="h-full w-full object-cover"
                 unoptimized
               />
+              {content.imageSources.editorial.credit && (
+                <p className="absolute bottom-2 right-3 rounded bg-black/45 px-2 py-1 text-[10px] text-white/80">
+                  Photo: {content.imageSources.editorial.credit}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -120,6 +130,11 @@ export function AboutPageView({
                   <p className="mt-1 text-sm font-semibold text-white">
                     {desk.panelMeta}
                   </p>
+                  {content.imageSources.desk.credit && (
+                    <p className="mt-2 text-[10px] text-white/70">
+                      Photo: {content.imageSources.desk.credit}
+                    </p>
+                  )}
                 </div>
               </div>
 

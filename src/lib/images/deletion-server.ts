@@ -1,5 +1,6 @@
 import "server-only";
 
+import { detachImageFromAboutPage } from "@/lib/about/library-assets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   assessImageDeletion,
@@ -85,9 +86,15 @@ export async function applyImageDeletion(
   const now = new Date().toISOString();
   const impact = assessImageDeletion(image, { requesterRole: options.requesterRole });
   const notice = deletionImpactMessage(impact);
+  const aboutDetach = await detachImageFromAboutPage(admin, image.id).catch((error) => ({
+    changed: false,
+    removedPaths: [] as string[],
+    error: error instanceof Error ? error.message : "회사소개 이미지 분리 실패",
+  }));
   const storage = impact.storagePurgeAllowed
     ? await removeStorageFiles(admin, image)
     : { removed: false, errors: [] };
+  if ("error" in aboutDetach) storage.errors.push(`about-page: ${aboutDetach.error}`);
 
   if (impact.buyerNoticeRequired) {
     await admin

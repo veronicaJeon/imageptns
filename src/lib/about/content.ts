@@ -1,4 +1,12 @@
 export type AboutPageLocale = "ko" | "en";
+export type AboutImageSlot = "hero" | "editorial" | "desk";
+
+export interface AboutImageSource {
+  source: "external" | "library";
+  imageId: string | null;
+  derivedPath: string | null;
+  credit: string | null;
+}
 
 export interface AboutPageRecord {
   label: string;
@@ -45,6 +53,7 @@ export interface AboutPageContent {
     editorial: string;
     desk: string;
   };
+  imageSources: Record<AboutImageSlot, AboutImageSource>;
   locales: Record<AboutPageLocale, AboutPageLocaleContent>;
 }
 
@@ -56,6 +65,11 @@ const DEFAULT_IMAGES = {
 
 export const DEFAULT_ABOUT_PAGE_CONTENT: AboutPageContent = {
   images: DEFAULT_IMAGES,
+  imageSources: {
+    hero: { source: "external", imageId: null, derivedPath: null, credit: null },
+    editorial: { source: "external", imageId: null, derivedPath: null, credit: null },
+    desk: { source: "external", imageId: null, derivedPath: null, credit: null },
+  },
   locales: {
     ko: {
       hero: {
@@ -147,13 +161,51 @@ function safeOptionalString(value: unknown, fallback: string, maxLength = 1200) 
 }
 
 export function isSafeImageUrl(value: string) {
-  return value.startsWith("https://") || value.startsWith("http://") || value.startsWith("/");
+  return (value.startsWith("https://") || value.startsWith("http://") || value.startsWith("/"))
+    && !isOriginalStorageUrl(value);
+}
+
+export function isOriginalStorageUrl(value: string) {
+  const normalized = value.toLowerCase();
+  return normalized.includes("/storage/v1/object/public/images-original/")
+    || normalized.includes("/storage/v1/object/sign/images-original/")
+    || normalized.includes("/storage/v1/object/authenticated/images-original/")
+    || normalized.includes("/storage/v1/object/public/images-full/")
+    || normalized.includes("/storage/v1/object/sign/images-full/")
+    || normalized.includes("/storage/v1/object/authenticated/images-full/");
+}
+
+export function aboutContentContainsOriginalStorageUrl(value: unknown) {
+  if (!value || typeof value !== "object") return false;
+  const images = (value as Record<string, unknown>).images;
+  if (!images || typeof images !== "object") return false;
+  return Object.values(images as Record<string, unknown>)
+    .some((image) => typeof image === "string" && isOriginalStorageUrl(image));
 }
 
 function normalizeImageUrl(value: unknown, fallback: string) {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
   return trimmed && isSafeImageUrl(trimmed) ? trimmed : fallback;
+}
+
+function normalizeImageSource(value: unknown): AboutImageSource {
+  const source = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  if (
+    source.source === "library" &&
+    typeof source.imageId === "string" &&
+    source.imageId.trim() &&
+    typeof source.derivedPath === "string" &&
+    source.derivedPath.startsWith("about/")
+  ) {
+    return {
+      source: "library",
+      imageId: source.imageId.trim(),
+      derivedPath: source.derivedPath.trim(),
+      credit: typeof source.credit === "string" ? source.credit.trim().slice(0, 120) || null : null,
+    };
+  }
+  return { source: "external", imageId: null, derivedPath: null, credit: null };
 }
 
 function normalizeRecords(value: unknown, fallback: AboutPageRecord[]) {
@@ -217,6 +269,9 @@ function normalizeLocaleContent(value: unknown, fallback: AboutPageLocaleContent
 export function normalizeAboutPageContent(value: unknown): AboutPageContent {
   const source = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const images = source.images && typeof source.images === "object" ? source.images as Record<string, unknown> : {};
+  const imageSources = source.imageSources && typeof source.imageSources === "object"
+    ? source.imageSources as Record<string, unknown>
+    : {};
   const locales = source.locales && typeof source.locales === "object" ? source.locales as Record<string, unknown> : {};
 
   return {
@@ -224,6 +279,11 @@ export function normalizeAboutPageContent(value: unknown): AboutPageContent {
       hero: normalizeImageUrl(images.hero, DEFAULT_ABOUT_PAGE_CONTENT.images.hero),
       editorial: normalizeImageUrl(images.editorial, DEFAULT_ABOUT_PAGE_CONTENT.images.editorial),
       desk: normalizeImageUrl(images.desk, DEFAULT_ABOUT_PAGE_CONTENT.images.desk),
+    },
+    imageSources: {
+      hero: normalizeImageSource(imageSources.hero),
+      editorial: normalizeImageSource(imageSources.editorial),
+      desk: normalizeImageSource(imageSources.desk),
     },
     locales: {
       ko: normalizeLocaleContent(locales.ko, DEFAULT_ABOUT_PAGE_CONTENT.locales.ko),

@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { recordAdminAuditLog } from "@/lib/admin/audit";
 import {
+  aboutContentContainsOriginalStorageUrl,
   DEFAULT_ABOUT_PAGE_CONTENT,
   normalizeAboutPageContent,
   type AboutPageContent,
 } from "@/lib/about/content";
+import {
+  removeUnreferencedAboutAssets,
+  validateAboutLibraryImages,
+} from "@/lib/about/library-assets";
 import { getAdminAboutPageState } from "@/lib/about/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -22,9 +27,24 @@ export async function PATCH(req: NextRequest) {
   if (!adminUser) return forbidden();
 
   const payload = await req.json().catch(() => null) as { content?: unknown } | null;
+  if (aboutContentContainsOriginalStorageUrl(payload?.content)) {
+    return NextResponse.json(
+      { error: "원본 또는 비공개 스토리지 URL은 회사소개에 게시할 수 없습니다." },
+      { status: 400 },
+    );
+  }
   const draftContent = normalizeAboutPageContent(payload?.content);
   const admin = createAdminClient();
   const now = new Date().toISOString();
+
+  try {
+    await validateAboutLibraryImages(admin, draftContent);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "이미지 권한을 확인하지 못했습니다." },
+      { status: 400 },
+    );
+  }
 
   const { data: before } = await admin
     .from("about_page_content")
@@ -57,6 +77,18 @@ export async function PATCH(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  await removeUnreferencedAboutAssets(
+    admin,
+    [
+      before ? normalizeAboutPageContent(before.content) : null,
+      before ? normalizeAboutPageContent(before.draft_content ?? before.content) : null,
+    ],
+    [
+      before ? normalizeAboutPageContent(before.content) : DEFAULT_ABOUT_PAGE_CONTENT,
+      draftContent,
+    ],
+  );
+
   await recordAdminAuditLog(admin, {
     actorId: adminUser.id,
     action: "about_page.draft_saved",
@@ -78,10 +110,25 @@ export async function POST(req: NextRequest) {
   if (payload?.action !== "publish") {
     return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
   }
+  if (aboutContentContainsOriginalStorageUrl(payload.content)) {
+    return NextResponse.json(
+      { error: "원본 또는 비공개 스토리지 URL은 회사소개에 게시할 수 없습니다." },
+      { status: 400 },
+    );
+  }
 
   const content: AboutPageContent = normalizeAboutPageContent(payload.content);
   const admin = createAdminClient();
   const now = new Date().toISOString();
+
+  try {
+    await validateAboutLibraryImages(admin, content);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "이미지 권한을 확인하지 못했습니다." },
+      { status: 400 },
+    );
+  }
 
   const { data: before } = await admin
     .from("about_page_content")
@@ -103,6 +150,15 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await removeUnreferencedAboutAssets(
+    admin,
+    [
+      before ? normalizeAboutPageContent(before.content) : null,
+      before ? normalizeAboutPageContent(before.draft_content ?? before.content) : null,
+    ],
+    [content, content],
+  );
 
   await recordAdminAuditLog(admin, {
     actorId: adminUser.id,

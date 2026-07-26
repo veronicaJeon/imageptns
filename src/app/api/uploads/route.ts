@@ -9,6 +9,7 @@ import { normalizeRotationDegrees } from "@/lib/images/orientation";
 import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryInput, syncImageCategoryAssignments } from "@/lib/images/category-server";
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
+import { PROMOTIONAL_USE_CONSENT_VERSION } from "@/lib/images/promotional-use";
 import { dateValueInTimeZone, takenAtIsAllowed } from "@/lib/uploads/taken-at";
 
 export const maxDuration = 60;
@@ -25,7 +26,7 @@ export async function GET() {
   const [imagesResult, settingsResult] = await Promise.all([
     admin
       .from("images")
-      .select("id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, rejected_at, lifecycle_status, deletion_requested_at, deletion_fee_krw, deletion_fee_status, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at, chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at, proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
+      .select("id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, rejected_at, lifecycle_status, deletion_requested_at, deletion_fee_krw, deletion_fee_status, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at, chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at, proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at")
       .eq("photographer_id", user.id)
       .eq("lifecycle_status", "active")
       .order("created_at", { ascending: false }),
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     upload_rotation_degrees, upload_original_width, upload_original_height,
     exif_taken_at, exif_lat, exif_lng, exif_location, exif_camera,
     copyright_license, free_usage_policy, attribution_name, attribution_url,
-    authorship_declaration, factuality_attested,
+    authorship_declaration, factuality_attested, promotional_use_allowed,
   } = body;
 
   const categoryInput = await normalizeImageCategoryInput(admin, category_codes, category);
@@ -135,6 +136,10 @@ export async function POST(req: NextRequest) {
       factuality_attested: true,
       factuality_attested_at: new Date().toISOString(),
       factuality_attestation_version: "2026-05-20",
+      promotional_use_allowed: promotional_use_allowed === true,
+      promotional_use_consented_at: promotional_use_allowed === true ? new Date().toISOString() : null,
+      promotional_use_consent_version: promotional_use_allowed === true ? PROMOTIONAL_USE_CONSENT_VERSION : null,
+      promotional_use_revoked_at: null,
       status:               "pending",
     })
     .select()

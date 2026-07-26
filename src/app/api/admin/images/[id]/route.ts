@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
+import { detachImageFromAboutPage } from "@/lib/about/library-assets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeLicensePrice } from "@/lib/commerce/pricing";
 import { previewUrl } from "@/lib/supabase/storage";
@@ -98,6 +99,7 @@ export async function PATCH(
   if (imageError || !image) return NextResponse.json({ error: imageError?.message ?? "Image update failed" }, { status: 500 });
 
   await syncImageCategoryAssignments(admin, id, categoryInput.codes);
+  if (!isPublished) await detachImageFromAboutPage(admin, id);
 
   const priceOverrides = body.priceOverrides && typeof body.priceOverrides === "object"
     ? body.priceOverrides as Record<string, unknown>

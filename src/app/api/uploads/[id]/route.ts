@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { detachImageFromAboutPage } from "@/lib/about/library-assets";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
@@ -6,12 +7,14 @@ import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryI
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 import { hasArweaveCredential } from "@/lib/images/deletion";
+import { PROMOTIONAL_USE_CONSENT_VERSION } from "@/lib/images/promotional-use";
 import { dateValueInTimeZone, takenAtIsAllowed } from "@/lib/uploads/taken-at";
 
 interface ImagePatchRow {
   id: string;
   status: string;
   photographer_id?: string | null;
+  promotional_use_allowed: boolean;
 }
 
 interface ImageDeleteRow {
@@ -39,7 +42,7 @@ export async function PATCH(
 
   const { data: img } = await admin
     .from("images")
-    .select("id, status, photographer_id")
+    .select("id, status, photographer_id, promotional_use_allowed")
     .eq("id", id)
     .eq("photographer_id", user.id)
     .single();
@@ -47,7 +50,7 @@ export async function PATCH(
   if (!img) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { title, description, title_ko, title_en, description_ko, description_en, tags_ko, tags_en, category, category_codes, tags, exif_location, exif_taken_at, resubmit, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration } = body as {
+  const { title, description, title_ko, title_en, description_ko, description_en, tags_ko, tags_en, category, category_codes, tags, exif_location, exif_taken_at, resubmit, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, promotional_use_allowed } = body as {
     title?: string;
     description?: string;
     title_ko?: string;
@@ -67,6 +70,7 @@ export async function PATCH(
     attribution_name?: string | null;
     attribution_url?: string | null;
     authorship_declaration?: AuthorshipDeclaration;
+    promotional_use_allowed?: boolean;
   };
 
   if (title !== undefined && !title.trim()) {
@@ -104,6 +108,19 @@ export async function PATCH(
     update.authorship_declaration = authorship_declaration;
     update.authorship_declared_at = new Date().toISOString();
   }
+  if (promotional_use_allowed !== undefined && promotional_use_allowed !== image.promotional_use_allowed) {
+    if (typeof promotional_use_allowed !== "boolean") {
+      return NextResponse.json({ error: "promotional_use_allowed must be boolean" }, { status: 400 });
+    }
+    update.promotional_use_allowed = promotional_use_allowed;
+    if (promotional_use_allowed) {
+      update.promotional_use_consented_at = new Date().toISOString();
+      update.promotional_use_consent_version = PROMOTIONAL_USE_CONSENT_VERSION;
+      update.promotional_use_revoked_at = null;
+    } else {
+      update.promotional_use_revoked_at = new Date().toISOString();
+    }
+  }
   // Resubmit: only for rejected/draft → pending (approved stays approved)
   if (resubmit && ["rejected", "draft"].includes(image.status)) {
     update.status = "pending";
@@ -116,13 +133,16 @@ export async function PATCH(
     .update(update)
     .eq("id", id)
     .eq("photographer_id", user.id)
-    .select("id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, rejected_at, exif_location, exif_taken_at, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at")
+    .select("id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, rejected_at, exif_location, exif_taken_at, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   if (categoryInput) {
     await syncImageCategoryAssignments(admin, id, categoryInput.codes);
+  }
+  if (promotional_use_allowed === false && image.promotional_use_allowed) {
+    await detachImageFromAboutPage(admin, id);
   }
 
   const categoryMap = await getImageCategoryCodeMap(admin, [id]);
@@ -172,6 +192,7 @@ export async function DELETE(
     reason_category_text: "portfolio_cleanup",
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await detachImageFromAboutPage(admin, id);
 
   return NextResponse.json({ ok: true, immediate: true, result });
 }

@@ -8,6 +8,7 @@ import { AdminButton, AdminChip, AdminListSurface } from "@/components/admin/Adm
 import {
   DEFAULT_ABOUT_PAGE_CONTENT,
   isSafeImageUrl,
+  type AboutImageSlot,
   type AboutPageContent,
   type AboutPageLocale,
   type AboutPageLocaleContent,
@@ -20,6 +21,21 @@ interface AboutPageState {
   publishedContent?: AboutPageContent;
   updatedAt?: string | null;
   publishedAt?: string | null;
+}
+
+interface PickerImage {
+  id: string;
+  asset_id: string | null;
+  title: string;
+  storage_path_preview: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+interface PickerPagination {
+  page: number;
+  total: number;
+  totalPages: number;
 }
 
 const fieldClass = "w-full rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface outline-none transition-colors placeholder:text-outline focus:border-primary";
@@ -73,6 +89,14 @@ export default function AdminAboutPage() {
   const [translating, setTranslating] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [pickerSlot, setPickerSlot] = useState<AboutImageSlot | null>(null);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [pickerPage, setPickerPage] = useState(1);
+  const [pickerImages, setPickerImages] = useState<PickerImage[]>([]);
+  const [pickerPagination, setPickerPagination] = useState<PickerPagination>({ page: 1, total: 0, totalPages: 1 });
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  const [generatingImageId, setGeneratingImageId] = useState<string | null>(null);
 
   const activeCopy = content.locales[activeLocale];
   const previewLabel = useMemo(() => sectionLabel(previewLocale), [previewLocale]);
@@ -104,11 +128,102 @@ export default function AdminAboutPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  function updateImage(key: keyof AboutPageContent["images"], value: string) {
+  useEffect(() => {
+    if (!pickerSlot) return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setPickerLoading(true);
+      setPickerError(null);
+      try {
+        const params = new URLSearchParams({
+          status: "approved",
+          promotionalUse: "true",
+          page: String(pickerPage),
+          pageSize: "24",
+        });
+        if (pickerQuery.trim()) params.set("query", pickerQuery.trim());
+        const response = await fetch(`/api/admin/images?${params}`, { signal: controller.signal });
+        const body = await response.json() as {
+          images?: PickerImage[];
+          pagination?: PickerPagination;
+          error?: string;
+        };
+        if (!response.ok) throw new Error(body.error ?? "라이브러리 이미지를 불러오지 못했습니다.");
+        setPickerImages(body.images ?? []);
+        setPickerPagination(body.pagination ?? { page: pickerPage, total: 0, totalPages: 1 });
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setPickerError(error instanceof Error ? error.message : "라이브러리 이미지를 불러오지 못했습니다.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setPickerLoading(false);
+      }
+    }, 250);
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [pickerPage, pickerQuery, pickerSlot]);
+
+  function updateImage(key: AboutImageSlot, value: string) {
     setContent((current) => ({
       ...current,
       images: { ...current.images, [key]: value },
+      imageSources: {
+        ...current.imageSources,
+        [key]: { source: "external", imageId: null, derivedPath: null, credit: null },
+      },
     }));
+  }
+
+  function openPicker(slot: AboutImageSlot) {
+    setPickerSlot(slot);
+    setPickerQuery("");
+    setPickerPage(1);
+    setPickerError(null);
+  }
+
+  async function selectLibraryImage(image: PickerImage) {
+    if (!pickerSlot) return;
+    setGeneratingImageId(image.id);
+    setPickerError(null);
+    try {
+      const response = await fetch("/api/admin/about-page/library-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageId: image.id, slot: pickerSlot }),
+      });
+      const body = await response.json() as {
+        imageId?: string;
+        derivedPath?: string;
+        url?: string;
+        credit?: string | null;
+        error?: string;
+      };
+      if (!response.ok || !body.imageId || !body.derivedPath || !body.url) {
+        throw new Error(body.error ?? "전시용 이미지를 만들지 못했습니다.");
+      }
+      const slot = pickerSlot;
+      setContent((current) => ({
+        ...current,
+        images: { ...current.images, [slot]: body.url! },
+        imageSources: {
+          ...current.imageSources,
+          [slot]: {
+            source: "library",
+            imageId: body.imageId!,
+            derivedPath: body.derivedPath!,
+            credit: body.credit ?? null,
+          },
+        },
+      }));
+      setPickerSlot(null);
+      setMessage(`라이브러리 이미지 “${image.title}”의 전시용 파생본을 적용했습니다. 초안 저장 후 게시해 주세요.`);
+    } catch (error) {
+      setPickerError(error instanceof Error ? error.message : "전시용 이미지를 만들지 못했습니다.");
+    } finally {
+      setGeneratingImageId(null);
+    }
   }
 
   function updateHero(field: keyof AboutPageLocaleContent["hero"], value: string) {
@@ -345,16 +460,31 @@ export default function AdminAboutPage() {
               {IMAGE_FIELDS.map((field) => {
                 const value = content.images[field.key];
                 const canPreview = isSafeImageUrl(value);
+                const source = content.imageSources[field.key];
                 return (
-                  <label key={field.key} className="block">
-                    <span className="text-xs font-bold text-outline">{field.label}</span>
-                    <span className="mt-1 block text-xs text-outline">{field.description}</span>
+                  <div key={field.key} className="block">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-bold text-outline">{field.label}</span>
+                        <span className="mt-1 block text-xs text-outline">{field.description}</span>
+                      </div>
+                      <AdminChip tone={source.source === "library" ? "success" : "neutral"}>
+                        {source.source === "library" ? "라이브러리 파생본" : "외부 URL"}
+                      </AdminChip>
+                    </div>
+                    <AdminButton type="button" className="mt-3" onClick={() => openPicker(field.key)}>
+                      <span className="material-symbols-outlined text-base">photo_library</span>
+                      라이브러리에서 선택
+                    </AdminButton>
+                    <label className="mt-3 block text-[11px] font-bold text-outline">
+                      직접 URL 입력 (보조 방식)
                     <input
                       value={value}
                       onChange={(event) => updateImage(field.key, event.target.value)}
                       placeholder="https://..."
                       className="mt-2 w-full rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface outline-none transition-colors placeholder:text-outline focus:border-primary"
                     />
+                    </label>
                     {canPreview && (
                       <div className="mt-3 aspect-[16/7] overflow-hidden border border-outline-variant/30 bg-surface-container-low">
                         <Image
@@ -367,7 +497,7 @@ export default function AdminAboutPage() {
                         />
                       </div>
                     )}
-                  </label>
+                  </div>
                 );
               })}
             </div>
@@ -568,6 +698,136 @@ export default function AdminAboutPage() {
           </AdminListSurface>
         </div>
       </div>
+
+      {pickerSlot && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="회사소개 라이브러리 이미지 선택"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target && !generatingImageId) setPickerSlot(null);
+          }}
+        >
+          <div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-surface-container-lowest shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-outline-variant/30 p-5">
+              <div>
+                <h2 className="text-base font-extrabold text-on-surface">라이브러리에서 이미지 선택</h2>
+                <p className="mt-1 text-xs leading-5 text-outline">
+                  사진가가 홍보 활용에 동의한 승인·공개 이미지만 표시됩니다. 선택하면 원본은 공개하지 않고,
+                  메타데이터를 제거한 저해상도 무워터마크 전시본을 생성합니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={Boolean(generatingImageId)}
+                onClick={() => setPickerSlot(null)}
+                aria-label="닫기"
+                className="rounded-lg p-2 text-outline hover:bg-surface-container-low hover:text-on-surface disabled:opacity-40"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="border-b border-outline-variant/30 p-4">
+              <div className="relative">
+                <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg text-outline">search</span>
+                <input
+                  autoFocus
+                  value={pickerQuery}
+                  onChange={(event) => {
+                    setPickerQuery(event.target.value);
+                    setPickerPage(1);
+                  }}
+                  placeholder="제목, 에셋 ID, 태그 검색"
+                  className={`${fieldClass} pl-10`}
+                />
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {pickerError && (
+                <div className="mb-4 rounded-lg bg-error-container px-4 py-3 text-sm text-on-error-container">{pickerError}</div>
+              )}
+              {pickerLoading ? (
+                <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-outline">
+                  <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                  이미지를 불러오는 중...
+                </div>
+              ) : pickerImages.length === 0 ? (
+                <div className="flex min-h-64 flex-col items-center justify-center text-center">
+                  <span className="material-symbols-outlined text-4xl text-outline">photo_library</span>
+                  <p className="mt-3 text-sm font-bold text-on-surface">선택 가능한 이미지가 없습니다.</p>
+                  <p className="mt-1 max-w-md text-xs leading-5 text-outline">
+                    승인·공개 상태이면서 사진가가 ‘회사 및 서비스 홍보 활용’에 동의한 이미지만 이 목록에 나타납니다.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {pickerImages.map((image) => (
+                    <button
+                      key={image.id}
+                      type="button"
+                      disabled={Boolean(generatingImageId) || !image.storage_path_preview}
+                      onClick={() => selectLibraryImage(image)}
+                      className="group overflow-hidden rounded-lg border border-outline-variant/40 bg-surface text-left transition hover:border-primary hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <div className="aspect-[4/3] overflow-hidden bg-surface-container-low">
+                        {image.storage_path_preview ? (
+                          <Image
+                            src={image.storage_path_preview}
+                            alt=""
+                            width={480}
+                            height={360}
+                            unoptimized
+                            className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
+                          />
+                        ) : null}
+                      </div>
+                      <div className="p-3">
+                        <p className="truncate text-xs font-extrabold text-on-surface">{image.title}</p>
+                        <p className="mt-1 truncate text-[11px] text-outline">
+                          {image.asset_id ?? "에셋 ID 없음"}
+                          {image.width && image.height ? ` · ${image.width}×${image.height}` : ""}
+                        </p>
+                        {generatingImageId === image.id && (
+                          <p className="mt-2 flex items-center gap-1 text-[11px] font-bold text-primary">
+                            <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                            전시본 생성 중
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-outline-variant/30 px-4 py-3">
+              <span className="text-xs text-outline">총 {pickerPagination.total.toLocaleString()}개</span>
+              <div className="flex items-center gap-2">
+                <AdminButton
+                  type="button"
+                  disabled={pickerPage <= 1 || pickerLoading}
+                  onClick={() => setPickerPage((page) => Math.max(1, page - 1))}
+                >
+                  이전
+                </AdminButton>
+                <span className="min-w-16 text-center text-xs font-bold text-on-surface">
+                  {pickerPagination.page} / {pickerPagination.totalPages}
+                </span>
+                <AdminButton
+                  type="button"
+                  disabled={pickerPage >= pickerPagination.totalPages || pickerLoading}
+                  onClick={() => setPickerPage((page) => page + 1)}
+                >
+                  다음
+                </AdminButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

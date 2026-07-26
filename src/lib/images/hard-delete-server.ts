@@ -1,5 +1,6 @@
 import "server-only";
 
+import { detachImageFromAboutPage } from "@/lib/about/library-assets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   assessHardDeleteEligibility,
@@ -142,6 +143,12 @@ export async function removeHardDeleteStorageFiles(
   const paths = storagePathsForHardDelete(image);
   const errors: string[] = [];
   let removed = 0;
+
+  try {
+    await detachImageFromAboutPage(admin, image.id);
+  } catch (error) {
+    errors.push(`about-page: ${error instanceof Error ? error.message : "회사소개 이미지 분리 실패"}`);
+  }
 
   if (paths.originals.length > 0) {
     const { error } = await admin.storage.from("images-original").remove(paths.originals);

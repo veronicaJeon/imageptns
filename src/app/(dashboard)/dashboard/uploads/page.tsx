@@ -52,6 +52,8 @@ const UPLOADS_PAGE_COPY = {
     authorship: "AI / 오리지널리티 선언",
     humanOriginal: "AI 이미지가 아니며, 본인의 오리지널리티 보증",
     aiGenerated: "AI 생성 이미지",
+    promotionalUse: "회사 및 서비스 홍보 활용 허용 (선택)",
+    promotionalUseHelp: "허용하면 관리자가 회사소개 등에 메타데이터를 제거한 저해상도 무워터마크 전시본을 사용할 수 있습니다. 원본은 공개되지 않으며 언제든 허용을 철회할 수 있습니다.",
     copyright: "저작권 등급",
     freeUse: "무료 사용",
     attributionName: "출처 표기명",
@@ -106,6 +108,8 @@ const UPLOADS_PAGE_COPY = {
     authorship: "AI / originality declaration",
     humanOriginal: "Not AI-generated; I attest to my originality",
     aiGenerated: "AI-generated image",
+    promotionalUse: "Allow company/service promotional use (optional)",
+    promotionalUseHelp: "Allows an administrator to use a low-resolution, metadata-free, unwatermarked display derivative on pages such as About. The original stays private, and you may withdraw permission at any time.",
     copyright: "Copyright license",
     freeUse: "Free use",
     attributionName: "Credit name",
@@ -145,6 +149,7 @@ interface EditState {
   attribution_name: string;
   attribution_url: string;
   authorship_declaration: AuthorshipDeclaration;
+  promotional_use_allowed: boolean;
 }
 
 interface UploadRow {
@@ -190,6 +195,10 @@ interface UploadRow {
   attribution_name: string | null;
   attribution_url: string | null;
   authorship_declaration: AuthorshipDeclaration | null;
+  promotional_use_allowed: boolean;
+  promotional_use_consented_at: string | null;
+  promotional_use_consent_version: string | null;
+  promotional_use_revoked_at: string | null;
 }
 
 function localizedText(
@@ -356,6 +365,7 @@ function UploadsPageContent() {
       attribution_name: img.attribution_name ?? "",
       attribution_url: img.attribution_url ?? "",
       authorship_declaration: img.authorship_declaration ?? "human_original",
+      promotional_use_allowed: img.promotional_use_allowed ?? false,
     });
   }
 
@@ -386,6 +396,7 @@ function UploadsPageContent() {
           attribution_name: editing.attribution_name.trim() || null,
           attribution_url: editing.attribution_url.trim() || null,
           authorship_declaration: editing.authorship_declaration,
+          promotional_use_allowed: editing.promotional_use_allowed,
           resubmit,
         }),
       });
@@ -678,6 +689,19 @@ function UploadsPageContent() {
                                   <option value="ai_generated">{copy.aiGenerated}</option>
                                 </select>
                               </div>
+
+                              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-3 sm:col-span-2">
+                                <input
+                                  type="checkbox"
+                                  checked={editing.promotional_use_allowed}
+                                  onChange={(e) => setEditing({ ...editing, promotional_use_allowed: e.target.checked })}
+                                  className="mt-0.5 h-4 w-4 accent-primary"
+                                />
+                                <span>
+                                  <span className="block text-xs font-bold text-on-surface">{copy.promotionalUse}</span>
+                                  <span className="mt-1 block text-[11px] leading-5 text-outline">{copy.promotionalUseHelp}</span>
+                                </span>
+                              </label>
 
                               <div className="flex flex-col gap-1.5">
                                 <label className="text-xs font-semibold text-outline">{copy.copyright}</label>
