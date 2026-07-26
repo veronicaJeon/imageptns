@@ -1,10 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPhotoRequestHref,
+  buildPhotoRequestSubject,
   draftPhotoRequestFromSearchParams,
 } from "./photo-request-draft";
 
 describe("photo request draft helpers", () => {
+  it("builds a request title from the buyer's description", () => {
+    expect(buildPhotoRequestSubject("  백제 금동대향로 전체가 잘 보이는 사진  ")).toBe(
+      "[사진 요청] 백제 금동대향로 전체가 잘 보이는 사진",
+    );
+    expect(buildPhotoRequestSubject("Bright Seoul rooftop image", "en")).toBe(
+      "[Image request] Bright Seoul rooftop image",
+    );
+  });
+
   it("builds a contact URL from library search state", () => {
     expect(buildPhotoRequestHref({
       query: "지리산 천왕봉 겨울 설경",

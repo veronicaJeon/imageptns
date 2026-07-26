@@ -21,6 +21,17 @@ function cleanText(value: string | null | undefined) {
   return (value ?? "").trim().replace(/\s+/g, " ");
 }
 
+export function buildPhotoRequestSubject(brief: string, lang: DraftLang = "ko") {
+  const normalized = cleanText(brief);
+  if (!normalized) return lang === "ko" ? "이미지(사진)요청" : "Image (photo) request";
+
+  const preview = normalized.slice(0, 60);
+  const suffix = normalized.length > preview.length ? "…" : "";
+  return lang === "ko"
+    ? `[사진 요청] ${preview}${suffix}`
+    : `[Image request] ${preview}${suffix}`;
+}
+
 function usageLabelsFromParams(params: URLSearchParams, lang: DraftLang) {
   const labels: string[] = [];
   if (params.get("free") === "true") labels.push(lang === "ko" ? "무료 사용 가능" : "Free use");

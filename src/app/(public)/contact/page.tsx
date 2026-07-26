@@ -4,12 +4,14 @@ import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
-import { draftPhotoRequestFromSearchParams } from "@/lib/contact/photo-request-draft";
+import { buildPhotoRequestSubject, draftPhotoRequestFromSearchParams } from "@/lib/contact/photo-request-draft";
 import { validatePhotoRequestBuyerFields } from "@/lib/contact/request-fields";
 import { cn } from "@/lib/utils/cn";
 
 type ContactMode = "general" | "photo";
 type SourcingPurpose = "rights_check" | "similar_search" | "supply_check" | "context_reference" | "shooting_request";
+
+const PHOTO_REQUEST_DRAFT_KEY = "imagepartners.photo-request-draft";
 
 const CONTACT_PHOTO_COPY = {
   ko: {
@@ -19,22 +21,21 @@ const CONTACT_PHOTO_COPY = {
     errors: {
       generalFailed: "문의 접수에 실패했습니다.",
       loginRequired: "이미지 소싱 요청은 로그인 후 접수할 수 있습니다.",
-      titleRequired: "요청 제목을 입력해주세요. 예: 백제 금동대향로 사진 후보 요청",
       briefRequired: "찾고 있는 이미지 설명을 입력해주세요. 필요한 장면, 대상, 피해야 할 요소를 편하게 적어도 괜찮습니다.",
       emailMissing: "로그인 이메일을 확인할 수 없습니다. 다시 로그인 후 접수해주세요.",
       photoFailed: "이미지 소싱 요청 접수에 실패했습니다.",
     },
     loginNotice: {
-      title: "이미지 소싱 요청은 로그인 후 접수할 수 있습니다.",
-      body: "출판 프로젝트 정보와 요청 이력을 안전하게 관리하기 위해 회원 로그인 후 요청을 받을게요.",
-      link: "로그인하러 가기",
+      title: "작성한 내용은 그대로 유지됩니다.",
+      body: "요청 이력을 안전하게 관리하기 위해 접수할 때만 로그인해 주세요.",
+      link: "로그인하고 요청하기",
     },
-    introTitle: "필요한 이미지를 편하게 설명해주세요.",
-    introBody: "필요한 이미지에 대해 최대한 알려주세요! 저희가 유사 이미지 서치, 권리 확인, 촬영 가능여부까지 종합적으로 검토해드립니다.",
+    introTitle: "필요한 사진을 말하듯 적어주세요.",
+    introBody: "정확한 조건을 몰라도 괜찮습니다. 유사 이미지 검색, 권리 확인, 신규 촬영 가능 여부는 저희가 검토합니다.",
     fields: {
       title: "요청 제목",
       titlePlaceholder: "예: 백제 금동대향로 사진 후보 요청",
-      brief: "찾고 있는 이미지 설명",
+      brief: "어떤 사진이 필요하세요?",
       briefPlaceholder: "예: 한국사 교재 백제 파트에 넣을 금동대향로 사진이 필요합니다. 유물 전체가 잘 보이고 배경이 너무 복잡하지 않았으면 합니다.",
       briefHelp: "문장으로 길게 써도 좋고, 필요한 컷·분위기·피해야 할 요소를 짧게 적어도 충분합니다.",
       organization: "요청자 소속",
@@ -45,16 +46,22 @@ const CONTACT_PHOTO_COPY = {
       usageProjectPlaceholder: "예: 중학교 한국사 보조교재",
       usageContext: "사용 맥락",
       usageContextPlaceholder: "예: 백제 문화의 공예 수준을 설명하는 본문 옆 삽입 이미지로 사용합니다.",
-      deadline: "희망 회신일",
-      deadlineHelp: "기본값은 2주 뒤입니다. 합리적인 검토 일정을 기준으로 먼저 제안합니다.",
-      referenceUrl: "참고 URL / 샘플 이미지 URL",
+      deadline: "언제까지 필요하세요?",
+      deadlineHelp: "기본값은 2주 뒤입니다. 필요한 경우만 바꿔주세요.",
+      referenceUrl: "참고 이미지 링크",
       referenceNote: "참고 설명",
       referenceNotePlaceholder: "예: 이 링크의 구도만 참고해주세요. / 이 이미지는 너무 어둡고 색감만 참고해주세요.",
       referenceNoteHelp: "참고자료에서 따라가야 할 점과 피해야 할 점을 적어주세요.",
       purposes: "참고자료를 어떻게 활용하면 될까요?",
-      advanced: "알고 있다면 추가 입력",
-      submit: "이미지(사진)요청 접수",
+      advanced: "상세 조건을 알고 있어요",
+      submit: "필요한 사진 찾아달라고 요청하기",
+      submitWithLogin: "로그인하고 사진 요청하기",
     },
+    deadlineOptions: [
+      { days: 3, label: "빠른 회신" },
+      { days: 7, label: "1주 이내" },
+      { days: 14, label: "2주 이내" },
+    ],
     purposes: [
       { value: "rights_check", label: "이 이미지와 완전히 같은 사진의 권리 확인이 필요합니다" },
       { value: "similar_search", label: "이 이미지와 유사한 사진이 필요합니다" },
@@ -75,18 +82,17 @@ const CONTACT_PHOTO_COPY = {
     errors: {
       generalFailed: "Could not submit your inquiry.",
       loginRequired: "Please log in before submitting an image sourcing request.",
-      titleRequired: "Enter a request title. Example: Baekje incense burner image candidates",
       briefRequired: "Describe the image you need. You can include the scene, subject, mood, and anything to avoid.",
       emailMissing: "We could not confirm your login email. Please log in again and resubmit.",
       photoFailed: "Could not submit your image sourcing request.",
     },
     loginNotice: {
-      title: "Please log in to submit an image sourcing request.",
-      body: "We use your account to manage project details, request history, and follow-up answers securely.",
-      link: "Go to login",
+      title: "Your draft will be kept.",
+      body: "Log in only when you are ready to submit so we can manage your request history securely.",
+      link: "Log in and request",
     },
-    introTitle: "Describe the image you need in your own words.",
-    introBody: "Our team will review candidate images, rights-check options, and whether a new shoot may be needed.",
+    introTitle: "Describe the photo as you would say it.",
+    introBody: "You do not need to know the exact usage terms. We will review similar images, rights, and new-shoot options.",
     fields: {
       title: "Request title",
       titlePlaceholder: "Example: Baekje incense burner image candidates",
@@ -101,16 +107,22 @@ const CONTACT_PHOTO_COPY = {
       usageProjectPlaceholder: "Example: middle-school Korean history workbook",
       usageContext: "Usage context",
       usageContextPlaceholder: "Example: It will appear next to body text explaining the craft level of Baekje culture.",
-      deadline: "Preferred response date",
-      deadlineHelp: "The default is two weeks from today, giving us a realistic review window.",
-      referenceUrl: "Reference URL / sample image URL",
+      deadline: "When do you need it?",
+      deadlineHelp: "The default is two weeks from today. Change it only if needed.",
+      referenceUrl: "Reference image link",
       referenceNote: "Reference notes",
       referenceNotePlaceholder: "Example: Please use only the composition from this link. / The image is too dark; use only the color direction.",
       referenceNoteHelp: "Tell us what to follow and what to avoid in the reference material.",
       purposes: "How should we use the reference material?",
-      advanced: "Add details if you already know them",
-      submit: "Submit image sourcing request",
+      advanced: "I know the usage details",
+      submit: "Ask Image Partners to find photos",
+      submitWithLogin: "Log in and request photos",
     },
+    deadlineOptions: [
+      { days: 3, label: "Quick reply" },
+      { days: 7, label: "Within 1 week" },
+      { days: 14, label: "Within 2 weeks" },
+    ],
     purposes: [
       { value: "rights_check", label: "I need rights clearance for this exact image" },
       { value: "similar_search", label: "I need images similar to this reference" },
@@ -142,7 +154,7 @@ function ContactPageContent() {
   const photoCopy = CONTACT_PHOTO_COPY[lang];
   const searchParams = useSearchParams();
 
-  const { user, init } = useAuth();
+  const { user, loading: authLoading, init } = useAuth();
   const [mode, setMode] = useState<ContactMode>("general");
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [photoForm, setPhotoForm] = useState({
@@ -169,6 +181,28 @@ function ContactPageContent() {
   const [error, setError] = useState("");
 
   useEffect(() => { init(); }, [init]);
+
+  useEffect(() => {
+    const rawDraft = window.sessionStorage.getItem(PHOTO_REQUEST_DRAFT_KEY);
+    if (!rawDraft) return;
+
+    try {
+      const draft = JSON.parse(rawDraft) as {
+        photoForm?: Partial<typeof photoForm>;
+        advancedUsage?: Partial<typeof advancedUsage>;
+      };
+      setMode("photo");
+      if (draft.photoForm) {
+        setPhotoForm((prev) => ({ ...prev, ...draft.photoForm }));
+      }
+      if (draft.advancedUsage) {
+        setAdvancedUsage((prev) => ({ ...prev, ...draft.advancedUsage }));
+        setShowAdvancedUsage(Object.values(draft.advancedUsage).some(Boolean));
+      }
+    } catch {
+      window.sessionStorage.removeItem(PHOTO_REQUEST_DRAFT_KEY);
+    }
+  }, []);
 
   // Auto-fill name and email when user is loaded
   useEffect(() => {
@@ -237,19 +271,16 @@ function ContactPageContent() {
     setLoading(true);
     setError("");
 
-    if (!user) {
-      setError(photoCopy.errors.loginRequired);
+    if (!photoForm.brief.trim()) {
+      setError(photoCopy.errors.briefRequired);
       setLoading(false);
       return;
     }
 
-    if (!photoForm.title.trim()) {
-      setError(photoCopy.errors.titleRequired);
-      setLoading(false);
-      return;
-    }
-    if (!photoForm.brief.trim()) {
-      setError(photoCopy.errors.briefRequired);
+    if (!user) {
+      window.sessionStorage.setItem(PHOTO_REQUEST_DRAFT_KEY, JSON.stringify({ photoForm, advancedUsage }));
+      const next = encodeURIComponent("/contact?mode=photo");
+      window.location.assign(`/login?next=${next}`);
       setLoading(false);
       return;
     }
@@ -298,7 +329,7 @@ function ContactPageContent() {
         body: JSON.stringify({
           name: buyerName,
           email: buyerEmail,
-          subject: photoForm.title,
+          subject: buildPhotoRequestSubject(photoForm.brief, lang),
           message: photoForm.brief,
           inquiry_type: "photo_request",
           requester_organization: photoForm.requester_organization,
@@ -322,6 +353,7 @@ function ContactPageContent() {
         const body = await res.json().catch(() => null) as { error?: string } | null;
         throw new Error(body?.error ?? photoCopy.errors.photoFailed);
       }
+      window.sessionStorage.removeItem(PHOTO_REQUEST_DRAFT_KEY);
       setSent(true);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : photoCopy.errors.photoFailed);
@@ -469,17 +501,6 @@ function ContactPageContent() {
               </form>
             ) : (
               <form onSubmit={handlePhotoSubmit} noValidate className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                {!isLoggedIn && (
-                  <div className="md:col-span-2 rounded-lg border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-on-surface">
-                    <p className="font-semibold text-primary">{photoCopy.loginNotice.title}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-                      {photoCopy.loginNotice.body}
-                    </p>
-                    <a href="/login?next=/contact?mode=photo" className="mt-3 inline-flex text-xs font-bold text-primary hover:underline">
-                      {photoCopy.loginNotice.link}
-                    </a>
-                  </div>
-                )}
                 {error && (
                   <div className="rounded-lg border border-error/20 bg-error/10 px-4 py-3 text-sm text-error md:col-span-2">
                     {error}
@@ -494,77 +515,54 @@ function ContactPageContent() {
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.title} <span className="text-error">*</span></label>
-                  <input
-                    type="text"
-                    value={photoForm.title}
-                    onChange={setPhoto("title")}
-                    placeholder={photoCopy.fields.titlePlaceholder}
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2 md:col-span-2">
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.brief} <span className="text-error">*</span></label>
                   <textarea
                     value={photoForm.brief}
                     onChange={setPhoto("brief")}
-                    rows={5}
+                    rows={7}
                     placeholder={photoCopy.fields.briefPlaceholder}
-                    className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-y min-h-32 transition-all"
+                    autoFocus
+                    className="min-h-44 resize-y rounded-xl bg-surface-container-lowest px-4 py-4 text-base leading-relaxed text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
                   />
                   <p className="text-xs leading-relaxed text-on-surface-variant">
                     {photoCopy.fields.briefHelp}
                   </p>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.organization}</label>
+                <div className="flex flex-col gap-2 md:col-span-2">
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.referenceUrl} <span className="font-medium normal-case tracking-normal text-on-surface-variant">{lang === "ko" ? "(선택)" : "(optional)"}</span></label>
                   <input
-                    type="text"
-                    value={photoForm.requester_organization}
-                    onChange={setPhoto("requester_organization")}
-                    placeholder={photoCopy.fields.organizationPlaceholder}
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.phone} <span className="text-error">*</span></label>
-                  <input
-                    type="tel"
-                    required
-                    value={photoForm.requester_phone}
-                    onChange={setPhoto("requester_phone")}
-                    placeholder={photoCopy.fields.phonePlaceholder}
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.usageProject} <span className="text-error">*</span></label>
-                  <input
-                    type="text"
-                    value={photoForm.usage_project}
-                    onChange={setPhoto("usage_project")}
-                    placeholder={photoCopy.fields.usageProjectPlaceholder}
+                    type="url"
+                    value={photoForm.reference_url}
+                    onChange={setPhoto("reference_url")}
+                    placeholder="https://example.com/reference"
                     className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
                   />
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.usageContext} <span className="text-error">*</span></label>
-                  <textarea
-                    value={photoForm.usage_context}
-                    onChange={setPhoto("usage_context")}
-                    rows={4}
-                    placeholder={photoCopy.fields.usageContextPlaceholder}
-                    className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-y min-h-28 transition-all"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.deadline} <span className="text-error">*</span></label>
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.deadline} <span className="font-medium normal-case tracking-normal text-on-surface-variant">{lang === "ko" ? "(선택)" : "(optional)"}</span></label>
+                  <div className="flex flex-wrap gap-2">
+                    {photoCopy.deadlineOptions.map((option) => {
+                      const value = dateInputValue(option.days);
+                      const selected = photoForm.deadline_at === value;
+                      return (
+                        <button
+                          key={option.days}
+                          type="button"
+                          onClick={() => setPhotoForm((prev) => ({ ...prev, deadline_at: value }))}
+                          className={cn(
+                            "rounded-full border px-4 py-2 text-xs font-bold transition-colors",
+                            selected
+                              ? "border-primary bg-primary text-white"
+                              : "border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-primary hover:text-primary",
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <input
                     type="date"
                     value={photoForm.deadline_at}
@@ -577,51 +575,6 @@ function ContactPageContent() {
                   </p>
                 </div>
 
-                <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.referenceUrl}</label>
-                  <input
-                    type="url"
-                    value={photoForm.reference_url}
-                    onChange={setPhoto("reference_url")}
-                    placeholder="https://example.com/reference"
-                    className="h-12 bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 text-sm text-on-surface placeholder:text-outline outline-none transition-all"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.referenceNote}</label>
-                  <textarea
-                    value={photoForm.reference_note}
-                    onChange={setPhoto("reference_note")}
-                    rows={3}
-                    placeholder={photoCopy.fields.referenceNotePlaceholder}
-                    className="bg-surface-container-lowest ring-1 ring-outline-variant focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-outline outline-none resize-y min-h-24 transition-all"
-                  />
-                  <p className="text-xs leading-relaxed text-on-surface-variant">
-                    {photoCopy.fields.referenceNoteHelp}
-                  </p>
-                </div>
-
-                <div className="md:col-span-2 flex flex-col gap-2">
-                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.purposes}</label>
-                  <div className="grid grid-cols-1 gap-2">
-                    {photoCopy.purposes.map((option) => (
-                      <label
-                        key={option.value}
-                        className="flex items-start gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-sm text-on-surface-variant"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={photoForm.sourcing_purposes.includes(option.value)}
-                          onChange={(event) => toggleSourcingPurpose(option.value, event.target.checked)}
-                          className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                        />
-                        <span>{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="md:col-span-2 rounded-lg bg-surface-container-lowest ring-1 ring-outline-variant">
                   <button
                     type="button"
@@ -632,7 +585,76 @@ function ContactPageContent() {
                     <span className="material-symbols-outlined text-lg">{showAdvancedUsage ? "expand_less" : "expand_more"}</span>
                   </button>
                   {showAdvancedUsage && (
-                    <div className="grid grid-cols-1 gap-4 border-t border-outline-variant p-4 md:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-5 border-t border-outline-variant p-4 md:grid-cols-2">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.organization}</label>
+                        <input
+                          type="text"
+                          value={photoForm.requester_organization}
+                          onChange={setPhoto("requester_organization")}
+                          placeholder={photoCopy.fields.organizationPlaceholder}
+                          className="h-11 rounded-lg bg-surface-container-lowest px-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.phone}</label>
+                        <input
+                          type="tel"
+                          value={photoForm.requester_phone}
+                          onChange={setPhoto("requester_phone")}
+                          placeholder={photoCopy.fields.phonePlaceholder}
+                          className="h-11 rounded-lg bg-surface-container-lowest px-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 md:col-span-2">
+                        <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.usageProject}</label>
+                        <input
+                          type="text"
+                          value={photoForm.usage_project}
+                          onChange={setPhoto("usage_project")}
+                          placeholder={photoCopy.fields.usageProjectPlaceholder}
+                          className="h-11 rounded-lg bg-surface-container-lowest px-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 md:col-span-2">
+                        <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.usageContext}</label>
+                        <textarea
+                          value={photoForm.usage_context}
+                          onChange={setPhoto("usage_context")}
+                          rows={3}
+                          placeholder={photoCopy.fields.usageContextPlaceholder}
+                          className="min-h-24 resize-y rounded-lg bg-surface-container-lowest px-3 py-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 md:col-span-2">
+                        <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.referenceNote}</label>
+                        <textarea
+                          value={photoForm.reference_note}
+                          onChange={setPhoto("reference_note")}
+                          rows={3}
+                          placeholder={photoCopy.fields.referenceNotePlaceholder}
+                          className="min-h-24 resize-y rounded-lg bg-surface-container-lowest px-3 py-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 md:col-span-2">
+                        <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.purposes}</label>
+                        <div className="grid grid-cols-1 gap-2">
+                          {photoCopy.purposes.map((option) => (
+                            <label
+                              key={option.value}
+                              className="flex items-start gap-3 rounded-lg border border-outline-variant px-3 py-3 text-sm text-on-surface-variant"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={photoForm.sourcing_purposes.includes(option.value)}
+                                onChange={(event) => toggleSourcingPurpose(option.value, event.target.checked)}
+                                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                              />
+                              <span>{option.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                       {photoCopy.advancedFields.map(([key, label, placeholder]) => (
                         <div key={key} className="flex flex-col gap-2">
                           <label className="text-xs font-bold text-outline uppercase tracking-widest">{label}</label>
@@ -649,14 +671,23 @@ function ContactPageContent() {
                   )}
                 </div>
 
+                {!isLoggedIn && !authLoading && (
+                  <div className="md:col-span-2 rounded-lg border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-on-surface">
+                    <p className="font-semibold text-primary">{photoCopy.loginNotice.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                      {photoCopy.loginNotice.body}
+                    </p>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  disabled={loading || !isLoggedIn}
+                  disabled={loading || authLoading}
                   className="md:col-span-2 flex items-center justify-center gap-2 py-4 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   {loading
                     ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    : <><span className="material-symbols-outlined text-base">send</span>{photoCopy.fields.submit}</>
+                    : <><span className="material-symbols-outlined text-base">send</span>{isLoggedIn ? photoCopy.fields.submit : photoCopy.fields.submitWithLogin}</>
                   }
                 </button>
               </form>

@@ -276,6 +276,12 @@ function normalizeDeadline(value: unknown, now: Date): string {
   return deadline.toISOString();
 }
 
+function defaultPhotoRequestDeadline(now: Date): string {
+  const deadline = new Date(now.getTime());
+  deadline.setDate(deadline.getDate() + 14);
+  return deadline.toISOString();
+}
+
 export function normalizeReferenceUrl(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== "string") {
@@ -313,27 +319,27 @@ export function validatePhotoRequestBuyerFields(
 
   const phone = typeof input.requester_phone === "string" ? input.requester_phone.trim() : "";
   const digits = phone.replace(/\D/g, "");
-  if (!phone || !/^[+\d\s().-]+$/.test(phone) || digits.length < 7 || digits.length > 15) {
+  if (phone && (!/^[+\d\s().-]+$/.test(phone) || digits.length < 7 || digits.length > 15)) {
     return messages.requesterPhone;
   }
 
-  try {
-    normalizeText(input.usage_project, "usage_project", 240);
-  } catch {
+  const usageProject = typeof input.usage_project === "string" ? input.usage_project.trim() : "";
+  if (usageProject.length > 240) {
     return messages.usageProject;
   }
 
-  try {
-    normalizeText(input.usage_context, "usage_context", 1000);
-  } catch {
-    const value = typeof input.usage_context === "string" ? input.usage_context.trim() : "";
-    return value ? messages.usageContextTooLong : messages.usageContextRequired;
+  const usageContext = typeof input.usage_context === "string" ? input.usage_context.trim() : "";
+  if (usageContext.length > 1000) {
+    return messages.usageContextTooLong;
   }
 
-  try {
-    normalizeDeadline(input.deadline_at, now);
-  } catch {
-    return messages.deadline;
+  const deadline = typeof input.deadline_at === "string" ? input.deadline_at.trim() : "";
+  if (deadline) {
+    try {
+      normalizeDeadline(deadline, now);
+    } catch {
+      return messages.deadline;
+    }
   }
 
   try {
@@ -390,7 +396,12 @@ export function normalizeContactSubmissionInput(
     };
   }
 
-  const deadline_at = normalizeDeadline(body.deadline_at, now);
+  const deadline_at = typeof body.deadline_at === "string" && body.deadline_at.trim()
+    ? normalizeDeadline(body.deadline_at, now)
+    : defaultPhotoRequestDeadline(now);
+  const requesterPhone = normalizePhoneNumber(body.requester_phone);
+  const usageProject = normalizeOptionalText(body.usage_project, "usage_project", 240);
+  const usageContext = normalizeOptionalText(body.usage_context, "usage_context", 1000);
   return {
     ...base,
     location_label: normalizeOptionalText(body.location_label, "location_label", 160),
@@ -406,9 +417,9 @@ export function normalizeContactSubmissionInput(
     reference_note: normalizeOptionalText(body.reference_note, "reference_note", 1000),
     non_copying_attested: body.non_copying_attested === true,
     requester_organization: normalizeOptionalText(body.requester_organization, "requester_organization", 160),
-    requester_phone: normalizePhoneNumber(body.requester_phone) ?? (() => { throw new Error("requester_phone is required"); })(),
-    usage_project: normalizeText(body.usage_project, "usage_project", 240),
-    usage_context: normalizeText(body.usage_context, "usage_context", 1000),
+    requester_phone: requesterPhone,
+    usage_project: usageProject ?? "미정",
+    usage_context: usageContext ?? base.message,
     sourcing_purposes: normalizeSourcingPurposes(body.sourcing_purposes),
     internal_sourcing_status: "submitted",
     buyer_sourcing_status: "received",
