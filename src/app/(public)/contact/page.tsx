@@ -530,6 +530,18 @@ function ContactPageContent() {
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
+                  <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.phone} <span className="text-error">*</span></label>
+                  <input
+                    type="tel"
+                    value={photoForm.requester_phone}
+                    onChange={setPhoto("requester_phone")}
+                    placeholder={photoCopy.fields.phonePlaceholder}
+                    autoComplete="tel"
+                    className="h-12 rounded-lg bg-surface-container-lowest px-4 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2 md:col-span-2">
                   <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.referenceUrl} <span className="font-medium normal-case tracking-normal text-on-surface-variant">{lang === "ko" ? "(선택)" : "(optional)"}</span></label>
                   <input
                     type="url"
@@ -593,16 +605,6 @@ function ContactPageContent() {
                           value={photoForm.requester_organization}
                           onChange={setPhoto("requester_organization")}
                           placeholder={photoCopy.fields.organizationPlaceholder}
-                          className="h-11 rounded-lg bg-surface-container-lowest px-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="text-xs font-bold text-outline uppercase tracking-widest">{photoCopy.fields.phone}</label>
-                        <input
-                          type="tel"
-                          value={photoForm.requester_phone}
-                          onChange={setPhoto("requester_phone")}
-                          placeholder={photoCopy.fields.phonePlaceholder}
                           className="h-11 rounded-lg bg-surface-container-lowest px-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant transition-all placeholder:text-outline focus:ring-2 focus:ring-primary"
                         />
                       </div>

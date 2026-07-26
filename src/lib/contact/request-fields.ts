@@ -319,7 +319,7 @@ export function validatePhotoRequestBuyerFields(
 
   const phone = typeof input.requester_phone === "string" ? input.requester_phone.trim() : "";
   const digits = phone.replace(/\D/g, "");
-  if (phone && (!/^[+\d\s().-]+$/.test(phone) || digits.length < 7 || digits.length > 15)) {
+  if (!phone || !/^[+\d\s().-]+$/.test(phone) || digits.length < 7 || digits.length > 15) {
     return messages.requesterPhone;
   }
 
@@ -399,7 +399,8 @@ export function normalizeContactSubmissionInput(
   const deadline_at = typeof body.deadline_at === "string" && body.deadline_at.trim()
     ? normalizeDeadline(body.deadline_at, now)
     : defaultPhotoRequestDeadline(now);
-  const requesterPhone = normalizePhoneNumber(body.requester_phone);
+  const requesterPhone = normalizePhoneNumber(body.requester_phone)
+    ?? (() => { throw new Error("requester_phone is required"); })();
   const usageProject = normalizeOptionalText(body.usage_project, "usage_project", 240);
   const usageContext = normalizeOptionalText(body.usage_context, "usage_context", 1000);
   return {

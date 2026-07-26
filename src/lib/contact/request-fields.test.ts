@@ -178,16 +178,24 @@ describe("normalizeContactSubmissionInput", () => {
       subject: "Rooftop campaign",
       message: "Need bright Seoul rooftop lifestyle images with morning light.",
       requester_organization: "",
-      requester_phone: "",
+      requester_phone: "010-1234-5678",
       usage_project: "",
       usage_context: "",
       deadline_at: "",
     }, NOW);
     expect(normalized.requester_organization).toBeNull();
-    expect(normalized.requester_phone).toBeNull();
+    expect(normalized.requester_phone).toBe("010-1234-5678");
     expect(normalized.usage_project).toBe("미정");
     expect(normalized.usage_context).toBe("Need bright Seoul rooftop lifestyle images with morning light.");
     expect(normalized.deadline_at).toBe("2026-06-03T00:00:00.000Z");
+    expect(() => normalizeContactSubmissionInput({
+      inquiry_type: "photo_request",
+      name: "Buyer",
+      email: "buyer@example.com",
+      subject: "Rooftop campaign",
+      message: "Need bright Seoul rooftop lifestyle images with morning light.",
+      requester_phone: "",
+    }, NOW)).toThrow("requester_phone is required");
   });
 
   it("rejects invalid deadlines while allowing omitted budget and region fields", () => {
@@ -226,20 +234,20 @@ describe("validatePhotoRequestBuyerFields", () => {
     expect(validatePhotoRequestBuyerFields(base, NOW)).toBeNull();
   });
 
-  it("allows blank optional buyer details", () => {
+  it("allows blank optional buyer details when contact is present", () => {
     expect(validatePhotoRequestBuyerFields({
       ...base,
       requester_organization: "",
-      requester_phone: "",
+      requester_phone: "010-1234-5678",
       usage_project: "",
       usage_context: "",
       deadline_at: "",
     }, NOW)).toBeNull();
   });
 
-  it("validates a requester phone number only when provided", () => {
+  it("requires and validates a requester phone number", () => {
     expect(validatePhotoRequestBuyerFields({ ...base, requester_phone: "010-1234-5678" }, NOW)).toBeNull();
-    expect(validatePhotoRequestBuyerFields({ ...base, requester_phone: "" }, NOW)).toBeNull();
+    expect(validatePhotoRequestBuyerFields({ ...base, requester_phone: "" }, NOW)).toBe("휴대전화번호를 입력해주세요. 숫자 7~15자리의 전화번호 형식이어야 합니다.");
     expect(validatePhotoRequestBuyerFields({ ...base, requester_phone: "123" }, NOW)).toBe("휴대전화번호를 입력해주세요. 숫자 7~15자리의 전화번호 형식이어야 합니다.");
   });
 
