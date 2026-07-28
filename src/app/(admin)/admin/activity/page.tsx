@@ -11,7 +11,9 @@ type EventType =
   | "search"
   | "cart_add"
   | "checkout_started"
-  | "download";
+  | "download"
+  | "ad_impression"
+  | "ad_click";
 
 interface ActivityEvent {
   id: string;
@@ -37,6 +39,8 @@ const FILTERS: { key: EventType; label: string; icon: string }[] = [
   { key: "cart_add", label: "장바구니", icon: "add_shopping_cart" },
   { key: "checkout_started", label: "결제 시작", icon: "shopping_cart_checkout" },
   { key: "download", label: "다운로드", icon: "download" },
+  { key: "ad_impression", label: "광고 노출", icon: "ads_click" },
+  { key: "ad_click", label: "광고 클릭", icon: "touch_app" },
 ];
 
 const EVENT_LABELS: Record<string, string> = {
@@ -46,10 +50,13 @@ const EVENT_LABELS: Record<string, string> = {
   cart_add: "장바구니 추가",
   checkout_started: "결제 시작",
   download: "다운로드",
+  ad_impression: "광고 노출",
+  ad_click: "광고 클릭",
 };
 
 function eventTone(eventType: string | null | undefined) {
   if (eventType === "checkout_started") return "success" as const;
+  if (eventType === "ad_click") return "success" as const;
   if (eventType === "cart_add") return "warning" as const;
   if (eventType === "image_view" || eventType === "search") return "primary" as const;
   return "neutral" as const;

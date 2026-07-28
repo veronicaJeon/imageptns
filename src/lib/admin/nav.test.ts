@@ -14,6 +14,7 @@ describe("admin navigation groups", () => {
     expect(webPages?.items.map((item) => item.href)).toEqual([
       "/admin/notices",
       "/admin/library-guidance",
+      "/admin/library-ads",
       "/admin/about-page",
     ]);
   });

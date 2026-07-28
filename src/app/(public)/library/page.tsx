@@ -7,6 +7,8 @@ import { MasonryGrid } from "@/components/gallery/MasonryGrid";
 import { ImageCard, ImageCardData } from "@/components/gallery/ImageCard";
 import { CategoryPill } from "@/components/ui/CategoryPill";
 import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
+import { LibraryAdCard } from "@/components/ads/LibraryAdCard";
+import type { PublicLibraryAd } from "@/lib/ads/campaigns";
 
 const PAGE_SIZE_OPTIONS = [20, 40, 60] as const;
 const FILTER_PANEL_STORAGE_KEY = "imagepartners.library.filters-collapsed";
@@ -57,19 +59,6 @@ const LIBRARY_PAGE_COPY = {
   },
 } as const;
 
-function AdRail({ side }: { side: "left" | "right" }) {
-  return (
-    <aside className="hidden 2xl:block" aria-label={`${side} sponsored rail`}>
-      <div className="sticky top-36 h-[640px] rounded-lg border border-dashed border-outline-variant bg-surface-container-lowest/70 px-4 py-5 text-center text-outline">
-        <p className="text-[10px] font-semibold text-on-surface-variant">Sponsored</p>
-        <div className="mt-6 flex h-[560px] items-center justify-center rounded-md bg-surface-container-low px-3 text-xs leading-relaxed">
-          광고 영역
-        </div>
-      </div>
-    </aside>
-  );
-}
-
 /* ── Page ───────────────────────────────────────────────── */
 export default function LibraryPage() {
   const { t, lang } = useLang();
@@ -97,6 +86,7 @@ export default function LibraryPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const [adCampaign, setAdCampaign] = useState<PublicLibraryAd | null>(null);
 
   const blurTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestSeqRef = useRef(0);
@@ -117,6 +107,19 @@ export default function LibraryPage() {
       .then((data: { message?: string | null }) => setGuidance(data.message || l.hero.sub))
       .catch(() => setGuidance(l.hero.sub));
   }, [lang, l.hero.sub]);
+
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/library-ad?lang=${lang}`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : { campaign: null })
+      .then((data: { campaign?: PublicLibraryAd | null }) => {
+        if (active) setAdCampaign(data.campaign ?? null);
+      })
+      .catch(() => {
+        if (active) setAdCampaign(null);
+      });
+    return () => { active = false; };
+  }, [lang]);
 
   useEffect(() => {
     fetch("/api/categories")
@@ -255,6 +258,7 @@ export default function LibraryPage() {
     { code: "all", label: l.categories.all },
     ...categories.map((item) => ({ code: item.code, label: item[lang] })),
   ];
+  const showAdCampaign = Boolean(adCampaign && !loading && images.length > 0);
 
   return (
     <>
@@ -352,8 +356,7 @@ export default function LibraryPage() {
 
       {/* ── Gallery ───────────────────────────────── */}
       <section className="py-12 px-6 md:px-8 bg-surface-container-low min-h-[60vh]">
-        <div className="mx-auto grid max-w-[1680px] gap-8 2xl:grid-cols-[160px_minmax(0,1fr)_160px]">
-          <AdRail side="left" />
+        <div className={`mx-auto grid max-w-[1680px] gap-8 ${showAdCampaign ? "2xl:grid-cols-[minmax(0,1fr)_240px]" : ""}`}>
           <div className="min-w-0">
             {loading ? (
               <div className="flex items-center justify-center py-40 text-outline">
@@ -398,7 +401,7 @@ export default function LibraryPage() {
               </>
             )}
           </div>
-          <AdRail side="right" />
+          {showAdCampaign && adCampaign && <LibraryAdCard campaign={adCampaign} />}
         </div>
       </section>
     </>

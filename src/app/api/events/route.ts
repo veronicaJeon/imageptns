@@ -10,6 +10,8 @@ const EVENT_TYPES = new Set([
   "cart_add",
   "checkout_started",
   "download",
+  "ad_impression",
+  "ad_click",
 ]);
 
 function ipHash(req: NextRequest) {

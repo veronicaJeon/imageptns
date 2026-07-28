@@ -57,6 +57,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { href: "/admin/notices", icon: "campaign", label: "공지사항" },
       { href: "/admin/library-guidance", icon: "format_quote", label: "안내글 관리" },
+      { href: "/admin/library-ads", icon: "ads_click", label: "광고·제휴 관리" },
       { href: "/admin/about-page", icon: "apartment", label: "회사소개관리" },
     ],
   },
