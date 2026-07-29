@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resizeWatermarkedPreview } from "@/lib/utils/watermark";
+import {
+  consumeDistributedRateLimit,
+  requestIdentity,
+} from "@/lib/security/distributed-rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -7,6 +11,7 @@ export const maxDuration = 30;
 const DEFAULT_WIDTH = 320;
 const DEFAULT_HEIGHT = 240;
 const MAX_SIZE = 1200;
+const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 
 function clampSize(value: string | null, fallback: number) {
   const parsed = Number(value);
@@ -31,6 +36,22 @@ function isAllowedPreviewUrl(src: string) {
 }
 
 export async function GET(req: NextRequest) {
+  const rate = await consumeDistributedRateLimit({
+    scope: "thumbnail",
+    identity: requestIdentity(req.headers),
+    limit: 300,
+    windowSeconds: 60,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: rate.unavailable ? "Thumbnail service temporarily unavailable" : "Too many thumbnail requests" },
+      {
+        status: rate.unavailable ? 503 : 429,
+        headers: { "Retry-After": String(rate.retryAfterSeconds) },
+      },
+    );
+  }
+
   const src = req.nextUrl.searchParams.get("src");
   if (!src || !isAllowedPreviewUrl(src)) {
     return NextResponse.json({ error: "Invalid thumbnail source" }, { status: 400 });
@@ -43,8 +64,15 @@ export async function GET(req: NextRequest) {
   if (!response.ok) {
     return NextResponse.json({ error: "Preview image not found" }, { status: response.status });
   }
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_SOURCE_BYTES) {
+    return NextResponse.json({ error: "Preview image is too large" }, { status: 413 });
+  }
 
   const input = Buffer.from(await response.arrayBuffer());
+  if (input.length > MAX_SOURCE_BYTES) {
+    return NextResponse.json({ error: "Preview image is too large" }, { status: 413 });
+  }
   const output = await resizeWatermarkedPreview(input, width, height);
 
   return new NextResponse(new Uint8Array(output), {

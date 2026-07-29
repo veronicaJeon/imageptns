@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { buildSiteUrl } from "@/lib/routing/canonical";
-import { checkRateLimit, requestIp } from "@/lib/security/rate-limit";
+import {
+  consumeDistributedRateLimit,
+  requestIdentity,
+} from "@/lib/security/distributed-rate-limit";
+import { readBoundedJson, RequestBodyError } from "@/lib/security/request-body";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   decideSignupFlow,
@@ -39,23 +43,34 @@ function badRequest(message: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const rate = checkRateLimit({
-    key: `auth-signup:${requestIp(req.headers)}`,
+  const rate = await consumeDistributedRateLimit({
+    scope: "auth-signup",
+    identity: requestIdentity(req.headers),
     limit: 10,
-    windowMs: 60 * 60 * 1000,
+    windowSeconds: 60 * 60,
   });
   if (!rate.allowed) {
     return NextResponse.json(
-      { error: "가입 요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
-      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+      {
+        error: rate.unavailable
+          ? "가입 서비스를 잠시 사용할 수 없습니다. 잠시 후 다시 시도해주세요."
+          : "가입 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+      },
+      {
+        status: rate.unavailable ? 503 : 429,
+        headers: { "Retry-After": String(rate.retryAfterSeconds) },
+      },
     );
   }
 
   let body: unknown;
   try {
-    body = await req.json();
-  } catch {
-    return badRequest("요청 형식이 올바르지 않습니다.");
+    body = await readBoundedJson(req, 32 * 1024);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "요청 형식이 올바르지 않습니다." },
+      { status: error instanceof RequestBodyError ? error.status : 400 },
+    );
   }
 
   if (!body || typeof body !== "object") {

@@ -3,26 +3,37 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizeContactSubmissionInput } from "@/lib/contact/request-fields";
 import { sendContactEmails } from "@/lib/email/contact";
 import { notifyOpsContact, safeEmailErrorDetails, sendContactConfirmation } from "@/lib/email/gmail";
-import { checkRateLimit, requestIp } from "@/lib/security/rate-limit";
+import {
+  consumeDistributedRateLimit,
+  requestIdentity,
+} from "@/lib/security/distributed-rate-limit";
+import { readBoundedJson, RequestBodyError } from "@/lib/security/request-body";
 
 export async function POST(req: NextRequest) {
-  const rate = checkRateLimit({
-    key: `contact:${requestIp(req.headers)}`,
+  const rate = await consumeDistributedRateLimit({
+    scope: "contact",
+    identity: requestIdentity(req.headers),
     limit: 5,
-    windowMs: 60 * 60 * 1000,
+    windowSeconds: 60 * 60,
   });
   if (!rate.allowed) {
     return NextResponse.json(
-      { error: "Too many contact requests" },
-      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+      { error: rate.unavailable ? "Contact service temporarily unavailable" : "Too many contact requests" },
+      {
+        status: rate.unavailable ? 503 : 429,
+        headers: { "Retry-After": String(rate.retryAfterSeconds) },
+      },
     );
   }
 
   let body: unknown;
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    body = await readBoundedJson(req, 64 * 1024);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Invalid contact request" },
+      { status: error instanceof RequestBodyError ? error.status : 400 },
+    );
   }
 
   let submission;

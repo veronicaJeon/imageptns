@@ -1,5 +1,6 @@
 import { escapeHtml } from "./html";
 import type { PhotoRequestInviteEmailPayload } from "./contact";
+import { buildSiteUrl } from "../routing/canonical";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Override via env vars in Vercel dashboard; defaults kept for local dev reference
@@ -14,8 +15,7 @@ interface EmailPayload {
 
 async function sendEmail(payload: EmailPayload): Promise<void> {
   if (!RESEND_API_KEY) {
-    console.warn("[resend] RESEND_API_KEY not set — email skipped");
-    return;
+    throw new Error("RESEND_API_KEY is not configured");
   }
 
   const res = await fetch("https://api.resend.com/emails", {
@@ -32,6 +32,22 @@ async function sendEmail(payload: EmailPayload): Promise<void> {
     console.error("[resend] send failed", err);
     throw new Error("Resend email delivery failed");
   }
+}
+
+function emailDomain(value: string) {
+  const address = value.match(/<([^>]+)>/)?.[1] ?? value;
+  return address.split("@")[1]?.trim().toLowerCase() ?? null;
+}
+
+export function resendRuntimeConfiguration() {
+  return {
+    apiKeyConfigured: Boolean(process.env.RESEND_API_KEY),
+    fromConfigured: Boolean(process.env.RESEND_FROM_EMAIL),
+    opsConfigured: Boolean(process.env.OPS_EMAIL),
+    fromDomain: emailDomain(FROM_EMAIL),
+    opsDomain: emailDomain(OPS_EMAIL),
+    usingResendTestSender: emailDomain(FROM_EMAIL) === "resend.dev",
+  };
 }
 
 export async function sendContactConfirmation(opts: {
@@ -88,15 +104,19 @@ export async function notifyOpsNewUpload(opts: {
   imageTitle:        string;
   imageId:           string;
 }) {
+  const photographerEmail = escapeHtml(opts.photographerEmail);
+  const photographerName = escapeHtml(opts.photographerName);
+  const imageTitle = escapeHtml(opts.imageTitle);
+  const imageId = escapeHtml(opts.imageId);
   await sendEmail({
     to:      OPS_EMAIL,
     subject: `[새 업로드] ${opts.imageTitle} — ${opts.photographerName}`,
     html: `
       <p>새 이미지가 심사 대기 중입니다.</p>
-      <p><strong>제목:</strong> ${opts.imageTitle}</p>
-      <p><strong>사진작가:</strong> ${opts.photographerName} (${opts.photographerEmail})</p>
-      <p><strong>이미지 ID:</strong> ${opts.imageId}</p>
-      <p><a href="https://imageptns.vercel.app/admin/images">관리자 페이지에서 검토하기 →</a></p>
+      <p><strong>제목:</strong> ${imageTitle}</p>
+      <p><strong>사진작가:</strong> ${photographerName} (${photographerEmail})</p>
+      <p><strong>이미지 ID:</strong> ${imageId}</p>
+      <p><a href="${buildSiteUrl("/admin/images")}">관리자 페이지에서 검토하기 →</a></p>
     `,
   });
 }
@@ -107,14 +127,17 @@ export async function sendImageApproved(opts: {
   imageTitle:        string;
   assetId:           string;
 }) {
+  const photographerName = escapeHtml(opts.photographerName);
+  const imageTitle = escapeHtml(opts.imageTitle);
+  const assetId = escapeHtml(opts.assetId);
   await sendEmail({
     to:      opts.photographerEmail,
     subject: `[Image Partners] 이미지가 승인되었습니다 — ${opts.imageTitle}`,
     html: `
-      <p>${opts.photographerName}님, 안녕하세요.</p>
+      <p>${photographerName}님, 안녕하세요.</p>
       <p>제출하신 이미지가 검토를 통과하여 라이브러리에 게시되었습니다.</p>
-      <p><strong>이미지:</strong> ${opts.imageTitle}</p>
-      <p><strong>에셋 ID:</strong> ${opts.assetId}</p>
+      <p><strong>이미지:</strong> ${imageTitle}</p>
+      <p><strong>에셋 ID:</strong> ${assetId}</p>
       <p>바이어들이 이미지를 검색하고 라이선스를 구매할 수 있습니다.</p>
       <br><p>Image Partners 팀 드림</p>
     `,
@@ -127,12 +150,14 @@ export async function sendPayoutApproved(opts: {
   period:            string;
   netKrw:            number;
 }) {
+  const photographerName = escapeHtml(opts.photographerName);
+  const period = escapeHtml(opts.period);
   await sendEmail({
     to:      opts.photographerEmail,
     subject: `[Image Partners] 정산이 완료되었습니다 — ${opts.period}`,
     html: `
-      <p>${opts.photographerName}님, 안녕하세요.</p>
-      <p>${opts.period} 기간의 정산이 처리되어 지급되었습니다.</p>
+      <p>${photographerName}님, 안녕하세요.</p>
+      <p>${period} 기간의 정산이 처리되어 지급되었습니다.</p>
       <p><strong>지급 금액:</strong> ₩${opts.netKrw.toLocaleString("ko-KR")}</p>
       <p>수익 장부에서 상세 내역을 확인하실 수 있습니다.</p>
       <br><p>Image Partners 팀 드림</p>
@@ -147,14 +172,17 @@ export async function sendPayoutRejected(opts: {
   netKrw:            number;
   note?:             string;
 }) {
+  const photographerName = escapeHtml(opts.photographerName);
+  const period = escapeHtml(opts.period);
+  const note = opts.note ? escapeHtml(opts.note) : null;
   await sendEmail({
     to:      opts.photographerEmail,
     subject: `[Image Partners] 정산 처리 안내 — ${opts.period}`,
     html: `
-      <p>${opts.photographerName}님, 안녕하세요.</p>
-      <p>${opts.period} 기간의 정산 요청이 아래 사유로 처리되지 않았습니다.</p>
+      <p>${photographerName}님, 안녕하세요.</p>
+      <p>${period} 기간의 정산 요청이 아래 사유로 처리되지 않았습니다.</p>
       <p><strong>신청 금액:</strong> ₩${opts.netKrw.toLocaleString("ko-KR")}</p>
-      ${opts.note ? `<p><strong>사유:</strong> ${opts.note}</p>` : ""}
+      ${note ? `<p><strong>사유:</strong> ${note}</p>` : ""}
       <p>문의 사항은 ${OPS_EMAIL}으로 연락해 주세요.</p>
       <br><p>Image Partners 팀 드림</p>
     `,
@@ -168,15 +196,19 @@ export async function sendImageRejected(opts: {
   assetId:           string;
   reason:            string;
 }) {
+  const photographerName = escapeHtml(opts.photographerName);
+  const imageTitle = escapeHtml(opts.imageTitle);
+  const assetId = escapeHtml(opts.assetId);
+  const reason = escapeHtml(opts.reason);
   await sendEmail({
     to:      opts.photographerEmail,
     subject: `[Image Partners] 이미지 검토 결과 안내 — ${opts.imageTitle}`,
     html: `
-      <p>${opts.photographerName}님, 안녕하세요.</p>
+      <p>${photographerName}님, 안녕하세요.</p>
       <p>제출하신 이미지가 아래 사유로 승인되지 않았습니다.</p>
-      <p><strong>이미지:</strong> ${opts.imageTitle}</p>
-      <p><strong>에셋 ID:</strong> ${opts.assetId}</p>
-      <p><strong>반려 사유:</strong> ${opts.reason}</p>
+      <p><strong>이미지:</strong> ${imageTitle}</p>
+      <p><strong>에셋 ID:</strong> ${assetId}</p>
+      <p><strong>반려 사유:</strong> ${reason}</p>
       <p>수정 후 다시 제출해 주시면 재검토 해드리겠습니다.</p>
       <br><p>Image Partners 팀 드림</p>
     `,
@@ -195,7 +227,7 @@ export async function sendPhotographerApplicationApproved(opts: {
     html: `
       <p>${photographerName}님, 안녕하세요.</p>
       <p>사진가 신청이 승인되었습니다. 이제 이미지 업로드, 운영팀 요청, 판매 정산 기능을 사용할 수 있습니다.</p>
-      <p><a href="https://imageptns.vercel.app/dashboard/uploads">대시보드에서 업로드 시작하기 →</a></p>
+      <p><a href="${buildSiteUrl("/dashboard/uploads")}">대시보드에서 업로드 시작하기 →</a></p>
       <br><p>Image Partners 팀 드림</p>
     `,
   });

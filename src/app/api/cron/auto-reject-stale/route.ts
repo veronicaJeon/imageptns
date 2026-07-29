@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendImageRejected } from "@/lib/email/resend";
 import { authorizeCronRequest } from "@/lib/security/cron";
+import { uploadPathBelongsToUser } from "@/lib/uploads/security";
 
 export const maxDuration = 60;
 
@@ -21,17 +22,73 @@ async function runRetentionCleanup(admin: ReturnType<typeof createAdminClient>) 
   return { ok: true as const, result: data };
 }
 
+async function purgeExpiredUploadSessions(admin: ReturnType<typeof createAdminClient>) {
+  const { data, error } = await admin
+    .from("upload_sessions")
+    .select("id, user_id, storage_path")
+    .in("status", ["pending", "processing", "failed"])
+    .lt("expires_at", new Date().toISOString())
+    .limit(1_000);
+
+  if (error) {
+    console.error("[auto-reject-stale] upload session cleanup query failed:", error.message);
+    return { ok: false as const };
+  }
+
+  const rows = (data ?? []).filter((row) => uploadPathBelongsToUser(row.storage_path, row.user_id));
+  const originalPaths = rows.map((row) => row.storage_path);
+  const previewPaths = rows.flatMap((row) => [row.storage_path, `thumbs/${row.storage_path}`]);
+
+  for (let index = 0; index < originalPaths.length; index += 100) {
+    const { error: storageError } = await admin.storage
+      .from("images-original")
+      .remove(originalPaths.slice(index, index + 100));
+    if (storageError) {
+      console.error("[auto-reject-stale] expired original cleanup failed:", storageError.message);
+      return { ok: false as const };
+    }
+  }
+  for (let index = 0; index < previewPaths.length; index += 100) {
+    const { error: storageError } = await admin.storage
+      .from("images-preview")
+      .remove(previewPaths.slice(index, index + 100));
+    if (storageError) {
+      console.error("[auto-reject-stale] expired preview cleanup failed:", storageError.message);
+      return { ok: false as const };
+    }
+  }
+
+  const ids = rows.map((row) => row.id);
+  if (ids.length > 0) {
+    const { error: updateError } = await admin
+      .from("upload_sessions")
+      .update({ status: "expired", updated_at: new Date().toISOString() })
+      .in("id", ids);
+    if (updateError) {
+      console.error("[auto-reject-stale] upload session cleanup update failed:", updateError.message);
+      return { ok: false as const };
+    }
+  }
+
+  return { ok: true as const, expired: ids.length };
+}
+
 async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient>) {
-  const [retention, monitoringRetention, rejectedImageRetention] = await Promise.all([
+  const [retention, monitoringRetention, rejectedImageRetention, rateLimitRetention, uploadSessionRetention] = await Promise.all([
     runRetentionCleanup(admin),
     admin.rpc("purge_old_operational_events"),
     admin.rpc("archive_expired_rejected_images"),
+    admin.rpc("purge_expired_api_rate_limits"),
+    purgeExpiredUploadSessions(admin),
   ]);
   if (monitoringRetention.error) {
     console.error("[auto-reject-stale] monitoring retention failed:", monitoringRetention.error.message);
   }
   if (rejectedImageRetention.error) {
     console.error("[auto-reject-stale] rejected image retention failed:", rejectedImageRetention.error.message);
+  }
+  if (rateLimitRetention.error) {
+    console.error("[auto-reject-stale] rate limit retention failed:", rateLimitRetention.error.message);
   }
   return {
     retention,
@@ -41,6 +98,10 @@ async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient
     rejectedImageRetention: rejectedImageRetention.error
       ? { ok: false as const }
       : { ok: true as const, archived: rejectedImageRetention.data ?? 0 },
+    rateLimitRetention: rateLimitRetention.error
+      ? { ok: false as const }
+      : { ok: true as const, deleted: rateLimitRetention.data ?? 0 },
+    uploadSessionRetention,
   };
 }
 

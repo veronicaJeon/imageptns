@@ -14,9 +14,12 @@ const PLAN_SLUGS: Record<number, string> = {
 };
 
 /** Toss JS SDK 동적 로드 (window.TossPayments 노출) */
-function useTossSDK() {
+const SUBSCRIPTIONS_ENABLED = process.env.NEXT_PUBLIC_COMMERCE_ENABLED === "true";
+
+function useTossSDK(enabled: boolean) {
   const loaded = useRef(false);
   useEffect(() => {
+    if (!enabled) return;
     if (loaded.current || typeof window === "undefined") return;
     if ((window as Window & { TossPayments?: unknown }).TossPayments) {
       loaded.current = true;
@@ -30,24 +33,25 @@ function useTossSDK() {
     return () => {
       // script 태그는 제거하지 않음 — 전역 SDK 공유
     };
-  }, []);
+  }, [enabled]);
 }
 
 export default function PricingPage() {
-  const { t } = useLang();
+  const { lang, t } = useLang();
   const p = t.pricing;
   const router = useRouter();
   const { user, loading: authLoading, init } = useAuth();
   const [annual, setAnnual] = useState(false);
   const [subscribing, setSubscribing] = useState<number | null>(null);
 
-  useTossSDK();
+  useTossSDK(SUBSCRIPTIONS_ENABLED);
 
   useEffect(() => {
     init();
   }, [init]);
 
   async function handleSubscribe(planIndex: number) {
+    if (!SUBSCRIPTIONS_ENABLED) return;
     // 엔터프라이즈는 문의 화면으로 연결
     if (planIndex === 2) {
       router.push("/contact");
@@ -105,6 +109,53 @@ export default function PricingPage() {
     } finally {
       setSubscribing(null);
     }
+  }
+
+  if (!SUBSCRIPTIONS_ENABLED) {
+    const copy = lang === "ko"
+      ? {
+          eyebrow: "현재 운영 방식",
+          title: "이미지별 라이선스와 개별 견적으로 운영합니다.",
+          body: "정기 구독과 온라인 카드 결제는 아직 공개하지 않았습니다. 라이브러리에서 필요한 이미지를 선택하면 무료 라이선스는 즉시 확정되고, 유료 라이선스는 계좌이체 요청 후 입금 확인을 거쳐 원본 이용 권한이 열립니다.",
+          library: "라이브러리 보기",
+          contact: "견적·사용 문의",
+          note: "가격과 사용 범위는 이미지별 표시, 주문 확인서 또는 별도 견적을 기준으로 확정됩니다.",
+        }
+      : {
+          eyebrow: "Current purchasing",
+          title: "Licenses and quotes are handled per image.",
+          body: "Subscriptions and online card payments are not publicly available yet. Free licenses can be confirmed immediately; paid licenses use a bank-transfer request and open original-file access after deposit verification.",
+          library: "Browse library",
+          contact: "Request a quote",
+          note: "Final price and usage scope are confirmed by the image listing, order statement, or a separate quote.",
+        };
+
+    return (
+      <main className="min-h-[70vh] bg-surface px-6 pb-24 pt-36">
+        <section className="mx-auto max-w-3xl bg-surface-container-lowest p-8 shadow-ghost sm:p-12">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">{copy.eyebrow}</p>
+          <h1 className="mt-4 font-headline text-3xl font-extrabold tracking-tight text-on-surface sm:text-5xl">
+            {copy.title}
+          </h1>
+          <p className="mt-6 text-base leading-8 text-on-surface-variant">{copy.body}</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/library"
+              className="rounded bg-primary px-7 py-3.5 text-center text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90"
+            >
+              {copy.library}
+            </Link>
+            <Link
+              href="/contact"
+              className="rounded border border-outline-variant px-7 py-3.5 text-center text-xs font-bold uppercase tracking-widest text-on-surface transition-colors hover:bg-surface-container-low"
+            >
+              {copy.contact}
+            </Link>
+          </div>
+          <p className="mt-8 border-t border-outline-variant/30 pt-5 text-xs leading-6 text-outline">{copy.note}</p>
+        </section>
+      </main>
+    );
   }
 
   return (

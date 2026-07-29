@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { escapeHtml } from "./html";
+import { buildSiteUrl } from "../routing/canonical";
 
 // Set in Vercel env vars:
 //   GMAIL_SMTP_USER = imgptns@gmail.com
@@ -145,7 +146,7 @@ export async function sendSupportStatusUpdate(opts: {
   const isResolved = opts.status === "resolved";
   const statusLabel = isResolved ? "답변 완료" : "검토 중";
   const destination = opts.inquiryType === "photo_request" ? "/dashboard/sourcing" : "/contact";
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://imageptns.vercel.app").replace(/\/$/, "");
+  const destinationUrl = buildSiteUrl(destination);
   const transport = createTransport();
 
   await transport.sendMail({
@@ -156,7 +157,7 @@ export async function sendSupportStatusUpdate(opts: {
       <p>${name}님, 안녕하세요.</p>
       <p>문의 <strong>${subject}</strong>의 처리 상태가 <strong>${statusLabel}</strong>으로 변경되었습니다.</p>
       <p>${isResolved ? "답변 내용을 확인해 주세요." : "담당자가 내용을 확인하고 있습니다. 처리가 완료되면 다시 알려드리겠습니다."}</p>
-      <p><a href="${baseUrl}${destination}">Image Partners에서 확인하기 →</a></p>
+      <p><a href="${destinationUrl}">Image Partners에서 확인하기 →</a></p>
       <br><p>Image Partners 팀 드림</p>
     `,
   });

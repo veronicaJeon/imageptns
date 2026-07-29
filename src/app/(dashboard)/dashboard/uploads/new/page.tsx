@@ -50,7 +50,7 @@ const NEW_UPLOAD_COPY = {
     doneTitle: "업로드 완료!",
     doneBody: "선택한 이미지가 검토 대기 중입니다. 승인 후 라이브러리에 노출됩니다.",
     dropTitle: "파일을 드래그하거나 클릭하여 선택",
-    dropHelp: "여러장을 동시에 업로드 할 수 있습니다. 안정적인 업로드를 위해 1회 20장 이하까지 가능합니다. 한 이미지당 최대 500MB, JPEG로 업로드 해 주십시오.",
+    dropHelp: "여러장을 동시에 업로드 할 수 있습니다. 안정적인 업로드를 위해 1회 20장 이하까지 가능합니다. 한 이미지당 최대 100MB, JPEG로 업로드해 주십시오.",
     addMore: "사진 추가",
     queueTitle: "업로드 대기창",
     queueHelp: "1. 유사한 이미지들을 업로드 할 때는 대표 이미지에 정보를 모두 입력한 뒤, '현재 입력값 전체 적용'을 클릭합니다. 그러면 동일한 정보가 유사한 이미지들 전체에 적용됩니다.\n2. 그 이미지들 가운데 디테일한 정보의 차이가 있을 경우, 그 이미지를 클릭한 후 다른 정보를 입력하면 수정됩니다.\n3. 위와 같이 수정한 후 '선택 이미지 업로드'를 클릭하면 정확하게 업로드됩니다.",
@@ -135,7 +135,7 @@ const NEW_UPLOAD_COPY = {
     doneTitle: "Upload complete",
     doneBody: "Your selected images are pending review. They will appear in the library after approval.",
     dropTitle: "Drag files here or click to select",
-    dropHelp: "Upload multiple images at once. A maximum of 20 images is allowed per batch for reliability. Each JPEG may be up to 500MB.",
+    dropHelp: "Upload multiple images at once. A maximum of 20 images is allowed per batch for reliability. Each JPEG may be up to 100MB.",
     addMore: "Add photos",
     queueTitle: "Upload window",
     queueHelp: "1. For similar images, complete the representative image first, then select 'Apply current fields to all'.\n2. If an image has different details, select it and edit those fields individually.\n3. When the details are correct, select 'Upload selected images'.",
@@ -694,10 +694,18 @@ function NewUploadContent() {
     const presignRes = await fetch("/api/uploads/presign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: draft.file.name, contentType: draft.file.type }),
+      body: JSON.stringify({
+        filename: draft.file.name,
+        contentType: draft.file.type,
+        fileSize: draft.file.size,
+      }),
     });
     if (!presignRes.ok) throw new Error("Failed to get upload URL");
-    const { uploadUrl, storagePath } = await presignRes.json() as { uploadUrl: string; storagePath: string };
+    const { uploadUrl, storagePath, uploadSessionId } = await presignRes.json() as {
+      uploadUrl: string;
+      storagePath: string;
+      uploadSessionId: string;
+    };
 
     await uploadOriginalFile(draft, uploadUrl);
     updateDraft(draft.id, (current) => ({ ...current, uploadStatus: "saving", progress: 100 }));
@@ -721,6 +729,7 @@ function NewUploadContent() {
         category: draft.categoryCodes[0],
         category_codes: draft.categoryCodes,
         tags: tagList,
+        upload_session_id: uploadSessionId,
         storage_path_original: storagePath,
         file_size_mb: parseFloat((draft.file.size / 1024 / 1024).toFixed(2)),
         file_format: fileFormat(draft.file),

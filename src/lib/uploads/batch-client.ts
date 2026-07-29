@@ -1,6 +1,6 @@
 export const ACCEPTED_UPLOAD_TYPES = ["image/jpeg"] as const;
 export const MAX_UPLOAD_BATCH_FILES = 20;
-export const MAX_UPLOAD_SIZE_MB = 500;
+export const MAX_UPLOAD_SIZE_MB = 100;
 
 export type UploadFileRejectionReason = "unsupported-type" | "too-large";
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCommerceEnabled } from "@/lib/commerce/availability";
 
 export const dynamic = "force-static";
 
@@ -9,5 +10,8 @@ const PLANS = [
 ] as const;
 
 export function GET() {
+  if (!isCommerceEnabled()) {
+    return NextResponse.json({ error: "Subscription plans are not available yet" }, { status: 503 });
+  }
   return NextResponse.json({ plans: PLANS });
 }
