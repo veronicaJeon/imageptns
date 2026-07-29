@@ -44,4 +44,63 @@ describe("Resend routing", () => {
       subject: "문의",
     })).rejects.toThrow("RESEND_API_KEY");
   });
+
+  it("reports an invalid provider key without attempting delivery", async () => {
+    vi.stubEnv("RESEND_API_KEY", "expired-key");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ message: "API key is invalid" }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { verifyResendProvider } = await import("./resend");
+    const result = await verifyResendProvider();
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "api_key_invalid",
+      providerStatus: 401,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires a verified sending and receiving domain plus inbound webhook", async () => {
+    vi.stubEnv("RESEND_API_KEY", "valid-key");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://www.imagepartners.kr");
+    vi.stubEnv("RESEND_FROM_EMAIL", "Image Partners <contact@imagepartners.kr>");
+    vi.stubEnv("RESEND_WEBHOOK_SECRET", "whsec_test");
+    vi.stubEnv("OPS_EMAIL", "imgptns@gmail.com");
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: [{
+          name: "imagepartners.kr",
+          status: "verified",
+          capabilities: { sending: "enabled", receiving: "enabled" },
+          records: [],
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: [{
+          endpoint: "https://www.imagepartners.kr/api/webhooks/resend-inbound",
+          status: "enabled",
+          events: ["email.received"],
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { verifyResendProvider } = await import("./resend");
+    const result = await verifyResendProvider();
+
+    expect(result).toMatchObject({
+      ok: true,
+      reason: null,
+      domain: {
+        name: "imagepartners.kr",
+        capabilities: { sending: "enabled", receiving: "enabled" },
+      },
+      inboundWebhook: {
+        endpoint: "https://www.imagepartners.kr/api/webhooks/resend-inbound",
+      },
+    });
+  });
 });

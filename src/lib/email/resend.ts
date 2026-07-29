@@ -14,6 +14,59 @@ interface EmailPayload {
   replyTo?: string;
 }
 
+interface ResendDomainRecord {
+  record?: string;
+  name?: string;
+  type?: string;
+  value?: string;
+  status?: string;
+}
+
+interface ResendDomain {
+  name: string;
+  status: string;
+  capabilities?: {
+    sending?: string;
+    receiving?: string;
+  };
+  records?: ResendDomainRecord[];
+}
+
+interface ResendWebhook {
+  endpoint: string;
+  status?: string;
+  events?: string[];
+}
+
+async function resendApiJson(path: string) {
+  if (!RESEND_API_KEY) {
+    return { ok: false as const, status: 0, data: null, reason: "api_key_not_set" as const };
+  }
+
+  try {
+    const response = await fetch(`https://api.resend.com${path}`, {
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}` },
+      signal: AbortSignal.timeout(8_000),
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => null);
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+      reason: response.ok
+        ? null
+        : response.status === 401
+          ? "api_key_invalid"
+          : response.status === 403
+            ? "api_key_permission_denied"
+            : "provider_error",
+    } as const;
+  } catch {
+    return { ok: false as const, status: 0, data: null, reason: "provider_unreachable" as const };
+  }
+}
+
 async function sendEmail(payload: EmailPayload): Promise<void> {
   if (!RESEND_API_KEY) {
     throw new Error("RESEND_API_KEY is not configured");
@@ -54,6 +107,86 @@ export function resendRuntimeConfiguration() {
     fromDomain: emailDomain(FROM_EMAIL),
     opsDomain: emailDomain(OPS_EMAIL),
     usingResendTestSender: emailDomain(FROM_EMAIL) === "resend.dev",
+  };
+}
+
+export async function verifyResendProvider() {
+  const configuration = resendRuntimeConfiguration();
+  if (!configuration.apiKeyConfigured) {
+    return {
+      ok: false as const,
+      reason: "api_key_not_set" as const,
+      configuration,
+      domain: null,
+      inboundWebhook: null,
+    };
+  }
+
+  const domainsResponse = await resendApiJson("/domains");
+  if (!domainsResponse.ok) {
+    return {
+      ok: false as const,
+      reason: domainsResponse.reason,
+      providerStatus: domainsResponse.status,
+      configuration,
+      domain: null,
+      inboundWebhook: null,
+    };
+  }
+
+  const domains = ((domainsResponse.data as { data?: ResendDomain[] } | null)?.data ?? []);
+  const domain = domains.find((candidate) => candidate.name.toLowerCase() === configuration.fromDomain) ?? null;
+  if (!domain) {
+    return {
+      ok: false as const,
+      reason: "sending_domain_missing" as const,
+      configuration,
+      domain: null,
+      inboundWebhook: null,
+    };
+  }
+
+  const webhooksResponse = await resendApiJson("/webhooks");
+  const webhooks = webhooksResponse.ok
+    ? ((webhooksResponse.data as { data?: ResendWebhook[] } | null)?.data ?? [])
+    : [];
+  const expectedEndpoint = buildSiteUrl("/api/webhooks/resend-inbound");
+  const inboundWebhook = webhooks.find((webhook) => (
+    webhook.endpoint === expectedEndpoint &&
+    webhook.events?.includes("email.received")
+  )) ?? null;
+  const domainVerified = domain.status === "verified";
+  const sendingEnabled = domain.capabilities?.sending === "enabled";
+  const receivingEnabled = domain.capabilities?.receiving === "enabled";
+  const webhookEnabled = inboundWebhook?.status !== "disabled" && Boolean(inboundWebhook);
+
+  return {
+    ok: domainVerified && sendingEnabled && receivingEnabled && webhookEnabled,
+    reason: !domainVerified
+      ? "sending_domain_not_verified"
+      : !sendingEnabled
+        ? "sending_not_enabled"
+        : !receivingEnabled
+          ? "receiving_not_enabled"
+          : !webhooksResponse.ok
+            ? webhooksResponse.reason
+            : !webhookEnabled
+              ? "inbound_webhook_missing"
+              : null,
+    configuration,
+    domain: {
+      name: domain.name,
+      status: domain.status,
+      capabilities: domain.capabilities ?? null,
+      records: domain.records ?? [],
+    },
+    inboundWebhook: inboundWebhook
+      ? {
+        endpoint: inboundWebhook.endpoint,
+        status: inboundWebhook.status ?? "enabled",
+        events: inboundWebhook.events ?? [],
+      }
+      : null,
   };
 }
 

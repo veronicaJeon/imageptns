@@ -29,6 +29,44 @@ interface OperationsPayload {
   events: OperationalEvent[];
 }
 
+interface EmailDiagnosticsPayload {
+  gmail: {
+    ok: boolean;
+    reason?: string;
+    error?: { code?: string; responseCode?: number; message?: string };
+  };
+  resend: {
+    ok: boolean;
+    reason: string | null;
+    providerStatus?: number;
+    configuration: {
+      apiKeyConfigured: boolean;
+      inboundWebhookConfigured: boolean;
+      fromConfigured: boolean;
+      opsConfigured: boolean;
+      fromDomain: string | null;
+      opsDomain: string | null;
+    };
+    domain: {
+      name: string;
+      status: string;
+      capabilities: { sending?: string; receiving?: string } | null;
+    } | null;
+    inboundWebhook: {
+      endpoint: string;
+      status: string;
+      events: string[];
+    } | null;
+  };
+  dns: {
+    mxConfigured: boolean;
+    sendingMxConfigured: boolean;
+    spfConfigured: boolean;
+    dkimConfigured: boolean;
+    dmarcConfigured: boolean;
+  };
+}
+
 const STATUS_STYLE = {
   ok: "bg-emerald-50 text-emerald-700",
   warning: "bg-amber-50 text-amber-700",
@@ -39,6 +77,8 @@ export default function OperationsPage() {
   const [payload, setPayload] = useState<OperationsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingAi, setCheckingAi] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const [emailDiagnostics, setEmailDiagnostics] = useState<EmailDiagnosticsPayload | null>(null);
   const [message, setMessage] = useState("");
 
   const load = useCallback(async () => {
@@ -56,6 +96,22 @@ export default function OperationsPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const checkEmail = useCallback(async () => {
+    setCheckingEmail(true);
+    try {
+      const response = await fetch("/api/admin/email/diagnostics", { cache: "no-store" });
+      const body = await response.json() as EmailDiagnosticsPayload & { error?: string };
+      if (!response.ok) throw new Error(body.error ?? "이메일 설정을 확인하지 못했습니다.");
+      setEmailDiagnostics(body);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "이메일 설정을 확인하지 못했습니다.");
+    } finally {
+      setCheckingEmail(false);
+    }
+  }, []);
+
+  useEffect(() => { void checkEmail(); }, [checkEmail]);
 
   async function checkAi() {
     setCheckingAi(true);
@@ -105,6 +161,78 @@ export default function OperationsPage() {
           </div>
         ))}
       </div>
+
+      <section className="mt-6 rounded-xl bg-surface-container-lowest p-5 shadow-ghost">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-on-surface">공식 이메일 진단</h2>
+            <p className="mt-1 text-xs text-outline">발송 자격증명, contact@ 수신 경로와 DNS 인증 상태를 확인합니다.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void checkEmail()}
+            disabled={checkingEmail}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-outline-variant px-3 text-xs font-bold text-on-surface disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-base">mark_email_read</span>
+            {checkingEmail ? "확인 중..." : "이메일 설정 재검사"}
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {[
+            {
+              label: "Resend 발송",
+              ok: emailDiagnostics?.resend.ok ?? false,
+              detail: emailDiagnostics?.resend.ok
+                ? "도메인과 API 정상"
+                : emailDiagnostics?.resend.reason ?? "확인 중",
+            },
+            {
+              label: "contact@ 수신",
+              ok: Boolean(
+                emailDiagnostics?.resend.inboundWebhook &&
+                emailDiagnostics?.resend.domain?.capabilities?.receiving === "enabled",
+              ),
+              detail: emailDiagnostics?.resend.inboundWebhook ? "수신 웹훅 연결됨" : "수신 웹훅 또는 도메인 미설정",
+            },
+            {
+              label: "Gmail 비상 SMTP",
+              ok: emailDiagnostics?.gmail.ok ?? false,
+              detail: emailDiagnostics?.gmail.ok
+                ? "연결 정상"
+                : emailDiagnostics?.gmail.error?.code ?? emailDiagnostics?.gmail.reason ?? "확인 중",
+            },
+          ].map((item) => (
+            <div key={item.label} className="rounded-lg bg-surface-container-low p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold text-on-surface">{item.label}</p>
+                <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${item.ok ? STATUS_STYLE.ok : STATUS_STYLE.error}`}>
+                  {item.ok ? "정상" : "조치 필요"}
+                </span>
+              </div>
+              <p className="mt-2 break-all text-[11px] text-outline">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+          {[
+            ["수신 MX", emailDiagnostics?.dns.mxConfigured],
+            ["발송 MX", emailDiagnostics?.dns.sendingMxConfigured],
+            ["SPF", emailDiagnostics?.dns.spfConfigured],
+            ["DKIM", emailDiagnostics?.dns.dkimConfigured],
+            ["DMARC", emailDiagnostics?.dns.dmarcConfigured],
+            ["발신주소 환경값", emailDiagnostics?.resend.configuration.fromConfigured],
+            ["운영수신함 환경값", emailDiagnostics?.resend.configuration.opsConfigured],
+            ["웹훅 비밀키", emailDiagnostics?.resend.configuration.inboundWebhookConfigured],
+          ].map(([label, ok]) => (
+            <span key={String(label)} className={`rounded-full px-2.5 py-1 font-bold ${ok ? STATUS_STYLE.ok : STATUS_STYLE.warning}`}>
+              {String(label)} {ok ? "확인" : "미설정"}
+            </span>
+          ))}
+        </div>
+      </section>
 
       <div className="mt-6 rounded-xl bg-surface-container-lowest shadow-ghost">
         <div className="border-b border-outline-variant/30 px-5 py-4">
