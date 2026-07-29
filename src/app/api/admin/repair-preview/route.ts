@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { applyWatermark, createWatermarkedThumbnail } from "@/lib/utils/watermark";
 import { storageBinaryBody } from "@/lib/supabase/storage-body";
+import { authorizeCronRequest } from "@/lib/security/cron";
+import { forbidden, requireAdminUser } from "@/lib/admin/auth";
+import { recordOperationalEvent } from "@/lib/monitoring/events";
 
 export const maxDuration = 60;
 
@@ -12,13 +15,19 @@ interface RepairPreviewImageRow {
 }
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get("x-admin-secret");
-  if (secret !== process.env.ADMIN_SECRET) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const legacySecret = process.env.ADMIN_SECRET;
+  const hasLegacySecret = Boolean(legacySecret)
+    && req.headers.get("x-admin-secret") === legacySecret;
+  const maintenanceAuthorization = authorizeCronRequest(req.headers);
+  const adminUser = await requireAdminUser();
+  if (!adminUser && !hasLegacySecret && !maintenanceAuthorization.authorized) {
+    return forbidden();
   }
 
-  const { image_id } = await req.json();
-  if (!image_id) return NextResponse.json({ error: "image_id required" }, { status: 400 });
+  const { image_id } = await req.json().catch(() => ({ image_id: null }));
+  if (typeof image_id !== "string" || !/^[0-9a-f-]{36}$/i.test(image_id)) {
+    return NextResponse.json({ error: "Valid image_id required" }, { status: 400 });
+  }
 
   const admin = createAdminClient();
 
@@ -65,6 +74,18 @@ export async function POST(req: NextRequest) {
   if (thumbUploadErr) {
     return NextResponse.json({ error: `Thumbnail upload failed: ${thumbUploadErr.message}` }, { status: 500 });
   }
+
+  await recordOperationalEvent({
+    eventType: "image_preview_repaired",
+    component: "storage",
+    status: "ok",
+    route: "/api/admin/repair-preview",
+    statusCode: 200,
+    metadata: {
+      imageId: image_id,
+      actor: adminUser ? "admin" : "maintenance",
+    },
+  });
 
   return NextResponse.json({ ok: true, repaired: image_id });
 }
