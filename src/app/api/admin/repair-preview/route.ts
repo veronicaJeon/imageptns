@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { applyWatermark, createWatermarkedThumbnail } from "@/lib/utils/watermark";
+import { storageBinaryBody } from "@/lib/supabase/storage-body";
 
 export const maxDuration = 60;
 
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   const { error: uploadErr } = await admin.storage
     .from("images-preview")
-    .upload(originalPath, watermarked, { contentType: "image/jpeg", upsert: true });
+    .upload(originalPath, storageBinaryBody(watermarked), { contentType: "image/jpeg", upsert: true });
 
   if (uploadErr) {
     return NextResponse.json({ error: `Preview upload failed: ${uploadErr.message}` }, { status: 500 });
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   const { error: thumbUploadErr } = await admin.storage
     .from("images-preview")
-    .upload(`thumbs/${originalPath}`, thumbnail, { contentType: "image/jpeg", upsert: true });
+    .upload(`thumbs/${originalPath}`, storageBinaryBody(thumbnail), { contentType: "image/jpeg", upsert: true });
 
   if (thumbUploadErr) {
     return NextResponse.json({ error: `Thumbnail upload failed: ${thumbUploadErr.message}` }, { status: 500 });

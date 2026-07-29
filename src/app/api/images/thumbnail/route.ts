@@ -4,6 +4,7 @@ import {
   consumeDistributedRateLimit,
   requestIdentity,
 } from "@/lib/security/distributed-rate-limit";
+import { recordOperationalEvent } from "@/lib/monitoring/events";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -35,7 +36,33 @@ function isAllowedPreviewUrl(src: string) {
   }
 }
 
+function unavailableThumbnail(width: number, height: number) {
+  const left = Math.round(width * 0.25);
+  const top = Math.round(height * 0.22);
+  const boxWidth = Math.round(width * 0.5);
+  const boxHeight = Math.round(height * 0.56);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <rect width="100%" height="100%" fill="#ecebea"/>
+    <g fill="none" stroke="#77716d" stroke-width="2" opacity=".75">
+      <rect x="${left}" y="${top}" width="${boxWidth}" height="${boxHeight}" rx="8"/>
+      <circle cx="42%" cy="40%" r="6"/>
+      <polyline points="${Math.round(width * 0.28)},${Math.round(height * 0.70)} ${Math.round(width * 0.43)},${Math.round(height * 0.54)} ${Math.round(width * 0.54)},${Math.round(height * 0.64)} ${Math.round(width * 0.64)},${Math.round(height * 0.52)} ${Math.round(width * 0.72)},${Math.round(height * 0.61)}"/>
+    </g>
+    <text x="50%" y="88%" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#77716d">IMAGE PARTNERS</text>
+  </svg>`;
+  return new NextResponse(svg, {
+    status: 200,
+    headers: {
+      "Content-Type": "image/svg+xml; charset=utf-8",
+      "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+      "X-ImagePartners-Fallback": "invalid-preview",
+    },
+  });
+}
+
 export async function GET(req: NextRequest) {
+  const startedAt = Date.now();
   const rate = await consumeDistributedRateLimit({
     scope: "thumbnail",
     identity: requestIdentity(req.headers),
@@ -60,9 +87,23 @@ export async function GET(req: NextRequest) {
   const width = clampSize(req.nextUrl.searchParams.get("w"), DEFAULT_WIDTH);
   const height = clampSize(req.nextUrl.searchParams.get("h"), DEFAULT_HEIGHT);
 
-  const response = await fetch(src, { next: { revalidate: 60 * 60 * 24 * 30 } });
+  const response = await fetch(src, { cache: "no-store" });
   if (!response.ok) {
     return NextResponse.json({ error: "Preview image not found" }, { status: response.status });
+  }
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!contentType.startsWith("image/")) {
+    await recordOperationalEvent({
+      eventType: "thumbnail_invalid_preview",
+      component: "storage",
+      status: "warning",
+      route: "/api/images/thumbnail",
+      statusCode: 200,
+      durationMs: Date.now() - startedAt,
+      errorCode: "invalid_content_type",
+      metadata: { contentType: contentType.slice(0, 100) || "missing" },
+    });
+    return unavailableThumbnail(width, height);
   }
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_SOURCE_BYTES) {
@@ -73,7 +114,24 @@ export async function GET(req: NextRequest) {
   if (input.length > MAX_SOURCE_BYTES) {
     return NextResponse.json({ error: "Preview image is too large" }, { status: 413 });
   }
-  const output = await resizeWatermarkedPreview(input, width, height);
+  let output: Buffer;
+  try {
+    output = await resizeWatermarkedPreview(input, width, height);
+  } catch (error) {
+    console.warn("[thumbnail] Invalid stored preview", error instanceof Error ? error.message : error);
+    await recordOperationalEvent({
+      eventType: "thumbnail_invalid_preview",
+      component: "storage",
+      status: "warning",
+      route: "/api/images/thumbnail",
+      statusCode: 200,
+      durationMs: Date.now() - startedAt,
+      errorCode: "unsupported_image",
+      message: error instanceof Error ? error.message : String(error),
+      metadata: { sourceBytes: input.length },
+    });
+    return unavailableThumbnail(width, height);
+  }
 
   return new NextResponse(new Uint8Array(output), {
     headers: {

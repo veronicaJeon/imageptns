@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordOperationalEvent } from "@/lib/monitoring/events";
+import { previewUrl } from "@/lib/supabase/storage";
+import { hasJpegSignature } from "@/lib/supabase/storage-body";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +30,7 @@ async function timedCheck(check: () => Promise<{ error: { message: string } | nu
 export async function GET() {
   const startedAt = Date.now();
   const admin = createAdminClient();
-  const [database, storage, latestAiResult] = await Promise.all([
+  const [database, storage, previewIntegrity, latestAiResult] = await Promise.all([
     timedCheck(async () => {
       const result = await admin.from("platform_commerce_settings").select("id").eq("id", true).maybeSingle();
       return { error: result.error };
@@ -36,6 +38,33 @@ export async function GET() {
     timedCheck(async () => {
       const result = await admin.storage.from("images-preview").list("", { limit: 1 });
       return { error: result.error };
+    }),
+    timedCheck(async () => {
+      const { data, error } = await admin
+        .from("images")
+        .select("storage_path_preview")
+        .eq("status", "approved")
+        .eq("lifecycle_status", "active")
+        .eq("is_published", true)
+        .not("storage_path_preview", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(3);
+      if (error) return { error };
+
+      for (const image of data ?? []) {
+        const path = image.storage_path_preview;
+        if (!path) continue;
+        const response = await fetch(previewUrl(`thumbs/${path}`), {
+          cache: "no-store",
+          headers: { Range: "bytes=0-15" },
+        });
+        if (!response.ok) return { error: new Error(`Preview returned ${response.status}`) };
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (!hasJpegSignature(bytes)) {
+          return { error: new Error("Preview JPEG signature is invalid") };
+        }
+      }
+      return { error: null };
     }),
     admin
       .from("operational_events")
@@ -54,7 +83,9 @@ export async function GET() {
       ? { status: "stale" as const, checkedAt: latestAi.created_at, latencyMs: latestAi.duration_ms }
       : { status: latestAi.status === "ok" ? "ok" as const : "error" as const, checkedAt: latestAi.created_at, latencyMs: latestAi.duration_ms };
 
-  const coreHealthy = database.status === "ok" && storage.status === "ok";
+  const coreHealthy = database.status === "ok"
+    && storage.status === "ok"
+    && previewIntegrity.status === "ok";
   const degraded = !coreHealthy || ai.status === "error" || ai.status === "stale";
   const durationMs = Date.now() - startedAt;
 
@@ -68,6 +99,7 @@ export async function GET() {
     metadata: {
       database: database.status,
       storage: storage.status,
+      previewIntegrity: previewIntegrity.status,
       ai: ai.status,
     },
   });
@@ -75,7 +107,7 @@ export async function GET() {
   return NextResponse.json(
     {
       status: degraded ? "degraded" : "ok",
-      checks: { database, storage, ai },
+      checks: { database, storage, previewIntegrity, ai },
       durationMs,
       timestamp: new Date().toISOString(),
     },
@@ -83,7 +115,7 @@ export async function GET() {
       status: coreHealthy ? 200 : 503,
       headers: {
         "Cache-Control": "no-store",
-        "Server-Timing": `total;dur=${durationMs}, db;dur=${database.latencyMs}, storage;dur=${storage.latencyMs}`,
+        "Server-Timing": `total;dur=${durationMs}, db;dur=${database.latencyMs}, storage;dur=${storage.latencyMs}, preview;dur=${previewIntegrity.latencyMs}`,
       },
     },
   );

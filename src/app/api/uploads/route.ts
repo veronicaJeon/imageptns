@@ -23,6 +23,7 @@ import {
 } from "@/lib/uploads/security";
 import { readBoundedJson, RequestBodyError } from "@/lib/security/request-body";
 import { ownerUploadBucket } from "@/lib/images/state-visibility";
+import { storageBinaryBody } from "@/lib/supabase/storage-body";
 
 export const maxDuration = 60;
 
@@ -232,11 +233,11 @@ export async function POST(req: NextRequest) {
 
     const { error: previewError } = await admin.storage
       .from("images-preview")
-      .upload(storage_path_original, watermarked, { contentType: "image/jpeg", upsert: true });
+      .upload(storage_path_original, storageBinaryBody(watermarked), { contentType: "image/jpeg", upsert: true });
     if (previewError) throw previewError;
     const { error: thumbnailError } = await admin.storage
       .from("images-preview")
-      .upload(`thumbs/${storage_path_original}`, thumbnail, { contentType: "image/jpeg", upsert: true });
+      .upload(`thumbs/${storage_path_original}`, storageBinaryBody(thumbnail), { contentType: "image/jpeg", upsert: true });
     if (thumbnailError) throw thumbnailError;
 
     const { data, error } = await supabase

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import sharp from "sharp";
+import { storageBinaryBody } from "@/lib/supabase/storage-body";
 import {
   DEFAULT_ABOUT_PAGE_CONTENT,
   normalizeAboutPageContent,
@@ -102,7 +103,7 @@ export async function createAboutLibraryAsset(
 
   const { error: uploadError } = await admin.storage
     .from("site-assets")
-    .upload(derivedPath, derivative, {
+    .upload(derivedPath, storageBinaryBody(derivative), {
       contentType: "image/webp",
       cacheControl: "31536000",
       upsert: true,

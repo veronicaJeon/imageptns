@@ -30,7 +30,8 @@ jobs:
           const payload = JSON.parse(fs.readFileSync(file, "utf8"));
           const coreHealthy = code === "200"
             && payload?.checks?.database?.status === "ok"
-            && payload?.checks?.storage?.status === "ok";
+            && payload?.checks?.storage?.status === "ok"
+            && payload?.checks?.previewIntegrity?.status === "ok";
           const aiHealthy = !["error", "stale"].includes(payload?.checks?.ai?.status);
           if (!coreHealthy || !aiHealthy) {
             console.error(JSON.stringify({ code, status: payload?.status, checks: payload?.checks }));
