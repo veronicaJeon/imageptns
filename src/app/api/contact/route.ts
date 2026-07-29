@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeContactSubmissionInput } from "@/lib/contact/request-fields";
 import { sendContactEmails } from "@/lib/email/contact";
-import { notifyOpsContact, safeEmailErrorDetails, sendContactConfirmation } from "@/lib/email/gmail";
+import { safeEmailErrorDetails } from "@/lib/email/gmail";
+import { notifyOpsContact, sendContactConfirmation } from "@/lib/email/resend";
 import {
   consumeDistributedRateLimit,
   requestIdentity,

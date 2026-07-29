@@ -17,6 +17,7 @@ import { dateValueInTimeZone, takenAtIsAllowed } from "@/lib/uploads/taken-at";
 interface ImagePatchRow {
   id: string;
   status: string;
+  lifecycle_status: string | null;
   photographer_id?: string | null;
   promotional_use_allowed: boolean;
   promotional_use_basis: PromotionalUseBasis | null;
@@ -49,12 +50,18 @@ export async function PATCH(
 
   const { data: img } = await admin
     .from("images")
-    .select("id, status, photographer_id, promotional_use_allowed, promotional_use_basis, copyright_license, free_usage_policy")
+    .select("id, status, lifecycle_status, photographer_id, promotional_use_allowed, promotional_use_basis, copyright_license, free_usage_policy")
     .eq("id", id)
     .eq("photographer_id", user.id)
     .single();
 
   if (!img) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (img.lifecycle_status && img.lifecycle_status !== "active") {
+    return NextResponse.json(
+      { error: "삭제 또는 권리 검토 중인 이미지는 수정할 수 없습니다." },
+      { status: 409 },
+    );
+  }
 
   const body = await req.json();
   const { title, description, title_ko, title_en, description_ko, description_en, tags_ko, tags_en, category, category_codes, tags, exif_location, exif_taken_at, resubmit, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, promotional_use_allowed } = body as {
@@ -164,6 +171,7 @@ export async function PATCH(
   // Resubmit: only for rejected/draft → pending (approved stays approved)
   if (resubmit && ["rejected", "draft"].includes(image.status)) {
     update.status = "pending";
+    update.is_published = false;
     update.rejection_reason = null;
     update.rejected_at = null;
   }

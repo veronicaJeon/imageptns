@@ -11,7 +11,7 @@
 | 구현·로컬 검증 완료 | 업로드 실패·만료 원본 자동 정리 | 매일 cron이 만료된 미완료 업로드 세션과 원본·미리보기를 정리하고 rate-limit 만료 버킷도 삭제한다. |
 | 구현 완료 | 미공개 온라인 결제·구독 표시 제거 | `NEXT_PUBLIC_COMMERCE_ENABLED=false`에서 구독 가격·Toss 시작 버튼과 미확정 FAQ 약속이 공개되지 않는지 운영 화면으로 확인한다. 계좌이체와 무료 라이선스는 유지한다. |
 | 구현 완료 | CI/CD 검증 게이트 | main/develop push와 PR에서 production dependency audit, typecheck, lint, 전체 테스트, build, 새 DB migration 적용·lint가 모두 성공한다. GitHub main 브랜치 보호 적용이 남아 있다. |
-| 운영정보 대기 | 공식 이메일과 발송 도메인 | 실제 수신 가능한 공개 주소, `RESEND_FROM_EMAIL`, `OPS_EMAIL`, SPF·DKIM·DMARC, Gmail/Resend 역할을 확정하고 문의·업로드·심사 메일 E2E를 통과한다. |
+| DNS·환경 반영 대기 | 공식 이메일과 발송 도메인 | 공개 주소·발신은 `contact@imagepartners.kr`, 운영 수신함은 `imgptns@gmail.com`으로 확정했다. 서명 검증·중복 방지된 `/api/webhooks/resend-inbound` 전달 경로는 구현했다. Resend 수신 도메인·웹훅, `RESEND_WEBHOOK_SECRET`, `RESEND_FROM_EMAIL`, `OPS_EMAIL`, MX·SPF·DKIM·DMARC와 Supabase Auth SMTP를 운영에 반영하고 직접수신·문의·업로드·심사 메일 E2E를 통과한다. |
 | 운영정보 대기 | 국내 사업자·거래조건 공개 | 대표자명, 사업자등록번호, 전화번호, 통신판매업 신고 상태, 환불·증빙 정책을 받아 약관·개인정보처리방침·결제 화면의 현재 계좌이체 운영과 일치시킨다. |
 | 배포 대기 | 운영 마이그레이션·배포·회귀 확인 | DB 마이그레이션을 앱보다 먼저 적용하고 동일 커밋을 배포한 뒤 library, pricing, support, 문의, 가입, 승인 사진가 업로드, rate limit, cron, health를 확인한다. |
 

@@ -29,6 +29,8 @@ interface ReviewImage {
 interface ReviewResponseImage {
   id: string;
   status: string;
+  lifecycle_status?: string | null;
+  is_published?: boolean;
   rejection_reason: string | null;
   approved_at: string | null;
   title: string;
@@ -39,7 +41,7 @@ interface ReviewResponseImage {
   proof_tx_hash?: string | null;
 }
 
-const REVIEW_SELECT = "id, status, rejection_reason, approved_at, title, asset_id, photographer_id, proof_status, proof_registered_at, proof_tx_hash";
+const REVIEW_SELECT = "id, status, lifecycle_status, is_published, rejection_reason, approved_at, title, asset_id, photographer_id, proof_status, proof_registered_at, proof_tx_hash";
 
 export async function PATCH(
   req: NextRequest,
@@ -82,12 +84,17 @@ export async function PATCH(
       .from("images")
       .update({
         status: "approved",
+        is_published: true,
+        unpublished_at: null,
+        unpublished_by: null,
+        unpublished_reason: null,
         approved_at: approvedAt,
         rejection_reason: null,
         rejected_at: null,
       })
       .eq("id", id)
       .eq("status", "pending")
+      .eq("lifecycle_status", "active")
       .select(REVIEW_SELECT)
       .maybeSingle();
 
@@ -103,18 +110,29 @@ export async function PATCH(
 
     data = approved;
   } else {
+    const rejectedAt = new Date().toISOString();
     const { data: rejected, error } = await admin
       .from("images")
-      .update({ status: "rejected", rejection_reason: rejection_reason!.trim(), rejected_at: new Date().toISOString(), approved_at: null })
+      .update({
+        status: "rejected",
+        is_published: false,
+        unpublished_at: rejectedAt,
+        unpublished_by: user.id,
+        unpublished_reason: "관리자 검토 반려",
+        rejection_reason: rejection_reason!.trim(),
+        rejected_at: rejectedAt,
+        approved_at: null,
+      })
       .eq("id", id)
-      .eq("status", "pending")
+      .in("status", ["pending", "approved"])
+      .eq("lifecycle_status", "active")
       .select(REVIEW_SELECT)
       .maybeSingle();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!rejected) {
       return NextResponse.json(
-        { error: "Image is no longer pending" },
+        { error: "Image is no longer reviewable" },
         { status: 409 }
       );
     }

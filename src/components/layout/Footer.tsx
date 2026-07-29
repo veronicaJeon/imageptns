@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useLang } from "@/lib/i18n/store";
 
 export function Footer() {
-  const { t } = useLang();
+  const { lang, t } = useLang();
   const f = t.footer;
 
   return (
@@ -27,6 +28,15 @@ export function Footer() {
           </a>
         </address>
       </div>
+      <nav className="mx-auto mt-8 flex max-w-7xl flex-wrap gap-x-5 gap-y-2 border-t border-outline-variant/30 pt-6 text-xs text-outline">
+        <Link href="/terms" className="hover:text-primary">{f.links.terms}</Link>
+        <Link href="/privacy" className="hover:text-primary">{f.links.privacy}</Link>
+        <Link href="/license-guide" className="hover:text-primary">{f.links.licenseGuide}</Link>
+        <Link href="/cookie" className="hover:text-primary">{f.links.cookie}</Link>
+        <Link href="/business-info" className="hover:text-primary">
+          {lang === "ko" ? "사업자정보·공시사항" : "Business information"}
+        </Link>
+      </nav>
     </footer>
   );
 }

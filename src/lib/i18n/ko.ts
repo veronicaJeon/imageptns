@@ -273,7 +273,7 @@ export const ko: Translations = {
     company: {
       title: "회사 정보",
       address: "서울시 서대문구 거북골로 21길57 제1호",
-      email: "helpimagepartners@gmail.com",
+      email: "contact@imagepartners.kr",
     },
     sections: {
       Resources: "리소스",

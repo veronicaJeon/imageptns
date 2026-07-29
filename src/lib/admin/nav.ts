@@ -66,6 +66,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     icon: "policy",
     label: "운영정책관리",
     items: [
+      { href: "/admin/policy-documents", icon: "folder_open", label: "운영정책 문서함" },
       { href: "/admin/legal", icon: "gavel", label: "법률정보" },
       { href: "/admin/commission", icon: "percent", label: "수수료정책" },
       { href: "/admin/pricing", icon: "sell", label: "상품가격" },

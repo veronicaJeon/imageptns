@@ -5,11 +5,7 @@ export const ADMIN_IMAGE_LIST_HIDDEN_LIFECYCLE_STATUSES = ["archived", "purged"]
 type HiddenAdminImageLifecycleStatus = (typeof ADMIN_IMAGE_LIST_HIDDEN_LIFECYCLE_STATUSES)[number];
 
 interface LifecycleFilterQuery<T> {
-  not(column: string, operator: string, value: string): T;
-}
-
-function hiddenLifecycleFilterValue() {
-  return `(${ADMIN_IMAGE_LIST_HIDDEN_LIFECYCLE_STATUSES.join(",")})`;
+  or(filters: string): T;
 }
 
 export function isVisibleInAdminImageList(lifecycleStatus: string | null | undefined) {
@@ -17,5 +13,11 @@ export function isVisibleInAdminImageList(lifecycleStatus: string | null | undef
 }
 
 export function applyAdminImageListLifecycleFilter<T extends LifecycleFilterQuery<T>>(query: T) {
-  return query.not("lifecycle_status", "in", hiddenLifecycleFilterValue());
+  return query.or(
+    `lifecycle_status.is.null,lifecycle_status.not.in.(${ADMIN_IMAGE_LIST_HIDDEN_LIFECYCLE_STATUSES.join(",")})`,
+  );
+}
+
+export function applyAdminReviewableLifecycleFilter<T extends LifecycleFilterQuery<T>>(query: T) {
+  return query.or("lifecycle_status.is.null,lifecycle_status.eq.active");
 }

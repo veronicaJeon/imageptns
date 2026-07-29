@@ -5,6 +5,7 @@ import Image from "next/image";
 import { AdminButton, AdminChip, AdminInlineMetrics, adminStatusTone } from "@/components/admin/AdminPrimitives";
 import { cn } from "@/lib/utils/cn";
 import { imageCategoryLabel } from "@/lib/images/categories";
+import { isImageLifecycleActive } from "@/lib/images/state-visibility";
 
 type Status = "pending" | "approved" | "rejected" | "all";
 
@@ -51,6 +52,9 @@ interface ImageRow {
   tags_ko: string[] | null;
   tags_en: string[] | null;
   status: string;
+  lifecycle_status: string | null;
+  is_published: boolean;
+  unpublished_reason: string | null;
   rejection_reason: string | null;
   storage_path_preview: string | null;
   file_format: string | null;
@@ -76,6 +80,9 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Status>("pending");
   const [images, setImages] = useState<ImageRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
   const [forbidden, setForbidden] = useState(false);
 
   // Per-image reject UI state
@@ -83,19 +90,39 @@ export default function AdminPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [actioning, setActioning] = useState<string | null>(null);
 
-  const fetchImages = useCallback(async (status: Status) => {
-    setLoading(true);
+  const fetchImages = useCallback(async (status: Status, silent = false) => {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
     try {
-      const res = await fetch(`/api/admin/images?status=${status}`);
+      const res = await fetch(`/api/admin/images?status=${status}`, { cache: "no-store" });
       if (res.status === 403) { setForbidden(true); return; }
-      const { images } = await res.json();
-      setImages(images ?? []);
+      const data = await res.json().catch(() => null) as {
+        images?: ImageRow[];
+        pagination?: { total?: number };
+        error?: string;
+      } | null;
+      if (!res.ok) throw new Error(data?.error || "이미지 목록을 불러오지 못했습니다.");
+      setImages(data?.images ?? []);
+      setTotal(data?.pagination?.total ?? data?.images?.length ?? 0);
+      setLoadError(null);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "이미지 목록을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { fetchImages(tab); }, [tab, fetchImages]);
+  useEffect(() => {
+    void fetchImages(tab);
+    const refreshOnFocus = () => void fetchImages(tab, true);
+    window.addEventListener("focus", refreshOnFocus);
+    const intervalId = window.setInterval(() => void fetchImages(tab, true), 30_000);
+    return () => {
+      window.removeEventListener("focus", refreshOnFocus);
+      window.clearInterval(intervalId);
+    };
+  }, [tab, fetchImages]);
 
   async function handleAction(id: string, action: "approve" | "reject", reason?: string) {
     setActioning(id);
@@ -137,12 +164,31 @@ export default function AdminPage() {
     <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
 
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">이미지 검토</h1>
-        <p className="text-sm text-outline mt-1">
-          {tab === "pending" && !loading && `${images.length}개 이미지가 검토 대기 중입니다`}
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">이미지 검토</h1>
+          <p className="text-sm text-outline mt-1">
+            {tab === "pending" && !loading && `${total}개 이미지가 검토 대기 중입니다`}
+          </p>
+        </div>
+        <AdminButton
+          onClick={() => void fetchImages(tab, true)}
+          disabled={refreshing}
+          size="md"
+        >
+          <span className={`material-symbols-outlined text-base ${refreshing ? "animate-spin" : ""}`}>refresh</span>
+          새로고침
+        </AdminButton>
       </div>
+
+      {loadError && (
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-error/20 bg-error/5 px-4 py-3 text-xs font-semibold text-error">
+          <span>{loadError}</span>
+          <button type="button" onClick={() => void fetchImages(tab, true)} className="shrink-0 underline">
+            다시 시도
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg bg-surface-container-lowest p-1 shadow-ghost sm:inline-grid sm:w-fit sm:grid-cols-4">
@@ -177,7 +223,9 @@ export default function AdminPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {images.map((img) => (
+          {images.map((img) => {
+            const lifecycleActive = isImageLifecycleActive(img);
+            return (
             <div key={img.id} className="overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost">
               <div className="flex gap-0 flex-col xl:flex-row">
 
@@ -220,6 +268,14 @@ export default function AdminPage() {
                       <AdminChip tone={adminStatusTone(img.status)}>
                         {STATUS_LABELS[img.status] ?? img.status}
                       </AdminChip>
+                      {!lifecycleActive && (
+                        <AdminChip tone="danger">
+                          {img.lifecycle_status === "deletion_requested" ? "삭제 요청됨" : img.lifecycle_status}
+                        </AdminChip>
+                      )}
+                      {lifecycleActive && img.status === "approved" && !img.is_published && (
+                        <AdminChip tone="warning">공개 중지</AdminChip>
+                      )}
                     </div>
                   </div>
 
@@ -317,7 +373,7 @@ export default function AdminPage() {
                   )}
 
                   {/* Action buttons */}
-                  {img.status !== "approved" && rejectingId !== img.id && (
+                  {lifecycleActive && img.status !== "approved" && rejectingId !== img.id && (
                     <div className="flex gap-2 flex-wrap">
                       <AdminButton
                         onClick={() => handleAction(img.id, "approve")}
@@ -343,7 +399,7 @@ export default function AdminPage() {
                       )}
                     </div>
                   )}
-                  {img.status === "approved" && (
+                  {lifecycleActive && img.status === "approved" && (
                     <AdminButton
                       onClick={() => { setRejectingId(img.id); setRejectReason(""); }}
                       className="w-fit"
@@ -356,7 +412,8 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

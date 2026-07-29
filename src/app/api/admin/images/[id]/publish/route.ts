@@ -18,11 +18,20 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const admin = createAdminClient();
   const { data: before, error: beforeError } = await admin
     .from("images")
-    .select("id, title, is_published, unpublished_at, unpublished_reason")
+    .select("id, title, status, lifecycle_status, is_published, unpublished_at, unpublished_reason")
     .eq("id", id)
     .single();
 
   if (beforeError) return NextResponse.json({ error: beforeError.message }, { status: 404 });
+  if (
+    body.is_published &&
+    (before.status !== "approved" || before.lifecycle_status !== "active")
+  ) {
+    return NextResponse.json(
+      { error: "승인 완료된 활성 이미지만 공개할 수 있습니다." },
+      { status: 409 },
+    );
+  }
 
   const reason = typeof body.reason === "string" && body.reason.trim() ? body.reason.trim() : null;
   const patch = body.is_published

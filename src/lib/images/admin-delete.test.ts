@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { applyAdminImageDeleteTargetFilter } from "./admin-delete";
 
 class QuerySpy {
-  calls: Array<{ column: string; operator: string; value: string }> = [];
+  calls: string[] = [];
 
-  not(column: string, operator: string, value: string) {
-    this.calls.push({ column, operator, value });
+  or(filters: string) {
+    this.calls.push(filters);
     return this;
   }
 }
@@ -16,7 +16,7 @@ describe("admin image delete target filtering", () => {
 
     expect(applyAdminImageDeleteTargetFilter(query)).toBe(query);
     expect(query.calls).toEqual([
-      { column: "lifecycle_status", operator: "in", value: "(archived,purged)" },
+      "lifecycle_status.is.null,lifecycle_status.not.in.(archived,purged)",
     ]);
   });
 });

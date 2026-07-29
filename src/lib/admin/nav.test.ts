@@ -19,10 +19,11 @@ describe("admin navigation groups", () => {
     ]);
   });
 
-  it("keeps legal, fees, pricing, and lifecycle under operations policy", () => {
+  it("keeps the policy document cabinet, legal, fees, pricing, and lifecycle under operations policy", () => {
     const policy = ADMIN_NAV_GROUPS.find((group) => group.id === "operations-policy");
     expect(policy?.label).toBe("운영정책관리");
     expect(policy?.items.map((item) => item.href)).toEqual([
+      "/admin/policy-documents",
       "/admin/legal",
       "/admin/commission",
       "/admin/pricing",

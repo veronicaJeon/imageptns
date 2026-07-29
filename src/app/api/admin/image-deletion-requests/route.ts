@@ -135,10 +135,19 @@ export async function PATCH(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    const requestImage = first(request.image);
+    const restorePublished =
+      request.impact_snapshot?.wasPublished === true &&
+      requestImage?.status === "approved";
+
     await admin
       .from("images")
       .update({
         lifecycle_status: "active",
+        is_published: restorePublished,
+        unpublished_at: restorePublished ? null : new Date().toISOString(),
+        unpublished_by: restorePublished ? null : adminUser.id,
+        unpublished_reason: restorePublished ? null : "삭제 요청 반려 후 비공개 유지",
         deletion_reviewed_by: adminUser.id,
         deletion_reviewed_at: now,
         deletion_admin_note: adminNote || null,

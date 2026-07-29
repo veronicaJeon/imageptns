@@ -22,6 +22,7 @@ import {
   validateImageMetadata,
 } from "@/lib/uploads/security";
 import { readBoundedJson, RequestBodyError } from "@/lib/security/request-body";
+import { ownerUploadBucket } from "@/lib/images/state-visibility";
 
 export const maxDuration = 60;
 
@@ -58,9 +59,8 @@ export async function GET() {
   const [imagesResult, settingsResult] = await Promise.all([
     admin
       .from("images")
-      .select("id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, rejected_at, lifecycle_status, deletion_requested_at, deletion_fee_krw, deletion_fee_status, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at, chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at, proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, promotional_use_basis")
+      .select("id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, rejection_reason, rejected_at, lifecycle_status, deletion_requested_at, deletion_fee_krw, deletion_fee_status, deleted_at, archived_at, purged_at, deletion_reason, deletion_admin_note, is_published, unpublished_at, unpublished_reason, views_count, sales_count, created_at, storage_path_preview, exif_location, exif_taken_at, chain_id, onchain_asset_id, content_hash, proof_tx_hash, proof_status, proof_registered_at, proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id, proof_arweave_confirmed_at, proof_failure_reason, copyright_license, free_usage_policy, attribution_name, attribution_url, authorship_declaration, authorship_declared_at, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, promotional_use_basis")
       .eq("photographer_id", user.id)
-      .eq("lifecycle_status", "active")
       .order("created_at", { ascending: false }),
     admin
       .from("platform_commerce_settings")
@@ -73,11 +73,9 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const rejectedImageRetentionDays = Math.min(365, Math.max(1, Number(settingsResult.data?.rejected_image_retention_days ?? 7)));
-  const rejectedCutoff = Date.now() - rejectedImageRetentionDays * 24 * 60 * 60 * 1000;
-  const visibleData = (data ?? []).filter((image) => (
-    image.status !== "rejected" ||
-    new Date(image.rejected_at ?? image.created_at).getTime() >= rejectedCutoff
-  ));
+  const visibleData = (data ?? []).filter((image) => ownerUploadBucket(image, {
+    rejectedRetentionDays: rejectedImageRetentionDays,
+  }) !== null);
 
   const categoryMap = await getImageCategoryCodeMap(admin, visibleData.map((img) => img.id));
   const uploads = visibleData.map((img) => ({
@@ -86,7 +84,9 @@ export async function GET() {
     storage_path_preview: previewUrl(img.storage_path_preview),
   }));
 
-  return NextResponse.json({ uploads, rejectedImageRetentionDays });
+  return NextResponse.json({ uploads, rejectedImageRetentionDays }, {
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -284,6 +284,8 @@ export async function POST(req: NextRequest) {
         promotional_use_consent_version: promotionalUseAllowed ? PROMOTIONAL_USE_CONSENT_VERSION : null,
         promotional_use_revoked_at: null,
         promotional_use_basis: promotionalUseBasis,
+        lifecycle_status: "active",
+        is_published: false,
         status: "pending",
       })
       .select()

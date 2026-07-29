@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n/store";
 import { buildUploadProofSteps, type TimelineState } from "@/lib/ux/status";
@@ -13,18 +13,23 @@ import {
   automaticPromotionalUseBasis,
   promotionalUseBasisLabel,
 } from "@/lib/images/promotional-use";
+import {
+  isImageLifecycleActive,
+  ownerUploadBucket,
+} from "@/lib/images/state-visibility";
 
-type StatusFilter = "all" | "pending" | "approved" | "rejected";
+type StatusFilter = "all" | "pending" | "approved" | "rejected" | "removed";
 
 const UPLOADS_PAGE_COPY = {
   ko: {
     locale: "ko-KR",
-    filterTabs: { all: "전체", pending: "검토 중", approved: "승인됨", rejected: "반려됨" },
+    filterTabs: { all: "전체", pending: "검토 중", approved: "승인됨", rejected: "반려됨", removed: "삭제·비공개" },
     empty: {
       all: "업로드한 이미지가 없습니다. 작품을 공유해보세요.",
       pending: "검토 대기 중인 이미지가 없습니다.",
       approved: "승인된 이미지가 없습니다. 더 업로드해보세요.",
       rejected: "거절된 이미지가 없습니다.",
+      removed: "삭제되었거나 비공개 처리된 이미지가 없습니다.",
     },
     proof: { not_registered: "증명 전", available: "등록가능", requested: "요청됨", pending: "Arweave 등록 중", registered: "증명 완료", failed: "증명 실패" },
     alreadyDeleting: "이미 삭제 절차가 진행 중이거나 완료된 이미지입니다.",
@@ -51,6 +56,12 @@ const UPLOADS_PAGE_COPY = {
     deleteTitle: "삭제",
     editMeta: "메타데이터 편집",
     editHelp: "제목이나 설명을 바꾸려면 해당 사진 오른쪽의 ‘편집’을 누르세요. 수정 후 아래의 ‘저장’을 누르면 반영됩니다.",
+    refresh: "새로고침",
+    loadFailed: "업로드 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    removedArchived: "삭제됨",
+    removedPurged: "관리자 완전삭제 처리",
+    legalHold: "권리 검토 중",
+    publicationStopped: "공개 중지",
     title: "제목 *",
     description: "설명",
     authorship: "AI / 오리지널리티 선언",
@@ -76,12 +87,13 @@ const UPLOADS_PAGE_COPY = {
   },
   en: {
     locale: "en-US",
-    filterTabs: { all: "All", pending: "Pending", approved: "Approved", rejected: "Rejected" },
+    filterTabs: { all: "All", pending: "Pending", approved: "Approved", rejected: "Rejected", removed: "Removed" },
     empty: {
       all: "No uploaded images yet. Start sharing your work.",
       pending: "No images are pending review.",
       approved: "No approved images yet. Upload more work.",
       rejected: "No rejected images.",
+      removed: "No deleted or unpublished images.",
     },
     proof: { not_registered: "Not proven", available: "Eligible", requested: "Requested", pending: "Arweave registering", registered: "Proof complete", failed: "Proof failed" },
     alreadyDeleting: "This image is already in or past the deletion process.",
@@ -108,6 +120,12 @@ const UPLOADS_PAGE_COPY = {
     deleteTitle: "Delete",
     editMeta: "Edit metadata",
     editHelp: "To change a title or description, select Edit beside the photo, then choose Save below.",
+    refresh: "Refresh",
+    loadFailed: "Could not load your uploads. Please try again shortly.",
+    removedArchived: "Removed",
+    removedPurged: "Permanently removed by administrator",
+    legalHold: "Under rights review",
+    publicationStopped: "Publication stopped",
     title: "Title *",
     description: "Description",
     authorship: "AI / originality declaration",
@@ -174,9 +192,17 @@ interface UploadRow {
   tags_en: string[] | null;
   status: string;
   lifecycle_status: string | null;
+  is_published: boolean;
+  unpublished_at: string | null;
+  unpublished_reason: string | null;
   deletion_requested_at: string | null;
   deletion_fee_krw: number | null;
   deletion_fee_status: string | null;
+  deleted_at: string | null;
+  archived_at: string | null;
+  purged_at: string | null;
+  deletion_reason: string | null;
+  deletion_admin_note: string | null;
   rejection_reason: string | null;
   rejected_at: string | null;
   views_count: number | null;
@@ -260,6 +286,8 @@ function UploadsPageContent() {
 
   const [uploads, setUploads] = useState<UploadRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deletionTarget, setDeletionTarget] = useState<UploadRow | null>(null);
   const [deletionReason, setDeletionReason] = useState<string>(copy.deleteReasonDefault);
@@ -270,15 +298,38 @@ function UploadsPageContent() {
   const [rejectedImageRetentionDays, setRejectedImageRetentionDays] = useState(7);
   const removeUnavailableItems = useCart((state) => state.removeUnavailableItems);
 
+  const loadUploads = useCallback(async (silent = false) => {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const response = await fetch("/api/uploads", { cache: "no-store" });
+      const data = await response.json().catch(() => null) as {
+        uploads?: UploadRow[];
+        rejectedImageRetentionDays?: number;
+        error?: string;
+      } | null;
+      if (!response.ok) throw new Error(data?.error || copy.loadFailed);
+      setUploads(data?.uploads ?? []);
+      setRejectedImageRetentionDays(data?.rejectedImageRetentionDays ?? 7);
+      setLoadError(null);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : copy.loadFailed);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [copy.loadFailed]);
+
   useEffect(() => {
-    fetch("/api/uploads")
-      .then((r) => r.json())
-      .then((data: { uploads?: UploadRow[]; rejectedImageRetentionDays?: number }) => {
-        setUploads(data.uploads ?? []);
-        setRejectedImageRetentionDays(data.rejectedImageRetentionDays ?? 7);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    void loadUploads();
+    const refreshOnFocus = () => void loadUploads(true);
+    window.addEventListener("focus", refreshOnFocus);
+    const intervalId = window.setInterval(() => void loadUploads(true), 30_000);
+    return () => {
+      window.removeEventListener("focus", refreshOnFocus);
+      window.clearInterval(intervalId);
+    };
+  }, [loadUploads]);
 
   useEffect(() => {
     fetch("/api/categories")
@@ -383,7 +434,17 @@ function UploadsPageContent() {
       }
 
       if (data?.immediate) {
-        setUploads((prev) => prev.filter((upload) => upload.id !== img.id));
+        const removedAt = new Date().toISOString();
+        setUploads((prev) => prev.map((upload) => upload.id === img.id
+          ? {
+              ...upload,
+              lifecycle_status: "archived",
+              is_published: false,
+              deleted_at: removedAt,
+              archived_at: removedAt,
+              deletion_reason: deletionReason.trim() || copy.deleteReasonDefault,
+            }
+          : upload));
         removeUnavailableItems([img.id]);
         setDeletionTarget(null);
         alert(copy.deleteImmediateAccepted);
@@ -391,7 +452,15 @@ function UploadsPageContent() {
         const fee = data?.impact?.estimatedFeeKrw ?? data?.request?.estimated_fee_krw ?? 0;
         alert(copy.deleteRequestAccepted(fee.toLocaleString(copy.locale)));
         setUploads((prev) => prev.map((u) => u.id === img.id
-          ? { ...u, lifecycle_status: "deletion_requested", deletion_fee_krw: fee, deletion_fee_status: fee > 0 ? "quoted" : "waived" }
+          ? {
+              ...u,
+              lifecycle_status: "deletion_requested",
+              is_published: false,
+              deletion_requested_at: new Date().toISOString(),
+              deletion_fee_krw: fee,
+              deletion_fee_status: fee > 0 ? "quoted" : "waived",
+              deletion_reason: deletionReason.trim() || copy.deleteReasonDefault,
+            }
           : u));
         setDeletionTarget(null);
       }
@@ -467,10 +536,13 @@ function UploadsPageContent() {
     }
   }
 
-  const filteredUploads =
-    activeFilter === "all"
-      ? uploads
-      : uploads.filter((u) => u.status === activeFilter);
+  const uploadBucket = useCallback((upload: UploadRow) => ownerUploadBucket(upload, {
+    rejectedRetentionDays: rejectedImageRetentionDays,
+  }), [rejectedImageRetentionDays]);
+
+  const filteredUploads = activeFilter === "all"
+    ? uploads
+    : uploads.filter((upload) => uploadBucket(upload) === activeFilter);
 
   if (loading) {
     return (
@@ -484,14 +556,34 @@ function UploadsPageContent() {
     <div className="p-4 md:p-10">
       <div className="flex items-center justify-between gap-3 mb-6 md:mb-8">
         <h1 className="font-headline text-xl font-extrabold text-on-surface tracking-tight md:text-2xl">{up.title}</h1>
-        <a
-          href="/dashboard/uploads/new"
-          className="flex shrink-0 items-center gap-1.5 rounded bg-primary px-3 py-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 md:gap-2 md:px-5 md:py-3 md:text-sm"
-        >
-          <span className="material-symbols-outlined text-base">cloud_upload</span>
-          {up.uploadBtn}
-        </a>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void loadUploads(true)}
+            disabled={refreshing}
+            className="inline-flex h-10 items-center gap-1.5 rounded border border-outline-variant px-3 text-xs font-semibold text-on-surface-variant transition-colors hover:border-outline hover:text-on-surface disabled:opacity-50"
+          >
+            <span className={`material-symbols-outlined text-base ${refreshing ? "animate-spin" : ""}`}>refresh</span>
+            <span className="hidden sm:inline">{copy.refresh}</span>
+          </button>
+          <a
+            href="/dashboard/uploads/new"
+            className="flex shrink-0 items-center gap-1.5 rounded bg-primary px-3 py-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 md:gap-2 md:px-5 md:py-3 md:text-sm"
+          >
+            <span className="material-symbols-outlined text-base">cloud_upload</span>
+            {up.uploadBtn}
+          </a>
+        </div>
       </div>
+
+      {loadError && (
+        <div className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-error/20 bg-error/5 px-4 py-3 text-xs font-semibold text-error">
+          <span>{loadError}</span>
+          <button type="button" onClick={() => void loadUploads(true)} className="shrink-0 underline">
+            {copy.refresh}
+          </button>
+        </div>
+      )}
 
       {uploads.length > 0 && (
         <div className="mb-5 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-xs leading-relaxed text-on-surface-variant">
@@ -514,7 +606,7 @@ function UploadsPageContent() {
               const count =
                 tab.key === "all"
                   ? uploads.length
-                  : uploads.filter((u) => u.status === tab.key).length;
+                  : uploads.filter((upload) => uploadBucket(upload) === tab.key).length;
               const isActive = activeFilter === tab.key;
               return (
                 <button
@@ -552,7 +644,13 @@ function UploadsPageContent() {
           {filteredUploads.length === 0 ? (
             <div className="flex flex-col items-center py-24 gap-3 text-outline">
               <span className="material-symbols-outlined text-5xl">
-                {activeFilter === "approved" ? "check_circle" : activeFilter === "rejected" ? "celebration" : "hourglass_empty"}
+                {activeFilter === "approved"
+                  ? "check_circle"
+                  : activeFilter === "rejected"
+                    ? "celebration"
+                    : activeFilter === "removed"
+                      ? "delete"
+                      : "hourglass_empty"}
               </span>
               <p className="text-sm">{copy.empty[activeFilter]}</p>
             </div>
@@ -582,9 +680,17 @@ function UploadsPageContent() {
                   month: "short", day: "numeric", year: "numeric",
                 });
                 const displayTitle = localizedText(lang, img.title, img.title_ko, img.title_en);
-                const canEdit = true; // 모든 상태에서 편집 가능
+                const lifecycleActive = isImageLifecycleActive(img);
+                const canEdit = lifecycleActive;
                 const isEditing = editing?.id === img.id;
                 const deletionPending = img.lifecycle_status === "deletion_requested";
+                const lifecycleLabel = deletionPending
+                  ? copy.deletionRequested((img.deletion_fee_krw ?? 0).toLocaleString(copy.locale))
+                  : img.lifecycle_status === "purged"
+                    ? copy.removedPurged
+                    : img.lifecycle_status === "legal_hold"
+                      ? copy.legalHold
+                      : copy.removedArchived;
 
                 return (
                   <Fragment key={img.id}>
@@ -625,9 +731,12 @@ function UploadsPageContent() {
                           </span>
                           {img.lifecycle_status && img.lifecycle_status !== "active" && (
                             <span className={`${CHIP_CLASS} border-error/20 bg-error/10 text-error`}>
-                              {deletionPending
-                                ? copy.deletionRequested((img.deletion_fee_krw ?? 0).toLocaleString(copy.locale))
-                                : img.lifecycle_status}
+                              {lifecycleLabel}
+                            </span>
+                          )}
+                          {lifecycleActive && img.status === "approved" && !img.is_published && (
+                            <span className={`${CHIP_CLASS} border-error/20 bg-error/10 text-error`}>
+                              {copy.publicationStopped}
                             </span>
                           )}
                           <span className={`${CHIP_CLASS} border-outline-variant/60 bg-surface-container-low text-on-surface-variant`}>
@@ -664,7 +773,17 @@ function UploadsPageContent() {
                             </a>
                           )}
                         </div>
-                        <UploadTimeline img={img} />
+                        {lifecycleActive && <UploadTimeline img={img} />}
+                        {!lifecycleActive && (img.deletion_admin_note || img.deletion_reason) && (
+                          <p className="mt-2 max-w-md text-[10px] leading-relaxed text-on-surface-variant">
+                            {img.deletion_admin_note || img.deletion_reason}
+                          </p>
+                        )}
+                        {lifecycleActive && img.status === "approved" && !img.is_published && img.unpublished_reason && (
+                          <p className="mt-2 max-w-md text-[10px] leading-relaxed text-error">
+                            {img.unpublished_reason}
+                          </p>
+                        )}
                       </td>
                       <td data-label={c.views} className="border-t border-outline-variant/20 px-4 py-3 text-center text-sm font-semibold text-on-surface before:block before:text-[10px] before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-6 md:py-4 md:text-left md:text-sm md:font-normal md:text-on-surface-variant md:before:hidden">{(img.views_count ?? 0).toLocaleString()}</td>
                       <td data-label={c.sales} className="border-t border-outline-variant/20 px-4 py-3 text-center text-sm font-semibold text-on-surface before:block before:text-[10px] before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-6 md:py-4 md:text-left md:text-sm md:font-normal md:text-on-surface-variant md:before:hidden">{img.sales_count ?? 0}</td>

@@ -1,16 +1,17 @@
 import { escapeHtml } from "./html";
+import { DEFAULT_OPS_EMAIL, PUBLIC_CONTACT_EMAIL } from "./inbound";
 import type { PhotoRequestInviteEmailPayload } from "./contact";
 import { buildSiteUrl } from "../routing/canonical";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-// Override via env vars in Vercel dashboard; defaults kept for local dev reference
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "Image Partners <onboarding@resend.dev>";
-const OPS_EMAIL  = process.env.OPS_EMAIL ?? "contact@imagepartners.kr";
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "Image Partners <contact@imagepartners.kr>";
+const OPS_EMAIL  = process.env.OPS_EMAIL ?? DEFAULT_OPS_EMAIL;
 
 interface EmailPayload {
   to:      string | string[];
   subject: string;
   html:    string;
+  replyTo?: string;
 }
 
 async function sendEmail(payload: EmailPayload): Promise<void> {
@@ -18,13 +19,18 @@ async function sendEmail(payload: EmailPayload): Promise<void> {
     throw new Error("RESEND_API_KEY is not configured");
   }
 
+  const { replyTo, ...message } = payload;
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization:  `Bearer ${RESEND_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from: FROM_EMAIL, ...payload }),
+    body: JSON.stringify({
+      from: FROM_EMAIL,
+      ...message,
+      ...(replyTo ? { reply_to: replyTo } : {}),
+    }),
   });
 
   if (!res.ok) {
@@ -42,6 +48,7 @@ function emailDomain(value: string) {
 export function resendRuntimeConfiguration() {
   return {
     apiKeyConfigured: Boolean(process.env.RESEND_API_KEY),
+    inboundWebhookConfigured: Boolean(process.env.RESEND_WEBHOOK_SECRET),
     fromConfigured: Boolean(process.env.RESEND_FROM_EMAIL),
     opsConfigured: Boolean(process.env.OPS_EMAIL),
     fromDomain: emailDomain(FROM_EMAIL),
@@ -85,6 +92,7 @@ export async function notifyOpsContact(opts: {
   const organization = opts.organization ? escapeHtml(opts.organization) : null;
   await sendEmail({
     to:      OPS_EMAIL,
+    replyTo: opts.email,
     subject: `[문의] ${opts.subject} — ${opts.name}`,
     html: `
       <p><strong>이름:</strong> ${name}</p>
@@ -183,7 +191,7 @@ export async function sendPayoutRejected(opts: {
       <p>${period} 기간의 정산 요청이 아래 사유로 처리되지 않았습니다.</p>
       <p><strong>신청 금액:</strong> ₩${opts.netKrw.toLocaleString("ko-KR")}</p>
       ${note ? `<p><strong>사유:</strong> ${note}</p>` : ""}
-      <p>문의 사항은 ${OPS_EMAIL}으로 연락해 주세요.</p>
+      <p>문의 사항은 ${PUBLIC_CONTACT_EMAIL}으로 연락해 주세요.</p>
       <br><p>Image Partners 팀 드림</p>
     `,
   });
@@ -297,7 +305,32 @@ export async function sendPhotoRequestInvite(opts: PhotoRequestInviteEmailPayloa
       ${deadlineAt ? `<p><strong>희망 마감:</strong> ${deadlineAt}</p>` : ""}
       ${budgetLabel ? `<p><strong>예산:</strong> ${budgetLabel}</p>` : ""}
       <p>참여 가능 여부와 세부 조건은 Image Partners 계정에서 확인해 주세요.</p>
-      <p>문의 사항은 ${OPS_EMAIL}으로 연락해 주세요.</p>
+      <p>문의 사항은 ${PUBLIC_CONTACT_EMAIL}으로 연락해 주세요.</p>
+      <br><p>Image Partners 팀 드림</p>
+    `,
+  });
+}
+
+export async function sendSupportStatusUpdate(opts: {
+  name: string;
+  email: string;
+  subject: string;
+  status: "in_progress" | "resolved";
+  inquiryType: "general" | "photo_request" | string;
+}) {
+  const name = escapeHtml(opts.name || "고객");
+  const subject = escapeHtml(opts.subject);
+  const statusLabel = opts.status === "resolved" ? "답변 완료" : "검토 중";
+  const destination = opts.inquiryType === "photo_request" ? "/dashboard/sourcing" : "/contact";
+
+  await sendEmail({
+    to: opts.email,
+    subject: `[Image Partners] 문의 상태가 ${statusLabel}으로 변경되었습니다 — ${opts.subject}`,
+    html: `
+      <p>${name}님, 안녕하세요.</p>
+      <p>문의 <strong>${subject}</strong>의 처리 상태가 <strong>${statusLabel}</strong>으로 변경되었습니다.</p>
+      <p>${opts.status === "resolved" ? "답변 내용을 확인해 주세요." : "담당자가 내용을 확인하고 있습니다. 처리가 완료되면 다시 알려드리겠습니다."}</p>
+      <p><a href="${buildSiteUrl(destination)}">Image Partners에서 확인하기 →</a></p>
       <br><p>Image Partners 팀 드림</p>
     `,
   });

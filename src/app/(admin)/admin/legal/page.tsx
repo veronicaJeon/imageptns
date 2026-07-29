@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   DEFAULT_LEGAL_DOCUMENTS,
   LEGAL_DOCUMENT_SLUGS,
@@ -182,6 +183,13 @@ export default function AdminLegalPage() {
                   </button>
                 );
               })}
+              <Link
+                href="/admin/legal/disclosure"
+                className="mt-2 flex items-center justify-between rounded border-t border-outline-variant/30 px-3 py-3 text-left text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+              >
+                <span>공시사항</span>
+                <span className="material-symbols-outlined text-base">open_in_new</span>
+              </Link>
             </div>
           </aside>
 

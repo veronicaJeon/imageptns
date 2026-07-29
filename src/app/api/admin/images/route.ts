@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
-import { applyAdminImageListLifecycleFilter } from "@/lib/images/admin-list";
+import {
+  applyAdminImageListLifecycleFilter,
+  applyAdminReviewableLifecycleFilter,
+} from "@/lib/images/admin-list";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { previewUrl } from "@/lib/supabase/storage";
 
@@ -58,7 +61,9 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  query = applyAdminImageListLifecycleFilter(query);
+  query = status === "all"
+    ? applyAdminImageListLifecycleFilter(query)
+    : applyAdminReviewableLifecycleFilter(query);
   if (status !== "all") query = query.eq("status", status);
   if (promotionalUseOnly) {
     query = query
@@ -93,5 +98,7 @@ export async function GET(req: NextRequest) {
       total: count ?? 0,
       totalPages: Math.max(1, Math.ceil((count ?? 0) / pageSize)),
     },
+  }, {
+    headers: { "Cache-Control": "private, no-store" },
   });
 }

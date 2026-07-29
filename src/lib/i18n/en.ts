@@ -472,7 +472,7 @@ export const en: Translations = {
     company: {
       title: "Company",
       address: "No. 1, 57, Geobukgol-ro 21-gil, Seodaemun-gu, Seoul",
-      email: "helpimagepartners@gmail.com",
+      email: "contact@imagepartners.kr",
     },
     sections: { Resources: "Resources", Legal: "Legal", Company: "Company" },
     links: {

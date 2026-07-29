@@ -114,6 +114,10 @@ export async function applyImageDeletion(
 
   const patch: Record<string, unknown> = {
     lifecycle_status: impact.lifecycleStatus,
+    is_published: false,
+    unpublished_at: now,
+    unpublished_by: options.actorId,
+    unpublished_reason: options.reason,
     deleted_at: now,
     deleted_by: options.actorId,
     deletion_reason: options.reason,

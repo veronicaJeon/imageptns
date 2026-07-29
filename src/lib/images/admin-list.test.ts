@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   applyAdminImageListLifecycleFilter,
+  applyAdminReviewableLifecycleFilter,
   isVisibleInAdminImageList,
 } from "./admin-list";
 
 class QuerySpy {
-  calls: Array<{ column: string; operator: string; value: string }> = [];
+  calls: string[] = [];
 
-  not(column: string, operator: string, value: string) {
-    this.calls.push({ column, operator, value });
+  or(filters: string) {
+    this.calls.push(filters);
     return this;
   }
 }
@@ -29,7 +30,16 @@ describe("admin image list lifecycle filtering", () => {
 
     expect(applyAdminImageListLifecycleFilter(query)).toBe(query);
     expect(query.calls).toEqual([
-      { column: "lifecycle_status", operator: "in", value: "(archived,purged)" },
+      "lifecycle_status.is.null,lifecycle_status.not.in.(archived,purged)",
+    ]);
+  });
+
+  it("restricts review queues to active and legacy-null lifecycle rows", () => {
+    const query = new QuerySpy();
+
+    expect(applyAdminReviewableLifecycleFilter(query)).toBe(query);
+    expect(query.calls).toEqual([
+      "lifecycle_status.is.null,lifecycle_status.eq.active",
     ]);
   });
 });

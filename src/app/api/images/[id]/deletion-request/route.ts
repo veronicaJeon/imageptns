@@ -9,6 +9,7 @@ interface RequestImageRow {
   asset_id: string | null;
   title: string;
   status: string | null;
+  is_published: boolean | null;
   photographer_id: string | null;
   lifecycle_status: string | null;
   sales_count: number | null;
@@ -48,7 +49,7 @@ export async function POST(
   const { data: image, error } = await admin
     .from("images")
     .select(`
-      id, asset_id, title, status, photographer_id, lifecycle_status,
+      id, asset_id, title, status, is_published, photographer_id, lifecycle_status,
       sales_count, proof_status, proof_tx_hash,
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
       proof_arweave_confirmed_at
@@ -131,7 +132,7 @@ export async function POST(
       estimated_fee_krw: impact.estimatedFeeKrw,
       charged_fee_krw: impact.estimatedFeeKrw,
       fee_status: impact.estimatedFeeKrw > 0 ? "quoted" : "waived",
-      impact_snapshot: impact,
+      impact_snapshot: { ...impact, wasPublished: row.is_published === true },
     })
     .select()
     .single();
@@ -142,6 +143,10 @@ export async function POST(
     .from("images")
     .update({
       lifecycle_status: "deletion_requested",
+      is_published: false,
+      unpublished_at: now,
+      unpublished_by: user.id,
+      unpublished_reason: "사진가 삭제 요청 검토 중",
       deletion_requested_at: now,
       deletion_requested_by: user.id,
       deletion_reason: reason,

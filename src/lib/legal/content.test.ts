@@ -30,9 +30,11 @@ describe("legal content helpers", () => {
     expect(privacy).toContain("Mistral AI SAS");
     expect(privacy).not.toContain("Groq, Inc.");
     expect(privacy).not.toContain("Gemini AI");
-    expect(privacy).not.toContain("Resend");
-    expect(terms).toContain("별도 사업자정보 화면");
-    expect(terms).not.toContain("대표자");
-    expect(terms).not.toContain("사업자등록번호");
+    expect(privacy).toContain("Resend, Inc.");
+    expect(privacy).toContain("운영 Gmail 수신함");
+    expect(terms).toContain("별도 사업자정보·거래조건 화면");
+    expect(terms).toContain("현재 계좌이체 요청");
+    expect(terms).not.toMatch(/대표자:\s*\S/);
+    expect(terms).not.toMatch(/사업자등록번호:\s*\S/);
   });
 });

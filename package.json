@@ -53,6 +53,7 @@
     "vitest": "^4.1.6"
   },
   "overrides": {
+    "eslint-plugin-react-hooks": "7.0.1",
     "postcss": "^8.5.24",
     "sharp": "$sharp"
   }

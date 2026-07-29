@@ -4,7 +4,7 @@ import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { buildPhotoRequestInviteRecipients, formatPhotoRequestBudget } from "@/lib/contact/photo-request-invites";
 import { sendPhotoRequestInviteEmails } from "@/lib/email/contact";
 import { sendPhotoRequestInvite } from "@/lib/email/resend";
-import { sendSupportStatusUpdate } from "@/lib/email/gmail";
+import { sendSupportStatusUpdate } from "@/lib/email/resend";
 import { candidateImageEligibility } from "@/lib/sourcing/candidates";
 import { createAdminClient } from "@/lib/supabase/admin";
 
