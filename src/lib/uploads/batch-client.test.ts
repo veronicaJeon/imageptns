@@ -26,13 +26,13 @@ describe("batch upload client helpers", () => {
     const result = filterAcceptedUploadFiles([
       imageFile("ok.jpg"),
       imageFile("bad.gif", "image/gif"),
-      imageFile("big.jpg", "image/jpeg", 501),
+      imageFile("big.jpg", "image/jpeg", 101),
     ]);
 
     expect(result.accepted.map((file) => file.name)).toEqual(["ok.jpg"]);
     expect(result.rejected).toEqual([
       { file: imageFile("bad.gif", "image/gif"), reason: "unsupported-type" },
-      { file: imageFile("big.jpg", "image/jpeg", 501), reason: "too-large" },
+      { file: imageFile("big.jpg", "image/jpeg", 101), reason: "too-large" },
     ]);
   });
 
@@ -65,6 +65,8 @@ describe("batch upload client helpers", () => {
         tags: "tag",
         takenAt: "unknown",
         location: "unknown",
+        imgWidth: 1_000,
+        imgHeight: 1_000,
         uploadStatus: "idle",
       }],
       authorshipDeclaration: "human_original",
@@ -81,8 +83,37 @@ describe("batch upload client helpers", () => {
         tags: "tag",
         takenAt: "unknown",
         location: "unknown",
+        imgWidth: 1_000,
+        imgHeight: 1_000,
         uploadStatus: "idle",
       }],
+      authorshipDeclaration: "human_original",
+      factualityAgreed: true,
+      busy: false,
+    })).toBe(false);
+  });
+
+  it("does not submit before dimensions are verified or above 120 megapixels", () => {
+    const baseDraft = {
+      id: "large",
+      title: "Title",
+      description: "Description",
+      categoryCodes: ["nature"],
+      tags: "tag",
+      takenAt: "unknown",
+      location: "unknown",
+      uploadStatus: "idle" as const,
+    };
+
+    expect(canSubmitUploadBatch({
+      drafts: [baseDraft],
+      authorshipDeclaration: "human_original",
+      factualityAgreed: true,
+      busy: false,
+    })).toBe(false);
+
+    expect(canSubmitUploadBatch({
+      drafts: [{ ...baseDraft, imgWidth: 15_000, imgHeight: 10_000 }],
       authorshipDeclaration: "human_original",
       factualityAgreed: true,
       busy: false,
@@ -99,6 +130,8 @@ describe("batch upload client helpers", () => {
         tags: "tag",
         takenAt: "2999-01-01",
         location: "서울특별시",
+        imgWidth: 1_000,
+        imgHeight: 1_000,
         uploadStatus: "idle",
       }],
       authorshipDeclaration: "human_original",

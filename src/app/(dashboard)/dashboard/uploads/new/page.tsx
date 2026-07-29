@@ -15,7 +15,9 @@ import { LocationAutocomplete } from "@/components/uploads/LocationAutocomplete"
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 import {
   ACCEPTED_UPLOAD_TYPES,
+  imageDimensionsWithinUploadLimit,
   MAX_UPLOAD_BATCH_FILES,
+  MAX_UPLOAD_IMAGE_MEGAPIXELS,
   MAX_UPLOAD_SIZE_MB,
   canSubmitUploadBatch,
   filterAcceptedUploadFiles,
@@ -42,6 +44,8 @@ const NEW_UPLOAD_COPY = {
     errors: {
       unsupportedType: "지원하지 않는 파일 형식입니다. JPEG만 허용됩니다.",
       tooLarge: (max: number) => `파일 크기는 ${max}MB를 초과할 수 없습니다.`,
+      tooManyPixels: (max: number) => `이미지 해상도는 ${max}메가픽셀을 초과할 수 없습니다.`,
+      invalidImage: "이미지 크기를 확인할 수 없는 JPEG 파일입니다.",
       uploadFailed: "업로드 중 오류가 발생했습니다.",
       duplicate: "이미 대기열에 추가된 파일입니다.",
       batchLimit: (max: number) => `한 번에 최대 ${max}장까지만 업로드할 수 있습니다. 초과한 사진은 추가되지 않았습니다.`,
@@ -50,7 +54,7 @@ const NEW_UPLOAD_COPY = {
     doneTitle: "업로드 완료!",
     doneBody: "선택한 이미지가 검토 대기 중입니다. 승인 후 라이브러리에 노출됩니다.",
     dropTitle: "파일을 드래그하거나 클릭하여 선택",
-    dropHelp: "여러장을 동시에 업로드 할 수 있습니다. 안정적인 업로드를 위해 1회 20장 이하까지 가능합니다. 한 이미지당 최대 100MB, JPEG로 업로드해 주십시오.",
+    dropHelp: `여러장을 동시에 업로드할 수 있습니다. 한 번에 최대 ${MAX_UPLOAD_BATCH_FILES}장, 이미지당 최대 ${MAX_UPLOAD_SIZE_MB}MB·${MAX_UPLOAD_IMAGE_MEGAPIXELS}메가픽셀의 JPEG를 업로드해 주십시오.`,
     addMore: "사진 추가",
     queueTitle: "업로드 대기창",
     queueHelp: "1. 유사한 이미지들을 업로드 할 때는 대표 이미지에 정보를 모두 입력한 뒤, '현재 입력값 전체 적용'을 클릭합니다. 그러면 동일한 정보가 유사한 이미지들 전체에 적용됩니다.\n2. 그 이미지들 가운데 디테일한 정보의 차이가 있을 경우, 그 이미지를 클릭한 후 다른 정보를 입력하면 수정됩니다.\n3. 위와 같이 수정한 후 '선택 이미지 업로드'를 클릭하면 정확하게 업로드됩니다.",
@@ -127,6 +131,8 @@ const NEW_UPLOAD_COPY = {
     errors: {
       unsupportedType: "Unsupported file type. Only JPEG is allowed.",
       tooLarge: (max: number) => `File size must not exceed ${max}MB.`,
+      tooManyPixels: (max: number) => `Image resolution must not exceed ${max} megapixels.`,
+      invalidImage: "This JPEG's dimensions could not be verified.",
       uploadFailed: "An error occurred while uploading.",
       duplicate: "This file is already in the upload queue.",
       batchLimit: (max: number) => `You can upload a maximum of ${max} photos per batch. Extra photos were not added.`,
@@ -135,7 +141,7 @@ const NEW_UPLOAD_COPY = {
     doneTitle: "Upload complete",
     doneBody: "Your selected images are pending review. They will appear in the library after approval.",
     dropTitle: "Drag files here or click to select",
-    dropHelp: "Upload multiple images at once. A maximum of 20 images is allowed per batch for reliability. Each JPEG may be up to 100MB.",
+    dropHelp: `Upload up to ${MAX_UPLOAD_BATCH_FILES} JPEGs per batch. Each image may be up to ${MAX_UPLOAD_SIZE_MB}MB and ${MAX_UPLOAD_IMAGE_MEGAPIXELS} megapixels.`,
     addMore: "Add photos",
     queueTitle: "Upload window",
     queueHelp: "1. For similar images, complete the representative image first, then select 'Apply current fields to all'.\n2. If an image has different details, select it and edit those fields individually.\n3. When the details are correct, select 'Upload selected images'.",
@@ -444,15 +450,35 @@ function NewUploadContent() {
   }
 
   function loadImageDimensions(id: string, file: File) {
-    if (file.type === "image/tiff") return;
-    const url = URL.createObjectURL(file);
-    const img = new window.Image();
-    img.onload = () => {
-      updateDraft(id, (draft) => ({ ...draft, imgWidth: img.naturalWidth, imgHeight: img.naturalHeight }));
-      URL.revokeObjectURL(url);
-    };
-    img.onerror = () => URL.revokeObjectURL(url);
-    img.src = url;
+    return new Promise<boolean>((resolve) => {
+      const url = URL.createObjectURL(file);
+      const img = new window.Image();
+      img.onload = () => {
+        const allowed = imageDimensionsWithinUploadLimit(img.naturalWidth, img.naturalHeight);
+        const dimensionError = copy.errors.tooManyPixels(MAX_UPLOAD_IMAGE_MEGAPIXELS);
+        updateDraft(id, (draft) => ({
+          ...draft,
+          imgWidth: img.naturalWidth,
+          imgHeight: img.naturalHeight,
+          uploadStatus: allowed ? draft.uploadStatus : "error",
+          errorMsg: allowed ? draft.errorMsg : dimensionError,
+        }));
+        if (!allowed) setErrorMsg(`${file.name}: ${dimensionError}`);
+        URL.revokeObjectURL(url);
+        resolve(allowed);
+      };
+      img.onerror = () => {
+        updateDraft(id, (draft) => ({
+          ...draft,
+          uploadStatus: "error",
+          errorMsg: copy.errors.invalidImage,
+        }));
+        setErrorMsg(`${file.name}: ${copy.errors.invalidImage}`);
+        URL.revokeObjectURL(url);
+        resolve(false);
+      };
+      img.src = url;
+    });
   }
 
   async function resizeForAI(file: File): Promise<string> {
@@ -595,9 +621,9 @@ function NewUploadContent() {
       setActiveDraftId((current) => current ?? newDrafts[0].id);
       setPageDone(false);
       setNoticeMsg("");
-      newDrafts.forEach((draft) => {
-        loadImageDimensions(draft.id, draft.file);
-        runAiAnalysis(draft.id, draft.file);
+      newDrafts.forEach(async (draft) => {
+        const dimensionsAllowed = await loadImageDimensions(draft.id, draft.file);
+        if (dimensionsAllowed) runAiAnalysis(draft.id, draft.file);
       });
     }
 

@@ -1,6 +1,17 @@
+import {
+  imageDimensionsWithinUploadLimit,
+  MAX_UPLOAD_BATCH_FILES,
+  MAX_UPLOAD_SIZE_MB,
+} from "./limits";
+
+export {
+  imageDimensionsWithinUploadLimit,
+  MAX_UPLOAD_BATCH_FILES,
+  MAX_UPLOAD_IMAGE_MEGAPIXELS,
+  MAX_UPLOAD_SIZE_MB,
+} from "./limits";
+
 export const ACCEPTED_UPLOAD_TYPES = ["image/jpeg"] as const;
-export const MAX_UPLOAD_BATCH_FILES = 20;
-export const MAX_UPLOAD_SIZE_MB = 100;
 
 export type UploadFileRejectionReason = "unsupported-type" | "too-large";
 
@@ -17,6 +28,8 @@ export interface UploadDraftReadiness {
   tags: string;
   takenAt: string;
   location: string;
+  imgWidth?: number | null;
+  imgHeight?: number | null;
   uploadStatus: "idle" | "uploading" | "saving" | "done" | "error";
 }
 
@@ -84,7 +97,8 @@ export function uploadDraftIsReady(draft: UploadDraftReadiness) {
     draft.categoryCodes.length > 0 &&
     draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean).length > 0 &&
     takenAtIsAllowed(draft.takenAt, localTodayDateValue()) &&
-    draft.location.trim().length > 0
+    draft.location.trim().length > 0 &&
+    imageDimensionsWithinUploadLimit(Number(draft.imgWidth), Number(draft.imgHeight))
   );
 }
 

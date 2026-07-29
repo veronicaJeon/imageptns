@@ -1,7 +1,10 @@
 import path from "node:path";
+import {
+  MAX_UPLOAD_FILE_BYTES,
+  MAX_UPLOAD_IMAGE_PIXELS,
+} from "./limits";
 
-export const MAX_UPLOAD_FILE_BYTES = 100 * 1024 * 1024;
-export const MAX_UPLOAD_IMAGE_PIXELS = 120_000_000;
+export { MAX_UPLOAD_FILE_BYTES, MAX_UPLOAD_IMAGE_PIXELS } from "./limits";
 export const UPLOAD_SESSION_TTL_MINUTES = 20;
 
 export const ALLOWED_UPLOAD_IMAGE_TYPES: Record<string, string> = {
