@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | P0 | 완료·상시 감시 | 서버 생성 이미지의 바이너리 손상과 썸네일 500 | 공개 이미지 72건을 검사해 손상된 `골목길` 1건을 원본에서 복구했다. Storage 업로드는 `ArrayBuffer`로 고정했고 잘못된 미리보기는 대체 이미지를 반환한다. health와 15분 모니터가 최근 공개 이미지의 JPEG 서명을 확인한다. |
 | P0 | 완료·회귀 도구 유지 | 업로드 소유권·세션·공개 상태 | 2026-07-29 운영에서 임시 승인 대기·승인 사진가와 심사 관리자 계정으로 403, 업로드, 사진가 목록, 관리자 검토, 승인·공개, 반려·비공개, 429를 확인했다. 테스트 이미지·Storage·세션·한도 버킷·계정은 즉시 정리했다. |
-| P0 | 앱 메일 완료·Auth SMTP 대기 | 공식 이메일 수신·발신 | `imagepartners.kr` Resend 송수신 인증, 수신 웹훅, Vercel 환경값과 MX·SPF·DKIM·DMARC를 반영했다. 문의 확인·운영 알림 2통과 `contact@` 수신→`imgptns@gmail.com` 전달이 모두 delivered였다. Supabase Auth SMTP 연결만 남아 있다. |
+| P0 | 완료·상시 감시 | 공식 이메일 수신·발신 | `imagepartners.kr` Resend 송수신 인증, 수신 웹훅, Vercel 환경값과 MX·SPF·DKIM·DMARC를 반영했다. Supabase Auth SMTP도 전송 전용·도메인 제한 키로 연결했다. 문의·수신 전달과 회원가입 인증·비밀번호 재설정 메일이 모두 delivered였고, 인증 후 대시보드 세션과 실제 비밀번호 변경까지 운영 E2E를 통과했다. |
 | P1 | 권한 필요 | GitHub main 브랜치 보호 | CI와 Production monitor는 성공 중이다. 현재 GitHub 토큰은 push 권한만 있고 admin 권한이 없어 보호 설정 조회·변경이 불가능하다. 저장소 관리자가 필수 CI 체크와 PR 승인을 설정한다. |
 | P1 | 점검 필요 | Vercel cron 수동 인증값 불일치 | CLI로 내려받은 Production `CRON_SECRET`은 배포 런타임의 cron endpoint 인증을 통과하지 못했다. 값을 즉시 교체하지 말고 다음 정기 cron 성공 여부와 Vercel 런타임 주입값·Project Settings 차이를 먼저 확인한다. |
 | P1 | 정책·정보 대기 | 국내 사업자·거래조건 공개 | 관리자 공시사항과 운영정책 문서함은 배포됐다. 대표자명·사업자등록번호·전화번호·통신판매업 상태·환불 및 증빙 정책 확정 후 공개한다. |
@@ -24,7 +24,7 @@
 | 운영 반영 완료·정기 관찰 | 업로드 실패·만료 원본 자동 정리 | 매일 `auto-reject-stale` cron이 데이터 파기, 만료 업로드 원본·미리보기, rate-limit 버킷 정리를 함께 수행한다. |
 | 운영 확인 완료 | 미공개 온라인 결제·구독 표시 제거 | `NEXT_PUBLIC_COMMERCE_ENABLED=false`에서 구독 가격·Toss 시작 버튼과 미확정 FAQ 약속이 공개되지 않는다. 계좌이체와 무료 라이선스는 유지한다. |
 | 구축·CI 성공·보호 설정 대기 | CI/CD 검증 게이트 | 커밋 `eb5f17b`의 CI와 Production monitor가 성공했다. main 브랜치 보호는 저장소 admin 권한으로 설정해야 한다. |
-| 앱 메일·DNS 완료 / Auth SMTP 대기 | 공식 이메일과 발송 도메인 | 공개 주소·발신은 `contact@imagepartners.kr`, 운영 수신함은 `imgptns@gmail.com`이다. Resend API·송수신 도메인·서명 검증 수신 웹훅, Vercel 환경값, 발송/수신 MX·SPF·DKIM·DMARC가 운영 진단을 통과했다. 문의 확인·운영 알림과 `contact@` 수신→Gmail 전달 E2E도 통과했다. Supabase Auth SMTP를 연결한 뒤 회원가입 확인·비밀번호 재설정 메일을 검증한다. |
+| 완료·상시 감시 | 공식 이메일과 발송 도메인 | 공개 주소·발신은 `contact@imagepartners.kr`, 운영 수신함은 `imgptns@gmail.com`이다. Resend API·송수신 도메인·서명 검증 수신 웹훅, Vercel 환경값, 발송/수신 MX·SPF·DKIM·DMARC가 운영 진단을 통과했다. Supabase Auth는 시간당 30건, 사용자별 60초 간격으로 Resend SMTP를 사용한다. 2026-08-05 한국어 가입 인증·비밀번호 재설정 메일 delivered, 인증 후 대시보드 로그인, 새 비밀번호 변경까지 확인했다. |
 | 운영정보 대기 | 국내 사업자·거래조건 공개 | 대표자명, 사업자등록번호, 전화번호, 통신판매업 신고 상태, 환불·증빙 정책을 받아 약관·개인정보처리방침·결제 화면의 현재 계좌이체 운영과 일치시킨다. |
 | 운영 배포·인증 회귀 완료 | 운영 마이그레이션·배포·회귀 확인 | 061~064와 앱이 운영에 반영됐고 공개 API·DB·health 및 인증 사용자 회귀를 확인했다. 재검증은 `scripts/production-photographer-e2e.mjs`로 수행하며 명시적 운영 확인 옵션과 종료 시 정리를 강제한다. |
 
