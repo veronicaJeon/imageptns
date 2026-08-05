@@ -83,6 +83,13 @@ interface BankTransferRequestState {
   account: NonNullable<CheckoutPrepareResponse["bankTransfer"]>["account"];
 }
 
+interface CheckoutReadiness {
+  paidOrdersAvailable: boolean;
+  disclosureComplete: boolean;
+  betaOverride: boolean;
+  accountConfigured: boolean;
+}
+
 // TEMPORARY: Toss 유료결제 우회(결제 pass). Toss live 연동 완료 시 이 플래그/관련 블록 제거.
 const PAYMENT_PASS_ENABLED = process.env.NEXT_PUBLIC_PAYMENT_PASS_ENABLED === "true";
 
@@ -156,6 +163,14 @@ const CHECKOUT_PAGE_COPY = {
     bankTransferHolder: "예금주",
     bankTransferConfirm: "확인했습니다",
     bankTransferSecureNote: "계좌이체 주문은 관리자 입금 확인 전까지 주문 대기 상태로 보관됩니다.",
+    termsTitle: "주문·라이선스 조건 동의 (필수)",
+    termsConsent: "주문 내용, 라이선스 조건, 취소·환불 정책을 확인했으며 원본 다운로드 권한 제공이 시작된 디지털 콘텐츠는 관계 법령과 사전 고지·동의에 따라 청약철회가 제한될 수 있음에 동의합니다.",
+    termsRequired: "주문 및 라이선스 조건에 동의해 주세요.",
+    businessInfo: "사업자정보·취소환불 정책",
+    termsLink: "이용약관",
+    licenseLink: "라이선스 안내",
+    paidOrdersUnavailable: "정식 유료 주문을 위한 사업자 공시사항을 준비하고 있습니다. 무료 사용권은 계속 이용할 수 있습니다.",
+    betaDisclosureNotice: "현재 제한 베타 운영 중입니다. 정식 공개 전 사업자 공시사항이 추가됩니다.",
     freeSecureNote: "무료 라이선스는 결제수단 입력 없이 즉시 확정됩니다.",
     widgetLoading: "결제 위젯 로딩 중...",
     baseTitle: "Base USDC 결제",
@@ -243,6 +258,14 @@ const CHECKOUT_PAGE_COPY = {
     bankTransferHolder: "Account holder",
     bankTransferConfirm: "Got it",
     bankTransferSecureNote: "Bank-transfer orders remain pending until an administrator confirms the deposit.",
+    termsTitle: "Order and license agreement (Required)",
+    termsConsent: "I have reviewed the order, license terms, and cancellation/refund policy, and understand that withdrawal may be restricted after original-file access begins where permitted by law and disclosed in advance.",
+    termsRequired: "Please agree to the order and license terms.",
+    businessInfo: "Business and refund information",
+    termsLink: "Terms of service",
+    licenseLink: "License guide",
+    paidOrdersUnavailable: "Public business disclosures are being prepared. Free licenses remain available.",
+    betaDisclosureNotice: "This is a limited beta. Full business disclosures will be published before the public launch.",
     freeSecureNote: "Free licenses are confirmed immediately without a payment method.",
     widgetLoading: "Loading payment widget...",
     baseTitle: "Base USDC payment",
@@ -314,6 +337,7 @@ function CheckoutContent() {
   const [licensePrices, setLicensePrices] = useState<Partial<Record<LicenseType, number>>>({});
   const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
   const [subscriptionEntitlement, setSubscriptionEntitlement] = useState<SubscriptionEntitlement | null>(null);
+  const [checkoutReadiness, setCheckoutReadiness] = useState<CheckoutReadiness | null>(null);
 
   useEffect(() => { init(); }, [init]);
 
@@ -348,6 +372,18 @@ function CheckoutContent() {
       })
       .catch(() => setSubscriptionEntitlement(null));
   }, [user]);
+
+  useEffect(() => {
+    fetch("/api/checkout/readiness", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: CheckoutReadiness) => setCheckoutReadiness(data))
+      .catch(() => setCheckoutReadiness({
+        paidOrdersAvailable: false,
+        disclosureComplete: false,
+        betaOverride: false,
+        accountConfigured: false,
+      }));
+  }, []);
 
   function displayPrice(imageId: string, license: LicenseType) {
     return priceOverrides[`${imageId}:${license}`] ?? licensePrices[license] ?? getLicensePrice(license);
@@ -385,6 +421,7 @@ function CheckoutContent() {
 
   const [billing, setBilling]   = useState({ name: "", email: "", company: "" });
   const [usagePurposeNote, setUsagePurposeNote] = useState("");
+  const [checkoutTermsAccepted, setCheckoutTermsAccepted] = useState(false);
   const [loading, setLoading]   = useState(false);
   const [widgetReady, setWidgetReady] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
@@ -393,6 +430,7 @@ function CheckoutContent() {
   const [baseRecovery, setBaseRecovery] = useState<BasePaymentRecovery | null>(null);
   const [bankTransferRequest, setBankTransferRequest] = useState<BankTransferRequestState | null>(null);
   const widgetRef = useRef<PaymentWidgetInstance | null>(null);
+  const checkoutAttemptRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const displayVat = paymentMethod === "base_usdc" ? 0 : vat;
   const displayTotal = subtotal + displayVat;
   const isFreeCheckout = total === 0;
@@ -431,6 +469,21 @@ function CheckoutContent() {
     return (v: string) => setBilling((p) => ({ ...p, [k]: v }));
   }
 
+  function checkoutRequestBody(provider: "toss" | "bank_transfer") {
+    const request = {
+      items: items.map((item) => ({ id: item.id, license: item.license })),
+      billing,
+      usagePurposeNote: usagePurposeNote.trim() || null,
+      paymentProvider: provider,
+      checkoutTermsAccepted,
+    };
+    const fingerprint = JSON.stringify(request);
+    if (!checkoutAttemptRef.current || checkoutAttemptRef.current.fingerprint !== fingerprint) {
+      checkoutAttemptRef.current = { fingerprint, key: crypto.randomUUID() };
+    }
+    return { ...request, checkoutIdempotencyKey: checkoutAttemptRef.current.key };
+  }
+
   // Load Toss widget when total is ready
   useEffect(() => {
     if (!ONLINE_PAYMENTS_ENABLED || paymentMethod !== "toss" || !total || typeof window === "undefined") return;
@@ -456,6 +509,14 @@ function CheckoutContent() {
     if (!billing.name || !billing.email) return;
     if (requiresUsagePurpose && !usagePurposeNote.trim()) {
       alert(copy.errors.usagePurposeRequired);
+      return;
+    }
+    if (!checkoutTermsAccepted) {
+      alert(copy.termsRequired);
+      return;
+    }
+    if (!isFreeCheckout && paymentMethod === "bank_transfer" && checkoutReadiness?.paidOrdersAvailable === false) {
+      alert(copy.paidOrdersUnavailable);
       return;
     }
 
@@ -489,11 +550,7 @@ function CheckoutContent() {
       const prepRes = await fetch("/api/checkout/prepare", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((i) => ({ id: i.id, license: i.license, price: i.price })),
-          billing,
-          usagePurposeNote: usagePurposeNote.trim() || null,
-        }),
+        body: JSON.stringify(checkoutRequestBody("toss")),
       });
       if (!prepRes.ok) throw new Error(copy.errors.orderCreate);
       const { orderId, orderName } = await prepRes.json() as CheckoutPrepareResponse;
@@ -520,11 +577,7 @@ function CheckoutContent() {
       const prepRes = await fetch("/api/checkout/prepare", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((i) => ({ id: i.id, license: i.license, price: i.price })),
-          billing,
-          usagePurposeNote: usagePurposeNote.trim() || null,
-        }),
+        body: JSON.stringify(checkoutRequestBody("toss")),
       });
       if (!prepRes.ok) throw new Error(await readApiError(prepRes, copy.errors.freeOrderCreate));
 
@@ -543,12 +596,7 @@ function CheckoutContent() {
       const prepRes = await fetch("/api/checkout/prepare", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((i) => ({ id: i.id, license: i.license, price: i.price })),
-          billing,
-          usagePurposeNote: usagePurposeNote.trim() || null,
-          paymentProvider: "bank_transfer",
-        }),
+        body: JSON.stringify(checkoutRequestBody("bank_transfer")),
       });
       if (!prepRes.ok) throw new Error(await readApiError(prepRes, copy.errors.bankTransferCreate));
       const prepared = await prepRes.json() as CheckoutPrepareResponse;
@@ -573,11 +621,7 @@ function CheckoutContent() {
       const prepRes = await fetch("/api/checkout/prepare", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((i) => ({ id: i.id, license: i.license, price: i.price })),
-          billing,
-          usagePurposeNote: usagePurposeNote.trim() || null,
-        }),
+        body: JSON.stringify(checkoutRequestBody("toss")),
       });
       if (!prepRes.ok) throw new Error(await readApiError(prepRes, copy.errors.orderCreate));
       const prepared = await prepRes.json() as CheckoutPrepareResponse;
@@ -990,10 +1034,44 @@ function CheckoutContent() {
               </div>
             )}
 
+            <section className="rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-4">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-on-surface">{copy.termsTitle}</h2>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold text-primary">
+                <Link href="/terms" target="_blank" rel="noopener noreferrer" className="hover:underline">{copy.termsLink}</Link>
+                <Link href="/license-guide" target="_blank" rel="noopener noreferrer" className="hover:underline">{copy.licenseLink}</Link>
+                <Link href="/business-info" target="_blank" rel="noopener noreferrer" className="hover:underline">{copy.businessInfo}</Link>
+              </div>
+              <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm leading-relaxed text-on-surface-variant">
+                <input
+                  type="checkbox"
+                  checked={checkoutTermsAccepted}
+                  onChange={(event) => setCheckoutTermsAccepted(event.target.checked)}
+                  required
+                  className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                />
+                <span>{copy.termsConsent}</span>
+              </label>
+              {!isFreeCheckout && paymentMethod === "bank_transfer" && checkoutReadiness?.betaOverride && !checkoutReadiness.disclosureComplete && (
+                <p className="mt-3 rounded bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                  {copy.betaDisclosureNotice}
+                </p>
+              )}
+              {!isFreeCheckout && paymentMethod === "bank_transfer" && checkoutReadiness?.paidOrdersAvailable === false && (
+                <p className="mt-3 rounded bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700 dark:bg-red-900/20 dark:text-red-200">
+                  {copy.paidOrdersUnavailable}
+                </p>
+              )}
+            </section>
+
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading || (!isFreeCheckout && paymentMethod === "toss" && !widgetReady)}
+              disabled={
+                loading
+                || !checkoutTermsAccepted
+                || (!isFreeCheckout && paymentMethod === "toss" && !widgetReady)
+                || (!isFreeCheckout && paymentMethod === "bank_transfer" && checkoutReadiness?.paidOrdersAvailable === false)
+              }
               className="w-full py-4 bg-primary text-white font-bold text-sm uppercase tracking-widest rounded hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading

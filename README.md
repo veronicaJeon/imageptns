@@ -1,4 +1,16 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Image Partners
+
+Image Partners is a Korea-focused B2B image library. Buyers can search curated images, request images, obtain free licenses, and request paid licenses by bank transfer. Approved photographers can upload images and use Mistral-assisted metadata generation; administrators review images and operate the service.
+
+The current production policy keeps bank-transfer orders available while online card payments, subscriptions, and on-chain payments remain hidden until their policies and operating requirements are approved.
+
+## Project documentation
+
+- [System definition](docs/system-definition.md): authoritative scope, actors, workflows, data, security boundaries, integrations, and operational baseline
+- [Document-driven development](docs/document-driven-development.md): required change process and Definition of Done
+- [Documentation index](docs/README.md): domain specifications, runbooks, and active backlog
+- [Operations backlog](docs/operations-backlog.md): verified remaining work and evidence
+- [Service terminology](docs/service-terminology.md): canonical Korean product language
 
 ## Getting Started
 

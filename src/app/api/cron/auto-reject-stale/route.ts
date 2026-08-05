@@ -8,6 +8,7 @@ import {
 } from "@/lib/images/hard-delete-server";
 import { authorizeCronRequest } from "@/lib/security/cron";
 import { uploadPathBelongsToUser } from "@/lib/uploads/security";
+import { dispatchPendingOrderEmails } from "@/lib/orders/email-outbox";
 
 export const maxDuration = 60;
 
@@ -167,6 +168,7 @@ async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient
     rateLimitRetention,
     uploadSessionRetention,
     photographerHiddenImageDeletion,
+    orderEmails,
   ] = await Promise.all([
     runRetentionCleanup(admin),
     admin.rpc("purge_old_operational_events"),
@@ -174,6 +176,7 @@ async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient
     admin.rpc("purge_expired_api_rate_limits"),
     purgeExpiredUploadSessions(admin),
     purgeExpiredPhotographerHiddenImages(admin),
+    dispatchPendingOrderEmails(10),
   ]);
   if (monitoringRetention.error) {
     console.error("[auto-reject-stale] monitoring retention failed:", monitoringRetention.error.message);
@@ -197,6 +200,7 @@ async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient
       : { ok: true as const, deleted: rateLimitRetention.data ?? 0 },
     uploadSessionRetention,
     photographerHiddenImageDeletion,
+    orderEmails,
   };
 }
 

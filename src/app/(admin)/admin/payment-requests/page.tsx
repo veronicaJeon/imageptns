@@ -30,6 +30,14 @@ interface PaymentRequest {
     price_krw: number;
     image: { id: string; title: string | null; asset_id: string | null; storage_path_preview: string | null } | null;
   }[];
+  order_email_outbox: {
+    event_type: string;
+    status: "pending" | "sending" | "sent" | "failed";
+    attempt_count: number;
+    last_error: string | null;
+    sent_at: string | null;
+    updated_at: string;
+  }[];
 }
 
 function formatKRW(value: number) {
@@ -69,7 +77,26 @@ export default function AdminPaymentRequestsPage() {
 
   useEffect(() => { loadRequests(); }, [loadRequests]);
 
-  async function handleAction(orderId: string, action: "approve" | "cancel") {
+  async function handleAction(orderId: string, action: "approve" | "cancel" | "resend") {
+    if (action === "resend") {
+      if (!confirm("전송되지 않은 주문 이메일을 다시 보낼까요?")) return;
+      setProcessingId(orderId);
+      try {
+        const res = await fetch("/api/admin/payment-requests", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId, action }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error ?? "이메일 재전송에 실패했습니다.");
+        await loadRequests();
+      } catch (error) {
+        alert(error instanceof Error ? error.message : "이메일 재전송에 실패했습니다.");
+      } finally {
+        setProcessingId(null);
+      }
+      return;
+    }
     const note = action === "approve"
       ? prompt("승인 메모를 입력하세요.", "입금 확인")
       : prompt("취소 사유를 입력하세요.", "오요청 또는 입금 미확인");
@@ -113,6 +140,8 @@ export default function AdminPaymentRequestsPage() {
         <div className="grid gap-4">
           {requests.map((request) => {
             const pending = request.status === "pending" && request.offline_payment_status === "requested";
+            const failedEmails = request.order_email_outbox?.filter((email) => email.status === "failed") ?? [];
+            const pendingEmails = request.order_email_outbox?.filter((email) => email.status === "pending" || email.status === "sending") ?? [];
             return (
               <article key={request.id} className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-ghost">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -128,6 +157,13 @@ export default function AdminPaymentRequestsPage() {
                       {request.billing_company ? ` · ${request.billing_company}` : ""}
                     </p>
                     <p className="mt-1 text-xs text-outline">요청일 {formatDate(request.offline_payment_requested_at ?? request.created_at)}</p>
+                    {failedEmails.length > 0 ? (
+                      <p className="mt-2 text-xs font-bold text-red-600">주문 이메일 전송 실패 {failedEmails.length}건</p>
+                    ) : pendingEmails.length > 0 ? (
+                      <p className="mt-2 text-xs font-bold text-amber-600">주문 이메일 전송 대기 {pendingEmails.length}건</p>
+                    ) : request.order_email_outbox?.length > 0 ? (
+                      <p className="mt-2 text-xs font-bold text-green-700">주문 이메일 전송 완료</p>
+                    ) : null}
                   </div>
                   <div className="text-left lg:text-right">
                     <p className="text-xs font-bold uppercase tracking-widest text-outline">입금 요청 금액</p>
@@ -158,6 +194,17 @@ export default function AdminPaymentRequestsPage() {
                 </div>
 
                 <div className="mt-5 flex flex-wrap justify-end gap-2">
+                  {(failedEmails.length > 0 || pendingEmails.length > 0) && (
+                    <AdminButton
+                      type="button"
+                      onClick={() => handleAction(request.id, "resend")}
+                      disabled={processingId === request.id}
+                      variant="secondary"
+                      size="md"
+                    >
+                      이메일 재전송
+                    </AdminButton>
+                  )}
                   {pending ? (
                     <>
                       <AdminButton

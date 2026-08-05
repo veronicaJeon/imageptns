@@ -209,6 +209,132 @@ export async function sendContactConfirmation(opts: {
   });
 }
 
+interface OrderEmailItem {
+  title: string;
+  assetId?: string | null;
+  licenseName: string;
+  priceKrw: number;
+}
+
+function orderItemsHtml(items: OrderEmailItem[]) {
+  return items.map((item) => `
+    <li>
+      <strong>${escapeHtml(item.title)}</strong>
+      ${item.assetId ? ` · ${escapeHtml(item.assetId)}` : ""}
+      · ${escapeHtml(item.licenseName)}
+      · ₩${item.priceKrw.toLocaleString("ko-KR")}
+    </li>
+  `).join("");
+}
+
+function orderPolicyLinksHtml() {
+  return `
+    <p>
+      <a href="${buildSiteUrl("/terms")}">이용약관</a> ·
+      <a href="${buildSiteUrl("/license-guide")}">라이선스 안내</a> ·
+      <a href="${buildSiteUrl("/business-info")}">사업자정보·취소환불 정책</a>
+    </p>
+  `;
+}
+
+export async function sendFreeOrderConfirmed(opts: {
+  buyerEmail: string;
+  buyerName: string;
+  orderNumber: string;
+  totalKrw: number;
+  items: OrderEmailItem[];
+}) {
+  await sendEmail({
+    to: opts.buyerEmail,
+    subject: `[Image Partners] 무료 사용권이 확정되었습니다 — ${opts.orderNumber}`,
+    html: `
+      <p>${escapeHtml(opts.buyerName)}님, 무료 사용권이 확정되었습니다.</p>
+      <p><strong>주문번호:</strong> ${escapeHtml(opts.orderNumber)}</p>
+      <ul>${orderItemsHtml(opts.items)}</ul>
+      <p><strong>합계:</strong> ₩${opts.totalKrw.toLocaleString("ko-KR")}</p>
+      <p><a href="${buildSiteUrl("/dashboard/orders")}">주문 내역에서 원본 다운로드하기 →</a></p>
+      ${orderPolicyLinksHtml()}
+      <p>이 메일은 주문 당시 계약내용에 관한 전자문서입니다. 필요한 기간 동안 보관해 주세요.</p>
+    `,
+  });
+}
+
+export async function sendBankTransferRequested(opts: {
+  buyerEmail: string;
+  buyerName: string;
+  orderNumber: string;
+  subtotalKrw: number;
+  vatKrw: number;
+  totalKrw: number;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  items: OrderEmailItem[];
+}) {
+  await sendEmail({
+    to: opts.buyerEmail,
+    subject: `[Image Partners] 계좌이체 요청이 접수되었습니다 — ${opts.orderNumber}`,
+    html: `
+      <p>${escapeHtml(opts.buyerName)}님, 계좌이체 요청이 접수되었습니다.</p>
+      <p><strong>주문번호:</strong> ${escapeHtml(opts.orderNumber)}</p>
+      <ul>${orderItemsHtml(opts.items)}</ul>
+      <p>공급가액 ₩${opts.subtotalKrw.toLocaleString("ko-KR")} · VAT ₩${opts.vatKrw.toLocaleString("ko-KR")} · <strong>입금액 ₩${opts.totalKrw.toLocaleString("ko-KR")}</strong></p>
+      <p><strong>입금계좌:</strong> ${escapeHtml(opts.bankName)} ${escapeHtml(opts.accountNumber)} / 예금주 ${escapeHtml(opts.accountHolder)}</p>
+      <p>운영팀이 입금을 확인하면 주문이 확정되고 원본 다운로드 권한이 열립니다.</p>
+      ${orderPolicyLinksHtml()}
+      <p>이 메일은 주문 당시 계약내용에 관한 전자문서입니다. 필요한 기간 동안 보관해 주세요.</p>
+    `,
+  });
+}
+
+export async function notifyOpsBankTransferRequested(opts: {
+  buyerEmail: string;
+  buyerName: string;
+  orderNumber: string;
+  totalKrw: number;
+  items: OrderEmailItem[];
+}) {
+  await sendEmail({
+    to: OPS_EMAIL,
+    replyTo: opts.buyerEmail,
+    subject: `[계좌이체 요청] ${opts.orderNumber} — ₩${opts.totalKrw.toLocaleString("ko-KR")}`,
+    html: `
+      <p><strong>구매자:</strong> ${escapeHtml(opts.buyerName)} (${escapeHtml(opts.buyerEmail)})</p>
+      <p><strong>주문번호:</strong> ${escapeHtml(opts.orderNumber)}</p>
+      <p><strong>요청금액:</strong> ₩${opts.totalKrw.toLocaleString("ko-KR")}</p>
+      <ul>${orderItemsHtml(opts.items)}</ul>
+      <p><a href="${buildSiteUrl("/admin/payment-requests")}">관리자 입금확인 화면 열기 →</a></p>
+    `,
+  });
+}
+
+export async function sendBankTransferReviewed(opts: {
+  buyerEmail: string;
+  buyerName: string;
+  orderNumber: string;
+  status: "approved" | "canceled";
+  totalKrw: number;
+  note?: string | null;
+  items: OrderEmailItem[];
+}) {
+  const approved = opts.status === "approved";
+  await sendEmail({
+    to: opts.buyerEmail,
+    subject: `[Image Partners] 계좌이체 주문이 ${approved ? "확정" : "취소"}되었습니다 — ${opts.orderNumber}`,
+    html: `
+      <p>${escapeHtml(opts.buyerName)}님, 계좌이체 주문이 <strong>${approved ? "확정" : "취소"}</strong>되었습니다.</p>
+      <p><strong>주문번호:</strong> ${escapeHtml(opts.orderNumber)}</p>
+      <p><strong>금액:</strong> ₩${opts.totalKrw.toLocaleString("ko-KR")}</p>
+      <ul>${orderItemsHtml(opts.items)}</ul>
+      ${opts.note ? `<p><strong>운영 메모:</strong> ${escapeHtml(opts.note)}</p>` : ""}
+      ${approved
+        ? `<p><a href="${buildSiteUrl("/dashboard/orders")}">주문 내역에서 원본 다운로드하기 →</a></p>`
+        : `<p>입금 또는 환급 확인이 필요한 경우 ${PUBLIC_CONTACT_EMAIL}으로 문의해 주세요.</p>`}
+      ${orderPolicyLinksHtml()}
+    `,
+  });
+}
+
 export async function notifyOpsContact(opts: {
   name:    string;
   email:   string;

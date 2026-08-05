@@ -92,6 +92,39 @@ describe("Resend routing", () => {
     expect(body.html).toContain("둘째 이미지");
   });
 
+  it("sends a bank-transfer contract email with order, account, and policy links", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://www.imagepartners.kr");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "email-order" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { sendBankTransferRequested } = await import("./resend");
+    await sendBankTransferRequested({
+      buyerEmail: "buyer@example.com",
+      buyerName: "구매자 <script>",
+      orderNumber: "ORD-000000000001",
+      subtotalKrw: 15_000,
+      vatKrw: 1_500,
+      totalKrw: 16_500,
+      bankName: "테스트은행",
+      accountNumber: "123-456",
+      accountHolder: "이미지파트너스",
+      items: [{ title: "출판 이미지", assetId: "IP-000000000001", licenseName: "에디토리얼", priceKrw: 15_000 }],
+    });
+
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(String(request.body)) as { to?: string; subject?: string; html?: string };
+    expect(body.to).toBe("buyer@example.com");
+    expect(body.subject).toContain("ORD-000000000001");
+    expect(body.html).toContain("123-456");
+    expect(body.html).toContain("/business-info");
+    expect(body.html).toContain("/license-guide");
+    expect(body.html).not.toContain("<script>");
+  });
+
   it("requires a verified sending and receiving domain plus inbound webhook", async () => {
     vi.stubEnv("RESEND_API_KEY", "valid-key");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://www.imagepartners.kr");

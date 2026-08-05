@@ -6,6 +6,23 @@ export interface BankTransferAccount {
   notice: string;
 }
 
+interface BankTransferEnvironment {
+  [key: string]: string | undefined;
+  BANK_TRANSFER_ACCOUNT_LABEL?: string;
+  BANK_TRANSFER_BANK_NAME?: string;
+  BANK_TRANSFER_ACCOUNT_NUMBER?: string;
+  BANK_TRANSFER_ACCOUNT_HOLDER?: string;
+}
+
+export function bankTransferAccountIsConfigured(env: BankTransferEnvironment = process.env) {
+  return Boolean(
+    env.BANK_TRANSFER_ACCOUNT_LABEL?.trim()
+    && env.BANK_TRANSFER_BANK_NAME?.trim()
+    && env.BANK_TRANSFER_ACCOUNT_NUMBER?.trim()
+    && env.BANK_TRANSFER_ACCOUNT_HOLDER?.trim(),
+  );
+}
+
 export function getBankTransferAccount(): BankTransferAccount {
   return {
     label: process.env.BANK_TRANSFER_ACCOUNT_LABEL ?? "Image Partners 계좌",

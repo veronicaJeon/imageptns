@@ -10,6 +10,7 @@
     "supabase:status": "npx supabase status --workdir .",
     "supabase:reset": "npx supabase db reset --workdir .",
     "supabase:check": "node scripts/check-local-supabase.mjs",
+    "e2e:production:checkout": "node scripts/production-checkout-e2e.mjs --confirm-production",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
