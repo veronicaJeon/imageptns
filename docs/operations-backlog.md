@@ -15,6 +15,7 @@
 | P1 | 결함 확인 | 운영 모니터링 컬럼·경로 | `data_retention_runs`의 실제 `result/created_at`을 조회하고 AI cron 이벤트 경로를 바로잡는다. |
 | P1 | 도입 검토 | 외부 오류 추적·호출 알림 | 개인정보 마스킹을 전제로 P0 오류 즉시 알림과 release 연계를 추가한다. |
 | P1 | 제거 검토 | 미사용 AI SDK | Anthropic·Google Generative AI SDK가 실제 미사용임을 재확인하고 운영 의존성에서 제거한다. |
+| P1 | 경고 확인 | GitHub Actions Node 런타임 | CI는 통과하지만 `actions/checkout@v4`와 `supabase/setup-cli@v1`의 Node 20 지원 종료 경고가 있다. 호환되는 최신 action으로 올리고 fresh migration과 앱 CI를 재검증한다. |
 
 예약 작업은 2026-08-05 운영에서 데이터 정리와 AI 합성 진단이 모두 성공했다. 과거의 `CRON_SECRET` 수동 인증 불일치는 현재 실행 차단으로 재현되지 않아 관찰 항목으로 낮춘다.
 
