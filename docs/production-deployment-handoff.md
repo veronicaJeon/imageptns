@@ -4,14 +4,14 @@
 
 ## 현재 운영 기준점
 
-- 배포 시각: 2026-08-05 23:59 KST
+- 배포 시각: 2026-08-06 08:27 KST
 - 릴리스 브랜치: `main`
-- 릴리스 커밋 SHA: `a6bae70` (운영 기준점 갱신은 문서·DB 후속 커밋)
-- 배포 소스 문서 커밋 SHA: `a6bae70`
-- Production deployment ID: `dpl_Fjy7ncusmy6DDamVBKoSTSmLcH4o`
-- Production URL: `https://imageptns-qsdenl1a6-veronicajeons-projects.vercel.app`
+- 릴리스 커밋 SHA: `8986849` (운영 기준점 갱신과 E2E 스크립트는 문서 후속 커밋)
+- 배포 소스 문서 커밋 SHA: `8986849`
+- Production deployment ID: `dpl_57VbUjdaeZeaWgZpsct2WKk8SEU9`
+- Production URL: `https://imageptns-cw6tvvs21-veronicajeons-projects.vercel.app`
 - 운영 상태: `Ready`, `https://www.imagepartners.kr` alias 연결 확인
-- 검증 기준: 80개 테스트 파일·336개 테스트 통과, 린트 오류 0(경고 11건), TypeScript·프로덕션 빌드·전체 audit 통과, 운영 DB·스토리지·미리보기 무결성·AI health `ok`, 계좌이체 주문·메일·승인·취소·원본 다운로드 운영 E2E 통과
+- 검증 기준: 81개 테스트 파일·338개 테스트 통과, 린트 오류 0(경고 11건), TypeScript·프로덕션 빌드·전체 audit 통과, fresh migration 001~068 적용, 운영 DB·스토리지·미리보기 무결성·AI health `ok`, 중복 업로드·관리자 후보 비교·사유 필수 예외승인 운영 E2E 통과
 
 다음 배포 담당자는 이 기준점과 새 배포의 ID·생성 시각·alias를 비교해 실제 전환 여부를 판단한다.
 
@@ -46,6 +46,8 @@
 운영자는 Mistral 기반 제목·설명·키워드 자동 생성 기능이 실제로 작동 중임을 확인했다. 별도 환경 파일 검사에서 얻은 값만으로 운영 키 교체가 필요하다고 판단하지 않으며, 키를 변경하지 않는다. Groq는 과거 실험 흔적이므로 호출 경로와 개인정보처리방침의 처리자 목록에서 제거한다. 향후 AI 이중화는 새 공급자 또는 내부 모델의 품질·비용·보유정책을 검증한 뒤 별도 도입한다.
 
 2026-08-05 공개 거래 준비 릴리스에서는 마이그레이션 065~067로 주문·항목·정책 스냅샷의 원자 생성, idempotency, 거래 메일 outbox와 직접 주문 insert 차단을 적용했다. 주문 화면은 필수 동의와 사업자 공시 준비 상태를 표시하며, 관리자는 접수·승인·취소 메일 실패를 확인하고 재전송할 수 있다. 실제 공시값 확정 전에는 `ALLOW_INCOMPLETE_DISCLOSURE_BETA=true`로 제한 베타만 유지하고 정식 공개 전에 값을 게시한 뒤 `false`로 전환한다.
+
+2026-08-06 릴리스에서는 마이그레이션 068로 이미지 지문과 중복 공개 제약을 적용했다. 운영 기존 이미지 85건 중 76건을 지문 백필했고 원본 경로가 없는 9건은 건너뛰었으며 실패는 없었다. 같은 사진가 exact 중복은 `409 DUPLICATE_UPLOAD`, 다른 사진가 exact 중복은 관리자 `중복` 후보와 비교 이미지로 표시되고 사유·감사로그가 있는 예외승인만 공개된다. 72시간 유지보수는 점검 실패와 운영 백로그에서 고정 ID 후보 이슈를 누적하고 저장소 권한자의 승인·거절을 받는 개선 루프로 확장했다.
 
 ## 2주차 착수 순서
 
