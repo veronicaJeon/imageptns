@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   const { id } = await params;
   if (id === adminUser.id) {
-    return NextResponse.json({ error: "자기 자신의 사진가 권한은 회수할 수 없습니다." }, { status: 400 });
+    return NextResponse.json({ error: "자기 자신의 사진작가 권한은 회수할 수 없습니다." }, { status: 400 });
   }
 
   const body = await req.json().catch(() => null) as { reason?: unknown } | null;
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   if (loadError) return NextResponse.json({ error: loadError.message }, { status: 404 });
   if (before.photographer_status === "none") {
-    return NextResponse.json({ error: "사진가 신청 이력이 없는 회원입니다." }, { status: 400 });
+    return NextResponse.json({ error: "사진작가 신청 이력이 없는 회원입니다." }, { status: 400 });
   }
   if (before.photographer_status === "suspended") {
     return NextResponse.json({ profile: before, duplicated: true });

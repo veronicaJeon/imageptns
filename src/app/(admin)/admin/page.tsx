@@ -328,7 +328,7 @@ export default function AdminPage() {
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-error">이전 자격증명 등록이 실패했습니다.</p>
                         <p className="text-xs text-on-surface-variant mt-1">
-                          승인 후 첫 판매가 완료되면 사진가가 블록체인 사진 화면에서 재등록을 요청할 수 있습니다.
+                          승인 후 첫 판매가 완료되면 사진작가가 블록체인 이미지 화면에서 재등록을 요청할 수 있습니다.
                         </p>
                         {img.proof_tx_hash && (
                           <p className="text-[10px] font-mono text-outline mt-1 truncate">tx {img.proof_tx_hash}</p>

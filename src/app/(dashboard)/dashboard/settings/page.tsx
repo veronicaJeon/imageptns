@@ -176,7 +176,7 @@ export default function SettingsPage() {
   }
 
   async function handleUpgradeToPhotographer() {
-    if (!confirm("사진가 신청을 접수하시겠습니까?\n관리자 확인 후 업로드 및 판매 기능이 활성화됩니다.")) return;
+    if (!confirm("사진작가 신청을 접수하시겠습니까?\n관리자 확인 후 업로드 및 판매 기능이 활성화됩니다.")) return;
     setUpgradeLoading(true);
     setUpgradeError("");
     try {
@@ -210,7 +210,7 @@ export default function SettingsPage() {
         setUpgradeDone(true);
         await init();
       } else {
-        setUpgradeError(body?.error ?? "사진가 신청을 접수하지 못했습니다.");
+        setUpgradeError(body?.error ?? "사진작가 신청을 접수하지 못했습니다.");
       }
     } finally {
       setUpgradeLoading(false);
@@ -382,7 +382,7 @@ export default function SettingsPage() {
                     }}
                     icon="account_balance_wallet"
                     placeholder="0x..."
-                    hint="사진 승인 증명과 USDC 정산에 사용할 Base 지갑입니다."
+                    hint="이미지 승인 증명과 USDC 정산에 사용할 Base 지갑입니다."
                   />
                   <Button
                     type="button"
@@ -471,7 +471,7 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3 px-5 py-4 bg-primary/5 border border-primary/20 rounded-lg">
             <span className="material-symbols-outlined text-xl text-primary">photo_camera</span>
             <div>
-              <p className="text-sm font-bold text-on-surface">사진가 계정</p>
+              <p className="text-sm font-bold text-on-surface">사진작가 계정</p>
               <p className="text-xs text-on-surface-variant mt-0.5">관리자 승인이 완료되어 이미지 업로드 및 판매 기능을 사용할 수 있습니다.</p>
             </div>
           </div>
@@ -496,10 +496,10 @@ export default function SettingsPage() {
               </span>
               <div>
                 <p className="text-sm font-bold text-on-surface">
-                  {photographerStatus === "suspended" ? "사진가 권한 중지" : "현재 역할: 바이어"}
+                  {photographerStatus === "suspended" ? "사진작가 권한 중지" : "현재 역할: 바이어"}
                 </p>
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-                  사진가 신청을 접수하면 관리자가 통화로 활동 정보를 확인한 뒤 승인합니다.<br />
+                  사진작가 신청을 접수하면 관리자가 통화로 활동 정보를 확인한 뒤 승인합니다.<br />
                   승인 전에도 기존 바이어 기능은 그대로 이용할 수 있습니다.
                 </p>
                 {photographerApplication?.rejection_reason && (
@@ -553,7 +553,7 @@ export default function SettingsPage() {
               ) : (
                 <span className="material-symbols-outlined text-sm">photo_camera</span>
               )}
-              {upgradeLoading ? "신청 중…" : photographerStatus === "suspended" ? "사진가 재신청" : "사진가 신청"}
+              {upgradeLoading ? "신청 중…" : photographerStatus === "suspended" ? "사진작가 재신청" : "사진작가 신청"}
             </button>
           </div>
         )}

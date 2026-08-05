@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       photographer_id, storage_path_preview, storage_path_full, storage_path_original, original_filename,
       file_size_mb, width, height, sales_count, proof_status, proof_tx_hash,
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
-      created_at,
+      proof_arweave_confirmed_at, created_at,
       photographer:profiles!photographer_id(full_name)
     `)
     .lt("created_at", createdBefore)

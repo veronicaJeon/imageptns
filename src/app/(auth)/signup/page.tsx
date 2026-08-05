@@ -199,7 +199,7 @@ export default function SignupPage() {
                 type="button"
                 onClick={() => {
                   if (role === "photographer" && (!phoneNumber.trim() || !activityRegions.trim())) {
-                    setError("사진가 신청을 위해 연락처와 주요 활동 지역을 입력해주세요.");
+                    setError("사진작가 신청을 위해 연락처와 주요 활동 지역을 입력해주세요.");
                     return;
                   }
                   setLoading(true);

@@ -97,7 +97,7 @@ export async function PATCH(req: NextRequest) {
     action: "deletion_fee_settings.updated",
     targetType: "platform_fee_settings",
     targetId: "image_deletion_fees",
-    targetLabel: "사진 삭제 요청 수수료",
+    targetLabel: "이미지 삭제 요청 수수료",
     before: { settings: before ?? [] },
     after: { settings: data ?? [] },
   });

@@ -51,7 +51,7 @@ export const ko: Translations = {
       privacyLink: "개인정보처리방침",
     },
     brand: {
-      tagline: "사진은 과거의 증명입니다.",
+      tagline: "이미지는 과거의 증명입니다.",
       quote: "\"모든 이미지는 이야기를 기다리고 있습니다.\"",
     },
   },
@@ -94,7 +94,7 @@ export const ko: Translations = {
       { question: "라이선스 이미지를 다운로드하려면 어떻게 하나요?", answer: "무료 라이선스는 사용 조건을 확인하고 주문을 확정하면, 유료 라이선스는 계좌이체 후 관리자가 입금을 확인하면 대시보드 주문 내역에서 원본을 다운로드할 수 있습니다." },
       { question: "어떤 라이선스 종류가 있나요?", answer: "이미지별로 Image Partners 표준 라이선스, 에디토리얼 조건, Creative Commons 조건 등이 표시됩니다. 실제 허용 범위는 이미지 상세와 라이선스 안내, 주문 확인서를 함께 확인해 주세요." },
       { question: "SNS에 이미지를 사용할 수 있나요?", answer: "이미지별 라이선스와 사용 목적에 따라 다릅니다. 상업 이용 허용 여부, 출처 표시, 변경 허용 조건을 확인하고 범위가 불분명하면 사용 전에 문의해 주세요." },
-      { question: "사진을 어떻게 제출하나요?", answer: "회원가입 후 사진가 신청이 승인되면 대시보드 → 업로드에서 사진을 제출할 수 있습니다. 제출된 이미지는 운영 검토 후 승인 또는 반려됩니다." },
+      { question: "이미지를 어떻게 제출하나요?", answer: "회원가입 후 사진작가 신청이 승인되면 대시보드 → 업로드에서 이미지를 제출할 수 있습니다. 제출된 이미지는 운영 검토 후 승인 또는 반려됩니다." },
       { question: "어떤 파일 형식을 지원하나요?", answer: "현재 업로드 화면은 JPEG를 지원하며 이미지당 최대 100MB·120메가픽셀입니다. 권리정보와 제목·설명·태그, 촬영정보를 함께 입력해야 합니다." },
       { question: "사진작가 수익은 언제, 어떻게 정산되나요?", answer: "수익배분율과 정산 일정은 아직 최종 확정 전입니다. 실제 판매·정산을 시작하기 전에 적용 기준을 별도로 안내하고 동의를 받습니다." },
       { question: "구독 상품을 이용할 수 있나요?", answer: "현재 정기 구독과 온라인 카드 결제는 공개하지 않았습니다. 유료 이미지는 계좌이체 요청 후 입금 확인 방식으로 이용할 수 있습니다." },
@@ -104,7 +104,7 @@ export const ko: Translations = {
     noResults: "검색 결과가 없습니다.",
   },
   dashboard: {
-    nav: { overview: "개요", sourcing: "내 소싱 요청", favorites: "즐겨찾기", orders: "주문 내역", uploads: "업로드", requests: "운영팀 요청", blockchain: "블록체인 사진", earnings: "수익", settings: "설정" },
+    nav: { overview: "개요", sourcing: "내 소싱 요청", favorites: "즐겨찾기", orders: "주문 내역", uploads: "업로드", requests: "운영팀 요청", blockchain: "블록체인 이미지", earnings: "수익", settings: "설정" },
     role: { buyer: "바이어", photographer: "사진작가" },
     overview: {
       greeting: "반갑습니다",
@@ -173,7 +173,7 @@ export const ko: Translations = {
     comingSoonSub: "법무팀에서 문서를 검토 중입니다. 곧 공개될 예정입니다.",
   },
   contact: {
-    hero: { headline: "문의하기.", sub: "에디토리얼 팀이 적합한 이미지를 찾는 데 도움을 드립니다." },
+    hero: { headline: "문의하기.", sub: "적합한 이미지를 찾는 데 도움을 드립니다." },
     form: { name: "이름", namePlaceholder: "홍길동", email: "이메일", emailPlaceholder: "you@example.com", subject: "제목", subjectPlaceholder: "어떻게 도와드릴까요?", message: "메시지", messagePlaceholder: "프로젝트에 대해 알려주세요…", submit: "메시지 보내기" },
     info: { title: "연락처 정보", email: "contact@imagepartners.kr", hours: "운영 시간", hoursVal: "월–금, 오전 9시–오후 6시 (KST)", response: "응답 시간", responseVal: "영업일 기준 1일 이내" },
     success: "메시지가 전송되었습니다! 영업일 기준 하루 안에 연락드리겠습니다.",

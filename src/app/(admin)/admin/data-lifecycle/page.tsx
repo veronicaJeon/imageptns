@@ -55,7 +55,7 @@ const FIELDS: Array<{
   {
     key: "rejected_image_retention_days",
     label: "반려된 이미지 보관주기",
-    description: "반려 시점부터 사진가의 업로드 목록에 보관할 기간입니다. 기간이 지나면 자동으로 아카이브되어 목록에서 사라집니다.",
+    description: "반려 시점부터 사진작가의 업로드 목록에 보관할 기간입니다. 기간이 지나면 자동으로 아카이브되어 목록에서 사라집니다.",
     min: 1,
     max: 365,
     required: true,

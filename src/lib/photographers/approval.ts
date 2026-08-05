@@ -39,9 +39,9 @@ export type PhotographerAuthorization =
     };
 
 const PHOTOGRAPHER_STATUS_MESSAGES: Record<Exclude<PhotographerStatus, "approved">, string> = {
-  none: "사진가 신청을 접수하면 관리자 확인 후 업로드 기능을 사용할 수 있습니다.",
-  pending: "사진가 신청이 승인 대기 중입니다. 관리자가 통화 후 활동 정보를 확인하고 있어요.",
-  suspended: "사진가 권한이 중지되었습니다. 활동 정보를 보완해 재신청할 수 있습니다.",
+  none: "사진작가 신청을 접수하면 관리자 확인 후 업로드 기능을 사용할 수 있습니다.",
+  pending: "사진작가 신청이 승인 대기 중입니다. 관리자가 통화 후 활동 정보를 확인하고 있어요.",
+  suspended: "사진작가 권한이 중지되었습니다. 활동 정보를 보완해 재신청할 수 있습니다.",
 };
 
 function cleanText(value: unknown, fieldName: string, maxLength: number, required: boolean) {
@@ -86,7 +86,7 @@ export function canApplyForPhotographer(status: unknown) {
 
 export function getPhotographerAccessMessage(status: unknown) {
   const normalized = normalizePhotographerStatus(status);
-  if (normalized === "approved") return "사진가 기능을 사용할 수 있습니다.";
+  if (normalized === "approved") return "사진작가 기능을 사용할 수 있습니다.";
   return PHOTOGRAPHER_STATUS_MESSAGES[normalized];
 }
 

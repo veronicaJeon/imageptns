@@ -90,7 +90,7 @@ export function buildOrderReceiptHtml(order: ReceiptOrder) {
   <header>
     <div>
       <div class="brand">IMAGE PARTNERS</div>
-      <h1>사진 구매 영수증</h1>
+      <h1>이미지 구매 영수증</h1>
     </div>
     <div>
       <span class="label">Order No.</span>
@@ -128,7 +128,7 @@ export function buildOrderReceiptHtml(order: ReceiptOrder) {
   </section>
 
   <footer>
-    본 영수증은 Image Partners 플랫폼의 사진 라이선스 구매 내역을 확인하기 위한 문서입니다.
+    본 영수증은 Image Partners 플랫폼의 이미지 라이선스 구매 내역을 확인하기 위한 문서입니다.
     실제 이용 범위는 구매 시점의 라이선스 조건과 서비스 약관을 기준으로 합니다.
   </footer>
 </body>

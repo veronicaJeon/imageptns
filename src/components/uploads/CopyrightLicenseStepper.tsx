@@ -25,7 +25,7 @@ const COPY = {
     step1: "수익 창출",
     step2: "무료 공개",
     step3: "사용 조건",
-    revenueQuestion: "이 사진으로 수익을 창출(판매)하시겠습니까?",
+    revenueQuestion: "이 이미지로 수익을 창출(판매)하시겠습니까?",
     paidTitle: "예, 유료 라이선스로 판매할게요",
     paidBody: "판매 수익 정산을 받는 Image Partners Standard가 적용됩니다.",
     freeTitle: "아니요, 무료로 공개할게요",

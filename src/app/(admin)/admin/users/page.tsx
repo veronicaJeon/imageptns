@@ -262,8 +262,8 @@ export default function AdminUsersPage() {
 
   async function suspendPhotographerAccess() {
     if (!detail) return;
-    const reason = prompt("사진가 권한 회수 사유를 입력하세요. 사용자에게 안내될 수 있습니다.")?.trim() ?? "";
-    if (!confirm(`${detail.full_name || detail.email || detail.id} 회원의 사진가 권한을 회수할까요?`)) return;
+    const reason = prompt("사진작가 권한 회수 사유를 입력하세요. 사용자에게 안내될 수 있습니다.")?.trim() ?? "";
+    if (!confirm(`${detail.full_name || detail.email || detail.id} 회원의 사진작가 권한을 회수할까요?`)) return;
 
     setSuspendingPhotographer(true);
     try {
@@ -273,7 +273,7 @@ export default function AdminUsersPage() {
         body: JSON.stringify({ reason }),
       });
       const body = await res.json().catch(() => null) as { profile?: UserDetail; error?: string } | null;
-      if (!res.ok) throw new Error(body?.error ?? "사진가 권한을 회수하지 못했습니다.");
+      if (!res.ok) throw new Error(body?.error ?? "사진작가 권한을 회수하지 못했습니다.");
 
       setDetail((current) => current ? { ...current, photographer_status: "suspended" } : current);
       setUsers((current) =>
@@ -282,7 +282,7 @@ export default function AdminUsersPage() {
         ),
       );
     } catch (error) {
-      alert(error instanceof Error ? error.message : "사진가 권한을 회수하지 못했습니다.");
+      alert(error instanceof Error ? error.message : "사진작가 권한을 회수하지 못했습니다.");
     } finally {
       setSuspendingPhotographer(false);
     }
@@ -298,7 +298,7 @@ export default function AdminUsersPage() {
       : "";
 
     if (action === "reject" && !rejectionReason) return;
-    if (!confirm(`${application.applicant_name}님의 사진가 신청을 ${action === "approve" ? "승인" : "거절"}할까요?`)) return;
+    if (!confirm(`${application.applicant_name}님의 사진작가 신청을 ${action === "approve" ? "승인" : "거절"}할까요?`)) return;
 
     setReviewingPhotographerApplication(true);
     try {
@@ -317,7 +317,7 @@ export default function AdminUsersPage() {
         error?: string;
       } | null;
       if (!res.ok || !body?.application) {
-        throw new Error(body?.error ?? "사진가 신청 검토 결과를 저장하지 못했습니다.");
+        throw new Error(body?.error ?? "사진작가 신청 검토 결과를 저장하지 못했습니다.");
       }
 
       const reviewedApplication = body.application;
@@ -350,7 +350,7 @@ export default function AdminUsersPage() {
         ),
       );
     } catch (error) {
-      alert(error instanceof Error ? error.message : "사진가 신청 검토 결과를 저장하지 못했습니다.");
+      alert(error instanceof Error ? error.message : "사진작가 신청 검토 결과를 저장하지 못했습니다.");
     } finally {
       setReviewingPhotographerApplication(false);
     }
@@ -384,7 +384,7 @@ export default function AdminUsersPage() {
             onChange={(event) => setPhotographerStatus(event.target.value)}
             className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
           >
-            <option value="all">전체 사진가상태</option>
+            <option value="all">전체 사진작가 상태</option>
             <option value="pending">승인대기</option>
             <option value="approved">승인됨</option>
             <option value="suspended">중지됨</option>
@@ -474,7 +474,7 @@ export default function AdminUsersPage() {
                 {detail.photographer_status !== "none" && (
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <AdminChip tone={adminStatusTone(detail.photographer_status)}>
-                      사진가 {PHOTOGRAPHER_STATUS_LABELS[detail.photographer_status]}
+                      사진작가 {PHOTOGRAPHER_STATUS_LABELS[detail.photographer_status]}
                     </AdminChip>
                     {detail.photographer_status === "approved" && (
                       <AdminButton
@@ -483,7 +483,7 @@ export default function AdminUsersPage() {
                         disabled={suspendingPhotographer}
                         variant="danger"
                       >
-                        {suspendingPhotographer ? "처리 중" : "사진가 권한 회수"}
+                        {suspendingPhotographer ? "처리 중" : "사진작가 권한 회수"}
                       </AdminButton>
                     )}
                   </div>
@@ -492,7 +492,7 @@ export default function AdminUsersPage() {
                   <div className="mt-4 rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사진가 신청</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">사진작가 신청</p>
                         <p className="mt-1 text-sm font-semibold text-on-surface">
                           {detail.latest_photographer_application.applicant_name}
                         </p>
@@ -540,7 +540,7 @@ export default function AdminUsersPage() {
                           variant="primary"
                           size="md"
                         >
-                          {reviewingPhotographerApplication ? "처리 중" : "사진가 승인"}
+                          {reviewingPhotographerApplication ? "처리 중" : "사진작가 승인"}
                         </AdminButton>
                         <AdminButton
                           type="button"

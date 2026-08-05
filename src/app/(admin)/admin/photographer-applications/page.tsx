@@ -58,10 +58,10 @@ export default function AdminPhotographerApplicationsPage() {
       if (status !== "all") params.set("status", status);
       const res = await fetch(`/api/admin/photographer-applications?${params.toString()}`);
       const body = await res.json().catch(() => null) as { applications?: PhotographerApplication[]; error?: string } | null;
-      if (!res.ok) throw new Error(body?.error ?? "사진가 신청 목록을 불러오지 못했습니다.");
+      if (!res.ok) throw new Error(body?.error ?? "사진작가 신청 목록을 불러오지 못했습니다.");
       setApplications(body?.applications ?? []);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "사진가 신청 목록을 불러오지 못했습니다.");
+      alert(error instanceof Error ? error.message : "사진작가 신청 목록을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
@@ -111,8 +111,8 @@ export default function AdminPhotographerApplicationsPage() {
     <div className="p-6 md:p-10">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">사진가 승인</h1>
-          <p className="mt-1 text-sm text-outline">사진가 가입과 재신청을 검토하고 승인 또는 거절합니다.</p>
+          <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">사진작가 승인</h1>
+          <p className="mt-1 text-sm text-outline">사진작가 가입과 재신청을 검토하고 승인 또는 거절합니다.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {(["pending", "approved", "rejected", "all"] as const).map((value) => (

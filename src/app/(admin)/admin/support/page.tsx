@@ -189,8 +189,8 @@ function displayList(values?: string[] | null) {
 }
 
 const SOURCING_PURPOSE_LABELS: Record<string, string> = {
-  rights_check: "동일 사진 권리 확인",
-  similar_search: "유사 사진 탐색",
+  rights_check: "동일 이미지 권리 확인",
+  similar_search: "유사 이미지 탐색",
   supply_check: "보유 이미지 확인",
   context_reference: "설명 참고",
   shooting_request: "신규 촬영 검토",
@@ -234,11 +234,11 @@ function PhotographerCandidatePicker({
       const params = new URLSearchParams({ region, q: query });
       const response = await fetch(`/api/admin/photographers/search?${params}`);
       const body = await response.json().catch(() => null) as { photographers?: PhotographerCandidate[]; error?: string } | null;
-      if (!response.ok) throw new Error(body?.error ?? "사진가 목록을 불러오지 못했습니다.");
+      if (!response.ok) throw new Error(body?.error ?? "사진작가 목록을 불러오지 못했습니다.");
       setPhotographers(body?.photographers ?? []);
       setSelectedIds([]);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "사진가 목록을 불러오지 못했습니다.");
+      alert(error instanceof Error ? error.message : "사진작가 목록을 불러오지 못했습니다.");
     } finally {
       setSearching(false);
     }
@@ -259,12 +259,12 @@ function PhotographerCandidatePicker({
         }),
       });
       const body = await response.json().catch(() => null) as { inserted?: number; skipped?: number; error?: string } | null;
-      if (!response.ok) throw new Error(body?.error ?? "선택한 사진가를 후보로 추가하지 못했습니다.");
-      alert(`사진가 ${body?.inserted ?? 0}명을 후보로 추가했습니다.${body?.skipped ? ` 중복/제외 ${body.skipped}명` : ""}`);
+      if (!response.ok) throw new Error(body?.error ?? "선택한 사진작가를 후보로 추가하지 못했습니다.");
+      alert(`사진작가 ${body?.inserted ?? 0}명을 후보로 추가했습니다.${body?.skipped ? ` 중복/제외 ${body.skipped}명` : ""}`);
       setSelectedIds([]);
       await onAdded();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "선택한 사진가를 후보로 추가하지 못했습니다.");
+      alert(error instanceof Error ? error.message : "선택한 사진작가를 후보로 추가하지 못했습니다.");
     } finally {
       setAdding(false);
     }
@@ -293,7 +293,7 @@ function PhotographerCandidatePicker({
           className="flex h-10 items-center justify-center gap-1.5 rounded bg-on-surface px-4 text-xs font-bold text-surface disabled:opacity-50"
         >
           <span className="material-symbols-outlined text-base">search</span>
-          {searching ? "검색 중" : "사진가 검색"}
+          {searching ? "검색 중" : "사진작가 검색"}
         </button>
       </div>
 
@@ -335,7 +335,7 @@ function PhotographerCandidatePicker({
             disabled={disabled || adding || selectedIds.length === 0}
             className="rounded bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
           >
-            {adding ? "추가 중..." : "선택 사진가를 후보로 추가"}
+            {adding ? "추가 중..." : "선택 사진작가를 후보로 추가"}
           </button>
         </div>
       )}
@@ -455,11 +455,11 @@ export default function AdminSupportPage() {
         return;
       }
       const body = await res.json().catch(() => null) as { error?: string; inserted?: number; skipped?: number } | null;
-      if (!res.ok) throw new Error(body?.error ?? "사진가 매칭에 실패했습니다.");
-      alert(`사진가 ${body?.inserted ?? 0}명에게 매칭했습니다.${body?.skipped ? ` 중복 ${body.skipped}건은 제외했습니다.` : ""}`);
+      if (!res.ok) throw new Error(body?.error ?? "사진작가 매칭에 실패했습니다.");
+      alert(`사진작가 ${body?.inserted ?? 0}명에게 매칭했습니다.${body?.skipped ? ` 중복 ${body.skipped}건은 제외했습니다.` : ""}`);
       await fetchSubmissions(tab, kind);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "사진가 매칭에 실패했습니다.");
+      alert(error instanceof Error ? error.message : "사진작가 매칭에 실패했습니다.");
     } finally {
       setActioning(null);
     }
@@ -494,11 +494,11 @@ export default function AdminSupportPage() {
         invited?: number;
         skipped?: unknown[];
       } | null;
-      if (!res.ok) throw new Error(body?.error ?? "사진가 초대 메일 발송에 실패했습니다.");
+      if (!res.ok) throw new Error(body?.error ?? "사진작가 초대 메일 발송에 실패했습니다.");
       alert(`초대 메일 ${body?.sent ?? 0}건을 발송했고, 후보 ${body?.invited ?? 0}명을 초대 상태로 변경했습니다.${body?.skipped?.length ? ` 스킵 ${body.skipped.length}건` : ""}`);
       await fetchSubmissions(tab, kind);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "사진가 초대 메일 발송에 실패했습니다.");
+      alert(error instanceof Error ? error.message : "사진작가 초대 메일 발송에 실패했습니다.");
     } finally {
       setActioning(null);
     }
@@ -596,7 +596,7 @@ export default function AdminSupportPage() {
     <div className="p-6 md:p-10">
       <div className="mb-8">
         <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">
-          {fixedKind === "photo" ? "사진 문의 운영" : "일반 문의"}
+          {fixedKind === "photo" ? "이미지 문의 운영" : "일반 문의"}
         </h1>
         <p className="text-sm text-outline mt-1">
           {!loading && `${submissions.length}건의 항목이 표시됩니다`}
@@ -678,7 +678,7 @@ export default function AdminSupportPage() {
 
                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                       <AdminChip tone={isPhotoRequest ? "primary" : "neutral"}>
-                        {isPhotoRequest ? "사진 의뢰" : "일반 문의"}
+                        {isPhotoRequest ? "이미지 의뢰" : "일반 문의"}
                       </AdminChip>
                       <AdminChip tone={priorityTone(submission.priority)}>
                         {PRIORITY_LABELS[submission.priority ?? "normal"] ?? submission.priority}
@@ -906,7 +906,7 @@ export default function AdminSupportPage() {
                   {isPhotoRequest && photoRequest && (
                     <div className="rounded-lg border border-outline-variant/30 p-4">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">후보 사진가 매칭</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-outline">후보 사진작가 매칭</p>
                         <button
                           onClick={() => createMatches(submission)}
                           disabled={isBusy}

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const currentStatus = normalizePhotographerStatus(profile.photographer_status);
   if (currentStatus === "approved") {
     return NextResponse.json({
-      error: "이미 승인된 사진가입니다.",
+      error: "이미 승인된 사진작가입니다.",
       code: "ALREADY_APPROVED_PHOTOGRAPHER",
       photographer_status: currentStatus,
     }, { status: 400 });
@@ -37,12 +37,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       photographer_status: currentStatus,
-      message: "사진가 신청이 이미 접수되어 승인 대기 중입니다.",
+      message: "사진작가 신청이 이미 접수되어 승인 대기 중입니다.",
     });
   }
 
   if (!canApplyForPhotographer(currentStatus)) {
-    return NextResponse.json({ error: "사진가 신청이 가능한 상태가 아닙니다." }, { status: 400 });
+    return NextResponse.json({ error: "사진작가 신청이 가능한 상태가 아닙니다." }, { status: 400 });
   }
 
   const name = typeof body.name === "string" && body.name.trim()
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     if (!applicationPayload.phone_number || applicationPayload.primary_activity_regions.length === 0) {
       return NextResponse.json(
-        { error: "사진가 신청을 위해 연락처와 주요 활동 지역을 입력해주세요." },
+        { error: "사진작가 신청을 위해 연락처와 주요 활동 지역을 입력해주세요." },
         { status: 400 },
       );
     }
@@ -86,11 +86,11 @@ export async function POST(req: NextRequest) {
       photographer_status: result.status,
       application: result.application,
       created: result.created,
-      message: "사진가 신청이 접수되었습니다. 관리자가 확인 후 안내드릴게요.",
+      message: "사진작가 신청이 접수되었습니다. 관리자가 확인 후 안내드릴게요.",
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "사진가 신청 정보를 확인해주세요." },
+      { error: error instanceof Error ? error.message : "사진작가 신청 정보를 확인해주세요." },
       { status: 400 },
     );
   }

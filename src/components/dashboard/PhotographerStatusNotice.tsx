@@ -12,20 +12,20 @@ type PhotographerStatus = "none" | "pending" | "approved" | "suspended";
 const STATUS_COPY: Record<Exclude<PhotographerStatus, "approved">, { icon: string; title: string; body: string; action: string }> = {
   none: {
     icon: "photo_camera",
-    title: "사진가 신청이 필요합니다",
-    body: "사진 업로드와 판매 기능은 관리자 승인 후 사용할 수 있습니다.",
+    title: "사진작가 신청이 필요합니다",
+    body: "이미지 업로드와 판매 기능은 관리자 승인 후 사용할 수 있습니다.",
     action: "신청하러 가기",
   },
   pending: {
     icon: "pending_actions",
-    title: "사진가 신청 승인 대기 중",
+    title: "사진작가 신청 승인 대기 중",
     body: "신청이 접수되었습니다. 관리자가 통화로 활동 정보를 확인한 뒤 승인 여부를 안내드립니다.",
     action: "신청 정보 보기",
   },
   suspended: {
     icon: "do_not_disturb_on",
-    title: "사진가 권한이 중지되었습니다",
-    body: "운영 확인이 필요한 상태입니다. 활동 정보를 보완해 사진가 재신청을 접수할 수 있습니다.",
+    title: "사진작가 권한이 중지되었습니다",
+    body: "운영 확인이 필요한 상태입니다. 활동 정보를 보완해 사진작가 재신청을 접수할 수 있습니다.",
     action: "재신청하기",
   },
 };

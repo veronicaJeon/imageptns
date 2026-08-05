@@ -22,6 +22,12 @@ describe("image state visibility matrix", () => {
     expect(buyerCanViewImage({ status: "rejected", lifecycle_status: "active", is_published: true })).toBe(false);
   });
 
+  it("groups approved unpublished images under the owner removed tab", () => {
+    const image = { status: "approved", lifecycle_status: "active", is_published: false };
+    expect(ownerUploadBucket(image, { rejectedRetentionDays: 7, now: NOW })).toBe("removed");
+    expect(buyerCanViewImage(image)).toBe(false);
+  });
+
   it("keeps deletion states in the owner history but out of review and buyer views", () => {
     for (const lifecycle_status of ["deletion_requested", "archived", "purged", "legal_hold"]) {
       const image = { status: "approved", lifecycle_status, is_published: false };

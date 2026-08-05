@@ -7,14 +7,14 @@ import {
 } from "./campaigns";
 
 const validInput = {
-  name: "사진 요청 안내",
+  name: "이미지 요청 안내",
   campaign_type: "house",
   placement: "right_rail",
   title_ko: "원하는 이미지가 없나요?",
   title_en: "Need another image?",
   body_ko: "필요한 장면을 알려주세요.",
   body_en: "",
-  cta_ko: "사진 요청하기",
+  cta_ko: "이미지 요청하기",
   cta_en: "Request a photo",
   image_url: "",
   image_alt_ko: "",
@@ -66,7 +66,7 @@ describe("library ad campaign localization", () => {
     expect(localizeLibraryAdCampaign(row, "ko")).toMatchObject({
       label: "이미지파트너스 안내",
       title: "원하는 이미지가 없나요?",
-      cta: "사진 요청하기",
+      cta: "이미지 요청하기",
     });
   });
 

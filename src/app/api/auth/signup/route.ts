@@ -109,10 +109,10 @@ export async function POST(req: NextRequest) {
         bio,
       });
       if (!applicationPayload.phone_number || applicationPayload.primary_activity_regions.length === 0) {
-        return badRequest("사진가 신청을 위해 연락처와 주요 활동 지역을 입력해주세요.");
+        return badRequest("사진작가 신청을 위해 연락처와 주요 활동 지역을 입력해주세요.");
       }
     } catch (error) {
-      return badRequest(error instanceof Error ? error.message : "사진가 신청 정보를 확인해주세요.");
+      return badRequest(error instanceof Error ? error.message : "사진작가 신청 정보를 확인해주세요.");
     }
   }
   const emailRedirectTo = buildSiteUrl("/api/auth/callback");
@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
       });
     } catch (applicationError) {
       console.error("[auth-signup] photographer application creation failed", applicationError);
-      return NextResponse.json({ error: "사진가 신청을 접수하지 못했습니다." }, { status: 500 });
+      return NextResponse.json({ error: "사진작가 신청을 접수하지 못했습니다." }, { status: 500 });
     }
   }
 

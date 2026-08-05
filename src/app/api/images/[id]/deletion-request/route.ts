@@ -42,7 +42,7 @@ export async function POST(
 
   const reason = typeof body?.reason === "string" && body.reason.trim()
     ? body.reason.trim()
-    : "사진가 삭제 요청";
+    : "사진작가 삭제 요청";
   const reasonCategory = normalizeReasonCategory(body?.reasonCategory);
 
   const admin = createAdminClient();
@@ -146,7 +146,7 @@ export async function POST(
       is_published: false,
       unpublished_at: now,
       unpublished_by: user.id,
-      unpublished_reason: "사진가 삭제 요청 검토 중",
+      unpublished_reason: "사진작가 삭제 요청 검토 중",
       deletion_requested_at: now,
       deletion_requested_by: user.id,
       deletion_reason: reason,

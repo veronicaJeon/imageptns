@@ -104,11 +104,11 @@ function FeePaymentContent() {
     <div className="p-6 md:p-10">
       <div className="mb-8">
         <Link href="/dashboard/blockchain" className="text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:text-primary">
-          ← 블록체인 사진
+          ← 블록체인 이미지
         </Link>
         <h1 className="mt-3 font-headline text-2xl font-extrabold tracking-tight text-on-surface">셀프등록 수수료 결제</h1>
         <p className="mt-1 text-sm text-on-surface-variant">
-          판매 전 이미지를 Arweave에 등록 요청하려면 사진가 부담 수수료 결제가 필요합니다. 결제 완료 후 관리자 검토를 거쳐 등록됩니다.
+          판매 전 이미지를 Arweave에 등록 요청하려면 사진작가 부담 수수료 결제가 필요합니다. 결제 완료 후 관리자 검토를 거쳐 등록됩니다.
         </p>
       </div>
 
@@ -137,7 +137,7 @@ function FeePaymentContent() {
                   : "결제할 수 없는 주문 상태입니다."}
           </p>
           <Link href="/dashboard/blockchain" className="mt-3 inline-block font-bold text-primary hover:underline">
-            블록체인 사진으로 돌아가기
+            블록체인 이미지로 돌아가기
           </Link>
         </div>
       ) : (

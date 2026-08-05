@@ -37,13 +37,19 @@ const UPLOADS_PAGE_COPY = {
     deleteRequestFailed: "삭제 요청을 생성하지 못했습니다.",
     deleteRequestAccepted: (fee: string) => `삭제 요청이 접수되었습니다. 예상 삭제 수수료: ₩${fee}`,
     deleteImmediateAccepted: "검색과 신규 판매에서 즉시 제외했습니다.",
-    deleteDialogTitle: "사진을 삭제하시겠습니까?",
-    arweaveDeletionNotice: "이 사진은 Arweave 자격증명이 발급되어 원본 증명 기록이 영구 저장되어 있습니다. 해당 기록 자체는 삭제할 수 없으며, 웹사이트 비노출·구매자 기록 보존·자격증명 연결 검토를 관리자가 처리해야 하므로 삭제 수수료가 발생할 수 있습니다. 비용은 Arweave 자격증명 사진에만 적용됩니다.",
-    immediateDeletionNotice: "이 사진에는 Arweave 자격증명이 없습니다. 확인하면 검색과 신규 판매에서 즉시 제외되고, 장바구니에서는 사라지며, 기존 구매이력에서는 비활성 상태로 표시됩니다. 원본 파일과 데이터베이스 기록의 완전삭제는 관리자가 별도로 처리합니다.",
+    deleteDialogTitle: "이미지를 삭제하시겠습니까?",
+    arweaveDeletionNotice: "이 이미지는 Arweave 자격증명이 발급되어 원본 증명 기록이 영구 저장되어 있습니다. 해당 기록 자체는 삭제할 수 없으며, 웹사이트 비노출·구매자 기록 보존·자격증명 연결 검토를 관리자가 처리해야 하므로 삭제 수수료가 발생할 수 있습니다. 비용은 Arweave 자격증명 이미지에만 적용됩니다.",
+    immediateDeletionNotice: "이 이미지에는 Arweave 자격증명이 없습니다. 확인하면 검색과 신규 판매에서 즉시 제외되고, 장바구니에서는 사라지며, 기존 구매이력에서는 비활성 상태로 표시됩니다. 원본 파일과 데이터베이스 기록은 삭제·비공개 탭에서 직접 완전삭제할 수 있습니다.",
     deletionReasonLabel: "삭제 사유",
     deletionReasonPlaceholder: "예: 포트폴리오 정리",
     confirmDeleteRequest: "삭제 요청",
     confirmImmediateDelete: "즉시 비노출",
+    finalDeleteTitle: "완전삭제",
+    finalDeleteConfirm: "이 이미지를 영구 삭제할까요? 완전삭제 후에는 복구할 수 없습니다.",
+    finalDeleteAccepted: "이미지를 완전삭제했습니다.",
+    finalDeleteFailed: "이미지를 완전삭제하지 못했습니다.",
+    autoDeleteNotice: (date: string) => `${date} 이후 안전 조건을 충족하면 자동 삭제됩니다.`,
+    autoDeleteBlocked: "판매·권리·증명 기록이 연결된 이미지는 자동 완전삭제 대신 운영 보존됩니다.",
     rejectedRetention: (days: number) => `${days}일 이후 해당 기록은 사라집니다.`,
     latestSort: "최신순 정렬",
     deletionRequested: (fee: string) => `삭제 요청됨 · 수수료 ₩${fee}`,
@@ -55,7 +61,7 @@ const UPLOADS_PAGE_COPY = {
     deleteRequestTitle: "삭제 요청",
     deleteTitle: "삭제",
     editMeta: "메타데이터 편집",
-    editHelp: "제목이나 설명을 바꾸려면 해당 사진 오른쪽의 ‘편집’을 누르세요. 수정 후 아래의 ‘저장’을 누르면 반영됩니다.",
+    editHelp: "제목이나 설명을 바꾸려면 해당 이미지 오른쪽의 ‘편집’을 누르세요. 수정 후 아래의 ‘저장’을 누르면 반영됩니다.",
     refresh: "새로고침",
     loadFailed: "업로드 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     removedArchived: "삭제됨",
@@ -108,6 +114,12 @@ const UPLOADS_PAGE_COPY = {
     deletionReasonPlaceholder: "Example: Portfolio cleanup",
     confirmDeleteRequest: "Request deletion",
     confirmImmediateDelete: "Remove now",
+    finalDeleteTitle: "Delete permanently",
+    finalDeleteConfirm: "Permanently delete this image? This cannot be undone.",
+    finalDeleteAccepted: "The image was permanently deleted.",
+    finalDeleteFailed: "Could not permanently delete the image.",
+    autoDeleteNotice: (date: string) => `If safety checks pass, this image will be deleted automatically after ${date}.`,
+    autoDeleteBlocked: "Images with sales, rights, proof, or operational records are retained instead of being deleted automatically.",
     rejectedRetention: (days: number) => `This record disappears after ${days} days.`,
     latestSort: "Newest first",
     deletionRequested: (fee: string) => `Deletion requested · fee ₩${fee}`,
@@ -159,6 +171,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const CHIP_CLASS = "inline-flex h-6 max-w-full items-center rounded-full border px-2.5 text-[10px] font-bold leading-none";
+const PHOTOGRAPHER_HIDDEN_IMAGE_AUTO_DELETE_DAYS = 15;
 
 interface EditState {
   id: string;
@@ -254,6 +267,21 @@ function explorerTxUrl(chainId: number | null, txHash: string | null) {
   if (!chainId || !txHash) return null;
   const baseUrl = chainId === 8453 ? "https://basescan.org" : "https://sepolia.basescan.org";
   return `${baseUrl}/tx/${txHash}`;
+}
+
+function hiddenAtForAutoDelete(img: UploadRow) {
+  const lifecycle = img.lifecycle_status ?? "active";
+  if (lifecycle === "active") return img.unpublished_at;
+  return img.deleted_at ?? img.archived_at ?? img.unpublished_at;
+}
+
+function autoDeleteDateLabel(img: UploadRow, locale: string) {
+  const hiddenAt = hiddenAtForAutoDelete(img);
+  if (!hiddenAt) return null;
+  const hiddenMs = new Date(hiddenAt).getTime();
+  if (!Number.isFinite(hiddenMs)) return null;
+  return new Date(hiddenMs + PHOTOGRAPHER_HIDDEN_IMAGE_AUTO_DELETE_DAYS * 24 * 60 * 60 * 1000)
+    .toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" });
 }
 
 function UploadTimeline({ img }: { img: UploadRow }) {
@@ -464,6 +492,35 @@ function UploadsPageContent() {
           : u));
         setDeletionTarget(null);
       }
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  async function handleFinalDelete(img: UploadRow) {
+    if (!window.confirm(copy.finalDeleteConfirm)) return;
+    setDeleting(img.id);
+    try {
+      const res = await fetch(`/api/uploads/${img.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null) as {
+        hardDeleted?: boolean;
+        errors?: string[];
+        blockers?: string[];
+        error?: string;
+      } | null;
+      if (!res.ok || !data?.hardDeleted) {
+        const details = [
+          data?.error ?? copy.finalDeleteFailed,
+          data?.blockers?.length ? `blockers: ${data.blockers.join(", ")}` : "",
+          data?.errors?.length ? data.errors.join(", ") : "",
+        ].filter(Boolean).join("\n");
+        alert(details || copy.finalDeleteFailed);
+        return;
+      }
+
+      setUploads((prev) => prev.filter((upload) => upload.id !== img.id));
+      removeUnavailableItems([img.id]);
+      alert(copy.finalDeleteAccepted);
     } finally {
       setDeleting(null);
     }
@@ -681,7 +738,10 @@ function UploadsPageContent() {
                 });
                 const displayTitle = localizedText(lang, img.title, img.title_ko, img.title_en);
                 const lifecycleActive = isImageLifecycleActive(img);
-                const canEdit = lifecycleActive;
+                const bucket = uploadBucket(img);
+                const canEdit = lifecycleActive && bucket !== "removed";
+                const canFinalDelete = bucket === "removed" && img.lifecycle_status !== "deletion_requested" && img.lifecycle_status !== "legal_hold";
+                const autoDeleteDate = bucket === "removed" ? autoDeleteDateLabel(img, copy.locale) : null;
                 const isEditing = editing?.id === img.id;
                 const deletionPending = img.lifecycle_status === "deletion_requested";
                 const lifecycleLabel = deletionPending
@@ -784,6 +844,16 @@ function UploadsPageContent() {
                             {img.unpublished_reason}
                           </p>
                         )}
+                        {autoDeleteDate && (
+                          <p className="mt-2 max-w-md text-[10px] leading-relaxed text-outline">
+                            {copy.autoDeleteNotice(autoDeleteDate)}
+                          </p>
+                        )}
+                        {bucket === "removed" && !autoDeleteDate && img.lifecycle_status !== "deletion_requested" && (
+                          <p className="mt-2 max-w-md text-[10px] leading-relaxed text-outline">
+                            {copy.autoDeleteBlocked}
+                          </p>
+                        )}
                       </td>
                       <td data-label={c.views} className="border-t border-outline-variant/20 px-4 py-3 text-center text-sm font-semibold text-on-surface before:block before:text-[10px] before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-6 md:py-4 md:text-left md:text-sm md:font-normal md:text-on-surface-variant md:before:hidden">{(img.views_count ?? 0).toLocaleString()}</td>
                       <td data-label={c.sales} className="border-t border-outline-variant/20 px-4 py-3 text-center text-sm font-semibold text-on-surface before:block before:text-[10px] before:font-semibold before:text-outline before:content-[attr(data-label)] md:table-cell md:border-t-0 md:px-6 md:py-4 md:text-left md:text-sm md:font-normal md:text-on-surface-variant md:before:hidden">{img.sales_count ?? 0}</td>
@@ -792,6 +862,7 @@ function UploadsPageContent() {
                         <div className="flex items-center justify-end gap-3 md:justify-start md:gap-2">
                           {canEdit && (
                             <button
+                              type="button"
                               onClick={() => isEditing ? setEditing(null) : openEdit(img)}
                               className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold transition-colors ${isEditing ? "bg-primary/10 text-primary" : "text-on-surface-variant hover:bg-primary/5 hover:text-primary"}`}
                               title={copy.editTitle}
@@ -805,6 +876,7 @@ function UploadsPageContent() {
                           )}
                           {canEdit && (
                             <button
+                              type="button"
                               onClick={() => openDeletionDialog(img)}
                               disabled={deleting === img.id}
                               className="text-outline hover:text-error transition-colors disabled:opacity-50"
@@ -815,6 +887,22 @@ function UploadsPageContent() {
                                 ? <span className="w-4 h-4 border-2 border-error border-t-transparent rounded-full animate-spin inline-block" />
                                 : <span className="material-symbols-outlined text-base">delete</span>
                               }
+                            </button>
+                          )}
+                          {canFinalDelete && (
+                            <button
+                              type="button"
+                              onClick={() => void handleFinalDelete(img)}
+                              disabled={deleting === img.id}
+                              className="inline-flex items-center gap-1 rounded border border-error/25 px-2.5 py-1.5 text-xs font-bold text-error transition-colors hover:bg-error/5 disabled:opacity-50"
+                              title={copy.finalDeleteTitle}
+                              aria-label={copy.finalDeleteTitle}
+                            >
+                              {deleting === img.id
+                                ? <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-error border-t-transparent" />
+                                : <span className="material-symbols-outlined text-base">delete_forever</span>
+                              }
+                              <span>{copy.finalDeleteTitle}</span>
                             </button>
                           )}
                         </div>

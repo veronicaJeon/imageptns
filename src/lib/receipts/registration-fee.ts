@@ -92,7 +92,7 @@ export function buildRegistrationFeeReceiptHtml(receipt: RegistrationFeeReceipt)
   </header>
 
   <section class="meta">
-    <div><span class="label">사진가</span>${escapeHtml(receipt.billingName || "-")}</div>
+    <div><span class="label">사진작가</span>${escapeHtml(receipt.billingName || "-")}</div>
     <div><span class="label">이메일</span>${escapeHtml(receipt.billingEmail || "-")}</div>
     <div><span class="label">결제 확정일</span>${escapeHtml(formatDateTime(receipt.paidAt))}</div>
     <div><span class="label">결제수단</span>${escapeHtml(receipt.paymentProvider || "toss")}</div>
@@ -118,7 +118,7 @@ export function buildRegistrationFeeReceiptHtml(receipt: RegistrationFeeReceipt)
 
   <footer>
     본 영수증은 Image Partners 플랫폼의 Arweave 셀프등록 수수료 결제 내역을 확인하기 위한 문서입니다.
-    수수료는 판매 전 이미지의 Arweave 원본/메타데이터 등록 요청 처리를 위한 사진가 부담 비용입니다.
+    수수료는 판매 전 이미지의 Arweave 원본/메타데이터 등록 요청 처리를 위한 사진작가 부담 비용입니다.
   </footer>
 </body>
 </html>`;

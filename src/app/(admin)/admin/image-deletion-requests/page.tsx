@@ -93,8 +93,8 @@ export default function AdminImageDeletionRequestsPage() {
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Deletion Review</p>
-          <h1 className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">사진 삭제 요청</h1>
-          <p className="mt-2 text-sm text-outline">사진가 삭제 요청을 검토하고 수수료 청구 또는 면제 상태로 처리합니다.</p>
+          <h1 className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">이미지 삭제 요청</h1>
+          <p className="mt-2 text-sm text-outline">사진작가 삭제 요청을 검토하고 수수료 청구 또는 면제 상태로 처리합니다.</p>
         </div>
         <select
           value={status}
@@ -140,7 +140,7 @@ export default function AdminImageDeletionRequestsPage() {
                     </div>
                   </div>
                 </td>
-                <td className="px-5 py-4 text-on-surface-variant">{request.requester?.full_name ?? "사진가"}</td>
+                <td className="px-5 py-4 text-on-surface-variant">{request.requester?.full_name ?? "사진작가"}</td>
                 <td className="px-5 py-4">
                   <p className="text-xs font-bold text-primary">{request.reason_category}</p>
                   <p className="mt-1 max-w-xs text-sm leading-relaxed text-on-surface-variant">{request.reason}</p>

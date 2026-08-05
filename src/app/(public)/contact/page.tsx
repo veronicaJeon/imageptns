@@ -15,8 +15,8 @@ const PHOTO_REQUEST_DRAFT_KEY = "imagepartners.photo-request-draft";
 
 const CONTACT_PHOTO_COPY = {
   ko: {
-    tabs: { general: "일반 문의", photo: "이미지(사진)요청" },
-    success: "이미지(사진)요청이 접수되었습니다.",
+    tabs: { general: "일반 문의", photo: "이미지 요청" },
+    success: "이미지 요청이 접수되었습니다.",
     composeNew: "새로 작성",
     errors: {
       generalFailed: "문의 접수에 실패했습니다.",
@@ -30,13 +30,13 @@ const CONTACT_PHOTO_COPY = {
       body: "요청 이력을 안전하게 관리하기 위해 접수할 때만 로그인해 주세요.",
       link: "로그인하고 요청하기",
     },
-    introTitle: "필요한 사진을 말하듯 적어주세요.",
+    introTitle: "필요한 이미지를 말하듯 적어주세요.",
     introBody: "정확한 조건을 몰라도 괜찮습니다. 유사 이미지 검색, 권리 확인, 신규 촬영 가능 여부는 저희가 검토합니다.",
     fields: {
       title: "요청 제목",
-      titlePlaceholder: "예: 백제 금동대향로 사진 후보 요청",
-      brief: "어떤 사진이 필요하세요?",
-      briefPlaceholder: "예: 한국사 교재 백제 파트에 넣을 금동대향로 사진이 필요합니다. 유물 전체가 잘 보이고 배경이 너무 복잡하지 않았으면 합니다.",
+      titlePlaceholder: "예: 백제 금동대향로 이미지 후보 요청",
+      brief: "어떤 이미지가 필요하세요?",
+      briefPlaceholder: "예: 한국사 교재 백제 파트에 넣을 금동대향로 이미지가 필요합니다. 유물 전체가 잘 보이고 배경이 너무 복잡하지 않았으면 합니다.",
       briefHelp: "문장으로 길게 써도 좋고, 필요한 컷·분위기·피해야 할 요소를 짧게 적어도 충분합니다.",
       organization: "요청자 소속",
       organizationPlaceholder: "예: ○○출판사, 국립○○박물관, 프리랜서",
@@ -54,8 +54,8 @@ const CONTACT_PHOTO_COPY = {
       referenceNoteHelp: "참고자료에서 따라가야 할 점과 피해야 할 점을 적어주세요.",
       purposes: "참고자료를 어떻게 활용하면 될까요?",
       advanced: "상세 조건을 알고 있어요",
-      submit: "필요한 사진 찾아달라고 요청하기",
-      submitWithLogin: "로그인하고 사진 요청하기",
+      submit: "필요한 이미지 찾아달라고 요청하기",
+      submitWithLogin: "로그인하고 이미지 요청하기",
     },
     deadlineOptions: [
       { days: 3, label: "빠른 회신" },
@@ -63,8 +63,8 @@ const CONTACT_PHOTO_COPY = {
       { days: 14, label: "2주 이내" },
     ],
     purposes: [
-      { value: "rights_check", label: "이 이미지와 완전히 같은 사진의 권리 확인이 필요합니다" },
-      { value: "similar_search", label: "이 이미지와 유사한 사진이 필요합니다" },
+      { value: "rights_check", label: "이 이미지와 완전히 같은 이미지의 권리 확인이 필요합니다" },
+      { value: "similar_search", label: "이 이미지와 유사한 이미지가 필요합니다" },
       { value: "context_reference", label: "이 자료는 설명을 위한 참고일 뿐입니다" },
       { value: "shooting_request", label: "필요한 경우 신규 촬영 의뢰도 검토하고 싶습니다" },
     ] satisfies Array<{ value: SourcingPurpose; label: string }>,
@@ -76,7 +76,7 @@ const CONTACT_PHOTO_COPY = {
     ] as const,
   },
   en: {
-    tabs: { general: "General inquiry", photo: "Image (photo) request" },
+    tabs: { general: "General inquiry", photo: "Image request" },
     success: "Your image sourcing request has been received.",
     composeNew: "Write another",
     errors: {

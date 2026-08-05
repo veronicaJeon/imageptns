@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { assessHardDeleteEligibility, emptyImageReferenceCounts } from "./hard-delete";
+import {
+  assessHardDeleteEligibility,
+  assessPhotographerFinalDeleteEligibility,
+  emptyImageReferenceCounts,
+} from "./hard-delete";
 
 const baseImage = {
   id: "img-1",
@@ -42,5 +46,48 @@ describe("assessHardDeleteEligibility", () => {
     expect(assessHardDeleteEligibility(baseImage, { ...emptyImageReferenceCounts(), sourcingResults: 1 }).blockers).toContain("sourcing_results");
     expect(assessHardDeleteEligibility(baseImage, { ...emptyImageReferenceCounts(), subscriptionDownloads: 1 }).blockers).toContain("subscription_downloads");
     expect(assessHardDeleteEligibility(baseImage, { ...emptyImageReferenceCounts(), arweaveFeeOrderItems: 1 }).blockers).toContain("arweave_fee_orders");
+  });
+});
+
+describe("assessPhotographerFinalDeleteEligibility", () => {
+  it("allows safe archived or unpublished approved images", () => {
+    expect(assessPhotographerFinalDeleteEligibility({
+      ...baseImage,
+      lifecycle_status: "archived",
+    }, emptyImageReferenceCounts()).allowed).toBe(true);
+
+    expect(assessPhotographerFinalDeleteEligibility({
+      ...baseImage,
+      status: "approved",
+      lifecycle_status: "active",
+      is_published: false,
+    }, emptyImageReferenceCounts()).allowed).toBe(true);
+  });
+
+  it("blocks active visible, deletion-requested, sold, referenced, and Arweave images", () => {
+    expect(assessPhotographerFinalDeleteEligibility({
+      ...baseImage,
+      status: "approved",
+      lifecycle_status: "active",
+      is_published: true,
+    }, emptyImageReferenceCounts()).blockers).toContain("not_hidden");
+    expect(assessPhotographerFinalDeleteEligibility({
+      ...baseImage,
+      lifecycle_status: "deletion_requested",
+    }, emptyImageReferenceCounts()).blockers).toContain("deletion_requested");
+    expect(assessPhotographerFinalDeleteEligibility({
+      ...baseImage,
+      lifecycle_status: "archived",
+      sales_count: 1,
+    }, emptyImageReferenceCounts()).blockers).toContain("sales");
+    expect(assessPhotographerFinalDeleteEligibility({
+      ...baseImage,
+      lifecycle_status: "archived",
+      proof_arweave_original_tx_id: "abc",
+    }, emptyImageReferenceCounts()).blockers).toContain("onchain_or_arweave");
+    expect(assessPhotographerFinalDeleteEligibility({
+      ...baseImage,
+      lifecycle_status: "archived",
+    }, { ...emptyImageReferenceCounts(), orderItems: 1 }).blockers).toContain("order_items");
   });
 });

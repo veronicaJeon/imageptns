@@ -48,21 +48,21 @@ const NEW_UPLOAD_COPY = {
       invalidImage: "이미지 크기를 확인할 수 없는 JPEG 파일입니다.",
       uploadFailed: "업로드 중 오류가 발생했습니다.",
       duplicate: "이미 대기열에 추가된 파일입니다.",
-      batchLimit: (max: number) => `한 번에 최대 ${max}장까지만 업로드할 수 있습니다. 초과한 사진은 추가되지 않았습니다.`,
+      batchLimit: (max: number) => `한 번에 최대 ${max}장까지만 업로드할 수 있습니다. 초과한 이미지는 추가되지 않았습니다.`,
     },
     pageTitle: "이미지 업로드",
     doneTitle: "업로드 완료!",
     doneBody: "선택한 이미지가 검토 대기 중입니다. 승인 후 라이브러리에 노출됩니다.",
     dropTitle: "파일을 드래그하거나 클릭하여 선택",
     dropHelp: `여러장을 동시에 업로드할 수 있습니다. 한 번에 최대 ${MAX_UPLOAD_BATCH_FILES}장, 이미지당 최대 ${MAX_UPLOAD_SIZE_MB}MB·${MAX_UPLOAD_IMAGE_MEGAPIXELS}메가픽셀의 JPEG를 업로드해 주십시오.`,
-    addMore: "사진 추가",
+    addMore: "이미지 추가",
     queueTitle: "업로드 대기창",
     queueHelp: "1. 유사한 이미지들을 업로드 할 때는 대표 이미지에 정보를 모두 입력한 뒤, '현재 입력값 전체 적용'을 클릭합니다. 그러면 동일한 정보가 유사한 이미지들 전체에 적용됩니다.\n2. 그 이미지들 가운데 디테일한 정보의 차이가 있을 경우, 그 이미지를 클릭한 후 다른 정보를 입력하면 수정됩니다.\n3. 위와 같이 수정한 후 '선택 이미지 업로드'를 클릭하면 정확하게 업로드됩니다.",
     fileCount: (count: number) => `${count}장 선택됨`,
     activeFile: "편집 중",
     remove: "삭제",
     copyToAll: "현재 입력값 전체 적용",
-    copiedToAll: "현재 사진의 제목, 설명, 태그, 카테고리, 촬영정보를 다른 대기 파일에 복사했습니다.",
+    copiedToAll: "현재 이미지의 제목, 설명, 태그, 카테고리, 촬영정보를 다른 대기 파일에 복사했습니다.",
     noFiles: "먼저 업로드할 이미지를 선택하세요.",
     pending: "대기",
     uploadingFile: "업로드 중",
@@ -101,7 +101,7 @@ const NEW_UPLOAD_COPY = {
     locationPlaceholder: "예: 서교동",
     locationError: "촬영장소를 입력하거나 '미상'을 선택하세요.",
     copyrightTitle: "공통 저작권 및 공개 범위 *",
-    copyrightHelp: "이번 대기열에 있는 모든 사진에 같은 저작권 등급과 무료 사용 조건을 적용합니다.",
+    copyrightHelp: "이번 대기열에 있는 모든 이미지에 같은 저작권 등급과 무료 사용 조건을 적용합니다.",
     attributionName: "공통 출처 표기명",
     attributionPlaceholder: "예: 작가명 또는 스튜디오명",
     attributionUrl: "공통 출처 URL",
@@ -113,11 +113,15 @@ const NEW_UPLOAD_COPY = {
     aiBody: "AI 생성 또는 AI 보정 사실을 명시하며, 판매/배포 권한을 보유하고 있음을 확인합니다.",
     authorshipError: "AI 여부 또는 오리지널리티 보증을 선택해주세요.",
     factualityTitle: "공통 업로드 내용 사실성 보증 *",
-    factualityBody: "이번에 제출하는 사진, 제목, 설명, 캡션, 태그 및 관련 메타데이터가 사실과 부합하며, 제3자의 권리나 신원을 오인하게 만들지 않음을 확인합니다.",
+    factualityBody: "이번에 제출하는 이미지, 제목, 설명, 캡션, 태그 및 관련 메타데이터가 사실과 부합하며, 제3자의 권리나 신원을 오인하게 만들지 않음을 확인합니다.",
     factualityError: "사실성 보증 동의가 필요합니다.",
     promotionalTitle: "이미지파트너스 홍보 활용 허용 (선택)",
-    promotionalBody: "선택하면 이미지파트너스가 서비스 소개 페이지와 공식 홍보물에 이 사진의 워터마크 없는 저해상도 파생본을 사용할 수 있습니다. 원본 파일은 공개되지 않으며, 허용은 이후 철회할 수 있습니다.",
+    promotionalBody: "선택하면 이미지파트너스가 서비스 소개 페이지와 공식 홍보물에 이 이미지의 워터마크 없는 저해상도 파생본을 사용할 수 있습니다. 원본 파일은 공개되지 않으며, 허용은 이후 철회할 수 있습니다.",
     promotionalAutomaticTitle: "홍보 활용 범위 자동 적용",
+    opsNotificationTitle: "운영팀에 업로드 알림 보내기",
+    opsNotificationBody: "여러 이미지를 올릴 때도 검토 알림은 1회 종합 메일로 발송됩니다.",
+    opsNotificationSent: (count: number) => `운영팀에 ${count}개 이미지 요약 알림을 보냈습니다.`,
+    opsNotificationFailed: "이미지는 업로드됐지만 운영팀 알림 메일은 발송하지 못했습니다.",
     submit: "선택 이미지 업로드",
     reviewHelp: "제출한 이미지는 운영팀 검토 후 라이브러리에 노출됩니다. 검토에는 1-3 영업일이 소요됩니다.",
   },
@@ -135,21 +139,21 @@ const NEW_UPLOAD_COPY = {
       invalidImage: "This JPEG's dimensions could not be verified.",
       uploadFailed: "An error occurred while uploading.",
       duplicate: "This file is already in the upload queue.",
-      batchLimit: (max: number) => `You can upload a maximum of ${max} photos per batch. Extra photos were not added.`,
+      batchLimit: (max: number) => `You can upload a maximum of ${max} images per batch. Extra images were not added.`,
     },
     pageTitle: "Upload images",
     doneTitle: "Upload complete",
     doneBody: "Your selected images are pending review. They will appear in the library after approval.",
     dropTitle: "Drag files here or click to select",
     dropHelp: `Upload up to ${MAX_UPLOAD_BATCH_FILES} JPEGs per batch. Each image may be up to ${MAX_UPLOAD_SIZE_MB}MB and ${MAX_UPLOAD_IMAGE_MEGAPIXELS} megapixels.`,
-    addMore: "Add photos",
+    addMore: "Add images",
     queueTitle: "Upload window",
     queueHelp: "1. For similar images, complete the representative image first, then select 'Apply current fields to all'.\n2. If an image has different details, select it and edit those fields individually.\n3. When the details are correct, select 'Upload selected images'.",
     fileCount: (count: number) => `${count} selected`,
     activeFile: "Editing",
     remove: "Remove",
     copyToAll: "Apply current fields to all",
-    copiedToAll: "Copied this photo's title, description, tags, categories, and shooting info to the other queued files.",
+    copiedToAll: "Copied this image's title, description, tags, categories, and shooting info to the other queued files.",
     noFiles: "Select images to upload first.",
     pending: "Pending",
     uploadingFile: "Uploading",
@@ -188,7 +192,7 @@ const NEW_UPLOAD_COPY = {
     locationPlaceholder: "Example: Seoul, Korea",
     locationError: "Enter the location taken or choose Unknown.",
     copyrightTitle: "Shared copyright and release scope *",
-    copyrightHelp: "Apply the same Creative Commons level and free-use policy to every photo in this queue.",
+    copyrightHelp: "Apply the same Creative Commons level and free-use policy to every image in this queue.",
     attributionName: "Shared credit name",
     attributionPlaceholder: "Example: photographer or studio name",
     attributionUrl: "Shared credit URL",
@@ -205,6 +209,10 @@ const NEW_UPLOAD_COPY = {
     promotionalTitle: "Allow Image Partners promotional use (optional)",
     promotionalBody: "If selected, Image Partners may use a resized, unwatermarked derivative on service pages and official promotions. The original file remains private, and you may withdraw permission later.",
     promotionalAutomaticTitle: "Promotional use is included automatically",
+    opsNotificationTitle: "Send upload alert to operations",
+    opsNotificationBody: "For multi-image uploads, review alerts are sent as one summary email.",
+    opsNotificationSent: (count: number) => `Sent a ${count}-image summary alert to operations.`,
+    opsNotificationFailed: "Images were uploaded, but the operations alert email could not be sent.",
     submit: "Upload selected images",
     reviewHelp: "Submitted images appear in the library after operations review. Review usually takes 1-3 business days.",
   },
@@ -238,6 +246,10 @@ interface UploadDraft extends UploadDraftReadiness {
   uploadStatus: DraftStatus;
   progress: number;
   errorMsg: string;
+}
+
+interface CreatedUploadImage {
+  id: string;
 }
 
 const EMPTY_LOCALIZED_DRAFT: LocalizedDraft = {
@@ -362,6 +374,7 @@ function NewUploadContent() {
   const [authorshipDeclaration, setAuthorshipDeclaration] = useState<AuthorshipDeclaration | "">("");
   const [factualityAgreed, setFactualityAgreed] = useState(false);
   const [promotionalUseAllowed, setPromotionalUseAllowed] = useState(false);
+  const [opsNotificationEnabled, setOpsNotificationEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [pageDone, setPageDone] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -778,6 +791,7 @@ function NewUploadContent() {
         authorship_declaration: authorshipDeclaration,
         factuality_attested: factualityAgreed,
         promotional_use_allowed: Boolean(automaticPromotionBasis) || promotionalUseAllowed,
+        send_ops_notification: false,
       }),
     });
 
@@ -786,7 +800,9 @@ function NewUploadContent() {
       throw new Error(err?.error ?? "Failed to save");
     }
 
+    const saved = await saveRes.json() as { image?: CreatedUploadImage };
     updateDraft(draft.id, (current) => ({ ...current, uploadStatus: "done", progress: 100, errorMsg: "" }));
+    return saved.image ?? null;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -800,10 +816,12 @@ function NewUploadContent() {
     setErrorMsg("");
     setNoticeMsg("");
     let failed = 0;
+    const uploadedImageIds: string[] = [];
 
     for (const draft of drafts.filter((item) => item.uploadStatus !== "done")) {
       try {
-        await submitDraft(draft);
+        const uploaded = await submitDraft(draft);
+        if (uploaded?.id) uploadedImageIds.push(uploaded.id);
       } catch (err) {
         failed += 1;
         updateDraft(draft.id, (current) => ({
@@ -818,6 +836,24 @@ function NewUploadContent() {
     if (failed > 0) {
       setErrorMsg(copy.partialFailed(failed));
       return;
+    }
+
+    if (opsNotificationEnabled && uploadedImageIds.length > 0) {
+      try {
+        const notifyRes = await fetch("/api/uploads/notify-batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageIds: uploadedImageIds }),
+        });
+        if (notifyRes.ok) {
+          const result = await notifyRes.json().catch(() => null) as { notified?: number } | null;
+          setNoticeMsg(copy.opsNotificationSent(result?.notified ?? uploadedImageIds.length));
+        } else {
+          setNoticeMsg(copy.opsNotificationFailed);
+        }
+      } catch {
+        setNoticeMsg(copy.opsNotificationFailed);
+      }
     }
 
     setPageDone(true);
@@ -841,6 +877,7 @@ function NewUploadContent() {
           <span className="material-symbols-outlined text-6xl text-primary">check_circle</span>
           <h2 className="font-headline text-xl font-extrabold text-on-surface">{copy.doneTitle}</h2>
           <p className="text-sm text-on-surface-variant">{copy.doneBody}</p>
+          {noticeMsg && <p className="text-xs font-semibold text-primary">{noticeMsg}</p>}
         </div>
       )}
 
@@ -1315,6 +1352,19 @@ function NewUploadContent() {
                   </span>
                 </label>
               )}
+
+              <label className="flex cursor-pointer gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 transition-colors hover:border-outline">
+                <input
+                  type="checkbox"
+                  checked={opsNotificationEnabled}
+                  onChange={(e) => setOpsNotificationEnabled(e.target.checked)}
+                  className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                />
+                <span>
+                  <span className="block text-sm font-bold text-on-surface">{copy.opsNotificationTitle}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{copy.opsNotificationBody}</span>
+                </span>
+              </label>
             </>
           )}
 

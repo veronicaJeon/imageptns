@@ -262,7 +262,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error: unpaidSelfFunded
-          ? "사진가 부담 셀프등록 이미지는 수수료 결제 완료 후에만 등록할 수 있습니다."
+          ? "사진작가 부담 셀프등록 이미지는 수수료 결제 완료 후에만 등록할 수 있습니다."
           : "등록 가능한 상태(요청됨/등록가능/실패)와 원본 파일이 있는 승인 이미지만 등록할 수 있습니다.",
       },
       { status: 409 },

@@ -6,7 +6,7 @@ export interface AdminNavItem {
 
 export const ADMIN_NAV_PRIMARY_ITEMS: AdminNavItem[] = [
   { href: "/admin/support", icon: "support_agent", label: "일반 문의" },
-  { href: "/admin/photo-requests", icon: "add_photo_alternate", label: "사진 문의" },
+  { href: "/admin/photo-requests", icon: "add_photo_alternate", label: "이미지 문의" },
 ];
 
 export interface AdminNavGroup {
@@ -36,7 +36,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     label: "유저관리",
     items: [
       { href: "/admin/users", icon: "manage_accounts", label: "회원관리" },
-      { href: "/admin/photographer-applications", icon: "how_to_reg", label: "사진가 승인" },
+      { href: "/admin/photographer-applications", icon: "how_to_reg", label: "사진작가 승인" },
       { href: "/admin/profile-withdrawal-requests", icon: "person_remove", label: "탈퇴 검토" },
       { href: "/admin/admins", icon: "admin_panel_settings", label: "관리자 계정" },
     ],
@@ -79,7 +79,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     label: "온체인관리",
     items: [
       { href: "/admin/onchain", icon: "account_balance", label: "온체인 운영" },
-      { href: "/admin/onchain-registrations", icon: "verified", label: "온체인 등록사진" },
+      { href: "/admin/onchain-registrations", icon: "verified", label: "온체인 등록 이미지" },
       { href: "/admin/onchain-claims", icon: "verified", label: "온체인 클레임" },
     ],
   },

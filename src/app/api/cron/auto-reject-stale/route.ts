@@ -1,16 +1,30 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendImageRejected } from "@/lib/email/resend";
+import {
+  attachPhotographerFinalDeleteEligibility,
+  purgeHardDeleteImage,
+  type HardDeleteImageRow,
+} from "@/lib/images/hard-delete-server";
 import { authorizeCronRequest } from "@/lib/security/cron";
 import { uploadPathBelongsToUser } from "@/lib/uploads/security";
 
 export const maxDuration = 60;
+
+const PHOTOGRAPHER_HIDDEN_IMAGE_AUTO_DELETE_DAYS = 15;
+const PHOTOGRAPHER_HIDDEN_IMAGE_AUTO_DELETE_LIMIT = 100;
 
 interface StaleImageRow {
   id: string;
   title: string | null;
   asset_id: string | null;
   photographer_id: string | null;
+}
+
+interface PhotographerHiddenImageRow extends HardDeleteImageRow {
+  deleted_at: string | null;
+  archived_at: string | null;
+  unpublished_at: string | null;
 }
 
 async function runRetentionCleanup(admin: ReturnType<typeof createAdminClient>) {
@@ -73,13 +87,93 @@ async function purgeExpiredUploadSessions(admin: ReturnType<typeof createAdminCl
   return { ok: true as const, expired: ids.length };
 }
 
+function hiddenAtForPhotographerFinalDeletion(image: PhotographerHiddenImageRow) {
+  const lifecycle = image.lifecycle_status ?? "active";
+  if (lifecycle === "active") return image.unpublished_at;
+  return image.deleted_at ?? image.archived_at ?? image.unpublished_at;
+}
+
+function isExpiredPhotographerHiddenImage(image: PhotographerHiddenImageRow, cutoffMs: number) {
+  if (!image.photographer_id) return false;
+  const lifecycle = image.lifecycle_status ?? "active";
+  const isHiddenState =
+    lifecycle === "archived" ||
+    lifecycle === "purged" ||
+    (
+      lifecycle === "active" &&
+      image.status === "approved" &&
+      image.is_published === false
+    );
+  if (!isHiddenState) return false;
+
+  const hiddenAt = hiddenAtForPhotographerFinalDeletion(image);
+  if (!hiddenAt) return false;
+  const hiddenMs = new Date(hiddenAt).getTime();
+  return Number.isFinite(hiddenMs) && hiddenMs <= cutoffMs;
+}
+
+async function purgeExpiredPhotographerHiddenImages(admin: ReturnType<typeof createAdminClient>) {
+  const cutoffMs = Date.now() - PHOTOGRAPHER_HIDDEN_IMAGE_AUTO_DELETE_DAYS * 24 * 60 * 60 * 1000;
+  const { data, error } = await admin
+    .from("images")
+    .select(`
+      id, asset_id, title, status, lifecycle_status, is_published,
+      photographer_id, storage_path_preview, storage_path_full, storage_path_original, original_filename,
+      file_size_mb, width, height, sales_count, proof_status, proof_tx_hash,
+      proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
+      proof_arweave_confirmed_at, created_at, deleted_at, archived_at, unpublished_at,
+      photographer:profiles!photographer_id(full_name)
+    `)
+    .not("photographer_id", "is", null)
+    .or("lifecycle_status.in.(archived,purged),and(status.eq.approved,is_published.eq.false)")
+    .limit(PHOTOGRAPHER_HIDDEN_IMAGE_AUTO_DELETE_LIMIT);
+
+  if (error) {
+    console.error("[auto-reject-stale] photographer hidden image cleanup query failed:", error.message);
+    return { ok: false as const };
+  }
+
+  const candidates = ((data ?? []) as PhotographerHiddenImageRow[])
+    .filter((image) => isExpiredPhotographerHiddenImage(image, cutoffMs));
+  const results = [];
+
+  for (const image of candidates) {
+    const assessed = await attachPhotographerFinalDeleteEligibility(admin, image);
+    const result = await purgeHardDeleteImage(admin, assessed, {
+      deletedBy: null,
+      deleteKind: "photographer_request",
+      reason: `${PHOTOGRAPHER_HIDDEN_IMAGE_AUTO_DELETE_DAYS}일 자동 삭제`,
+    });
+    if (!result.purged) {
+      console.error("[auto-reject-stale] photographer hidden image cleanup failed:", image.id, result.errors.join(","));
+    }
+    results.push(result);
+  }
+
+  return {
+    ok: true as const,
+    scanned: data?.length ?? 0,
+    eligible: candidates.length,
+    purged: results.filter((result) => result.purged).length,
+    failed: results.filter((result) => !result.purged).length,
+  };
+}
+
 async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient>) {
-  const [retention, monitoringRetention, rejectedImageRetention, rateLimitRetention, uploadSessionRetention] = await Promise.all([
+  const [
+    retention,
+    monitoringRetention,
+    rejectedImageRetention,
+    rateLimitRetention,
+    uploadSessionRetention,
+    photographerHiddenImageDeletion,
+  ] = await Promise.all([
     runRetentionCleanup(admin),
     admin.rpc("purge_old_operational_events"),
     admin.rpc("archive_expired_rejected_images"),
     admin.rpc("purge_expired_api_rate_limits"),
     purgeExpiredUploadSessions(admin),
+    purgeExpiredPhotographerHiddenImages(admin),
   ]);
   if (monitoringRetention.error) {
     console.error("[auto-reject-stale] monitoring retention failed:", monitoringRetention.error.message);
@@ -102,6 +196,7 @@ async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient
       ? { ok: false as const }
       : { ok: true as const, deleted: rateLimitRetention.data ?? 0 },
     uploadSessionRetention,
+    photographerHiddenImageDeletion,
   };
 }
 

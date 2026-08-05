@@ -120,6 +120,7 @@ export async function POST(req: NextRequest) {
     exif_taken_at, exif_lat, exif_lng, exif_location, exif_camera,
     copyright_license, free_usage_policy, attribution_name, attribution_url,
     authorship_declaration, factuality_attested, promotional_use_allowed,
+    send_ops_notification,
   } = body;
 
   const categoryInput = await normalizeImageCategoryInput(admin, category_codes, category);
@@ -164,6 +165,9 @@ export async function POST(req: NextRequest) {
   }
   if (factuality_attested !== true) {
     return NextResponse.json({ error: "factuality_attested must be true" }, { status: 400 });
+  }
+  if (send_ops_notification !== undefined && typeof send_ops_notification !== "boolean") {
+    return NextResponse.json({ error: "send_ops_notification must be boolean" }, { status: 400 });
   }
   if (exif_taken_at && !takenAtIsAllowed(exif_taken_at, dateValueInTimeZone())) {
     return NextResponse.json({ error: "exif_taken_at must be a valid date that is not in the future" }, { status: 400 });
@@ -309,12 +313,14 @@ export async function POST(req: NextRequest) {
       console.error("[uploads] Failed to mark upload session consumed", consumedError);
     }
 
-    notifyOpsNewUpload({
-      photographerEmail: user.email ?? "",
-      photographerName: user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "Unknown",
-      imageTitle: title.trim(),
-      imageId: data.id,
-    }).catch((e) => console.error("[uploads] admin notify failed", e));
+    if (send_ops_notification !== false) {
+      notifyOpsNewUpload({
+        photographerEmail: user.email ?? "",
+        photographerName: user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "Unknown",
+        imageTitle: title.trim(),
+        imageId: data.id,
+      }).catch((e) => console.error("[uploads] admin notify failed", e));
+    }
 
     return NextResponse.json({ image: data }, { status: 201 });
   } catch (err) {

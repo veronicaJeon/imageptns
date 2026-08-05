@@ -318,9 +318,9 @@ export default function AdminOnchainRegistrationsPage() {
   return (
     <div className="p-6 md:p-10">
       <div className="mb-8">
-        <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">온체인 등록사진</h1>
+        <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">온체인 등록 이미지</h1>
         <p className="mt-1 text-sm text-on-surface-variant">
-          사진가가 요청한 판매 완료 또는 셀프 등록 이미지를 Arweave에 일괄 등록하고 GraphQL 컨펌 결과를 기록합니다.
+          사진작가가 요청한 판매 완료 또는 셀프 등록 이미지를 Arweave에 일괄 등록하고 GraphQL 컨펌 결과를 기록합니다.
         </p>
       </div>
 
@@ -394,7 +394,7 @@ export default function AdminOnchainRegistrationsPage() {
       ) : images.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-24 text-outline">
           <span className="material-symbols-outlined text-5xl">verified</span>
-          <p className="text-sm">현재 조건에 맞는 등록사진이 없습니다.</p>
+          <p className="text-sm">현재 조건에 맞는 등록 이미지가 없습니다.</p>
         </div>
       ) : (
         <AdminListSurface className="mb-10 overflow-x-auto">
@@ -410,7 +410,7 @@ export default function AdminOnchainRegistrationsPage() {
                     aria-label="등록 가능 전체 선택"
                   />
                 </th>
-                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">사진</th>
+                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">이미지</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">작가</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">상태</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">판매/용량</th>
@@ -479,7 +479,7 @@ export default function AdminOnchainRegistrationsPage() {
                       {image.proof_request_kind === "self_funded" && (
                         <div className="mt-1 flex flex-col gap-1">
                           <AdminChip tone="neutral" className="w-fit">
-                            사진가 부담 ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")}
+                            사진작가 부담 ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")}
                           </AdminChip>
                           <span
                             className={`${CHIP_CLASS} w-fit ${
@@ -578,7 +578,7 @@ export default function AdminOnchainRegistrationsPage() {
       </div>
 
       <div className="mt-10">
-        <p className="mb-4 text-xs font-bold uppercase tracking-widest text-outline">사진가 부담 셀프등록 수수료</p>
+        <p className="mb-4 text-xs font-bold uppercase tracking-widest text-outline">사진작가 부담 셀프등록 수수료</p>
         <AdminListSurface className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

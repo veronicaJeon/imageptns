@@ -71,8 +71,8 @@ const EMPTY_FORM: PolicyForm = {
 };
 
 const DELETION_FEE_HELP: Record<DeletionFeeSetting["code"], string> = {
-  image_delete_simple: "현재 미사용입니다. Arweave 자격증명이 없는 사진은 수수료 없이 즉시 비노출 처리됩니다.",
-  image_delete_complex: "Arweave 자격증명 기록 확인과 웹사이트 비노출 처리가 필요한 사진가 요청에만 적용합니다.",
+  image_delete_simple: "현재 미사용입니다. Arweave 자격증명이 없는 이미지는 수수료 없이 즉시 비노출 처리됩니다.",
+  image_delete_complex: "Arweave 자격증명 기록 확인과 웹사이트 비노출 처리가 필요한 사진작가 요청에만 적용합니다.",
 };
 
 function formatRate(rate: number) {
@@ -318,9 +318,9 @@ export default function AdminCommissionPage() {
         <section className="bg-surface-container-lowest shadow-ghost rounded-xl p-5 flex flex-col gap-4">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
             <div>
-              <h2 className="font-headline text-lg font-extrabold text-on-surface">사진 삭제 요청 수수료</h2>
+              <h2 className="font-headline text-lg font-extrabold text-on-surface">이미지 삭제 요청 수수료</h2>
               <p className="text-xs text-outline mt-0.5">
-                사진가가 삭제를 요청할 때 안내되는 수수료를 운영 상황에 맞게 조정합니다.
+                사진작가가 삭제를 요청할 때 안내되는 수수료를 운영 상황에 맞게 조정합니다.
               </p>
             </div>
             <button

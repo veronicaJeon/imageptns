@@ -614,7 +614,7 @@ async function addSelectedPhotoRequestMatches(body: SupportPostBody, adminUserId
 
   if (!requestId) return NextResponse.json({ error: "requestId is required" }, { status: 400 });
   if (photographerIds.length === 0) {
-    return NextResponse.json({ error: "사진가를 한 명 이상 선택해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "사진작가를 한 명 이상 선택해주세요." }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -1005,7 +1005,7 @@ async function sendPhotoRequestInvites(body: SupportPostBody, adminUserId: strin
   }
 
   const budgetLabel = formatPhotoRequestBudget(requestRow.budget_min_krw, requestRow.budget_max_krw);
-  const requestTitle = requestRow.subject?.trim() || "사진 의뢰";
+  const requestTitle = requestRow.subject?.trim() || "이미지 의뢰";
   const payloads = recipients.map((recipient) => ({
     photographerEmail: recipient.photographerEmail,
     photographerName: recipient.photographerName,

@@ -262,6 +262,35 @@ export async function notifyOpsNewUpload(opts: {
   });
 }
 
+export async function notifyOpsUploadBatch(opts: {
+  photographerEmail: string;
+  photographerName:  string;
+  images: Array<{ title: string; imageId: string; assetId?: string | null }>;
+}) {
+  if (opts.images.length === 0) return;
+
+  const photographerEmail = escapeHtml(opts.photographerEmail);
+  const photographerName = escapeHtml(opts.photographerName);
+  const count = opts.images.length;
+  const rows = opts.images.map((image) => {
+    const title = escapeHtml(image.title);
+    const imageId = escapeHtml(image.imageId);
+    const assetId = image.assetId ? escapeHtml(image.assetId) : null;
+    return `<li><strong>${title}</strong> · ${assetId ? `에셋 ${assetId} · ` : ""}ID ${imageId}</li>`;
+  }).join("");
+
+  await sendEmail({
+    to: OPS_EMAIL,
+    subject: `[새 업로드 묶음] ${count}개 이미지 — ${opts.photographerName}`,
+    html: `
+      <p>새 이미지 ${count}개가 심사 대기 중입니다.</p>
+      <p><strong>사진작가:</strong> ${photographerName} (${photographerEmail})</p>
+      <ul>${rows}</ul>
+      <p><a href="${buildSiteUrl("/admin/images")}">관리자 페이지에서 검토하기 →</a></p>
+    `,
+  });
+}
+
 export async function sendImageApproved(opts: {
   photographerEmail: string;
   photographerName:  string;
@@ -364,10 +393,10 @@ export async function sendPhotographerApplicationApproved(opts: {
 
   await sendEmail({
     to: opts.photographerEmail,
-    subject: "[Image Partners] 사진가 신청이 승인되었습니다",
+    subject: "[Image Partners] 사진작가 신청이 승인되었습니다",
     html: `
       <p>${photographerName}님, 안녕하세요.</p>
-      <p>사진가 신청이 승인되었습니다. 이제 이미지 업로드, 운영팀 요청, 판매 정산 기능을 사용할 수 있습니다.</p>
+      <p>사진작가 신청이 승인되었습니다. 이제 이미지 업로드, 운영팀 요청, 판매 정산 기능을 사용할 수 있습니다.</p>
       <p><a href="${buildSiteUrl("/dashboard/uploads")}">대시보드에서 업로드 시작하기 →</a></p>
       <br><p>Image Partners 팀 드림</p>
     `,
@@ -384,10 +413,10 @@ export async function sendPhotographerApplicationRejected(opts: {
 
   await sendEmail({
     to: opts.photographerEmail,
-    subject: "[Image Partners] 사진가 신청 검토 결과 안내",
+    subject: "[Image Partners] 사진작가 신청 검토 결과 안내",
     html: `
       <p>${photographerName}님, 안녕하세요.</p>
-      <p>사진가 신청이 아래 사유로 승인되지 않았습니다.</p>
+      <p>사진작가 신청이 아래 사유로 승인되지 않았습니다.</p>
       <p><strong>사유:</strong> ${reason}</p>
       <p>정보를 보완한 뒤 설정 페이지에서 다시 신청할 수 있습니다.</p>
       <br><p>Image Partners 팀 드림</p>
@@ -405,10 +434,10 @@ export async function sendPhotographerAccessSuspended(opts: {
 
   await sendEmail({
     to: opts.photographerEmail,
-    subject: "[Image Partners] 사진가 권한 상태 안내",
+    subject: "[Image Partners] 사진작가 권한 상태 안내",
     html: `
       <p>${photographerName}님, 안녕하세요.</p>
-      <p>운영 확인이 필요한 사유로 사진가 권한이 중지되었습니다.</p>
+      <p>운영 확인이 필요한 사유로 사진작가 권한이 중지되었습니다.</p>
       ${reason ? `<p><strong>메모:</strong> ${reason}</p>` : ""}
       <p>설정 페이지에서 활동 정보를 보완해 재신청할 수 있습니다.</p>
       <br><p>Image Partners 팀 드림</p>
@@ -427,10 +456,10 @@ export async function sendPhotoRequestInvite(opts: PhotoRequestInviteEmailPayloa
 
   await sendEmail({
     to: opts.photographerEmail,
-    subject: `[Image Partners] 사진 의뢰 초대 — ${opts.requestTitle}`,
+    subject: `[Image Partners] 이미지 의뢰 초대 — ${opts.requestTitle}`,
     html: `
       <p>${photographerName}님, 안녕하세요.</p>
-      <p>Image Partners 운영팀에서 아래 사진 의뢰 후보로 초대드립니다.</p>
+      <p>Image Partners 운영팀에서 아래 이미지 의뢰 후보로 초대드립니다.</p>
       <p><strong>의뢰:</strong> ${requestTitle}</p>
       ${usageProject ? `<p><strong>사용 프로젝트:</strong> ${usageProject}</p>` : ""}
       ${usageContext ? `<p><strong>사용 맥락:</strong> ${usageContext}</p>` : ""}

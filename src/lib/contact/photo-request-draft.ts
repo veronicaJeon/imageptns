@@ -23,12 +23,12 @@ function cleanText(value: string | null | undefined) {
 
 export function buildPhotoRequestSubject(brief: string, lang: DraftLang = "ko") {
   const normalized = cleanText(brief);
-  if (!normalized) return lang === "ko" ? "이미지(사진)요청" : "Image (photo) request";
+  if (!normalized) return lang === "ko" ? "이미지 요청" : "Image request";
 
   const preview = normalized.slice(0, 60);
   const suffix = normalized.length > preview.length ? "…" : "";
   return lang === "ko"
-    ? `[사진 요청] ${preview}${suffix}`
+    ? `[이미지 요청] ${preview}${suffix}`
     : `[Image request] ${preview}${suffix}`;
 }
 
@@ -81,7 +81,7 @@ export function draftPhotoRequestFromSearchParams(params: URLSearchParams, lang:
   const usageLabels = usageLabelsFromParams(params, lang);
   return {
     mode: "photo",
-    title: query ? (lang === "ko" ? `${query} 이미지(사진)요청` : `${query} image request`) : (lang === "ko" ? "이미지(사진)요청" : "Image (photo) request"),
+    title: query ? (lang === "ko" ? `${query} 이미지 요청` : `${query} image request`) : (lang === "ko" ? "이미지 요청" : "Image request"),
     brief: query,
     usage_context: usageLabels.length > 0
       ? (lang === "ko" ? `검색 조건과 동일한 사용 조건 검토: ${usageLabels.join(", ")}` : `Review the same usage terms as the search filters: ${usageLabels.join(", ")}`)

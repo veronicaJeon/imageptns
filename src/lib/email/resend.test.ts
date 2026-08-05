@@ -64,6 +64,34 @@ describe("Resend routing", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("sends one operations email for a batch upload summary", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "Image Partners <contact@imagepartners.kr>");
+    vi.stubEnv("OPS_EMAIL", "imgptns@gmail.com");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "email-1" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { notifyOpsUploadBatch } = await import("./resend");
+    await notifyOpsUploadBatch({
+      photographerEmail: "artist@example.com",
+      photographerName: "사진작가",
+      images: [
+        { title: "첫 이미지", imageId: "img-1", assetId: "IP-1" },
+        { title: "둘째 이미지", imageId: "img-2", assetId: "IP-2" },
+      ],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(String(request.body)) as { subject?: string; html?: string };
+    expect(body.subject).toContain("2개 이미지");
+    expect(body.html).toContain("첫 이미지");
+    expect(body.html).toContain("둘째 이미지");
+  });
+
   it("requires a verified sending and receiving domain plus inbound webhook", async () => {
     vi.stubEnv("RESEND_API_KEY", "valid-key");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://www.imagepartners.kr");

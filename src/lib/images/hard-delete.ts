@@ -10,6 +10,7 @@ export interface HardDeleteImageInput {
   proof_arweave_original_tx_id: string | null;
   proof_arweave_metadata_tx_id: string | null;
   proof_arweave_manifest_tx_id: string | null;
+  proof_arweave_confirmed_at?: string | null;
 }
 
 export interface ImageReferenceCounts {
@@ -56,7 +57,8 @@ export function hasOnchainOrArweaveRecord(image: HardDeleteImageInput) {
     hasValue(image.proof_tx_hash) ||
     hasValue(image.proof_arweave_original_tx_id) ||
     hasValue(image.proof_arweave_metadata_tx_id) ||
-    hasValue(image.proof_arweave_manifest_tx_id)
+    hasValue(image.proof_arweave_manifest_tx_id) ||
+    hasValue(image.proof_arweave_confirmed_at)
   );
 }
 
@@ -79,6 +81,50 @@ export function assessHardDeleteEligibility(
   if (counts.sourcingResults > 0) blockers.push("sourcing_results");
   if (counts.subscriptionDownloads > 0) blockers.push("subscription_downloads");
   if (counts.arweaveFeeOrderItems > 0) blockers.push("arweave_fee_orders");
+
+  return {
+    allowed: blockers.length === 0,
+    blockers,
+  };
+}
+
+function addBlockingReferenceBlockers(counts: ImageReferenceCounts, blockers: string[]) {
+  if (counts.orderItems > 0) blockers.push("order_items");
+  if (counts.downloads > 0) blockers.push("downloads");
+  if (counts.earningsLedger > 0) blockers.push("earnings_ledger");
+  if (counts.deletionRequests > 0) blockers.push("deletion_requests");
+  if (counts.sourcingResults > 0) blockers.push("sourcing_results");
+  if (counts.subscriptionDownloads > 0) blockers.push("subscription_downloads");
+  if (counts.arweaveFeeOrderItems > 0) blockers.push("arweave_fee_orders");
+}
+
+export function isPhotographerFinalDeleteState(image: HardDeleteImageInput) {
+  const lifecycle = image.lifecycle_status ?? "active";
+  return (
+    lifecycle === "archived" ||
+    lifecycle === "purged" ||
+    (
+      lifecycle === "active" &&
+      image.status === "approved" &&
+      image.is_published === false
+    )
+  );
+}
+
+export function assessPhotographerFinalDeleteEligibility(
+  image: HardDeleteImageInput,
+  counts: ImageReferenceCounts,
+): HardDeleteEligibility {
+  const blockers: string[] = [];
+  const lifecycle = image.lifecycle_status ?? "active";
+
+  if (lifecycle === "legal_hold") blockers.push("legal_hold");
+  else if (lifecycle === "deletion_requested") blockers.push("deletion_requested");
+  else if (!isPhotographerFinalDeleteState(image)) blockers.push("not_hidden");
+
+  if (Number(image.sales_count ?? 0) > 0) blockers.push("sales");
+  if (hasOnchainOrArweaveRecord(image)) blockers.push("onchain_or_arweave");
+  addBlockingReferenceBlockers(counts, blockers);
 
   return {
     allowed: blockers.length === 0,

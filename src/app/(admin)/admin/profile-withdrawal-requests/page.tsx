@@ -140,7 +140,7 @@ export default function AdminProfileWithdrawalRequestsPage() {
     <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8">
         <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">탈퇴 검토</h1>
-        <p className="mt-1 text-sm text-outline">사진가 탈퇴/회원삭제 요청의 권리, 구매자 접근, 온체인 기록, 정산 리스크를 확인합니다.</p>
+        <p className="mt-1 text-sm text-outline">사진작가 탈퇴/회원삭제 요청의 권리, 구매자 접근, 온체인 기록, 정산 리스크를 확인합니다.</p>
       </div>
 
       <div className="mb-6 flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl bg-surface-container-lowest p-1 shadow-ghost">

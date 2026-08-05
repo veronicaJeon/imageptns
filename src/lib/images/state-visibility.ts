@@ -42,6 +42,7 @@ export function ownerUploadBucket(
   }
 
   if (NON_ACTIVE_STATES.has(currentLifecycle)) return "removed";
+  if (state.status === "approved" && state.is_published === false) return "removed";
 
   if (state.status === "rejected") {
     const retentionMs = Math.max(1, options.rejectedRetentionDays) * 24 * 60 * 60 * 1000;

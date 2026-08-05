@@ -728,7 +728,7 @@ export default function AdminAboutPage() {
               <div>
                 <h2 className="text-base font-extrabold text-on-surface">라이브러리에서 이미지 선택</h2>
                 <p className="mt-1 text-xs leading-5 text-outline">
-                  사진가가 홍보 활용에 동의한 승인·공개 이미지만 표시됩니다. 선택하면 원본은 공개하지 않고,
+                  사진작가가 홍보 활용에 동의한 승인·공개 이미지만 표시됩니다. 선택하면 원본은 공개하지 않고,
                   메타데이터를 제거한 저해상도 무워터마크 전시본을 생성합니다.
                 </p>
               </div>
@@ -773,7 +773,7 @@ export default function AdminAboutPage() {
                   <span className="material-symbols-outlined text-4xl text-outline">photo_library</span>
                   <p className="mt-3 text-sm font-bold text-on-surface">선택 가능한 이미지가 없습니다.</p>
                   <p className="mt-1 max-w-md text-xs leading-5 text-outline">
-                    승인·공개 상태이면서 사진가가 ‘회사 및 서비스 홍보 활용’에 동의한 이미지만 이 목록에 나타납니다.
+                    승인·공개 상태이면서 사진작가가 ‘회사 및 서비스 홍보 활용’에 동의한 이미지만 이 목록에 나타납니다.
                   </p>
                 </div>
               ) : (

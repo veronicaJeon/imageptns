@@ -154,9 +154,9 @@ export default function AdminStatsPage() {
     },
     {
       icon: "verified",
-      label: "사진가 등록 요청",
+      label: "사진작가 등록 요청",
       value: proof.requested,
-      detail: "사진가가 Arweave 자격증명 등록을 요청한 이미지입니다.",
+      detail: "사진작가가 Arweave 자격증명 등록을 요청한 이미지입니다.",
       href: "/admin/onchain-registrations",
       tone: "text-amber-600 bg-amber-50 dark:bg-amber-900/20",
     },
@@ -178,7 +178,7 @@ export default function AdminStatsPage() {
     },
     {
       icon: "savings",
-      label: "사진가 Claim 대기",
+      label: "사진작가 Claim 대기",
       value: claims.claimableRows,
       detail: `${formatUSDC(claims.claimableUsdc ?? 0)}가 아직 claim되지 않았습니다.`,
       href: "/admin/payouts",

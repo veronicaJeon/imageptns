@@ -7,6 +7,12 @@ import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryI
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
 import { hasArweaveCredential } from "@/lib/images/deletion";
+import { isPhotographerFinalDeleteState } from "@/lib/images/hard-delete";
+import {
+  attachPhotographerFinalDeleteEligibility,
+  purgeHardDeleteImage,
+  type HardDeleteImageRow,
+} from "@/lib/images/hard-delete-server";
 import {
   automaticPromotionalUseBasis,
   PROMOTIONAL_USE_CONSENT_VERSION,
@@ -23,16 +29,6 @@ interface ImagePatchRow {
   promotional_use_basis: PromotionalUseBasis | null;
   copyright_license: string | null;
   free_usage_policy: string | null;
-}
-
-interface ImageDeleteRow {
-  id: string;
-  status: string;
-  lifecycle_status: string | null;
-  proof_arweave_original_tx_id: string | null;
-  proof_arweave_metadata_tx_id: string | null;
-  proof_arweave_manifest_tx_id: string | null;
-  proof_arweave_confirmed_at: string | null;
 }
 
 export async function PATCH(
@@ -215,17 +211,48 @@ export async function DELETE(
   const authorization = await requireApprovedPhotographer(admin, user.id);
   if (!authorization.ok) return authorization.response;
 
-  // Legacy DELETE callers use the same archive-only policy as the deletion request endpoint.
-  // Physical storage/database deletion remains an administrator operation.
   const { data: img } = await admin
     .from("images")
-    .select("id, status, lifecycle_status, proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id, proof_arweave_confirmed_at")
+    .select(`
+      id, asset_id, title, status, lifecycle_status, is_published,
+      photographer_id, storage_path_preview, storage_path_full, storage_path_original, original_filename,
+      file_size_mb, width, height, sales_count, proof_status, proof_tx_hash,
+      proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
+      proof_arweave_confirmed_at, created_at,
+      photographer:profiles!photographer_id(full_name)
+    `)
     .eq("id", id)
     .eq("photographer_id", user.id)
     .single();
 
   if (!img) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const image = img as ImageDeleteRow;
+  const image = img as HardDeleteImageRow;
+
+  if (isPhotographerFinalDeleteState(image)) {
+    const assessed = await attachPhotographerFinalDeleteEligibility(admin, image);
+    if (!assessed.eligibility.allowed) {
+      return NextResponse.json({
+        error: "이 이미지는 판매, 권리, 증명 또는 운영 기록이 연결되어 있어 완전삭제할 수 없습니다.",
+        blockers: assessed.eligibility.blockers,
+      }, { status: 409 });
+    }
+
+    const result = await purgeHardDeleteImage(admin, assessed, {
+      deletedBy: user.id,
+      deleteKind: "photographer_request",
+      reason: "사진작가 직접 삭제",
+    });
+    if (!result.purged) {
+      return NextResponse.json({
+        error: "이미지를 완전삭제하지 못했습니다.",
+        blockers: result.blockers,
+        errors: result.errors,
+      }, { status: result.errors.includes("hard_delete_not_allowed") ? 409 : 500 });
+    }
+
+    return NextResponse.json({ ok: true, hardDeleted: true, result });
+  }
+
   if (image.lifecycle_status && image.lifecycle_status !== "active") {
     return NextResponse.json({ error: "이미 삭제 절차가 진행 중이거나 완료된 이미지입니다." }, { status: 409 });
   }
@@ -236,7 +263,7 @@ export async function DELETE(
   const { data: result, error } = await admin.rpc("archive_unregistered_photographer_image", {
     target_image_id: id,
     target_user_id: user.id,
-    deletion_reason_text: "사진가 직접 삭제",
+    deletion_reason_text: "사진작가 직접 삭제",
     reason_category_text: "portfolio_cleanup",
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

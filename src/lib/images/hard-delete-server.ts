@@ -4,6 +4,7 @@ import { detachImageFromAboutPage } from "@/lib/about/library-assets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   assessHardDeleteEligibility,
+  assessPhotographerFinalDeleteEligibility,
   emptyImageReferenceCounts,
   type HardDeleteEligibility,
   type HardDeleteImageInput,
@@ -29,6 +30,26 @@ export interface HardDeleteCandidate {
   image: HardDeleteImageRow;
   referenceCounts: ImageReferenceCounts;
   eligibility: HardDeleteEligibility;
+}
+
+export type HardDeleteKind = "beta_cleanup" | "admin_hard_delete" | "photographer_request";
+
+export interface HardDeletePurgeOptions {
+  deletedBy: string | null;
+  deleteKind: HardDeleteKind;
+  reason: string;
+}
+
+export interface HardDeletePurgeResult {
+  imageId: string;
+  assetId: string | null;
+  title: string;
+  purged: boolean;
+  blockers: string[];
+  errors: string[];
+  storageRemoved?: number;
+  storagePaths?: ReturnType<typeof storagePathsForHardDelete>;
+  referenceCounts?: ImageReferenceCounts;
 }
 
 function first<T>(value: T | T[] | null | undefined): T | null {
@@ -122,6 +143,18 @@ export async function attachHardDeleteEligibility(
   };
 }
 
+export async function attachPhotographerFinalDeleteEligibility(
+  admin: ReturnType<typeof createAdminClient>,
+  image: HardDeleteImageRow,
+): Promise<HardDeleteCandidate> {
+  const referenceCounts = await getImageReferenceCounts(admin, image.id);
+  return {
+    image,
+    referenceCounts,
+    eligibility: assessPhotographerFinalDeleteEligibility(image, referenceCounts),
+  };
+}
+
 function uniqueStrings(values: Array<string | null | undefined>) {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
 }
@@ -174,4 +207,97 @@ export async function deleteSafeDependentRows(
     admin.from("collection_items").delete().eq("image_id", imageId),
     admin.from("image_price_overrides").delete().eq("image_id", imageId),
   ]);
+}
+
+export async function purgeHardDeleteImage(
+  admin: ReturnType<typeof createAdminClient>,
+  candidate: HardDeleteCandidate,
+  options: HardDeletePurgeOptions,
+): Promise<HardDeletePurgeResult> {
+  const { image } = candidate;
+  if (!candidate.eligibility.allowed) {
+    return {
+      imageId: image.id,
+      assetId: image.asset_id,
+      title: image.title,
+      purged: false,
+      blockers: candidate.eligibility.blockers,
+      errors: ["hard_delete_not_allowed"],
+      referenceCounts: candidate.referenceCounts,
+    };
+  }
+
+  const storage = await removeHardDeleteStorageFiles(admin, image);
+  if (storage.errors.length > 0) {
+    return {
+      imageId: image.id,
+      assetId: image.asset_id,
+      title: image.title,
+      purged: false,
+      blockers: [],
+      errors: storage.errors,
+      storagePaths: storage.paths,
+      referenceCounts: candidate.referenceCounts,
+    };
+  }
+
+  await deleteSafeDependentRows(admin, image.id);
+
+  const logRow = {
+    image_id: image.id,
+    asset_id: image.asset_id,
+    title: image.title,
+    photographer_id: image.photographer_id,
+    photographer_name: photographerName(image),
+    deleted_by: options.deletedBy,
+    delete_kind: options.deleteKind,
+    delete_reason: options.reason,
+    status_snapshot: image.status,
+    lifecycle_status_snapshot: image.lifecycle_status,
+    is_published_snapshot: image.is_published,
+    storage_paths_snapshot: storage.paths,
+    reference_counts_snapshot: candidate.referenceCounts,
+    image_created_at: image.created_at,
+    purged_at: new Date().toISOString(),
+  };
+
+  const { error: logError } = await admin.from("image_purge_logs").insert(logRow);
+  if (logError) {
+    return {
+      imageId: image.id,
+      assetId: image.asset_id,
+      title: image.title,
+      purged: false,
+      blockers: [],
+      errors: [`purge_log: ${logError.message}`],
+      storagePaths: storage.paths,
+      referenceCounts: candidate.referenceCounts,
+    };
+  }
+
+  const { error: deleteError } = await admin.from("images").delete().eq("id", image.id);
+  if (deleteError) {
+    return {
+      imageId: image.id,
+      assetId: image.asset_id,
+      title: image.title,
+      purged: false,
+      blockers: [],
+      errors: [`image: ${deleteError.message}`],
+      storagePaths: storage.paths,
+      referenceCounts: candidate.referenceCounts,
+    };
+  }
+
+  return {
+    imageId: image.id,
+    assetId: image.asset_id,
+    title: image.title,
+    purged: true,
+    blockers: [],
+    errors: [],
+    storageRemoved: storage.removed,
+    storagePaths: storage.paths,
+    referenceCounts: candidate.referenceCounts,
+  };
 }

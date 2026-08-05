@@ -17,7 +17,7 @@ const TOP_NAV_COPY = {
     darkMode: "다크 모드",
     mobileMenu: "모바일 메뉴",
     logout: "로그아웃",
-    photoRequest: "사진요청",
+    photoRequest: "이미지 요청",
     photoRequestHint: "원하는 이미지가 없다면?",
   },
   en: {
@@ -27,7 +27,7 @@ const TOP_NAV_COPY = {
     darkMode: "Dark mode",
     mobileMenu: "Mobile menu",
     logout: "Log out",
-    photoRequest: "Photo request",
+    photoRequest: "Image request",
     photoRequestHint: "Can't find the right image?",
   },
 } as const;

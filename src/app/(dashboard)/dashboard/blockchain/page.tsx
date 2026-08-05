@@ -232,9 +232,9 @@ function PhotographerBlockchainContent() {
     <div className="p-6 md:p-10">
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">블록체인 사진</h1>
+          <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">블록체인 이미지</h1>
           <p className="mt-1 text-sm text-on-surface-variant">
-            판매 완료 사진은 플랫폼 부담으로, 아직 판매되지 않은 사진은 사진가 부담 셀프 등록으로 Arweave 원본 보관 및 자격증명 등록을 요청합니다.
+            판매 완료 이미지는 플랫폼 부담으로, 아직 판매되지 않은 이미지는 사진작가 부담 셀프 등록으로 Arweave 원본 보관 및 자격증명 등록을 요청합니다.
           </p>
         </div>
         <Link
@@ -309,7 +309,7 @@ function PhotographerBlockchainContent() {
       ) : images.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-28 text-outline">
           <span className="material-symbols-outlined text-5xl">verified</span>
-          <p className="text-sm">아직 블록체인 등록 대상 사진이 없습니다.</p>
+          <p className="text-sm">아직 블록체인 등록 대상 이미지가 없습니다.</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost">
@@ -325,7 +325,7 @@ function PhotographerBlockchainContent() {
                     aria-label="전체 선택"
                   />
                 </th>
-                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">사진</th>
+                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">이미지</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">상태</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">판매</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">용량</th>
@@ -374,7 +374,7 @@ function PhotographerBlockchainContent() {
                       )}
                       {image.registration_state === "self_funded_available" && (
                         <p className="mt-1 max-w-[220px] text-[10px] text-outline">
-                          사진가 부담 예상 수수료 ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")}
+                          사진작가 부담 예상 수수료 ₩{(image.proof_request_fee_krw ?? 0).toLocaleString("ko-KR")}
                         </p>
                       )}
                       {image.registration_state === "self_funded_payment_pending" && (

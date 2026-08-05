@@ -359,7 +359,7 @@ export default function AdminOnchainPage() {
         <div className="flex flex-col gap-1 mb-4">
           <p className="text-xs font-bold text-outline uppercase tracking-widest">DB / Contract Claimable 대조</p>
           <p className="text-sm text-on-surface-variant">
-            사진가별 DB claimable USDC와 escrow contract의 claimable(address)를 비교합니다.
+            사진작가별 DB claimable USDC와 escrow contract의 claimable(address)를 비교합니다.
           </p>
           {!summary.contractReconciliationConfigured && (
             <p className="text-xs text-error mt-1">{data?.contractReconciliationError ?? "온체인 설정이 없어 contract 값을 읽지 못했습니다."}</p>
@@ -380,7 +380,7 @@ export default function AdminOnchainPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-outline-variant/20">
-                  {["사진가", "DB", "Contract", "차이", "상태"].map((head) => (
+                  {["사진작가", "DB", "Contract", "차이", "상태"].map((head) => (
                     <th key={head} className="text-left text-[10px] font-bold uppercase tracking-widest text-outline px-3 py-2">
                       {head}
                     </th>
