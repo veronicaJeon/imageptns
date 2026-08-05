@@ -211,7 +211,21 @@ async function main() {
     assert(downloadResponse.response.status === 200 && downloadResponse.data?.url, "Signed original download URL was not issued");
     const bytesResponse = await fetch(downloadResponse.data.url, { headers: { Range: "bytes=0-15" } });
     assert(bytesResponse.ok, `Signed original download returned ${bytesResponse.status}`);
-    results.push("관리자 입금 승인·확정메일·원본 다운로드: 통과");
+    const bulkResponse = await api("/api/download/bulk", {
+      cookie: buyerCookie,
+      method: "POST",
+      body: { orderItemIds: [download.order_item_id] },
+    });
+    assert(bulkResponse.response.status === 200, `Bulk download returned ${bulkResponse.response.status}`);
+    assert(bulkResponse.data?.raw?.startsWith("PK"), "Bulk download did not return a ZIP file");
+    const orderHistory = await api("/api/orders", { cookie: buyerCookie });
+    assert(orderHistory.response.status === 200, `Order history returned ${orderHistory.response.status}`);
+    const historyRows = Array.isArray(orderHistory.data) ? orderHistory.data : orderHistory.data?.orders;
+    assert(
+      Array.isArray(historyRows) && historyRows.some((order) => order.id === first.data.orderDbId),
+      "Completed order was not visible in buyer order history",
+    );
+    results.push("관리자 입금 승인·확정메일·단건·일괄 다운로드·주문이력: 통과");
 
     const canceledOrder = await createBankOrder(randomUUID());
     const cancellation = await api("/api/admin/payment-requests", {

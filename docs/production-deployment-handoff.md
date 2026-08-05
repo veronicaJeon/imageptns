@@ -4,14 +4,14 @@
 
 ## 현재 운영 기준점
 
-- 배포 시각: 2026-08-05 21:37:25 KST
+- 배포 시각: 2026-08-05 23:59 KST
 - 릴리스 브랜치: `main`
-- 릴리스 커밋 SHA: `4050b38ef001c81f25d572943ce5144f0b1c6604`
-- 배포 소스 문서 커밋 SHA: `4050b38ef001c81f25d572943ce5144f0b1c6604` (운영 기준점 갱신은 문서 전용 후속 커밋)
-- Production deployment ID: `dpl_CuEVRqYKJUZYk6J5zLUkDRBxKUUh`
-- Production URL: `https://imageptns-9jhecb1u9-veronicajeons-projects.vercel.app`
+- 릴리스 커밋 SHA: `a6bae70` (운영 기준점 갱신은 문서·DB 후속 커밋)
+- 배포 소스 문서 커밋 SHA: `a6bae70`
+- Production deployment ID: `dpl_Fjy7ncusmy6DDamVBKoSTSmLcH4o`
+- Production URL: `https://imageptns-qsdenl1a6-veronicajeons-projects.vercel.app`
 - 운영 상태: `Ready`, `https://www.imagepartners.kr` alias 연결 확인
-- 검증 기준: 78개 테스트 파일·330개 테스트 통과, 린트 오류 0(경고 11건), TypeScript·프로덕션 빌드 통과, 운영 DB·스토리지·미리보기 무결성·AI health `ok`, GitHub 외부 모니터 통과
+- 검증 기준: 80개 테스트 파일·336개 테스트 통과, 린트 오류 0(경고 11건), TypeScript·프로덕션 빌드·전체 audit 통과, 운영 DB·스토리지·미리보기 무결성·AI health `ok`, 계좌이체 주문·메일·승인·취소·원본 다운로드 운영 E2E 통과
 
 다음 배포 담당자는 이 기준점과 새 배포의 ID·생성 시각·alias를 비교해 실제 전환 여부를 판단한다.
 
@@ -44,6 +44,8 @@
 2026-07-21 23:06 릴리스에서는 운영 데이터 흐름을 기준으로 국내용 개인정보처리방침을 확정하고 마이그레이션 `050_finalize_domestic_privacy_notice.sql`을 운영 DB에 적용했다. 대표자명과 사업자등록번호는 약관 본문에 넣지 않았으며, 유료 전자상거래 개시 전에 별도 사업자정보 화면에 법정 표시사항을 공개하도록 약관을 정리했다. 종료된 Groq 비전·Gemini 경로를 제거하고 Mistral 비전 모델명을 현재 모델로 갱신했다.
 
 운영자는 Mistral 기반 제목·설명·키워드 자동 생성 기능이 실제로 작동 중임을 확인했다. 별도 환경 파일 검사에서 얻은 값만으로 운영 키 교체가 필요하다고 판단하지 않으며, 키를 변경하지 않는다. Groq는 과거 실험 흔적이므로 호출 경로와 개인정보처리방침의 처리자 목록에서 제거한다. 향후 AI 이중화는 새 공급자 또는 내부 모델의 품질·비용·보유정책을 검증한 뒤 별도 도입한다.
+
+2026-08-05 공개 거래 준비 릴리스에서는 마이그레이션 065~067로 주문·항목·정책 스냅샷의 원자 생성, idempotency, 거래 메일 outbox와 직접 주문 insert 차단을 적용했다. 주문 화면은 필수 동의와 사업자 공시 준비 상태를 표시하며, 관리자는 접수·승인·취소 메일 실패를 확인하고 재전송할 수 있다. 실제 공시값 확정 전에는 `ALLOW_INCOMPLETE_DISCLOSURE_BETA=true`로 제한 베타만 유지하고 정식 공개 전에 값을 게시한 뒤 `false`로 전환한다.
 
 ## 2주차 착수 순서
 
