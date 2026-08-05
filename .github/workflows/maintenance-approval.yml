@@ -1,0 +1,91 @@
+name: Maintenance candidate approval
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  record:
+    name: Record owner decision
+    if: >-
+      contains(github.event.issue.labels.*.name, 'maintenance-candidate') &&
+      (startsWith(github.event.comment.body, '/approve MNT-') || startsWith(github.event.comment.body, '/reject MNT-'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate and record decision
+        id: decision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          AUTHOR: ${{ github.event.comment.user.login }}
+          ASSOCIATION: ${{ github.event.comment.author_association }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$ASSOCIATION" =~ ^(OWNER|MEMBER|COLLABORATOR)$ ]]; then
+            gh issue comment "$ISSUE_NUMBER" --body="@$AUTHOR 님은 이 유지보수 후보를 승인할 저장소 권한이 없습니다."
+            exit 1
+          fi
+
+          action="$(printf '%s' "$COMMENT_BODY" | awk '{print $1}')"
+          candidate_id="$(printf '%s' "$COMMENT_BODY" | awk '{print $2}')"
+          if [[ "$ISSUE_BODY" != *"<!-- maintenance-candidate:$candidate_id -->"* ]]; then
+            gh issue comment "$ISSUE_NUMBER" --body="후보 ID \`$candidate_id\`가 이 이슈와 일치하지 않습니다. 이슈 본문의 명령을 사용해 주세요."
+            exit 1
+          fi
+
+          gh label create maintenance-approved --color 0E8A16 --description "Approved for an implementation task" --force >/dev/null
+          gh label create maintenance-rejected --color B60205 --description "Rejected maintenance proposal" --force >/dev/null
+          if [ "$action" = "/approve" ]; then
+            gh api --method DELETE "repos/$GH_REPO/issues/$ISSUE_NUMBER/labels/maintenance-rejected" >/dev/null 2>&1 || true
+            gh issue edit "$ISSUE_NUMBER" --add-label maintenance-approved
+            decision="approved"
+            message="✅ @$AUTHOR 님이 \`$candidate_id\` 구현 착수를 승인했습니다. 외부 개발 에이전트가 연결돼 있으면 작업 요청을 전달하며, 그렇지 않으면 승인 대기열에 유지됩니다. 운영 배포·DB 변경·데이터 삭제 승인은 별도입니다."
+          else
+            gh api --method DELETE "repos/$GH_REPO/issues/$ISSUE_NUMBER/labels/maintenance-approved" >/dev/null 2>&1 || true
+            gh issue edit "$ISSUE_NUMBER" --add-label maintenance-rejected
+            decision="rejected"
+            message="⛔ @$AUTHOR 님이 \`$candidate_id\` 제안을 거절했습니다. 사유나 대안을 댓글로 남기면 다음 점검 근거에 포함할 수 있습니다."
+          fi
+          gh issue comment "$ISSUE_NUMBER" --body="$message"
+          echo "decision=$decision" >> "$GITHUB_OUTPUT"
+          echo "candidate_id=$candidate_id" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch approved candidate to configured development agent
+        if: steps.decision.outputs.decision == 'approved'
+        env:
+          AGENT_WEBHOOK_URL: ${{ secrets.MAINTENANCE_AGENT_WEBHOOK_URL }}
+          AGENT_WEBHOOK_TOKEN: ${{ secrets.MAINTENANCE_AGENT_WEBHOOK_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          CANDIDATE_ID: ${{ steps.decision.outputs.candidate_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$AGENT_WEBHOOK_URL" ]; then
+            echo "No maintenance agent webhook is configured; approval remains queued."
+            exit 0
+          fi
+          payload="$(jq -n \
+            --arg repository "$REPOSITORY" \
+            --arg candidateId "$CANDIDATE_ID" \
+            --arg issueNumber "$ISSUE_NUMBER" \
+            --arg issueUrl "$ISSUE_URL" \
+            '{event:"maintenance_candidate_approved", repository:$repository, candidateId:$candidateId, issueNumber:$issueNumber, issueUrl:$issueUrl}')"
+          auth_args=()
+          if [ -n "$AGENT_WEBHOOK_TOKEN" ]; then
+            auth_args=(-H "Authorization: Bearer $AGENT_WEBHOOK_TOKEN")
+          fi
+          curl --fail --silent --show-error --retry 2 \
+            -H "Content-Type: application/json" \
+            "${auth_args[@]}" \
+            --data "$payload" \
+            "$AGENT_WEBHOOK_URL"

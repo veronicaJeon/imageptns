@@ -67,6 +67,19 @@ interface ImageRow {
   proof_tx_hash: string | null;
   proof_status: string | null;
   proof_registered_at: string | null;
+  duplicate_review_status: "clear" | "required" | "confirmed" | "overridden";
+  duplicate_match_kind: "exact" | "visual" | null;
+  duplicate_phash_distance: number | null;
+  duplicate_dhash_distance: number | null;
+  duplicate_review_reason: string | null;
+  duplicate_candidate: {
+    id: string;
+    asset_id: string | null;
+    title: string;
+    storage_path_preview: string | null;
+    photographer_id: string | null;
+    photographer_name: string | null;
+  } | null;
   photographer: { id: string; full_name: string; avatar_url: string | null; wallet_address?: string | null } | null;
 }
 
@@ -122,13 +135,22 @@ export default function AdminPage() {
     };
   }, [tab, fetchImages]);
 
-  async function handleAction(id: string, action: "approve" | "reject", reason?: string) {
+  async function handleAction(
+    id: string,
+    action: "approve" | "reject",
+    reason?: string,
+    duplicateOverrideReason?: string,
+  ) {
     setActioning(id);
     try {
       const res = await fetch(`/api/admin/images/${id}/review`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, rejection_reason: reason }),
+        body: JSON.stringify({
+          action,
+          rejection_reason: reason,
+          duplicate_override_reason: duplicateOverrideReason,
+        }),
       });
       if (!res.ok) {
         const { error } = await res.json();
@@ -263,6 +285,12 @@ export default function AdminPage() {
                           {PROOF_LABELS[img.proof_status] ?? `증명: ${img.proof_status}`}
                         </AdminChip>
                       )}
+                      {img.duplicate_review_status === "required" && (
+                        <AdminChip tone="danger">중복</AdminChip>
+                      )}
+                      {img.duplicate_review_status === "overridden" && (
+                        <AdminChip tone="warning">중복 예외 승인</AdminChip>
+                      )}
                       <AdminChip tone={adminStatusTone(img.status)}>
                         {STATUS_LABELS[img.status] ?? img.status}
                       </AdminChip>
@@ -335,6 +363,42 @@ export default function AdminPage() {
                     </div>
                   )}
 
+                  {img.duplicate_review_status === "required" && (
+                    <div className="rounded-lg border border-error/25 bg-error/5 p-3">
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-base text-error">content_copy</span>
+                        <p className="text-xs font-bold text-error">
+                          {img.duplicate_match_kind === "exact" ? "원본 파일이 같은 중복 후보" : "시각적으로 유사한 중복 후보"}
+                        </p>
+                      </div>
+                      {img.duplicate_candidate ? (
+                        <div className="flex items-center gap-3">
+                          {img.duplicate_candidate.storage_path_preview && (
+                            <Image
+                              src={img.duplicate_candidate.storage_path_preview}
+                              alt={img.duplicate_candidate.title}
+                              width={96}
+                              height={72}
+                              className="h-16 w-24 rounded-md bg-surface-container-low object-contain"
+                            />
+                          )}
+                          <div className="min-w-0 text-xs text-on-surface-variant">
+                            <p className="truncate font-semibold text-on-surface">{img.duplicate_candidate.title}</p>
+                            <p>{img.duplicate_candidate.asset_id ?? img.duplicate_candidate.id}</p>
+                            <p>{img.duplicate_candidate.photographer_name ?? "사진작가 정보 없음"}</p>
+                            {img.duplicate_match_kind === "visual" && (
+                              <p>유사도 거리 pHash {img.duplicate_phash_distance ?? "-"} · dHash {img.duplicate_dhash_distance ?? "-"}</p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-on-surface-variant">
+                          중복 기준 이미지는 삭제되어 보존 지문으로만 확인됩니다.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Reject inline form */}
                   {rejectingId === img.id && (
                     <div className="flex flex-col gap-2 p-3 bg-error/5 border border-error/20 rounded-lg">
@@ -374,7 +438,17 @@ export default function AdminPage() {
                   {lifecycleActive && img.status !== "approved" && rejectingId !== img.id && (
                     <div className="flex gap-2 flex-wrap">
                       <AdminButton
-                        onClick={() => handleAction(img.id, "approve")}
+                        onClick={() => {
+                          if (img.duplicate_review_status !== "required") {
+                            void handleAction(img.id, "approve");
+                            return;
+                          }
+                          const overrideReason = window.prompt(
+                            "중복 후보와 별도 이미지로 승인하는 사유를 입력하세요. 이 내용은 감사 기록에 남습니다.",
+                          );
+                          if (!overrideReason?.trim()) return;
+                          void handleAction(img.id, "approve", undefined, overrideReason.trim());
+                        }}
                         disabled={actioning === img.id || img.status !== "pending"}
                         variant="primary"
                         size="md"
@@ -383,7 +457,7 @@ export default function AdminPage() {
                           ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           : <span className="material-symbols-outlined text-sm">check_circle</span>
                         }
-                        승인
+                        {img.duplicate_review_status === "required" ? "별도 이미지로 승인" : "승인"}
                       </AdminButton>
                       {img.status !== "rejected" && (
                         <AdminButton

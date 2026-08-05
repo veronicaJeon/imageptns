@@ -24,10 +24,21 @@ import {
 import { readBoundedJson, RequestBodyError } from "@/lib/security/request-body";
 import { ownerUploadBucket } from "@/lib/images/state-visibility";
 import { storageBinaryBody } from "@/lib/supabase/storage-body";
+import { createImageFingerprint } from "@/lib/images/fingerprint";
 
 export const maxDuration = 60;
 
 class UploadValidationError extends Error {}
+class DuplicateUploadError extends Error {}
+
+interface FingerprintReservation {
+  blocked: boolean;
+  fingerprint_id?: string;
+  matched_fingerprint_id?: string | null;
+  match_kind?: "exact" | "visual" | null;
+  phash_distance?: number | null;
+  dhash_distance?: number | null;
+}
 
 const SHARP_FORMAT_CONTENT_TYPES: Record<string, string> = {
   jpeg: "image/jpeg",
@@ -203,6 +214,7 @@ export async function POST(req: NextRequest) {
   }
 
   let createdImageId: string | null = null;
+  let fingerprintReservationId: string | null = null;
   try {
     const { data: downloaded, error: downloadErr } = await admin.storage
       .from("images-original")
@@ -228,6 +240,28 @@ export async function POST(req: NextRequest) {
     if (SHARP_FORMAT_CONTENT_TYPES[verifiedImage.format] !== uploadSession.content_type) {
       throw new UploadValidationError("Uploaded image type does not match the upload session");
     }
+
+    const fingerprint = await createImageFingerprint(buffer, uploadRotationDegrees);
+    const { data: reservationData, error: reservationError } = await admin.rpc(
+      "reserve_image_fingerprint",
+      {
+        p_upload_session_id: uploadSession.id,
+        p_photographer_id: user.id,
+        p_original_sha256: fingerprint.originalSha256,
+        p_phash: fingerprint.phash,
+        p_dhash: fingerprint.dhash,
+        p_width: fingerprint.width,
+        p_height: fingerprint.height,
+        p_algorithm_version: fingerprint.algorithmVersion,
+      },
+    );
+    if (reservationError) throw reservationError;
+    const reservation = reservationData as FingerprintReservation | null;
+    if (reservation?.blocked) {
+      throw new DuplicateUploadError("This image duplicates an existing upload");
+    }
+    if (!reservation?.fingerprint_id) throw new Error("Failed to reserve image fingerprint");
+    fingerprintReservationId = reservation.fingerprint_id;
 
     const watermarked = await applyWatermark(buffer, uploadRotationDegrees);
     const thumbnail = await createWatermarkedThumbnail(buffer, 320, 240, uploadRotationDegrees);
@@ -292,12 +326,24 @@ export async function POST(req: NextRequest) {
         lifecycle_status: "active",
         is_published: false,
         status: "pending",
+        duplicate_review_status: reservation.matched_fingerprint_id ? "required" : "clear",
+        duplicate_of_fingerprint_id: reservation.matched_fingerprint_id ?? null,
+        duplicate_match_kind: reservation.match_kind ?? null,
+        duplicate_phash_distance: reservation.phash_distance ?? null,
+        duplicate_dhash_distance: reservation.dhash_distance ?? null,
       })
       .select()
       .single();
 
     if (error || !data) throw error ?? new Error("Failed to save uploaded image");
     createdImageId = data.id;
+
+    const { error: attachFingerprintError } = await admin
+      .from("image_fingerprints")
+      .update({ image_id: data.id, updated_at: new Date().toISOString() })
+      .eq("id", fingerprintReservationId)
+      .is("image_id", null);
+    if (attachFingerprintError) throw attachFingerprintError;
     await syncImageCategoryAssignments(admin, data.id, categoryInput.codes);
 
     const { error: consumedError } = await admin
@@ -328,6 +374,9 @@ export async function POST(req: NextRequest) {
     if (createdImageId) {
       await admin.from("images").delete().eq("id", createdImageId);
     }
+    if (fingerprintReservationId) {
+      await admin.from("image_fingerprints").delete().eq("id", fingerprintReservationId);
+    }
     await Promise.all([
       admin.storage.from("images-original").remove([storage_path_original]),
       admin.storage.from("images-preview").remove([
@@ -338,16 +387,25 @@ export async function POST(req: NextRequest) {
         .from("upload_sessions")
         .update({
           status: "failed",
-          failure_code: err instanceof UploadValidationError ? "validation_failed" : "processing_failed",
+          failure_code: err instanceof DuplicateUploadError
+            ? "duplicate_exact"
+            : err instanceof UploadValidationError
+              ? "validation_failed"
+              : "processing_failed",
           updated_at: new Date().toISOString(),
         })
         .eq("id", uploadSession.id),
     ]);
 
-    const message = err instanceof UploadValidationError ? err.message : "Failed to process uploaded image";
+    const duplicate = err instanceof DuplicateUploadError;
+    const message = duplicate
+      ? "This image duplicates an existing upload"
+      : err instanceof UploadValidationError
+        ? err.message
+        : "Failed to process uploaded image";
     return NextResponse.json(
-      { error: message },
-      { status: err instanceof UploadValidationError ? 400 : 500 },
+      { error: message, ...(duplicate ? { code: "DUPLICATE_UPLOAD" } : {}) },
+      { status: duplicate ? 409 : err instanceof UploadValidationError ? 400 : 500 },
     );
   }
 }

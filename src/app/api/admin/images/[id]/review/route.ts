@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { detachImageFromAboutPage } from "@/lib/about/library-assets";
 import { sendImageApproved, sendImageRejected } from "@/lib/email/resend";
+import { recordAdminAuditLog } from "@/lib/admin/audit";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -24,6 +25,9 @@ interface ReviewImage {
   asset_id: string | null;
   title: string;
   photographer_id: string | null;
+  duplicate_review_status: string;
+  duplicate_of_fingerprint_id: string | null;
+  duplicate_match_kind: string | null;
 }
 
 interface ReviewResponseImage {
@@ -41,7 +45,7 @@ interface ReviewResponseImage {
   proof_tx_hash?: string | null;
 }
 
-const REVIEW_SELECT = "id, status, lifecycle_status, is_published, rejection_reason, approved_at, title, asset_id, photographer_id, proof_status, proof_registered_at, proof_tx_hash";
+const REVIEW_SELECT = "id, status, lifecycle_status, is_published, rejection_reason, approved_at, title, asset_id, photographer_id, proof_status, proof_registered_at, proof_tx_hash, duplicate_review_status, duplicate_review_reason";
 
 export async function PATCH(
   req: NextRequest,
@@ -52,9 +56,10 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const { action, rejection_reason } = body as {
+  const { action, rejection_reason, duplicate_override_reason } = body as {
     action: "approve" | "reject";
     rejection_reason?: string;
+    duplicate_override_reason?: string;
   };
 
   if (!["approve", "reject"].includes(action)) {
@@ -70,7 +75,7 @@ export async function PATCH(
   if (action === "approve") {
     const { data: loadedImage, error: loadError } = await admin
       .from("images")
-      .select("id, asset_id, title, photographer_id")
+      .select("id, asset_id, title, photographer_id, duplicate_review_status, duplicate_of_fingerprint_id, duplicate_match_kind")
       .eq("id", id)
       .single();
 
@@ -78,6 +83,14 @@ export async function PATCH(
     const image = loadedImage as ReviewImage;
     if (!image.asset_id) return NextResponse.json({ error: "Image asset_id required" }, { status: 400 });
     if (!image.photographer_id) return NextResponse.json({ error: "Photographer required" }, { status: 400 });
+    const requiresDuplicateOverride = image.duplicate_review_status === "required";
+    const duplicateOverrideReason = duplicate_override_reason?.trim() ?? "";
+    if (requiresDuplicateOverride && !duplicateOverrideReason) {
+      return NextResponse.json(
+        { error: "중복 후보를 별도 이미지로 승인하는 사유가 필요합니다.", code: "DUPLICATE_OVERRIDE_REASON_REQUIRED" },
+        { status: 409 },
+      );
+    }
 
     const approvedAt = new Date().toISOString();
     const { data: approved, error: approveError } = await admin
@@ -91,6 +104,12 @@ export async function PATCH(
         approved_at: approvedAt,
         rejection_reason: null,
         rejected_at: null,
+        ...(requiresDuplicateOverride ? {
+          duplicate_review_status: "overridden",
+          duplicate_reviewed_by: user.id,
+          duplicate_reviewed_at: approvedAt,
+          duplicate_review_reason: duplicateOverrideReason,
+        } : {}),
       })
       .eq("id", id)
       .eq("status", "pending")
@@ -109,6 +128,22 @@ export async function PATCH(
     }
 
     data = approved;
+    if (requiresDuplicateOverride) {
+      await recordAdminAuditLog(admin, {
+        actorId: user.id,
+        action: "image.duplicate_override_approved",
+        targetType: "image",
+        targetId: image.id,
+        targetLabel: image.asset_id ?? image.title,
+        before: {
+          duplicate_review_status: image.duplicate_review_status,
+          duplicate_of_fingerprint_id: image.duplicate_of_fingerprint_id,
+          duplicate_match_kind: image.duplicate_match_kind,
+        },
+        after: { duplicate_review_status: "overridden" },
+        reason: duplicateOverrideReason,
+      });
+    }
   } else {
     const rejectedAt = new Date().toISOString();
     const { data: rejected, error } = await admin

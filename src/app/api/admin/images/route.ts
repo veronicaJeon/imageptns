@@ -9,6 +9,22 @@ import { previewUrl } from "@/lib/supabase/storage";
 
 interface AdminImageListRow {
   storage_path_preview: string | null;
+  duplicate_of_fingerprint_id?: string | null;
+}
+
+interface DuplicateFingerprintRow {
+  id: string;
+  image_id: string | null;
+}
+
+interface DuplicateCandidateRow {
+  id: string;
+  asset_id: string | null;
+  title: string;
+  title_ko: string | null;
+  storage_path_preview: string | null;
+  photographer_id: string | null;
+  photographer: { full_name: string | null } | { full_name: string | null }[] | null;
 }
 
 function clampPage(value: string | null) {
@@ -56,6 +72,8 @@ export async function GET(req: NextRequest) {
     promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, promotional_use_basis,
     width, height, resolution_mp, file_format, file_size_mb,
     views_count, sales_count, created_at, approved_at,
+    duplicate_review_status, duplicate_of_fingerprint_id, duplicate_match_kind,
+    duplicate_phash_distance, duplicate_dhash_distance, duplicate_review_reason,
     photographer:profiles!photographer_id(id, full_name, avatar_url, wallet_address)
   `, { count: "exact" })
     .order("created_at", { ascending: false })
@@ -85,10 +103,58 @@ export async function GET(req: NextRequest) {
   const { data, error, count } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const images = (data ?? []).map((img: AdminImageListRow) => ({
-    ...img,
-    storage_path_preview: previewUrl(img.storage_path_preview),
-  }));
+  const fingerprintIds = [...new Set((data ?? [])
+    .map((img: AdminImageListRow) => img.duplicate_of_fingerprint_id)
+    .filter((id): id is string => Boolean(id)))];
+  const fingerprintMap = new Map<string, DuplicateFingerprintRow>();
+  const candidateMap = new Map<string, DuplicateCandidateRow>();
+
+  if (fingerprintIds.length > 0) {
+    const { data: fingerprints, error: fingerprintsError } = await admin
+      .from("image_fingerprints")
+      .select("id, image_id")
+      .in("id", fingerprintIds);
+    if (fingerprintsError) return NextResponse.json({ error: fingerprintsError.message }, { status: 500 });
+    for (const fingerprint of (fingerprints ?? []) as DuplicateFingerprintRow[]) {
+      fingerprintMap.set(fingerprint.id, fingerprint);
+    }
+
+    const candidateIds = [...new Set((fingerprints ?? [])
+      .map((fingerprint: DuplicateFingerprintRow) => fingerprint.image_id)
+      .filter((id): id is string => Boolean(id)))];
+    if (candidateIds.length > 0) {
+      const { data: candidates, error: candidatesError } = await admin
+        .from("images")
+        .select("id, asset_id, title, title_ko, storage_path_preview, photographer_id, photographer:profiles!photographer_id(full_name)")
+        .in("id", candidateIds);
+      if (candidatesError) return NextResponse.json({ error: candidatesError.message }, { status: 500 });
+      for (const candidate of (candidates ?? []) as unknown as DuplicateCandidateRow[]) {
+        candidateMap.set(candidate.id, candidate);
+      }
+    }
+  }
+
+  const images = (data ?? []).map((img: AdminImageListRow) => {
+    const fingerprint = img.duplicate_of_fingerprint_id
+      ? fingerprintMap.get(img.duplicate_of_fingerprint_id)
+      : null;
+    const candidate = fingerprint?.image_id ? candidateMap.get(fingerprint.image_id) : null;
+    const photographer = Array.isArray(candidate?.photographer)
+      ? candidate.photographer[0] ?? null
+      : candidate?.photographer ?? null;
+    return {
+      ...img,
+      storage_path_preview: previewUrl(img.storage_path_preview),
+      duplicate_candidate: candidate ? {
+        id: candidate.id,
+        asset_id: candidate.asset_id,
+        title: candidate.title_ko?.trim() || candidate.title,
+        storage_path_preview: previewUrl(candidate.storage_path_preview),
+        photographer_id: candidate.photographer_id,
+        photographer_name: photographer?.full_name ?? null,
+      } : null,
+    };
+  });
 
   return NextResponse.json({
     images,

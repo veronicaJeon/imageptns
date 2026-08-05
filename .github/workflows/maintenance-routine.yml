@@ -16,6 +16,7 @@ on:
 permissions:
   contents: read
   issues: write
+  pull-requests: read
   actions: read
 
 concurrency:
@@ -40,7 +41,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          title="[maintenance] Image Partners 72-hour review"
           issue_number="$(gh issue list --state all --limit 100 --json number,title --jq 'map(select(.title == "[maintenance] Image Partners 72-hour review"))[0].number // empty')"
           last_success_at=""
 
@@ -63,9 +63,11 @@ jobs:
             fi
           fi
 
-          echo "due=$due" >> "$GITHUB_OUTPUT"
-          echo "issue_number=$issue_number" >> "$GITHUB_OUTPUT"
-          echo "last_success_at=$last_success_at" >> "$GITHUB_OUTPUT"
+          {
+            echo "due=$due"
+            echo "issue_number=$issue_number"
+            echo "last_success_at=$last_success_at"
+          } >> "$GITHUB_OUTPUT"
           echo "Maintenance review due: $due"
 
   review:
@@ -203,7 +205,18 @@ jobs:
         continue-on-error: true
         run: supabase stop --no-backup
 
+      - name: Derive active improvement candidates
+        id: candidates
+        if: always()
+        env:
+          MAINTENANCE_RESULTS: >-
+            {"install":"${{ steps.install.outcome }}","audit":"${{ steps.audit.outcome }}","typecheck":"${{ steps.typecheck.outcome }}","lint":"${{ steps.lint.outcome }}","test":"${{ steps.test.outcome }}","build":"${{ steps.build.outcome }}","supabase_cli":"${{ steps.supabase_cli.outcome }}","database_start":"${{ steps.database_start.outcome }}","database_lint":"${{ steps.database_lint.outcome }}","health":"${{ steps.health.outcome }}","smoke":"${{ steps.smoke.outcome }}","checkout_readiness":"${{ steps.checkout_readiness.outcome }}","branch_protection":"${{ steps.branch_protection.outputs.result || 'unverified' }}"}
+        run: |
+          node scripts/derive-maintenance-candidates.mjs "$RUNNER_TEMP/maintenance-candidates.json"
+          echo "count=$(jq length "$RUNNER_TEMP/maintenance-candidates.json")" >> "$GITHUB_OUTPUT"
+
       - name: Publish maintenance report
+        id: publish
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -223,6 +236,7 @@ jobs:
           SMOKE: ${{ steps.smoke.outcome }}
           CHECKOUT_READINESS: ${{ steps.checkout_readiness.outcome }}
           BRANCH_PROTECTION: ${{ steps.branch_protection.outputs.result || 'unverified' }}
+          CANDIDATE_COUNT: ${{ steps.candidates.outputs.count || '0' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -256,7 +270,12 @@ jobs:
             echo "| 계좌이체 공개 경계 | $CHECKOUT_READINESS |"
             echo "| main 보호 확인 | $BRANCH_PROTECTION |"
             echo
-            echo "자동 수정, DB 변경, 운영 배포와 데이터 삭제는 수행하지 않았습니다. 실패 항목은 P0/P1/P2로 분류해 작은 PR과 승인 절차로 처리합니다."
+            echo "### 점진적 개선 루프"
+            echo
+            echo "- 활성 개선 후보: ${CANDIDATE_COUNT}건"
+            echo "- 각 후보는 별도 이슈로 생성·갱신되며 \`/approve MNT-…\` 또는 \`/reject MNT-…\`로 결정합니다."
+            echo "- 승인된 후보는 연결된 개발 에이전트가 작은 PR로 구현합니다. 에이전트가 미연결이면 승인 대기 상태를 유지합니다."
+            echo "- 병합, DB 적용, 데이터 삭제, 운영 배포는 별도 승인 게이트를 통과해야 합니다."
             if [ "$failed" = false ]; then
               echo
               echo "<!-- imagepartners-maintenance-success -->"
@@ -264,6 +283,10 @@ jobs:
           } > "$report_file"
 
           gh label create maintenance --color 1D76DB --description "Scheduled maintenance and operational review" --force >/dev/null
+          gh label create maintenance-candidate --color FBCA04 --description "Candidate derived by the maintenance improvement loop" --force >/dev/null
+          gh label create approval-required --color D93F0B --description "Human decision is required" --force >/dev/null
+          gh label create priority-p0 --color B60205 --description "Critical maintenance priority" --force >/dev/null
+          gh label create priority-p1 --color D93F0B --description "High maintenance priority" --force >/dev/null
           if [ -z "$TRACKING_ISSUE" ]; then
             TRACKING_ISSUE="$(gh api --method POST "repos/$GH_REPO/issues" \
               -f title="[maintenance] Image Partners 72-hour review" \
@@ -272,6 +295,103 @@ jobs:
               --jq '.number')"
           fi
           gh issue comment "$TRACKING_ISSUE" --body-file "$report_file"
+          echo "tracking_issue=$TRACKING_ISSUE" >> "$GITHUB_OUTPUT"
+
+          active_ids_file="$(mktemp)"
+          jq -r '.[].id' "$RUNNER_TEMP/maintenance-candidates.json" > "$active_ids_file"
+          while IFS= read -r candidate; do
+            candidate_id="$(jq -r '.id' <<<"$candidate")"
+            priority="$(jq -r '.priority' <<<"$candidate")"
+            title="$(jq -r '.title' <<<"$candidate")"
+            evidence="$(jq -r '.evidence' <<<"$candidate")"
+            proposal="$(jq -r '.proposal' <<<"$candidate")"
+            acceptance="$(jq -r '.acceptance' <<<"$candidate")"
+            change_class="$(jq -r '.changeClass' <<<"$candidate")"
+            marker="<!-- maintenance-candidate:$candidate_id -->"
+            existing_issue="$(gh issue list --state all --label maintenance-candidate --limit 200 --json number,body --jq ".[] | select(.body | contains(\"$marker\")) | .number" | head -n 1)"
+            candidate_body="$(mktemp)"
+            {
+              echo "$marker"
+              echo "## ${priority} 개선 후보 — ${candidate_id}"
+              echo
+              echo "**관찰 근거**"
+              echo
+              echo "$evidence"
+              echo
+              echo "**제안 작업**"
+              echo
+              echo "$proposal"
+              echo
+              echo "**완료 기준**"
+              echo
+              echo "$acceptance"
+              echo
+              echo "- 변경 분류: \`$change_class\`"
+              echo "- 기준 커밋: \`$GITHUB_SHA\`"
+              echo "- 최신 점검: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              echo
+              echo "구현을 시작하려면 저장소 OWNER/MEMBER/COLLABORATOR가 다음 댓글을 남깁니다."
+              echo
+              echo "\`/approve $candidate_id\`"
+              echo
+              echo "거절하거나 보류하려면 \`/reject $candidate_id\`를 사용합니다. 구현 승인에는 운영 배포·DB 적용·데이터 삭제 승인이 포함되지 않습니다."
+            } > "$candidate_body"
+
+            priority_label="$(printf '%s' "$priority" | tr '[:upper:]' '[:lower:]' | sed 's/^/priority-/')"
+            if [ -z "$existing_issue" ]; then
+              gh api --method POST "repos/$GH_REPO/issues" \
+                -f title="[maintenance][$priority] $title" \
+                -F body="@$candidate_body" \
+                -f 'labels[]=maintenance' \
+                -f 'labels[]=maintenance-candidate' \
+                -f 'labels[]=approval-required' \
+                -f "labels[]=$priority_label" >/dev/null
+            else
+              gh issue edit "$existing_issue" --body-file "$candidate_body" >/dev/null
+              if [ "$(gh issue view "$existing_issue" --json state --jq '.state')" = "CLOSED" ]; then
+                gh issue reopen "$existing_issue" >/dev/null
+                gh issue comment "$existing_issue" --body="최근 점검에서 동일 후보가 다시 발견되어 재개했습니다." >/dev/null
+              fi
+            fi
+          done < <(jq -c '.[]' "$RUNNER_TEMP/maintenance-candidates.json")
+
+          while IFS=$'\t' read -r issue_number issue_body; do
+            candidate_id="$(printf '%s' "$issue_body" | sed -n 's/.*<!-- maintenance-candidate:\([^ ]*\) -->.*/\1/p' | head -n 1)"
+            if [ -n "$candidate_id" ] && ! grep -Fxq "$candidate_id" "$active_ids_file"; then
+              gh issue close "$issue_number" --comment="현재 검사와 운영 백로그에서 이 후보가 더 이상 활성 상태가 아니므로 자동 종료합니다. 실제 운영 반영 근거가 부족하면 다시 열고 근거를 추가해 주세요." >/dev/null
+            fi
+          done < <(gh issue list --state open --label maintenance-candidate --limit 200 --json number,body --jq '.[] | [.number, (.body | gsub("\\n"; " "))] | @tsv')
+
           cat "$report_file" >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$failed" = true ]; then exit 1; fi
+
+      - name: Offer the review to a configured development agent
+        if: always() && steps.candidates.outcome == 'success'
+        env:
+          AGENT_WEBHOOK_URL: ${{ secrets.MAINTENANCE_AGENT_WEBHOOK_URL }}
+          AGENT_WEBHOOK_TOKEN: ${{ secrets.MAINTENANCE_AGENT_WEBHOOK_TOKEN }}
+          TRACKING_ISSUE: ${{ steps.publish.outputs.tracking_issue }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$AGENT_WEBHOOK_URL" ]; then
+            echo "No maintenance agent webhook is configured; candidate issues are the handoff queue."
+            exit 0
+          fi
+          payload="$(jq -n \
+            --arg event "maintenance_review_completed" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg runUrl "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg trackingIssue "$TRACKING_ISSUE" \
+            --slurpfile candidates "$RUNNER_TEMP/maintenance-candidates.json" \
+            '{event:$event, repository:$repository, runUrl:$runUrl, trackingIssue:$trackingIssue, candidates:$candidates[0]}')"
+          auth_args=()
+          if [ -n "$AGENT_WEBHOOK_TOKEN" ]; then
+            auth_args=(-H "Authorization: Bearer $AGENT_WEBHOOK_TOKEN")
+          fi
+          curl --fail --silent --show-error --retry 2 \
+            -H "Content-Type: application/json" \
+            "${auth_args[@]}" \
+            --data "$payload" \
+            "$AGENT_WEBHOOK_URL"

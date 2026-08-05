@@ -2,12 +2,26 @@ name: Manual Deploy to Vercel
 
 on:
   workflow_dispatch:
+    inputs:
+      candidate_issue:
+        description: Approved maintenance candidate issue number, when applicable
+        required: false
+        type: string
+      approval_reference:
+        description: Owner approval comment or change reference
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
   deploy:
     name: Verified Production Deploy
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: production
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -38,8 +52,63 @@ jobs:
           echo "Vercel deployment secrets are not configured."
           exit 1
 
+      - name: Verify maintenance candidate approval
+        if: inputs.candidate_issue != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.candidate_issue }}
+        run: |
+          labels="$(gh issue view "$ISSUE_NUMBER" --json labels --jq '.labels[].name')"
+          if ! grep -Fxq maintenance-approved <<<"$labels"; then
+            echo "Maintenance candidate #$ISSUE_NUMBER is not approved."
+            exit 1
+          fi
+
       - name: Install Vercel CLI
         run: npm install -g vercel
 
       - name: Deploy to Vercel
-        run: vercel deploy --prod --yes --token="$VERCEL_TOKEN"
+        id: deploy
+        run: |
+          vercel deploy --prod --yes --token="$VERCEL_TOKEN" | tee "$RUNNER_TEMP/vercel-deploy.log"
+          deployment_url="$(tail -n 1 "$RUNNER_TEMP/vercel-deploy.log")"
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+      - name: Verify production after deploy
+        id: smoke
+        run: |
+          curl --silent --show-error --location --fail --retry 3 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            https://www.imagepartners.kr/api/health
+          for path in "/" "/library" "/contact"; do
+            curl --silent --show-error --location --fail --retry 2 --retry-all-errors \
+              --connect-timeout 10 --max-time 30 --output /dev/null \
+              "https://www.imagepartners.kr${path}"
+          done
+
+      - name: Record deployment result on maintenance candidate
+        if: always() && inputs.candidate_issue != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.candidate_issue }}
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+        run: |
+          result="실패"
+          if [ "$DEPLOY_OUTCOME" = "success" ] && [ "$SMOKE_OUTCOME" = "success" ]; then result="성공"; fi
+          report_file="$(mktemp)"
+          {
+            echo "## 운영 배포 결과"
+            echo
+            echo "- 결과: **$result**"
+            echo "- 커밋: \`$GITHUB_SHA\`"
+            echo "- 실행: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "- 배포 URL: ${DEPLOYMENT_URL:-확인 불가}"
+            echo "- 배포 검증: \`$SMOKE_OUTCOME\`"
+            echo "- 승인 근거: $APPROVAL_REFERENCE"
+            echo
+            echo "DB 변경과 데이터 작업은 이 배포 워크플로의 범위에 포함되지 않습니다."
+          } > "$report_file"
+          gh issue comment "$ISSUE_NUMBER" --body-file "$report_file"

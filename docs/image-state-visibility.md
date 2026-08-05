@@ -18,16 +18,18 @@
 ## 상태 전이
 
 1. 새 업로드는 항상 `pending + active + is_published=false`로 생성한다.
-2. 관리자가 승인하면 `approved + active + is_published=true`가 된다.
-3. 관리자가 반려하거나 승인을 취소하면 `rejected + active + is_published=false`가 된다.
-4. 사진작가가 반려 이미지를 수정해 재검토를 요청하면
+2. 중복 후보는 여기에 `duplicate_review_status=required`가 추가되며 관리자 화면에만 후보 이미지와 거리 정보가 보인다.
+3. `required` 또는 `confirmed` 상태는 `is_published=true`가 될 수 없다. 별도 이미지임을 확인한 관리자가 사유를 남겨 `overridden`으로 바꾼 경우에만 승인·공개한다.
+4. 관리자가 승인하면 `approved + active + is_published=true`가 된다.
+5. 관리자가 반려하거나 승인을 취소하면 `rejected + active + is_published=false`가 된다.
+6. 사진작가가 반려 이미지를 수정해 재검토를 요청하면
    `pending + active + is_published=false`로 돌아간다.
-5. 삭제 요청을 생성하는 즉시 `is_published=false`로 바꾸고 장바구니에서 제거한다.
-6. Arweave 자격증명이 없는 이미지는 즉시 `archived`로 전환한다. 원본과 DB의
+7. 삭제 요청을 생성하는 즉시 `is_published=false`로 바꾸고 장바구니에서 제거한다.
+8. Arweave 자격증명이 없는 이미지는 즉시 `archived`로 전환한다. 원본과 DB의
    물리 삭제는 관리자가 별도 처리한다.
-7. Arweave 자격증명이 있는 이미지는 `deletion_requested`로 전환하고 관리자가
+9. Arweave 자격증명이 있는 이미지는 `deletion_requested`로 전환하고 관리자가
    비용·권리·구매이력을 검토한다.
-8. 반려 이미지는 관리자 설정 보관기간이 지나면 자동으로 `archived`가 되고
+10. 반려 이미지는 관리자 설정 보관기간이 지나면 자동으로 `archived`가 되고
    사진작가 목록에서도 사라진다.
 
 ## 화면 갱신

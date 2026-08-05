@@ -48,6 +48,7 @@ const NEW_UPLOAD_COPY = {
       invalidImage: "이미지 크기를 확인할 수 없는 JPEG 파일입니다.",
       uploadFailed: "업로드 중 오류가 발생했습니다.",
       duplicate: "이미 대기열에 추가된 파일입니다.",
+      existingDuplicate: (label: string) => `[${label}]의 사진은 기존 이미지와 중복이므로 업로드에 실패했습니다.`,
       batchLimit: (max: number) => `한 번에 최대 ${max}장까지만 업로드할 수 있습니다. 초과한 이미지는 추가되지 않았습니다.`,
     },
     pageTitle: "이미지 업로드",
@@ -139,6 +140,7 @@ const NEW_UPLOAD_COPY = {
       invalidImage: "This JPEG's dimensions could not be verified.",
       uploadFailed: "An error occurred while uploading.",
       duplicate: "This file is already in the upload queue.",
+      existingDuplicate: (label: string) => `[${label}] duplicates an existing image and could not be uploaded.`,
       batchLimit: (max: number) => `You can upload a maximum of ${max} images per batch. Extra images were not added.`,
     },
     pageTitle: "Upload images",
@@ -796,7 +798,11 @@ function NewUploadContent() {
     });
 
     if (!saveRes.ok) {
-      const err = await saveRes.json().catch(() => null) as { error?: string } | null;
+      const err = await saveRes.json().catch(() => null) as { error?: string; code?: string } | null;
+      if (err?.code === "DUPLICATE_UPLOAD") {
+        const label = draft.description.trim() || draft.title.trim() || draft.file.name;
+        throw new Error(copy.errors.existingDuplicate(label));
+      }
       throw new Error(err?.error ?? "Failed to save");
     }
 

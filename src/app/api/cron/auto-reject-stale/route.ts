@@ -168,6 +168,7 @@ async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient
     rateLimitRetention,
     uploadSessionRetention,
     photographerHiddenImageDeletion,
+    imageFingerprintRetention,
     orderEmails,
   ] = await Promise.all([
     runRetentionCleanup(admin),
@@ -176,6 +177,7 @@ async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient
     admin.rpc("purge_expired_api_rate_limits"),
     purgeExpiredUploadSessions(admin),
     purgeExpiredPhotographerHiddenImages(admin),
+    admin.rpc("purge_expired_image_fingerprints"),
     dispatchPendingOrderEmails(10),
   ]);
   if (monitoringRetention.error) {
@@ -186,6 +188,9 @@ async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient
   }
   if (rateLimitRetention.error) {
     console.error("[auto-reject-stale] rate limit retention failed:", rateLimitRetention.error.message);
+  }
+  if (imageFingerprintRetention.error) {
+    console.error("[auto-reject-stale] fingerprint retention failed:", imageFingerprintRetention.error.message);
   }
   return {
     retention,
@@ -200,6 +205,9 @@ async function finishOperationalTasks(admin: ReturnType<typeof createAdminClient
       : { ok: true as const, deleted: rateLimitRetention.data ?? 0 },
     uploadSessionRetention,
     photographerHiddenImageDeletion,
+    imageFingerprintRetention: imageFingerprintRetention.error
+      ? { ok: false as const }
+      : { ok: true as const, deleted: imageFingerprintRetention.data ?? 0 },
     orderEmails,
   };
 }
