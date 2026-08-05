@@ -378,33 +378,3 @@ jobs:
           cat "$report_file" >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$failed" = true ]; then exit 1; fi
-
-      - name: Offer the review to a configured development agent
-        if: always() && steps.candidates.outcome == 'success'
-        env:
-          AGENT_WEBHOOK_URL: ${{ secrets.MAINTENANCE_AGENT_WEBHOOK_URL }}
-          AGENT_WEBHOOK_TOKEN: ${{ secrets.MAINTENANCE_AGENT_WEBHOOK_TOKEN }}
-          TRACKING_ISSUE: ${{ steps.publish.outputs.tracking_issue }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "$AGENT_WEBHOOK_URL" ]; then
-            echo "No maintenance agent webhook is configured; candidate issues are the handoff queue."
-            exit 0
-          fi
-          payload="$(jq -n \
-            --arg event "maintenance_review_completed" \
-            --arg repository "$GITHUB_REPOSITORY" \
-            --arg runUrl "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-            --arg trackingIssue "$TRACKING_ISSUE" \
-            --slurpfile candidates "$RUNNER_TEMP/maintenance-candidates.json" \
-            '{event:$event, repository:$repository, runUrl:$runUrl, trackingIssue:$trackingIssue, candidates:$candidates[0]}')"
-          auth_args=()
-          if [ -n "$AGENT_WEBHOOK_TOKEN" ]; then
-            auth_args=(-H "Authorization: Bearer $AGENT_WEBHOOK_TOKEN")
-          fi
-          curl --fail --silent --show-error --retry 2 \
-            -H "Content-Type: application/json" \
-            "${auth_args[@]}" \
-            --data "$payload" \
-            "$AGENT_WEBHOOK_URL"

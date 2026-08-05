@@ -1,0 +1,184 @@
+name: Codex maintenance implementation
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_issue:
+        description: Approved maintenance candidate issue number
+        required: true
+        type: string
+      candidate_id:
+        description: Stable MNT candidate id
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  generate_patch:
+    name: Generate isolated Codex patch
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      has_patch: ${{ steps.patch.outputs.has_patch }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate approved candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.candidate_issue }}
+          CANDIDATE_ID: ${{ inputs.candidate_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          issue_json="$(gh issue view "$ISSUE_NUMBER" --json body,state,labels)"
+          if [ "$(jq -r '.state' <<<"$issue_json")" != "OPEN" ]; then
+            echo "Candidate issue is not open."
+            exit 1
+          fi
+          if ! jq -e '.labels | map(.name) | index("maintenance-approved")' <<<"$issue_json" >/dev/null; then
+            echo "Candidate issue is not approved."
+            exit 1
+          fi
+          if ! jq -r '.body' <<<"$issue_json" | grep -Fq "<!-- maintenance-candidate:$CANDIDATE_ID -->"; then
+            echo "Candidate id does not match the issue."
+            exit 1
+          fi
+          jq -r '.body' <<<"$issue_json" > .maintenance-candidate.md
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Run Codex implementation agent
+        id: codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/prompts/maintenance-implementation.md
+          output-file: codex-final-message.md
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          allow-bots: true
+          codex-args: '["--ephemeral"]'
+
+      - name: Package patch without agent credentials
+        id: patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mv codex-final-message.md "$RUNNER_TEMP/codex-final-message.md"
+          git checkout -- .maintenance-candidate.md 2>/dev/null || true
+          unlink .maintenance-candidate.md
+          git add -N .
+          git diff --binary HEAD > codex.patch
+          if [ -s codex.patch ]; then
+            echo "has_patch=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_patch=false" >> "$GITHUB_OUTPUT"
+          fi
+          cp "$RUNNER_TEMP/codex-final-message.md" codex-final-message.md
+
+      - name: Upload proposed patch
+        if: steps.patch.outputs.has_patch == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-patch-${{ inputs.candidate_id }}
+          path: |
+            codex.patch
+            codex-final-message.md
+          if-no-files-found: error
+          retention-days: 14
+
+  open_pr:
+    name: Open reviewable maintenance PR
+    needs: generate_patch
+    if: needs.generate_patch.outputs.has_patch == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: maintenance-patch-${{ inputs.candidate_id }}
+
+      - name: Apply patch and open PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.candidate_issue }}
+          CANDIDATE_ID: ${{ inputs.candidate_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --index codex.patch
+          branch="codex/maintenance-$(tr '[:upper:]' '[:lower:]' <<<"$CANDIDATE_ID")-$GITHUB_RUN_ID"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -m "fix: implement $CANDIDATE_ID maintenance candidate"
+          git push origin "$branch"
+
+          gh label create maintenance-in-progress --color 1D76DB --description "Codex implementation PR is open" --force >/dev/null
+          gh issue edit "$ISSUE_NUMBER" --add-label maintenance-in-progress
+          pr_body="$(mktemp)"
+          {
+            echo "Closes #$ISSUE_NUMBER"
+            echo
+            echo "Codex generated this patch after an authorized maintenance approval. Review all code, CI results, migrations, and operational impact before merging."
+            echo
+            echo "This workflow did not apply production DB changes, delete data, or deploy production."
+          } > "$pr_body"
+          pr_url="$(gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "[$CANDIDATE_ID] Codex maintenance implementation" \
+            --label maintenance \
+            --body-file "$pr_body")"
+          gh issue comment "$ISSUE_NUMBER" --body="Codex 구현 PR을 생성했습니다: $pr_url"
+
+  report_no_patch:
+    name: Report no proposed change
+    needs: generate_patch
+    if: needs.generate_patch.outputs.has_patch == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.candidate_issue }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body="Codex 실행은 완료됐지만 제안할 코드 변경이 없었습니다. 실행 로그를 검토하고 후보 범위나 필요한 외부 정보를 보완해 주세요: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+  report_failure:
+    name: Report agent failure
+    needs: generate_patch
+    if: always() && needs.generate_patch.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.candidate_issue }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body="Codex 자동 구현이 실패했습니다. 코드·DB·운영에는 반영되지 않았습니다: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

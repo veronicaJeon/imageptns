@@ -16,7 +16,7 @@
 | P1 | 도입 검토 | 외부 오류 추적·호출 알림 | 개인정보 마스킹을 전제로 P0 오류 즉시 알림과 release 연계를 추가한다. |
 | P1 | 제거 검토 | 미사용 AI SDK | Anthropic·Google Generative AI SDK가 실제 미사용임을 재확인하고 운영 의존성에서 제거한다. |
 | P1 | 완료·정기 관찰 | GitHub Actions Node 런타임 | checkout·setup-node v5와 고정된 Supabase setup action으로 앱·fresh migration CI가 통과했고 기존 Node 20 action 경고가 제거됐다. |
-| P1 | 개선 루프 검증 완료·에이전트 연결 대기 | 72시간 유지보수 루틴 | 실행 `31056834565`에서 후보 8건 생성과 포트 충돌 가짜 후보 2건의 자동 종료를 확인했다. 지속적인 코드 구현을 위해 Codex scheduler/API webhook을 연결한다. 연결 전에는 승인된 이슈가 구현 대기열 역할을 한다. |
+| P1 | Codex 구현 workflow 완료·API 키 연결 대기 | 72시간 유지보수 루틴 | 실행 `31056834565`에서 후보 8건 생성과 포트 충돌 가짜 후보 2건의 자동 종료를 확인했다. 승인 후보를 격리된 Codex patch와 검토용 PR로 전환하는 workflow를 추가했다. 저장소 Secret `OPENAI_API_KEY` 설정 후 시험 후보 1건으로 E2E를 완료한다. |
 | P1 | 1단계 구현·운영 관찰 필요 | 중복 이미지 탐지 | 같은 사진가 SHA-256 exact 차단, 타 사진가 exact 및 엄격한 pHash+dHash 후보 관리자 표시, 사유 필수 예외승인, 공개 DB 제약, 삭제 지문 1년 보관을 구현했다. 기존 이미지 백필과 2~4주 오탐률 측정, 이의제기 SLA는 후속 과제다. |
 
 예약 작업은 2026-08-05 운영에서 데이터 정리와 AI 합성 진단이 모두 성공했다. 과거의 `CRON_SECRET` 수동 인증 불일치는 현재 실행 차단으로 재현되지 않아 관찰 항목으로 낮춘다.
