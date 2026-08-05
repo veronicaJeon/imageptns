@@ -1,0 +1,277 @@
+name: 72-hour maintenance review
+
+on:
+  schedule:
+    # GitHub schedules run daily; the due job performs the real review only
+    # when 72 hours have elapsed since the last successful review.
+    - cron: "41 0 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Run even when the 72-hour interval has not elapsed
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+concurrency:
+  group: imagepartners-maintenance-review
+  cancel-in-progress: false
+
+jobs:
+  due:
+    name: Check 72-hour interval
+    runs-on: ubuntu-latest
+    outputs:
+      due: ${{ steps.interval.outputs.due }}
+      issue_number: ${{ steps.interval.outputs.issue_number }}
+      last_success_at: ${{ steps.interval.outputs.last_success_at }}
+    steps:
+      - name: Determine whether a full review is due
+        id: interval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          FORCE: ${{ inputs.force || false }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="[maintenance] Image Partners 72-hour review"
+          issue_number="$(gh issue list --state all --limit 100 --json number,title --jq 'map(select(.title == "[maintenance] Image Partners 72-hour review"))[0].number // empty')"
+          last_success_at=""
+
+          if [ -n "$issue_number" ]; then
+            last_success_at="$(
+              gh api --paginate "repos/$GH_REPO/issues/$issue_number/comments" \
+                --jq '.[] | select(.body | contains("<!-- imagepartners-maintenance-success -->")) | .created_at' \
+                | tail -n 1
+            )"
+          fi
+
+          due=false
+          if [ "$FORCE" = "true" ] || [ -z "$last_success_at" ]; then
+            due=true
+          else
+            now_epoch="$(date -u +%s)"
+            last_epoch="$(date -u -d "$last_success_at" +%s)"
+            if [ $((now_epoch - last_epoch)) -ge 259200 ]; then
+              due=true
+            fi
+          fi
+
+          echo "due=$due" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$issue_number" >> "$GITHUB_OUTPUT"
+          echo "last_success_at=$last_success_at" >> "$GITHUB_OUTPUT"
+          echo "Maintenance review due: $due"
+
+  review:
+    name: Run maintenance review
+    needs: due
+    if: needs.due.outputs.due == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        id: install
+        continue-on-error: true
+        run: npm ci
+
+      - name: Audit all dependencies
+        id: audit
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+      - name: Type check
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Lint
+        id: lint
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Test
+        id: test
+        continue-on-error: true
+        run: npm test
+
+      - name: Build
+        id: build
+        continue-on-error: true
+        run: npm run build
+
+      - name: Setup Supabase CLI
+        id: supabase_cli
+        continue-on-error: true
+        uses: supabase/setup-cli@c44671e41ed90c0841a8ec5e5f88b7f0adc830ea
+        with:
+          version: 2.111.0
+
+      - name: Apply migrations to a fresh local database
+        id: database_start
+        continue-on-error: true
+        run: supabase start
+
+      - name: Lint database schema
+        id: database_lint
+        continue-on-error: true
+        run: supabase db lint --local --level error
+
+      - name: Check production health
+        id: health
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          http_code="$(curl --silent --show-error --location --retry 2 --retry-all-errors --connect-timeout 10 --max-time 30 --output "$response_file" --write-out '%{http_code}' https://www.imagepartners.kr/api/health)"
+          node - "$response_file" "$http_code" <<'NODE'
+          const fs = require("fs");
+          const [file, code] = process.argv.slice(2);
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const healthy = code === "200"
+            && payload?.checks?.database?.status === "ok"
+            && payload?.checks?.storage?.status === "ok"
+            && payload?.checks?.previewIntegrity?.status === "ok"
+            && !["error", "stale"].includes(payload?.checks?.ai?.status);
+          if (!healthy) process.exit(1);
+          console.log(JSON.stringify({ status: payload.status, durationMs: payload.durationMs, checks: payload.checks }));
+          NODE
+
+      - name: Check public routes
+        id: smoke
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in "/" "/library" "/contact" "/terms" "/privacy" "/business-info" "/api/images?limit=1"; do
+            curl --silent --show-error --location --fail --retry 2 --retry-all-errors --connect-timeout 10 --max-time 30 --output /dev/null "https://www.imagepartners.kr${path}"
+          done
+
+      - name: Check checkout readiness boundary
+        id: checkout_readiness
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          curl --silent --show-error --location --fail --retry 2 --retry-all-errors --connect-timeout 10 --max-time 30 --output "$response_file" https://www.imagepartners.kr/api/checkout/readiness
+          node - "$response_file" <<'NODE'
+          const fs = require("fs");
+          const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const validBoundary = payload?.accountConfigured === true
+            && payload?.paidOrdersAvailable === true
+            && (payload?.disclosureComplete === true || payload?.betaOverride === true);
+          if (!validBoundary) process.exit(1);
+          console.log(JSON.stringify(payload));
+          NODE
+
+      - name: Inspect main branch protection
+        id: branch_protection
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          if gh api "repos/$GH_REPO/branches/main/protection" >/dev/null 2>&1; then
+            echo "result=verified" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=unprotected-or-token-cannot-verify" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stop local Supabase
+        if: always()
+        continue-on-error: true
+        run: supabase stop --no-backup
+
+      - name: Publish maintenance report
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TRACKING_ISSUE: ${{ needs.due.outputs.issue_number }}
+          LAST_SUCCESS_AT: ${{ needs.due.outputs.last_success_at }}
+          INSTALL: ${{ steps.install.outcome }}
+          AUDIT: ${{ steps.audit.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          TEST: ${{ steps.test.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          SUPABASE_CLI: ${{ steps.supabase_cli.outcome }}
+          DATABASE_START: ${{ steps.database_start.outcome }}
+          DATABASE_LINT: ${{ steps.database_lint.outcome }}
+          HEALTH: ${{ steps.health.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+          CHECKOUT_READINESS: ${{ steps.checkout_readiness.outcome }}
+          BRANCH_PROTECTION: ${{ steps.branch_protection.outputs.result || 'unverified' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=false
+          for result in "$INSTALL" "$AUDIT" "$TYPECHECK" "$LINT" "$TEST" "$BUILD" "$SUPABASE_CLI" "$DATABASE_START" "$DATABASE_LINT" "$HEALTH" "$SMOKE" "$CHECKOUT_READINESS"; do
+            if [ "$result" != "success" ]; then failed=true; fi
+          done
+
+          report_file="$(mktemp)"
+          {
+            echo "## 72시간 유지보수 점검 — $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo
+            echo "- 기준 커밋: \`$GITHUB_SHA\`"
+            echo "- 실행: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "- 직전 성공: ${LAST_SUCCESS_AT:-없음}"
+            echo "- 결과: $([ "$failed" = true ] && echo '실패 — 조치 필요' || echo '통과')"
+            echo
+            echo "| 점검 | 결과 |"
+            echo "| --- | --- |"
+            echo "| 의존성 설치 | $INSTALL |"
+            echo "| 전체 의존성 audit | $AUDIT |"
+            echo "| TypeScript | $TYPECHECK |"
+            echo "| Lint | $LINT |"
+            echo "| 테스트 | $TEST |"
+            echo "| 프로덕션 빌드 | $BUILD |"
+            echo "| Supabase CLI | $SUPABASE_CLI |"
+            echo "| Fresh DB migration | $DATABASE_START |"
+            echo "| DB schema lint | $DATABASE_LINT |"
+            echo "| 운영 health | $HEALTH |"
+            echo "| 공개 경로 smoke | $SMOKE |"
+            echo "| 계좌이체 공개 경계 | $CHECKOUT_READINESS |"
+            echo "| main 보호 확인 | $BRANCH_PROTECTION |"
+            echo
+            echo "자동 수정, DB 변경, 운영 배포와 데이터 삭제는 수행하지 않았습니다. 실패 항목은 P0/P1/P2로 분류해 작은 PR과 승인 절차로 처리합니다."
+            if [ "$failed" = false ]; then
+              echo
+              echo "<!-- imagepartners-maintenance-success -->"
+            fi
+          } > "$report_file"
+
+          gh label create maintenance --color 1D76DB --description "Scheduled maintenance and operational review" --force >/dev/null
+          if [ -z "$TRACKING_ISSUE" ]; then
+            TRACKING_ISSUE="$(gh api --method POST "repos/$GH_REPO/issues" \
+              -f title="[maintenance] Image Partners 72-hour review" \
+              -f body="이 이슈는 72시간 유지보수 점검 결과를 누적합니다. 자동 점검은 운영 상태를 변경하지 않습니다." \
+              -f 'labels[]=maintenance' \
+              --jq '.number')"
+          fi
+          gh issue comment "$TRACKING_ISSUE" --body-file "$report_file"
+          cat "$report_file" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$failed" = true ]; then exit 1; fi

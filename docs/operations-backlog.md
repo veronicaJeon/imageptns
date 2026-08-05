@@ -15,7 +15,9 @@
 | P1 | 결함 확인 | 운영 모니터링 컬럼·경로 | `data_retention_runs`의 실제 `result/created_at`을 조회하고 AI cron 이벤트 경로를 바로잡는다. |
 | P1 | 도입 검토 | 외부 오류 추적·호출 알림 | 개인정보 마스킹을 전제로 P0 오류 즉시 알림과 release 연계를 추가한다. |
 | P1 | 제거 검토 | 미사용 AI SDK | Anthropic·Google Generative AI SDK가 실제 미사용임을 재확인하고 운영 의존성에서 제거한다. |
-| P1 | 경고 확인 | GitHub Actions Node 런타임 | CI는 통과하지만 `actions/checkout@v4`와 `supabase/setup-cli@v1`의 Node 20 지원 종료 경고가 있다. 호환되는 최신 action으로 올리고 fresh migration과 앱 CI를 재검증한다. |
+| P1 | 변경 완료·CI 확인 대기 | GitHub Actions Node 런타임 | checkout·setup-node를 v5로 올리고 Supabase setup action을 Node 20 경고가 없는 검증된 커밋으로 고정했다. 앱과 fresh migration CI 통과 후 완료 처리한다. |
+| P1 | 배포 후 확인 | 72시간 유지보수 루틴 | 워크플로와 기준 문서를 구축했다. 첫 강제 실행에서 추적 이슈·전체 점검을 확인하고, 72시간 이내 예약 실행이 건너뛰는지 확인한다. |
+| P1 | 정책 결정·설계 완료 | 중복 이미지 탐지 | SHA-256 exact 차단과 pHash+dHash 관찰 모드 설계를 작성했다. 반려·삭제 이미지 재업로드, 지문 tombstone 보관기간과 타 사진가 권리 확인 SLA를 결정한 뒤 1단계를 구현한다. |
 
 예약 작업은 2026-08-05 운영에서 데이터 정리와 AI 합성 진단이 모두 성공했다. 과거의 `CRON_SECRET` 수동 인증 불일치는 현재 실행 차단으로 재현되지 않아 관찰 항목으로 낮춘다.
 

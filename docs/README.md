@@ -8,6 +8,7 @@
 2. [문서 기반 개발 규칙](./document-driven-development.md) — 변경 제안부터 배포까지의 절차
 3. [운영 잔여 과제](./operations-backlog.md) — 미완료 과제, 우선순위, 검증 근거
 4. [공개 오픈 준비도 검토](./opening-readiness-review.md) — 오픈 게이트와 3일 유지보수 루틴 제안
+5. [72시간 유지보수 루틴](./maintenance-routine.md) — 자동 점검·보고와 승인 후 수정·배포 절차
 
 ## 영역별 세부 규격
 
@@ -15,9 +16,11 @@
 | --- | --- |
 | 사용자 화면 용어 | [서비스 표준 용어](./service-terminology.md) |
 | 이미지 상태·노출 | [이미지 상태와 화면 노출 기준](./image-state-visibility.md) |
+| 중복 이미지 | [중복 이미지 탐지·차단 제안](./duplicate-image-detection-proposal.md) |
 | 운영정책 | [운영정책 문서함](./operating-policy-handbook.md) |
 | UI·디자인 | [디자인 시스템 가이드](./design-system-guidelines.md) |
 | 모니터링·장애대응 | [운영 모니터링 기준](./operations-monitoring.md) |
+| 정기 유지보수 | [72시간 유지보수 루틴](./maintenance-routine.md) |
 | 배포 | [운영 배포 인수인계](./production-deployment-handoff.md), [Vercel 배포 런북](./vercel-deployment-runbook.md) |
 | 온체인 | [운영 준비도](./onchain-production-readiness.md), [위험 등록부](./onchain-production-risk-register.md) |
 

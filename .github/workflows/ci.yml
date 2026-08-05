@@ -25,10 +25,10 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: "npm"
@@ -57,12 +57,12 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@c44671e41ed90c0841a8ec5e5f88b7f0adc830ea
         with:
-          version: 2.105.0
+          version: 2.111.0
 
       - name: Apply migrations to a fresh local database
         run: supabase start
