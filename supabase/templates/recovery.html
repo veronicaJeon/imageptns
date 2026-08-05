@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko">
+  <body style="margin:0;background:#f6f5f2;color:#202020;font-family:Arial,'Noto Sans KR',sans-serif">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 16px">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fff;border:1px solid #e4e1da;border-radius:12px;padding:36px">
+            <tr><td style="font-size:13px;font-weight:700;letter-spacing:.12em">IMAGE PARTNERS</td></tr>
+            <tr><td style="padding-top:28px;font-size:24px;font-weight:700">비밀번호를 재설정해 주세요</td></tr>
+            <tr><td style="padding-top:14px;font-size:15px;line-height:1.7;color:#555">아래 버튼을 누르면 새 비밀번호를 설정할 수 있습니다.</td></tr>
+            <tr><td style="padding-top:28px"><a href="{{ .SiteURL }}/api/auth/confirm?token_hash={{ .TokenHash }}&amp;type=recovery&amp;next=/update-password" style="display:inline-block;padding:13px 22px;background:#202020;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:700">비밀번호 재설정하기</a></td></tr>
+            <tr><td style="padding-top:28px;font-size:12px;line-height:1.6;color:#777">본인이 요청하지 않았다면 비밀번호는 변경되지 않습니다.<br>문의: contact@imagepartners.kr</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
