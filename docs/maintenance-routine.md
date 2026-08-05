@@ -57,6 +57,8 @@ flowchart LR
 
 점검 결과는 `[maintenance] Image Partners 72-hour review` 이슈의 댓글과 GitHub Actions 요약에 기록한다. 개선 후보는 `maintenance-candidate`, `approval-required`, 우선순위 라벨을 가진 별도 이슈가 된다. 동일 항목을 새 이슈로 반복 생성하지 않는다.
 
+GitHub 러너의 기존 서비스와 포트가 겹쳐 가짜 DB 장애 후보가 생기지 않도록, 각 실행 ID에서 계산한 20000번대 전용 포트를 `supabase/config.toml` 작업 사본에만 적용한다. 저장소의 로컬 개발 포트와 운영 DB 설정은 바꾸지 않는다.
+
 ## 승인과 구현
 
 저장소 `OWNER`, `MEMBER`, `COLLABORATOR`만 후보 본문의 명령으로 결정을 기록할 수 있다.

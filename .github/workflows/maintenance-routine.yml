@@ -127,6 +127,19 @@ jobs:
         with:
           version: 2.111.0
 
+      - name: Reserve isolated Supabase ports
+        if: steps.supabase_cli.outcome == 'success'
+        shell: bash
+        run: |
+          base_port=$((20000 + GITHUB_RUN_ID % 10000))
+          sed -i "s/^port = 55001$/port = $base_port/" supabase/config.toml
+          sed -i "s/^port = 55002$/port = $((base_port + 1))/" supabase/config.toml
+          sed -i "s/^shadow_port = 54320$/shadow_port = $((base_port + 2))/" supabase/config.toml
+          sed -i "s/^port = 55003$/port = $((base_port + 3))/" supabase/config.toml
+          sed -i "s/^port = 55005$/port = $((base_port + 5))/" supabase/config.toml
+          sed -i "s/^port = 54329$/port = $((base_port + 9))/" supabase/config.toml
+          echo "Supabase CI port range starts at $base_port."
+
       - name: Apply migrations to a fresh local database
         id: database_start
         continue-on-error: true
