@@ -34,10 +34,10 @@ interface SuccessOrder {
 const CHECKOUT_SUCCESS_COPY = {
   ko: {
     downloadError: "원본 파일 다운로드 링크를 만들지 못했습니다.",
-    title: "결제가 완료되었습니다",
+    title: "주문이 확정되었습니다",
     orderNumber: "주문번호",
-    body: "구매하신 이미지는 지금 바로 다운로드할 수 있고, 대시보드 → 주문 내역에서도 다시 받을 수 있습니다.",
-    originalsTitle: "구매한 원본 파일",
+    body: "사용권이 확정된 이미지는 지금 바로 다운로드할 수 있고, 대시보드 → 주문 내역에서도 다시 받을 수 있습니다.",
+    originalsTitle: "사용권이 확정된 원본 파일",
     originalsHelp: "다운로드 링크는 서버에서 안전하게 서명되어 새 창으로 열립니다.",
     empty: "결제는 완료됐지만 이 화면에서 주문 항목을 불러오지 못했습니다. 주문 내역에서 다운로드를 확인해주세요.",
     downloadOriginal: "원본 다운로드",

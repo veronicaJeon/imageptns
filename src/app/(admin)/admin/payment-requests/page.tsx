@@ -74,7 +74,7 @@ export default function AdminPaymentRequestsPage() {
       ? prompt("승인 메모를 입력하세요.", "입금 확인")
       : prompt("취소 사유를 입력하세요.", "오요청 또는 입금 미확인");
     if (note === null) return;
-    if (!confirm(action === "approve" ? "입금 확인 후 구매확정 처리할까요?" : "이 계좌결제 요청을 취소할까요?")) return;
+    if (!confirm(action === "approve" ? "입금 확인 후 주문을 확정할까요?" : "이 계좌이체 요청을 취소할까요?")) return;
 
     setProcessingId(orderId);
     try {
@@ -97,7 +97,7 @@ export default function AdminPaymentRequestsPage() {
     <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8">
         <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">결제요청목록</h1>
-        <p className="mt-1 text-sm text-outline">계좌결제 요청을 확인하고 입금 확인 후 구매확정 또는 취소 처리합니다.</p>
+        <p className="mt-1 text-sm text-outline">계좌이체 요청을 확인하고 입금 확인 후 주문 확정 또는 취소 처리합니다.</p>
       </div>
 
       {loading ? (
@@ -107,7 +107,7 @@ export default function AdminPaymentRequestsPage() {
       ) : requests.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-24 text-outline">
           <span className="material-symbols-outlined text-5xl">receipt_long</span>
-          <p>계좌결제 요청이 없습니다.</p>
+          <p>계좌이체 요청이 없습니다.</p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -176,7 +176,7 @@ export default function AdminPaymentRequestsPage() {
                         variant="primary"
                         size="md"
                       >
-                        구매확정 승인
+                        주문 확정
                       </AdminButton>
                     </>
                   ) : (

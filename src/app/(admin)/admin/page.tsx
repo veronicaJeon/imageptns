@@ -6,29 +6,27 @@ import { AdminButton, AdminChip, AdminInlineMetrics, adminStatusTone } from "@/c
 import { cn } from "@/lib/utils/cn";
 import { imageCategoryLabel } from "@/lib/images/categories";
 import { isImageLifecycleActive } from "@/lib/images/state-visibility";
+import { IMAGE_REVIEW_STATUS_LABELS } from "@/lib/ux/terminology";
 
 type Status = "pending" | "approved" | "rejected" | "all";
 
 const TABS: { key: Status; label: string; icon: string }[] = [
-  { key: "pending",  label: "검토 대기",  icon: "pending_actions" },
-  { key: "approved", label: "승인됨",    icon: "check_circle"    },
-  { key: "rejected", label: "거절됨",    icon: "cancel"          },
-  { key: "all",      label: "전체",      icon: "grid_view"       },
+  { key: "pending",  label: IMAGE_REVIEW_STATUS_LABELS.pending,  icon: "pending_actions" },
+  { key: "approved", label: IMAGE_REVIEW_STATUS_LABELS.approved, icon: "check_circle"    },
+  { key: "rejected", label: IMAGE_REVIEW_STATUS_LABELS.rejected, icon: "cancel"          },
+  { key: "all",      label: IMAGE_REVIEW_STATUS_LABELS.all,      icon: "grid_view"       },
 ];
 
 const STATUS_LABELS: Record<string, string> = {
-  approved: "승인됨",
-  pending:  "검토 대기",
-  rejected: "거절됨",
-  draft:    "임시저장",
+  ...IMAGE_REVIEW_STATUS_LABELS,
 };
 
 const PROOF_LABELS: Record<string, string> = {
-  available: "자격증명 등록가능",
-  requested: "자격증명 요청됨",
+  available: "원본 증명 등록 가능",
+  requested: "원본 증명 요청됨",
   pending: "Arweave 등록 중",
-  registered: "자격증명 완료",
-  failed: "자격증명 실패",
+  registered: "원본 증명 완료",
+  failed: "원본 증명 실패",
 };
 
 function proofTone(status: string | null | undefined) {
@@ -326,9 +324,9 @@ export default function AdminPage() {
                     <div className="flex items-start gap-2 bg-error/8 border border-error/20 rounded-lg px-3 py-2">
                       <span className="material-symbols-outlined text-error text-sm mt-0.5">sync_problem</span>
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-error">이전 자격증명 등록이 실패했습니다.</p>
+                        <p className="text-xs font-bold text-error">이전 원본 증명 등록이 실패했습니다.</p>
                         <p className="text-xs text-on-surface-variant mt-1">
-                          승인 후 첫 판매가 완료되면 사진작가가 블록체인 이미지 화면에서 재등록을 요청할 수 있습니다.
+                          승인 후 첫 사용권 판매가 완료되면 사진작가가 블록체인 이미지 화면에서 재등록을 요청할 수 있습니다.
                         </p>
                         {img.proof_tx_hash && (
                           <p className="text-[10px] font-mono text-outline mt-1 truncate">tx {img.proof_tx_hash}</p>
@@ -340,7 +338,7 @@ export default function AdminPage() {
                   {/* Reject inline form */}
                   {rejectingId === img.id && (
                     <div className="flex flex-col gap-2 p-3 bg-error/5 border border-error/20 rounded-lg">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-error">거절 사유 *</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-error">반려 사유 *</label>
                       <textarea
                         value={rejectReason}
                         onChange={(e) => setRejectReason(e.target.value)}
@@ -360,7 +358,7 @@ export default function AdminPage() {
                             ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             : <span className="material-symbols-outlined text-sm">cancel</span>
                           }
-                          거절 확정
+                          반려 확정
                         </AdminButton>
                         <button
                           onClick={() => { setRejectingId(null); setRejectReason(""); }}
@@ -394,7 +392,7 @@ export default function AdminPage() {
                           size="md"
                         >
                           <span className="material-symbols-outlined text-sm">cancel</span>
-                          거절
+                          반려
                         </AdminButton>
                       )}
                     </div>
@@ -406,7 +404,7 @@ export default function AdminPage() {
                       size="md"
                     >
                       <span className="material-symbols-outlined text-sm">undo</span>
-                      승인 취소 (거절로 변경)
+                      승인 취소 (반려로 변경)
                     </AdminButton>
                   )}
                 </div>

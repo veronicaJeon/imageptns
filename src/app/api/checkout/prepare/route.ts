@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   const imageRows = (images ?? []) as CheckoutImageRow[];
   const imageMap = Object.fromEntries(imageRows.map((img) => [img.id, img]));
   if (imageIds.some((id) => !imageMap[id])) {
-    return NextResponse.json({ error: "현재 구매할 수 없는 이미지가 포함되어 있습니다." }, { status: 409 });
+    return NextResponse.json({ error: "현재 사용권을 구매할 수 없는 이미지가 포함되어 있습니다." }, { status: 409 });
   }
 
   const { data: priceOverrides, error: overrideError } = await admin
@@ -223,7 +223,7 @@ export async function POST(req: NextRequest) {
       orderDbId: order.id,
       orderNumber: order.order_number,
       amount: total,
-      orderName: items.length === 1 ? `계좌결제 이미지 라이선스 (${items[0].license})` : `계좌결제 이미지 라이선스 외 ${items.length - 1}건`,
+      orderName: items.length === 1 ? `계좌이체 이미지 라이선스 (${items[0].license})` : `계좌이체 이미지 라이선스 외 ${items.length - 1}건`,
       bankTransfer: {
         status: "requested",
         account: getBankTransferAccount(),

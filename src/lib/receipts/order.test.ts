@@ -25,7 +25,7 @@ describe("buildOrderReceiptHtml", () => {
       ],
     });
 
-    expect(html).toContain("이미지 구매 영수증");
+    expect(html).toContain("이미지 사용권 주문 영수증");
     expect(html).toContain("IP-20260521-0001");
     expect(html).toContain("&lt;Buyer&gt;");
     expect(html).toContain("Morning &lt;Peak&gt;");

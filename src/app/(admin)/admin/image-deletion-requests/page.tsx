@@ -67,9 +67,9 @@ export default function AdminImageDeletionRequestsPage() {
   useEffect(() => { loadRequests(); }, [loadRequests]);
 
   async function decide(id: string, decision: "approved" | "rejected", waiveFee = false) {
-    const adminNote = prompt(decision === "approved" ? "승인 메모를 입력하세요." : "거절 사유를 입력하세요.", "");
+    const adminNote = prompt(decision === "approved" ? "승인 메모를 입력하세요." : "반려 사유를 입력하세요.", "");
     if (adminNote === null) return;
-    if (!confirm(decision === "approved" ? "이 삭제 요청을 승인할까요?" : "이 삭제 요청을 거절할까요?")) return;
+    if (!confirm(decision === "approved" ? "이 삭제 요청을 승인할까요?" : "이 삭제 요청을 반려할까요?")) return;
 
     setProcessingId(id);
     try {
@@ -103,7 +103,7 @@ export default function AdminImageDeletionRequestsPage() {
         >
           <option value="pending">대기 중</option>
           <option value="completed">완료</option>
-          <option value="rejected">거절</option>
+          <option value="rejected">반려</option>
           <option value="all">전체</option>
         </select>
       </div>
@@ -183,7 +183,7 @@ export default function AdminImageDeletionRequestsPage() {
                         disabled={processingId === request.id}
                         variant="danger"
                       >
-                        거절
+                        반려
                       </AdminButton>
                     </div>
                   )}

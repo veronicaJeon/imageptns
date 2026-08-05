@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { KO_SERVICE_TERMS } from "@/lib/ux/terminology";
 import { recordAdminAuditLog } from "@/lib/admin/audit";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import {
@@ -12,7 +13,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const MAX_PURGE = 50;
-const CONFIRMATION_TEXT = "영구삭제";
+const CONFIRMATION_TEXT = KO_SERVICE_TERMS.permanentDeletion;
 
 function normalizeDeleteKind(value: unknown) {
   if (value === "beta_cleanup" || value === "admin_hard_delete" || value === "photographer_request") {

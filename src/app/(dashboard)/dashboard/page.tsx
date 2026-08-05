@@ -227,7 +227,7 @@ export default function DashboardPage() {
         baseConfirmed: "완료",
         baseFailed: "실패",
         basePendingTitle: "Base 결제 확인이 필요한 주문이 있습니다",
-        basePendingBody: "구매 트랜잭션이 완료됐는데 화면 확인 단계에서 멈춘 주문은 주문 내역에서 tx 상태를 확인하세요.",
+        basePendingBody: "사용권 구매 트랜잭션이 완료됐는데 화면 확인 단계에서 멈춘 주문은 주문 내역에서 tx 상태를 확인하세요.",
         viewOrders: "주문 내역 보기",
         baseWallet: "Base 지갑",
         walletReady: "등록됨",
@@ -236,7 +236,7 @@ export default function DashboardPage() {
         proofProgress: "등록가능/진행",
         claimReady: "Claim 대기",
         walletRequiredBody: "Base 정산을 받으려면 지갑 주소를 등록해야 합니다.",
-        credentialReadyBody: (count: number) => `첫 판매가 완료된 이미지 ${count}개를 Arweave 등록 요청할 수 있습니다.`,
+        credentialReadyBody: (count: number) => `첫 사용권 판매가 완료된 이미지 ${count}개를 Arweave 원본 증명 등록 요청할 수 있습니다.`,
         proofAttentionBody: "증명 등록 실패 이미지가 있어 관리자 재처리가 필요할 수 있습니다.",
         claimReadyBody: (amount: string) => `${amount}를 Base에서 claim할 수 있습니다.`,
       }

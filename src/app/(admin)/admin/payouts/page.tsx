@@ -3,20 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { AdminButton, AdminChip, AdminInlineMetrics } from "@/components/admin/AdminPrimitives";
 import { cn } from "@/lib/utils/cn";
+import { PAYOUT_STATUS_LABELS } from "@/lib/ux/terminology";
 
 type PayoutStatus = "pending" | "paid" | "rejected" | "all";
 
 const TABS: { key: PayoutStatus; label: string; icon: string }[] = [
-  { key: "pending",  label: "대기 중",  icon: "pending_actions" },
-  { key: "paid",     label: "지급 완료", icon: "check_circle"    },
-  { key: "rejected", label: "거절됨",   icon: "cancel"          },
+  { key: "pending",  label: PAYOUT_STATUS_LABELS.pending,  icon: "pending_actions" },
+  { key: "paid",     label: PAYOUT_STATUS_LABELS.paid,     icon: "check_circle"    },
+  { key: "rejected", label: PAYOUT_STATUS_LABELS.rejected, icon: "cancel"          },
   { key: "all",      label: "전체",     icon: "grid_view"       },
 ];
 
 const STATUS_LABELS: Record<string, string> = {
-  pending:  "대기 중",
-  paid:     "지급 완료",
-  rejected: "거절됨",
+  ...PAYOUT_STATUS_LABELS,
 };
 
 function payoutStatusTone(status: string | null | undefined) {
@@ -215,7 +214,7 @@ export default function AdminPayoutsPage() {
                 {/* Reject inline form */}
                 {rejectingId === payout.id && (
                   <div className="flex flex-col gap-2 p-3 bg-error/5 border border-error/20 rounded-lg">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-error">거절 사유 (선택)</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-error">반려 사유 (선택)</label>
                     <textarea
                       value={rejectNote}
                       onChange={(e) => setRejectNote(e.target.value)}
@@ -236,7 +235,7 @@ export default function AdminPayoutsPage() {
                         ) : (
                           <span className="material-symbols-outlined text-sm">cancel</span>
                         )}
-                        거절 확정
+                        반려 확정
                       </AdminButton>
                       <button
                         onClick={() => { setRejectingId(null); setRejectNote(""); }}
@@ -270,7 +269,7 @@ export default function AdminPayoutsPage() {
                       size="md"
                     >
                       <span className="material-symbols-outlined text-sm">cancel</span>
-                      거절
+                      반려
                     </AdminButton>
                   </div>
                 )}

@@ -308,7 +308,7 @@ export async function sendImageApproved(opts: {
       <p>제출하신 이미지가 검토를 통과하여 라이브러리에 게시되었습니다.</p>
       <p><strong>이미지:</strong> ${imageTitle}</p>
       <p><strong>에셋 ID:</strong> ${assetId}</p>
-      <p>바이어들이 이미지를 검색하고 라이선스를 구매할 수 있습니다.</p>
+      <p>구매자들이 이미지를 검색하고 사용권을 구매할 수 있습니다.</p>
       <br><p>Image Partners 팀 드림</p>
     `,
   });
@@ -396,7 +396,7 @@ export async function sendPhotographerApplicationApproved(opts: {
     subject: "[Image Partners] 사진작가 신청이 승인되었습니다",
     html: `
       <p>${photographerName}님, 안녕하세요.</p>
-      <p>사진작가 신청이 승인되었습니다. 이제 이미지 업로드, 운영팀 요청, 판매 정산 기능을 사용할 수 있습니다.</p>
+      <p>사진작가 신청이 승인되었습니다. 이제 이미지 업로드, 운영팀 요청, 사용권 판매·정산 기능을 사용할 수 있습니다.</p>
       <p><a href="${buildSiteUrl("/dashboard/uploads")}">대시보드에서 업로드 시작하기 →</a></p>
       <br><p>Image Partners 팀 드림</p>
     `,

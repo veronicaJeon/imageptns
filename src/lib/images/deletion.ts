@@ -108,9 +108,9 @@ export function deletionImpactMessage(impact: ImageDeletionImpact) {
     return "판매 및 온체인 등록 이력이 없어 원본과 공개 미리보기를 완전삭제할 수 있습니다.";
   }
 
-  const fragments = ["신규 판매와 공개 노출은 중단하고 이미지는 운영 보존용으로 아카이브합니다."];
+  const fragments = ["신규 사용권 주문과 공개 노출은 중단하고 이미지는 운영 보존용으로 아카이브합니다."];
   if (impact.buyerNoticeRequired) {
-    fragments.push("기존 구매 이력에는 삭제/판매중지 안내가 표시됩니다.");
+    fragments.push("기존 주문 내역에는 공개 중지 안내가 표시됩니다.");
   }
   if (impact.onchainNoticeRequired) {
     fragments.push("온체인 또는 Arweave 증명 기록은 삭제하지 않고 철회/아카이브 상태로 보존합니다.");

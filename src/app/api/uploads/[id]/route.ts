@@ -257,7 +257,7 @@ export async function DELETE(
     return NextResponse.json({ error: "이미 삭제 절차가 진행 중이거나 완료된 이미지입니다." }, { status: 409 });
   }
   if (hasArweaveCredential(image)) {
-    return NextResponse.json({ error: "Arweave 자격증명 이미지는 안내 확인 후 삭제 요청을 접수해야 합니다." }, { status: 409 });
+    return NextResponse.json({ error: "Arweave 원본 증명 이미지는 안내 확인 후 삭제 요청을 접수해야 합니다." }, { status: 409 });
   }
 
   const { data: result, error } = await admin.rpc("archive_unregistered_photographer_image", {

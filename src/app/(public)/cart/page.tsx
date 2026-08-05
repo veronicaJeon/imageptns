@@ -16,7 +16,7 @@ const CART_PAGE_COPY = {
     defaultUsageCondition: "저작자 표시 필요",
     printStatement: "PDF 내역서 인쇄",
     creditLine: "저작자 표시",
-    purchaseOptions: "구매 옵션",
+    purchaseOptions: "사용권 옵션",
     bankTransferNote: "계좌이체 요청 후 관리자가 입금을 확인하면 원본 사용 권한이 열립니다.",
   },
   en: {

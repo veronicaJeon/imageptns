@@ -132,15 +132,15 @@ const WITHDRAWAL_ACTION_LABELS: Record<string, string> = {
 
 const PHOTOGRAPHER_STATUS_LABELS: Record<UserSummary["photographer_status"], string> = {
   none: "미신청",
-  pending: "승인대기",
+  pending: "승인 대기",
   approved: "승인됨",
   suspended: "중지됨",
 };
 
 const APPLICATION_STATUS_LABELS: Record<PhotographerApplicationSummary["status"], string> = {
-  pending: "신청대기",
-  approved: "신청승인",
-  rejected: "신청거절",
+  pending: "승인 대기",
+  approved: "승인됨",
+  rejected: "승인되지 않음",
 };
 
 function formatKRW(amount: number) {
@@ -294,11 +294,11 @@ export default function AdminUsersPage() {
     const application = detail.pending_photographer_application;
     const adminNote = prompt("관리자 메모를 입력하세요. 신청자에게는 공개되지 않습니다.")?.trim() ?? "";
     const rejectionReason = action === "reject"
-      ? prompt("거절 사유를 입력하세요. 신청자에게 안내됩니다.")?.trim() ?? ""
+      ? prompt("승인하지 않는 사유를 입력하세요. 신청자에게 안내됩니다.")?.trim() ?? ""
       : "";
 
     if (action === "reject" && !rejectionReason) return;
-    if (!confirm(`${application.applicant_name}님의 사진작가 신청을 ${action === "approve" ? "승인" : "거절"}할까요?`)) return;
+    if (!confirm(`${application.applicant_name}님의 사진작가 신청을 ${action === "approve" ? "승인" : "승인하지 않음"} 처리할까요?`)) return;
 
     setReviewingPhotographerApplication(true);
     try {
@@ -376,7 +376,7 @@ export default function AdminUsersPage() {
             className="h-11 rounded-lg bg-surface-container-lowest px-4 text-sm outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary"
           >
             <option value="all">전체 역할</option>
-            <option value="buyer">바이어</option>
+            <option value="buyer">구매자</option>
             <option value="photographer">사진작가</option>
           </select>
           <select
@@ -427,7 +427,7 @@ export default function AdminUsersPage() {
                   <td className="px-5 py-4">
                     <div className="flex flex-wrap gap-1.5">
                       <AdminChip tone="neutral">
-                        {user.role === "photographer" ? "사진작가" : "바이어"}
+                        {user.role === "photographer" ? "사진작가" : "구매자"}
                       </AdminChip>
                       {user.photographer_status !== "none" && (
                         <AdminChip tone={adminStatusTone(user.photographer_status)}>
@@ -524,7 +524,7 @@ export default function AdminUsersPage() {
                         <p className="leading-relaxed">소개: {detail.latest_photographer_application.bio}</p>
                       )}
                       {detail.latest_photographer_application.rejection_reason && (
-                        <p className="text-error">거절 사유: {detail.latest_photographer_application.rejection_reason}</p>
+                        <p className="text-error">승인하지 않는 사유: {detail.latest_photographer_application.rejection_reason}</p>
                       )}
                       {detail.latest_photographer_application.admin_note && (
                         <p className="text-outline">관리자 메모: {detail.latest_photographer_application.admin_note}</p>
@@ -549,7 +549,7 @@ export default function AdminUsersPage() {
                           variant="danger"
                           size="md"
                         >
-                          거절
+                          승인하지 않음
                         </AdminButton>
                       </div>
                     )}

@@ -411,7 +411,7 @@ export default function AdminOnchainRegistrationsPage() {
                   />
                 </th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">이미지</th>
-                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">작가</th>
+                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">사진작가</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">상태</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">판매/용량</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">TxID</th>
@@ -583,7 +583,7 @@ export default function AdminOnchainRegistrationsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant/20">
-                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">작가</th>
+                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">사진작가</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">금액</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">이미지</th>
                 <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-outline">상태</th>

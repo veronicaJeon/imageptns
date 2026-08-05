@@ -13,7 +13,7 @@ const STATUS_COPY: Record<Exclude<PhotographerStatus, "approved">, { icon: strin
   none: {
     icon: "photo_camera",
     title: "사진작가 신청이 필요합니다",
-    body: "이미지 업로드와 판매 기능은 관리자 승인 후 사용할 수 있습니다.",
+    body: "이미지 업로드와 사용권 판매 기능은 관리자 승인 후 사용할 수 있습니다.",
     action: "신청하러 가기",
   },
   pending: {

@@ -95,7 +95,7 @@ export default function ImageInsightsPage() {
                   <th className="text-left px-5 py-3.5 text-[10px] font-bold text-outline uppercase tracking-widest w-10">#</th>
                   <th className="text-left px-4 py-3.5 text-[10px] font-bold text-outline uppercase tracking-widest">이미지</th>
                   <th className="text-left px-4 py-3.5 text-[10px] font-bold text-outline uppercase tracking-widest hidden md:table-cell">카테고리</th>
-                  <th className="text-left px-4 py-3.5 text-[10px] font-bold text-outline uppercase tracking-widest hidden lg:table-cell">작가</th>
+                  <th className="text-left px-4 py-3.5 text-[10px] font-bold text-outline uppercase tracking-widest hidden lg:table-cell">사진작가</th>
                   <th className="text-right px-5 py-3.5 text-[10px] font-bold text-outline uppercase tracking-widest">
                     <span className="flex items-center justify-end gap-1">
                       <span className="material-symbols-outlined text-sm">{currentSort.icon}</span>

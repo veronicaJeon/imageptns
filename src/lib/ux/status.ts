@@ -40,14 +40,14 @@ export function buildOrderStatusSteps(order: OrderStatusInput): TimelineStep[] {
     },
     {
       key: "confirmation",
-      label: isOnchain ? "온체인 확인" : "구매 확정",
-      description: isOnchain ? "트랜잭션과 주문 금액을 대조해 구매를 확정합니다." : "결제 완료 후 다운로드 권한을 발급합니다.",
+      label: isOnchain ? "온체인 확인" : "주문 확정",
+      description: isOnchain ? "트랜잭션과 주문 금액을 대조해 주문을 확정합니다." : "결제 완료 후 다운로드 권한을 발급합니다.",
       state: paymentFailed ? "failed" : confirmationDone ? "done" : paymentDone || isOnchain ? "current" : "pending",
     },
     {
       key: "download",
       label: "다운로드 가능",
-      description: "구매한 원본 파일을 다운로드할 수 있습니다.",
+      description: "사용권이 확정된 원본 파일을 다운로드할 수 있습니다.",
       state: order.status === "completed" ? "done" : paymentFailed ? "failed" : "pending",
     },
   ];
@@ -78,7 +78,7 @@ export function buildUploadProofSteps(upload: UploadProofInput): TimelineStep[] 
     },
     {
       key: "proof",
-      label: "Arweave 자격증명",
+      label: "Arweave 원본 증명",
       description: "첫 판매 이후 또는 사진작가 셀프 등록 요청으로 관리자 일괄 등록을 거쳐 원본과 해시를 Arweave에 기록합니다.",
       state: proofRegistered ? "done" : proofFailed ? "failed" : proofActive ? "current" : approved ? "pending" : "pending",
     },

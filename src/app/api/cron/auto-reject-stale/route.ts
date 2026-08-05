@@ -227,7 +227,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ rejected: 0, operations });
   }
 
-  const reason = "검토 기간(7일)이 초과되어 자동 거절되었습니다. 내용을 수정한 후 재제출해 주세요.";
+  const reason = "검토 기간(7일)이 초과되어 자동 반려되었습니다. 내용을 수정한 후 재제출해 주세요.";
   let rejected = 0;
 
   for (const img of staleImages) {

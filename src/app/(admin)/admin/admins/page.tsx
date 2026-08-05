@@ -178,7 +178,7 @@ export default function AdminAccountsPage() {
                           key={role}
                           className="rounded-full bg-surface-container-low px-2.5 py-1 text-[11px] font-bold text-on-surface-variant"
                         >
-                          {role === "photographer" ? "사진작가" : "바이어"}
+                          {role === "photographer" ? "사진작가" : "구매자"}
                         </span>
                       ))}
                     </div>

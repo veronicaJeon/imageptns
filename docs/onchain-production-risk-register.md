@@ -52,7 +52,7 @@
    - 중간 실패 시 주문 완료와 onchain ledger 상태가 갈라질 수 있다.
    - 추가 개발: idempotent repair job, failed ledger update alert, order completion transaction boundary 재검토.
 
-4. **사진가 지갑 변경 정책**
+4. **사진작가 지갑 변경 정책**
    - proof 등록은 approval 시점의 photographer wallet으로 올라간다.
    - 이후 프로필 지갑 변경 시 기존 proof/claim 귀속과 사용자가 기대하는 수령 지갑이 달라질 수 있다.
    - 추가 개발: wallet lock/verification, 변경 이력, 기존 asset wallet 변경 불가 안내.

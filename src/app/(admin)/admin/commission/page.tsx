@@ -41,7 +41,7 @@ interface DeletionFeeSetting {
 const SCOPE_LABELS: Record<CommissionScope, string> = {
   default: "기본",
   license: "라이선스",
-  photographer: "작가",
+  photographer: "사진작가",
   image: "이미지",
 };
 
@@ -54,7 +54,7 @@ const SCOPE_ICONS: Record<CommissionScope, string> = {
 
 const TARGET_LABELS: Record<Exclude<CommissionScope, "default">, string> = {
   license: "라이선스 코드",
-  photographer: "작가 ID",
+  photographer: "사진작가 ID",
   image: "이미지 ID",
 };
 
@@ -71,8 +71,8 @@ const EMPTY_FORM: PolicyForm = {
 };
 
 const DELETION_FEE_HELP: Record<DeletionFeeSetting["code"], string> = {
-  image_delete_simple: "현재 미사용입니다. Arweave 자격증명이 없는 이미지는 수수료 없이 즉시 비노출 처리됩니다.",
-  image_delete_complex: "Arweave 자격증명 기록 확인과 웹사이트 비노출 처리가 필요한 사진작가 요청에만 적용합니다.",
+  image_delete_simple: "현재 미사용입니다. Arweave 원본 증명이 없는 이미지는 수수료 없이 즉시 공개 중지됩니다.",
+  image_delete_complex: "Arweave 원본 증명 기록 확인과 공개 중지 처리가 필요한 사진작가 요청에만 적용합니다.",
 };
 
 function formatRate(rate: number) {

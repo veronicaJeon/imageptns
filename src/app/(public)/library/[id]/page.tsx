@@ -28,7 +28,7 @@ const IMAGE_DETAIL_COPY = {
     creditHelp: "모든 사용에는 위 저작자 표시가 필요합니다. 사용상 주의사항이 있는 이미지는 이 영역에 별도로 표시됩니다.",
     licenseDetails: "라이선스 세부 정보",
     ccOriginal: "Creative Commons 원문 보기",
-    buyNow: "바로 구매하고 원본 다운로드",
+    buyNow: "사용권 구매 후 원본 다운로드",
     cartAdded: "장바구니에 추가됨",
   },
   en: {

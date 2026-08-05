@@ -176,7 +176,7 @@ export default function SettingsPage() {
   }
 
   async function handleUpgradeToPhotographer() {
-    if (!confirm("사진작가 신청을 접수하시겠습니까?\n관리자 확인 후 업로드 및 판매 기능이 활성화됩니다.")) return;
+    if (!confirm("사진작가 신청을 접수하시겠습니까?\n관리자 확인 후 이미지 업로드 및 사용권 판매 기능이 활성화됩니다.")) return;
     setUpgradeLoading(true);
     setUpgradeError("");
     try {
@@ -218,7 +218,7 @@ export default function SettingsPage() {
   }
 
   async function handleRequestWithdrawal() {
-    if (!confirm("계정 삭제 요청을 접수하시겠습니까?\n구매, 판매, 정산, 온체인 증명 이력이 있는 경우 관리자가 정합성을 확인한 뒤 처리합니다.")) return;
+    if (!confirm("계정 삭제 요청을 접수하시겠습니까?\n주문, 사용권 판매, 정산, 온체인 증명 이력이 있는 경우 관리자가 정합성을 확인한 뒤 처리합니다.")) return;
     setWithdrawalLoading(true);
     try {
       const res = await fetch("/api/profile/withdrawal-request", { method: "POST" });
@@ -472,7 +472,7 @@ export default function SettingsPage() {
             <span className="material-symbols-outlined text-xl text-primary">photo_camera</span>
             <div>
               <p className="text-sm font-bold text-on-surface">사진작가 계정</p>
-              <p className="text-xs text-on-surface-variant mt-0.5">관리자 승인이 완료되어 이미지 업로드 및 판매 기능을 사용할 수 있습니다.</p>
+              <p className="text-xs text-on-surface-variant mt-0.5">관리자 승인이 완료되어 이미지 업로드 및 사용권 판매 기능을 사용할 수 있습니다.</p>
             </div>
           </div>
         ) : photographerStatus === "pending" || upgradeDone ? (
@@ -496,11 +496,11 @@ export default function SettingsPage() {
               </span>
               <div>
                 <p className="text-sm font-bold text-on-surface">
-                  {photographerStatus === "suspended" ? "사진작가 권한 중지" : "현재 역할: 바이어"}
+                  {photographerStatus === "suspended" ? "사진작가 권한 중지" : "현재 역할: 구매자"}
                 </p>
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
                   사진작가 신청을 접수하면 관리자가 통화로 활동 정보를 확인한 뒤 승인합니다.<br />
-                  승인 전에도 기존 바이어 기능은 그대로 이용할 수 있습니다.
+                  승인 전에도 기존 구매자 기능은 그대로 이용할 수 있습니다.
                 </p>
                 {photographerApplication?.rejection_reason && (
                   <p className="mt-2 text-xs text-error">최근 검토 메모: {photographerApplication.rejection_reason}</p>

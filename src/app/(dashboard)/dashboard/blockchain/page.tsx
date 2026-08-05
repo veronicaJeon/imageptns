@@ -234,7 +234,7 @@ function PhotographerBlockchainContent() {
         <div>
           <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">블록체인 이미지</h1>
           <p className="mt-1 text-sm text-on-surface-variant">
-            판매 완료 이미지는 플랫폼 부담으로, 아직 판매되지 않은 이미지는 사진작가 부담 셀프 등록으로 Arweave 원본 보관 및 자격증명 등록을 요청합니다.
+            사용권 판매가 완료된 이미지는 플랫폼 부담으로, 아직 사용권이 판매되지 않은 이미지는 사진작가 부담 셀프 등록으로 Arweave 원본 보관 및 원본 증명 등록을 요청합니다.
           </p>
         </div>
         <Link
@@ -462,7 +462,7 @@ function PhotographerBlockchainContent() {
                                     <th className="px-3 py-2 text-left">구매자</th>
                                     <th className="px-3 py-2 text-left">라이선스</th>
                                     <th className="px-3 py-2 text-right">결제금액</th>
-                                    <th className="px-3 py-2 text-right">작가수익</th>
+                                    <th className="px-3 py-2 text-right">사진작가 수익</th>
                                     <th className="px-3 py-2 text-left">Base 장부</th>
                                   </tr>
                                 </thead>

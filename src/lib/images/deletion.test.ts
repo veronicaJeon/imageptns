@@ -33,7 +33,7 @@ describe("image deletion policy", () => {
     expect(impact.action).toBe("archive");
     expect(impact.lifecycleStatus).toBe("archived");
     expect(impact.buyerNoticeRequired).toBe(true);
-    expect(deletionImpactMessage(impact)).toContain("구매 이력");
+    expect(deletionImpactMessage(impact)).toContain("기존 주문 내역");
   });
 
   it("archives onchain or Arweave registered images even when sales count is missing", () => {

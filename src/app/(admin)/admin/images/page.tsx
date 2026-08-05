@@ -12,6 +12,7 @@ import {
   adminStatusTone,
 } from "@/components/admin/AdminPrimitives";
 import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
+import { IMAGE_REVIEW_STATUS_LABELS } from "@/lib/ux/terminology";
 
 type ImageStatus = "all" | "pending" | "approved" | "rejected" | "draft";
 
@@ -103,11 +104,7 @@ const PAGE_SIZE = 50;
 const LICENSE_CODES = ["editorial", "commercial", "extended"] as const;
 
 const STATUS_LABELS: Record<string, string> = {
-  all: "전체",
-  pending: "검토 대기",
-  approved: "승인됨",
-  rejected: "거절됨",
-  draft: "임시저장",
+  ...IMAGE_REVIEW_STATUS_LABELS,
 };
 
 function formatDate(value: string) {
@@ -644,7 +641,7 @@ export default function AdminImagesPage() {
               <table className="w-full min-w-[860px] text-xs">
                 <thead>
                   <tr className="border-b border-outline-variant/20 text-outline">
-                    {["일시", "주문", "구매자", "라이선스", "결제", "작가수익", "온체인"].map((head) => (
+                    {["일시", "주문", "구매자", "라이선스", "결제", "사진작가 수익", "온체인"].map((head) => (
                       <th key={head} className="px-3 py-2 text-left font-bold">{head}</th>
                     ))}
                   </tr>

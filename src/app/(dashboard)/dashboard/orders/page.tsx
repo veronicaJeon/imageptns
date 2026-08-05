@@ -178,11 +178,11 @@ export default function OrdersPage() {
   const copy = lang === "ko"
     ? {
         popupBlocked: "팝업이 차단되어 영수증 창을 열지 못했습니다.",
-        stoppedNotice: "판매중지/삭제 고지",
+        stoppedNotice: "공개 중지/삭제 고지",
         subscriptionDownload: "무료다운",
-        recoveryHelp: "지갑 결제를 완료했는데 다운로드가 열리지 않으면, 지갑의 트랜잭션 해시를 오른쪽 복구 입력창에 붙여넣어 구매 확정을 다시 요청하세요.",
+        recoveryHelp: "지갑 결제를 완료했는데 다운로드가 열리지 않으면, 지갑의 트랜잭션 해시를 오른쪽 복구 입력창에 붙여넣어 주문 확정을 다시 요청하세요.",
         license: "라이선스:",
-        licenseFallback: "구매한 라이선스 조건에 따라 사용 가능합니다.",
+        licenseFallback: "확정된 라이선스 조건에 따라 사용할 수 있습니다.",
         downloadExpires: "다운로드 만료:",
         receiptPdf: "영수증 PDF",
         downloadAll: "전체 다운로드",
@@ -444,7 +444,7 @@ export default function OrdersPage() {
                         {row.license}
                       </span>
                       {row.paymentProvider === "bank_transfer" && (
-                        <span className={`${CHIP_CLASS} border-amber-200/70 bg-amber-50 text-amber-700`}>계좌결제</span>
+                        <span className={`${CHIP_CLASS} border-amber-200/70 bg-amber-50 text-amber-700`}>계좌이체</span>
                       )}
                     </div>
                   </div>

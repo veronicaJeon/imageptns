@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { PHOTOGRAPHER_APPLICATION_STATUS_LABELS } from "@/lib/ux/terminology";
 
 type ApplicationStatusFilter = "pending" | "approved" | "rejected" | "all";
 
@@ -29,9 +30,7 @@ interface PhotographerApplication {
 }
 
 const STATUS_LABELS: Record<PhotographerApplication["status"], string> = {
-  pending: "승인대기",
-  approved: "승인됨",
-  rejected: "거절됨",
+  ...PHOTOGRAPHER_APPLICATION_STATUS_LABELS,
 };
 
 const STATUS_STYLES: Record<PhotographerApplication["status"], string> = {
@@ -72,11 +71,11 @@ export default function AdminPhotographerApplicationsPage() {
   async function reviewApplication(application: PhotographerApplication, action: "approve" | "reject") {
     const adminNote = prompt("관리자 메모를 입력하세요. 신청자에게는 공개되지 않습니다.")?.trim() ?? "";
     const rejectionReason = action === "reject"
-      ? prompt("거절 사유를 입력하세요. 신청자에게 안내됩니다.")?.trim() ?? ""
+      ? prompt("승인하지 않는 사유를 입력하세요. 신청자에게 안내됩니다.")?.trim() ?? ""
       : "";
 
     if (action === "reject" && !rejectionReason) return;
-    if (!confirm(`${application.applicant_name} 신청을 ${action === "approve" ? "승인" : "거절"}할까요?`)) return;
+    if (!confirm(`${application.applicant_name} 신청을 ${action === "approve" ? "승인" : "승인하지 않음"} 처리할까요?`)) return;
 
     setReviewingId(application.id);
     try {
@@ -112,7 +111,7 @@ export default function AdminPhotographerApplicationsPage() {
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">사진작가 승인</h1>
-          <p className="mt-1 text-sm text-outline">사진작가 가입과 재신청을 검토하고 승인 또는 거절합니다.</p>
+          <p className="mt-1 text-sm text-outline">사진작가 가입과 재신청을 검토하고 승인 여부를 결정합니다.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {(["pending", "approved", "rejected", "all"] as const).map((value) => (
@@ -169,7 +168,7 @@ export default function AdminPhotographerApplicationsPage() {
                 <td className="px-5 py-4">
                   <p className="line-clamp-4 text-xs leading-relaxed text-on-surface-variant">{application.bio || "소개 없음"}</p>
                   {application.rejection_reason && (
-                    <p className="mt-2 text-xs text-error">거절 사유: {application.rejection_reason}</p>
+                    <p className="mt-2 text-xs text-error">승인하지 않는 사유: {application.rejection_reason}</p>
                   )}
                   {application.admin_note && (
                     <p className="mt-2 text-xs text-outline">관리자 메모: {application.admin_note}</p>
@@ -200,7 +199,7 @@ export default function AdminPhotographerApplicationsPage() {
                         disabled={reviewingId === application.id}
                         className="rounded-lg border border-error/30 px-3 py-2 text-xs font-bold uppercase tracking-widest text-error hover:bg-error/10 disabled:opacity-50"
                       >
-                        거절
+                        승인하지 않음
                       </button>
                     </div>
                   ) : (

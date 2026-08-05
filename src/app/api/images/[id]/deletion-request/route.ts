@@ -93,7 +93,7 @@ export async function POST(
         reasons: ["photographer_immediate_archive"],
         estimatedFeeKrw: 0,
       },
-      notice: "검색과 신규 판매에서 즉시 제외했습니다. 구매이력에는 비활성 상태로 보존되며, 실제 데이터 완전삭제는 관리자가 별도로 처리합니다.",
+      notice: "검색과 신규 사용권 주문에서 즉시 제외했습니다. 기존 주문 내역에는 비활성 상태로 보존되며, 실제 데이터 완전삭제는 관리자가 별도로 처리합니다.",
     });
   }
 

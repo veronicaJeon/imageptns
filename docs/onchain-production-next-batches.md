@@ -27,7 +27,7 @@
 - `checkout/confirm` rate limit과 반복 실패 backoff를 주문 단위로 추가했다.
 - 주문별 static USDC/KRW quote snapshot과 15분 quote expiry를 추가했다.
 - 관리자 온체인 화면에서 pending 주문 purchase tx hash를 직접 재확인할 수 있게 했다.
-- 관리자 온체인 화면에서 DB `earnings_ledger`와 contract `claimable(address)`를 사진가별로 대조한다.
+- 관리자 온체인 화면에서 DB `earnings_ledger`와 contract `claimable(address)`를 사진작가별로 대조한다.
 
 ## 다음 개발 배치
 
@@ -58,7 +58,7 @@
 
 - crypto checkout VAT/세금 정책을 주문 모델에 반영한다.
 - 환불/취소/분쟁 정책을 contract settlement 흐름과 맞춘다.
-- 사진가 지갑 변경 정책을 확정하고, 기존 proof/claim 귀속을 사용자가 오해하지 않도록 잠금/검증 UX를 만든다.
+- 사진작가 지갑 변경 정책을 확정하고, 기존 proof/claim 귀속을 사용자가 오해하지 않도록 잠금/검증 UX를 만든다.
 
 ## 테스트넷 의존 배치
 

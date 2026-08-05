@@ -54,7 +54,7 @@ export function buildOrderReceiptHtml(order: ReceiptOrder) {
         <span>${escapeHtml(item.assetId || "-")}</span>
       </td>
       <td>${escapeHtml(item.license)}</td>
-      <td>${item.subscriptionCovered ? "구독 무료다운 적용" : "일반 구매"}</td>
+      <td>${item.subscriptionCovered ? "구독 무료다운 적용" : "일반 사용권 구매"}</td>
       <td>${escapeHtml(formatDateTime(item.downloadExpiresAt))}</td>
       <td class="amount">${escapeHtml(formatKrw(item.priceKrw))}</td>
     </tr>
@@ -90,7 +90,7 @@ export function buildOrderReceiptHtml(order: ReceiptOrder) {
   <header>
     <div>
       <div class="brand">IMAGE PARTNERS</div>
-      <h1>이미지 구매 영수증</h1>
+      <h1>이미지 사용권 주문 영수증</h1>
     </div>
     <div>
       <span class="label">Order No.</span>
@@ -101,7 +101,7 @@ export function buildOrderReceiptHtml(order: ReceiptOrder) {
   <section class="meta">
     <div><span class="label">구매자</span>${escapeHtml(order.billingName || "-")}</div>
     <div><span class="label">이메일</span>${escapeHtml(order.billingEmail || "-")}</div>
-    <div><span class="label">구매 확정일</span>${escapeHtml(formatDateTime(order.completedAt))}</div>
+    <div><span class="label">주문 확정일</span>${escapeHtml(formatDateTime(order.completedAt))}</div>
     <div><span class="label">결제수단</span>${escapeHtml(order.paymentProvider || "toss")}</div>
     <div><span class="label">온체인 주문키</span>${escapeHtml(order.contractOrderId || "-")}</div>
     <div><span class="label">결제 Tx</span>${escapeHtml(order.paymentTxHash || "-")}</div>
@@ -128,8 +128,8 @@ export function buildOrderReceiptHtml(order: ReceiptOrder) {
   </section>
 
   <footer>
-    본 영수증은 Image Partners 플랫폼의 이미지 라이선스 구매 내역을 확인하기 위한 문서입니다.
-    실제 이용 범위는 구매 시점의 라이선스 조건과 서비스 약관을 기준으로 합니다.
+    본 영수증은 Image Partners 플랫폼의 이미지 사용권 주문 내역을 확인하기 위한 문서입니다.
+    실제 이용 범위는 주문 확정 시점의 라이선스 조건과 서비스 약관을 기준으로 합니다.
   </footer>
 </body>
 </html>`;

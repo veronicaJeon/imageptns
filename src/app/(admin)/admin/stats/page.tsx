@@ -156,7 +156,7 @@ export default function AdminStatsPage() {
       icon: "verified",
       label: "사진작가 등록 요청",
       value: proof.requested,
-      detail: "사진작가가 Arweave 자격증명 등록을 요청한 이미지입니다.",
+      detail: "사진작가가 Arweave 원본 증명 등록을 요청한 이미지입니다.",
       href: "/admin/onchain-registrations",
       tone: "text-amber-600 bg-amber-50 dark:bg-amber-900/20",
     },
@@ -197,7 +197,7 @@ export default function AdminStatsPage() {
         <StatCard icon="photo_library" label="전체 이미지"  value={img.total    ?? 0} color="bg-surface-container-high text-on-surface-variant" />
         <StatCard icon="pending"       label="검토 대기"    value={img.pending  ?? 0} color="bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-300" />
         <StatCard icon="check_circle"  label="승인됨"       value={img.approved ?? 0} sub={`승인율 ${reviewRate}%`} color="bg-primary/10 text-primary" />
-        <StatCard icon="cancel"        label="거절됨"       value={img.rejected ?? 0} color="bg-error/10 text-error" />
+        <StatCard icon="cancel"        label="반려됨"       value={img.rejected ?? 0} color="bg-error/10 text-error" />
         </div>
       </AdminListSurface>
 
@@ -288,13 +288,13 @@ export default function AdminStatsPage() {
                 <div className="bg-amber-400 transition-all" style={{ width: `${(img.pending / img.total) * 100}%` }} title={`대기: ${img.pending}`} />
               )}
               {img.rejected > 0 && (
-                <div className="bg-error/60 transition-all" style={{ width: `${(img.rejected / img.total) * 100}%` }} title={`거절: ${img.rejected}`} />
+                <div className="bg-error/60 transition-all" style={{ width: `${(img.rejected / img.total) * 100}%` }} title={`반려: ${img.rejected}`} />
               )}
             </div>
             <div className="flex gap-6 mt-3 text-xs text-outline">
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-primary inline-block" />승인 {img.approved}</span>
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />대기 {img.pending}</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-error/60 inline-block" />거절 {img.rejected}</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-error/60 inline-block" />반려 {img.rejected}</span>
             </div>
           </AdminListSurface>
         </>
@@ -323,7 +323,7 @@ export default function AdminStatsPage() {
                   <td className="px-6 py-4 font-medium text-on-surface">{u.full_name || "—"}</td>
                   <td className="px-6 py-4">
                     <AdminChip tone={u.role === "photographer" ? "primary" : "neutral"}>
-                      {u.role === "photographer" ? "사진작가" : "바이어"}
+                      {u.role === "photographer" ? "사진작가" : "구매자"}
                     </AdminChip>
                   </td>
                   <td className="px-6 py-4 text-on-surface-variant">

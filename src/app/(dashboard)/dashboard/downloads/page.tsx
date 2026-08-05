@@ -42,9 +42,9 @@ export default function DownloadsPage() {
   const copy = lang === "ko"
     ? {
         title: "다운로드",
-        empty: "구매한 이미지가 없습니다.",
+        empty: "사용권이 확정된 이미지가 없습니다.",
         browse: "라이브러리 보기",
-        headers: ["이미지", "라이선스", "구매일", "만료일", ""],
+        headers: ["이미지", "라이선스", "주문 확정일", "만료일", ""],
         subscriptionDownload: "무료다운",
         downloadCount: (count: number) => `다운로드 ${count}회`,
         download: "다운로드",

@@ -30,7 +30,7 @@ const FIELDS: Array<{
   },
   {
     key: "download_access_days",
-    label: "구매 후 다운로드 가능 기간",
+    label: "주문 확정 후 다운로드 가능 기간",
     description: "결제 완료 시 생성되는 원본 다운로드 권한의 최대 유효기간입니다. 새 주문부터 적용됩니다.",
     min: 1,
     max: 3650,

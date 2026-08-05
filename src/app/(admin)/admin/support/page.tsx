@@ -24,7 +24,7 @@ const STATUS_LABELS: Record<string, string> = {
   submitted: "접수됨",
   matching: "매칭 중",
   fulfilled: "답변 완료",
-  rejected: "거절",
+  rejected: "반려",
   cancelled: "취소",
 };
 
@@ -39,7 +39,7 @@ const MATCH_STATUS_LABELS: Record<string, string> = {
   candidate: "후보",
   invited: "초대됨",
   interested: "관심 있음",
-  declined: "거절",
+  declined: "참여하지 않음",
 };
 
 const RIGHTS_RESULT_LABELS: Record<string, string> = {
@@ -670,7 +670,7 @@ export default function AdminSupportPage() {
                             {submission.email}
                           </a>
                         ) : (
-                          <span className="text-xs text-outline">로그인 바이어</span>
+                          <span className="text-xs text-outline">로그인 구매자</span>
                         )}
                       </div>
                       <p className="text-xs text-outline mt-1">접수일 {formatDate(submission.created_at)}</p>

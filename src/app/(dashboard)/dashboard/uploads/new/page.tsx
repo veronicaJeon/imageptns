@@ -103,7 +103,7 @@ const NEW_UPLOAD_COPY = {
     copyrightTitle: "공통 저작권 및 공개 범위 *",
     copyrightHelp: "이번 대기열에 있는 모든 이미지에 같은 저작권 등급과 무료 사용 조건을 적용합니다.",
     attributionName: "공통 출처 표기명",
-    attributionPlaceholder: "예: 작가명 또는 스튜디오명",
+    attributionPlaceholder: "예: 사진작가명 또는 스튜디오명",
     attributionUrl: "공통 출처 URL",
     authorshipTitle: "공통 AI 및 오리지널리티 보증 *",
     authorshipHelp: "대기열에 있는 모든 이미지의 생성 방식을 선언해주세요.",
