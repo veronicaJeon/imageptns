@@ -19,7 +19,7 @@ export async function buildCheckoutTermsSnapshot() {
       .from("legal_documents")
       .select("slug, title, body, published_at, updated_at")
       .in("slug", ["terms", "license_guide"])
-      .eq("is_published", true),
+      .not("published_at", "is", null),
   ]);
 
   if (legalDocuments.error) throw new Error(legalDocuments.error.message);
