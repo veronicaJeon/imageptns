@@ -179,14 +179,15 @@ jobs:
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_cli_version: 0.52.0
-          gemini_model: gemini-3.6-flash
+          gemini_model: gemini-2.5-flash
           upload_artifacts: false
           settings: >-
-            {"tools":{"core":["read_file","read_many_files","list_directory","glob","grep_search","replace","write_file"],"sandboxNetworkAccess":false},"security":{"blockGitExtensions":true,"environmentVariableRedaction":{"enabled":true,"blocked":["GEMINI_API_KEY"]}},"telemetry":{"enabled":false}}
+            {"general":{"topicUpdateNarration":false},"model":{"maxSessionTurns":12},"tools":{"core":["read_file","read_many_files","list_directory","glob","grep_search","replace","write_file"],"sandboxNetworkAccess":false},"security":{"blockGitExtensions":true,"environmentVariableRedaction":{"enabled":true,"blocked":["GEMINI_API_KEY"]}},"telemetry":{"enabled":false}}
           prompt: >-
-            Read AGENTS.md, .github/codex/prompts/maintenance-implementation.md,
+            First use read_many_files once to read AGENTS.md,
+            .github/codex/prompts/maintenance-implementation.md,
             .maintenance-candidate.md, docs/system-definition.md, and
-            docs/document-driven-development.md. Follow all of them and implement
+            docs/document-driven-development.md. Follow them and implement
             the smallest coherent patch for the approved maintenance candidate.
             You have file read, search, and edit tools only. Do not attempt shell,
             network, GitHub, commit, push, database, data deletion, or deployment
@@ -237,7 +238,7 @@ jobs:
             ':(exclude).gemini/**' \
             ':(exclude)gemini-artifacts/**' > codex.patch
           printf '%s\n' "$GEMINI_SUMMARY" > codex-final-message.md
-          echo "Gemini 3.6 Flash" > maintenance-provider.txt
+          echo "Gemini 2.5 Flash" > maintenance-provider.txt
           if [ -s codex.patch ]; then
             echo "has_patch=true" >> "$GITHUB_OUTPUT"
           else
