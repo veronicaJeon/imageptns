@@ -14,7 +14,7 @@
 | P0 | 저장소 권한 필요 | main·Production 배포 게이트 | main 필수 CI·PR 승인과 Production Environment 승인자를 설정한다. |
 | P1 | 결함 확인 | 운영 모니터링 컬럼·경로 | `data_retention_runs`의 실제 `result/created_at`을 조회하고 AI cron 이벤트 경로를 바로잡는다. |
 | P1 | 도입 검토 | 외부 오류 추적·호출 알림 | 개인정보 마스킹을 전제로 P0 오류 즉시 알림과 release 연계를 추가한다. |
-| P1 | 제거 검토 | 미사용 AI SDK | Anthropic·Google Generative AI SDK가 실제 미사용임을 재확인하고 운영 의존성에서 제거한다. |
+| P1 | 제거 완료·회귀 검증 | 미사용 AI SDK | 2026-08-07 코드 검색에서 두 SDK의 import·호출이 없고 Gemini 유지보수 자문은 별도 HTTP 경로를 사용하는 것을 재확인했다. Anthropic·Google Generative AI SDK를 운영 의존성과 lockfile에서 제거하고 audit·타입·린트·테스트·빌드로 회귀 검증했다. |
 | P1 | 완료·정기 관찰 | GitHub Actions Node 런타임 | checkout·setup-node v5와 고정된 Supabase setup action으로 앱·fresh migration CI가 통과했고 기존 Node 20 action 경고가 제거됐다. |
 | P1 | Codex 예약 개발 전환·첫 실행 검증 | 72시간 유지보수 루틴 | GitHub Actions의 Grok·Gemini 코드 수정 workflow를 제거하고 검사·고정 ID 후보·승인 대기열까지만 담당하도록 분리했다. Codex Scheduled task가 `codex-ready` 후보를 3일마다 격리 worktree에서 한 건씩 구현·검증해 draft PR을 만드는 첫 E2E 결과를 기록한다. |
 | P1 | 운영 반영·실패 가시성 검증 완료 | 에이전트 활동현황 | GitHub 추적 이슈를 원장으로 GitHub 검사기, Grok·Gemini 자문, Codex 대기열·PR을 관리자 화면에 통합했다. 강제 실행 `31108201758`에서 결정론적 검사는 통과했고 Grok의 `XAI_400` 키 오류와 Gemini의 `GOOGLE_503` 일시 장애가 구조화 댓글로 보고됐다. Grok 키 교정과 다음 주기의 Gemini 회복 여부를 추적한다. |
