@@ -13,7 +13,7 @@ GitHub Actions의 AI 구현 단계는 xAI 자격증명을 별도 Secret으로 �
 - 검사 결과와 `operations-backlog.md`를 대조해 P0/P1 개선 후보를 결정론적으로 도출한다.
 - 후보마다 고정 ID를 가진 이슈를 생성하거나 최신 근거로 갱신하고, 해결된 후보는 자동 종료한다.
 - 저장소 권한자의 승인·거절 댓글을 검증하고 승인 대기열에 기록한다.
-- 승인된 후보는 Codex GitHub Action 실행기가 xAI Responses API의 `grok-4.5`로 격리된 패치를 만들고 별도 job이 검토용 PR을 연다.
+- 승인된 후보는 우선 Codex GitHub Action 실행기가 xAI Responses API의 `grok-4.5`로 격리된 패치를 만든다. Grok이 실패하면 별도의 깨끗한 checkout에서 Google 공식 Gemini CLI Action의 `gemini-3.6-flash`가 한 번 백업 실행되며, 이후 별도 job이 검토용 PR을 연다.
 - 승인 후 수동 배포 워크플로가 검증·운영 스모크와 결과 댓글을 남긴다.
 
 에이전트 연결 뒤에도 PR 병합, 운영 DB 적용, 데이터 삭제와 운영 배포는 각각의 명시적 승인 경계를 유지한다. 이는 개선을 하지 않는다는 뜻이 아니라 되돌리기 어려운 변경을 예약 작업의 판단만으로 실행하지 않는다는 뜻이다.
@@ -71,12 +71,12 @@ GitHub 러너의 기존 서비스와 포트가 겹쳐 가짜 DB 장애 후보가
 승인은 해당 후보의 구현 착수 승인이다. 운영 배포, DB migration 적용, 운영 데이터 수정·삭제까지 포괄 승인하지 않는다. 승인을 받으면 다음 중 하나로 진행한다.
 
 1. 승인 workflow가 후보의 고정 ID와 승인자 권한을 검증한다.
-2. 저장소 Secret `GROK_API_KEY`가 있으면 `.github/workflows/maintenance-agent.yml`을 실행한다. 없으면 이슈에 설정 필요 메시지를 남기고 대기한다.
-3. Grok job은 `contents: read`, `workspace-write`, `drop-sudo` 경계에서 후보를 재현하고 소스·테스트·문서 패치만 만든다. 운영 서비스, 원격 DB, 데이터 삭제, 커밋·푸시·배포는 허용하지 않는다.
+2. 저장소 Secret `GROK_API_KEY` 또는 `GEMINI_API_KEY` 중 하나가 있으면 `.github/workflows/maintenance-agent.yml`을 실행한다. 둘 다 없으면 이슈에 설정 필요 메시지를 남기고 대기한다.
+3. Grok job은 `contents: read`, `workspace-write`, `drop-sudo` 경계에서 후보를 재현하고 소스·테스트·문서 패치만 만든다. Grok 실패 시 Gemini job은 셸·네트워크 도구 없이 파일 읽기·검색·수정 도구만 허용하고, 후속 무자격증명 단계가 타입 검사와 테스트를 실행한다. 두 job 모두 운영 서비스, 원격 DB, 데이터 삭제, 커밋·푸시·배포는 허용하지 않는다.
 4. API 키가 전달되지 않는 별도 job이 patch artifact를 적용해 `codex/maintenance-…` 브랜치와 PR을 생성한다.
 5. CI와 Preview 검증 뒤 사람이 PR을 검토·병합하고, DB 적용·데이터 작업·운영 배포는 각각 별도 승인을 받는다.
 
-`GROK_API_KEY`는 GitHub Actions Secret으로만 저장하며 애플리케이션·Vercel 환경이나 저장소 파일에는 넣지 않는다. 실행기는 `https://api.x.ai/v1/responses`에 `grok-4.5`를 요청한다. Codex CLI가 일반 Responses endpoint에는 `store: false`를 보내므로 xAI의 기본 30일 서버 저장을 사용하지 않지만, 프롬프트 수행에 필요한 후보 내용과 저장소 코드는 처리 중 xAI로 전송된다. OpenAI API 사용료는 발생하지 않으며 xAI 계정의 사용량·크레딧 정책은 별도로 적용된다. xAI가 아직 지원하지 않는 최신 `namespace` 도구 형식과 Codex 전용 웹 검색 인자를 피하기 위해 호환 확인된 Codex CLI 버전을 고정하고 다중 에이전트·웹 검색을 끈다. 상향 시 승인→PR E2E를 다시 수행한다.
+`GROK_API_KEY`와 `GEMINI_API_KEY`는 GitHub Actions Secret으로만 저장하며 애플리케이션·Vercel 환경이나 저장소 파일에는 넣지 않는다. 주 실행기는 `https://api.x.ai/v1/responses`에 `grok-4.5`를 요청한다. Codex CLI가 일반 Responses endpoint에는 `store: false`를 보내므로 xAI의 기본 30일 서버 저장을 사용하지 않지만, 프롬프트 수행에 필요한 후보 내용과 저장소 코드는 처리 중 xAI로 전송된다. OpenAI API 사용료는 발생하지 않으며 각 공급자 계정의 사용량·크레딧 정책은 별도로 적용된다. xAI가 아직 지원하지 않는 최신 `namespace` 도구 형식과 Codex 전용 웹 검색 인자를 피하기 위해 호환 확인된 Codex CLI 버전을 고정하고 다중 에이전트·웹 검색을 끈다. Gemini 백업은 안정 모델·CLI·공식 Action 커밋을 고정하고 텔레메트리와 네트워크·셸 도구를 끈다. 버전 상향 시 승인→PR E2E를 다시 수행한다.
 
 ## 배포와 결과 누적
 

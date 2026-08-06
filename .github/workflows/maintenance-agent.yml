@@ -1,4 +1,4 @@
-name: Grok maintenance implementation
+name: AI maintenance implementation
 
 on:
   workflow_dispatch:
@@ -17,12 +17,13 @@ permissions:
   issues: read
 
 jobs:
-  generate_patch:
+  generate_grok_patch:
     name: Generate isolated Grok patch
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
       has_patch: ${{ steps.patch.outputs.has_patch }}
+      agent_succeeded: ${{ steps.grok_result.outputs.agent_succeeded }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -63,7 +64,8 @@ jobs:
         run: npm ci
 
       - name: Run Grok-backed implementation agent
-        id: codex
+        id: grok
+        continue-on-error: true
         uses: openai/codex-action@v1
         with:
           # The action's input name is provider-neutral in practice: it forwards
@@ -83,8 +85,21 @@ jobs:
           # This maintenance task is deliberately single-agent anyway.
           codex-args: '["--ephemeral","--disable","multi_agent","--config","web_search=\"disabled\""]'
 
+      - name: Record Grok result
+        id: grok_result
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.grok.outcome }}" = "success" ]; then
+            echo "agent_succeeded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "agent_succeeded=false" >> "$GITHUB_OUTPUT"
+            echo "Grok failed; the isolated Gemini fallback job will run."
+          fi
+
       - name: Package patch without agent credentials
         id: patch
+        if: steps.grok.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -93,6 +108,7 @@ jobs:
           unlink .maintenance-candidate.md
           git add -N .
           git diff --binary HEAD > codex.patch
+          echo "Grok 4.5" > maintenance-provider.txt
           if [ -s codex.patch ]; then
             echo "has_patch=true" >> "$GITHUB_OUTPUT"
           else
@@ -101,6 +117,132 @@ jobs:
           cp "$RUNNER_TEMP/codex-final-message.md" codex-final-message.md
 
       - name: Upload proposed patch
+        if: steps.grok.outcome == 'success' && steps.patch.outputs.has_patch == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-patch-${{ inputs.candidate_id }}
+          path: |
+            codex.patch
+            codex-final-message.md
+            maintenance-provider.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  generate_gemini_patch:
+    name: Generate isolated Gemini fallback patch
+    needs: generate_grok_patch
+    if: always() && needs.generate_grok_patch.outputs.agent_succeeded != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      has_patch: ${{ steps.patch.outputs.has_patch }}
+      agent_succeeded: ${{ steps.gemini_result.outputs.agent_succeeded }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate approved candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.candidate_issue }}
+          CANDIDATE_ID: ${{ inputs.candidate_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          issue_json="$(gh issue view "$ISSUE_NUMBER" --json body,state,labels)"
+          if [ "$(jq -r '.state' <<<"$issue_json")" != "OPEN" ]; then
+            echo "Candidate issue is not open."
+            exit 1
+          fi
+          if ! jq -e '.labels | map(.name) | index("maintenance-approved")' <<<"$issue_json" >/dev/null; then
+            echo "Candidate issue is not approved."
+            exit 1
+          fi
+          if ! jq -r '.body' <<<"$issue_json" | grep -Fq "<!-- maintenance-candidate:$CANDIDATE_ID -->"; then
+            echo "Candidate id does not match the issue."
+            exit 1
+          fi
+          jq -r '.body' <<<"$issue_json" > .maintenance-candidate.md
+
+      - name: Run Gemini fallback implementation agent
+        id: gemini
+        continue-on-error: true
+        uses: google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          gemini_cli_version: 0.52.0
+          gemini_model: gemini-3.6-flash
+          upload_artifacts: false
+          settings: >-
+            {"tools":{"core":["read_file","read_many_files","list_directory","glob","grep_search","replace","write_file"],"sandboxNetworkAccess":false},"security":{"blockGitExtensions":true,"environmentVariableRedaction":{"enabled":true,"blocked":["GEMINI_API_KEY"]}},"telemetry":{"enabled":false}}
+          prompt: >-
+            Read AGENTS.md, .github/codex/prompts/maintenance-implementation.md,
+            .maintenance-candidate.md, docs/system-definition.md, and
+            docs/document-driven-development.md. Follow all of them and implement
+            the smallest coherent patch for the approved maintenance candidate.
+            You have file read, search, and edit tools only. Do not attempt shell,
+            network, GitHub, commit, push, database, data deletion, or deployment
+            operations. A separate credential-free step will run verification and
+            create a reviewable PR. Finish by summarizing changed files and risks.
+
+      - name: Setup Node.js for credential-free verification
+        if: steps.gemini.outcome == 'success'
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Verify Gemini patch without provider credentials
+        id: verification
+        if: steps.gemini.outcome == 'success'
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+
+      - name: Record Gemini result
+        id: gemini_result
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.gemini.outcome }}" = "success" ] && [ "${{ steps.verification.outcome }}" = "success" ]; then
+            echo "agent_succeeded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "agent_succeeded=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      - name: Package Gemini patch without provider credentials
+        id: patch
+        if: steps.gemini_result.outputs.agent_succeeded == 'true'
+        env:
+          GEMINI_SUMMARY: ${{ steps.gemini.outputs.summary }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -N -- . \
+            ':(exclude).maintenance-candidate.md' \
+            ':(exclude).gemini/**' \
+            ':(exclude)gemini-artifacts/**'
+          git diff --binary HEAD -- . \
+            ':(exclude).maintenance-candidate.md' \
+            ':(exclude).gemini/**' \
+            ':(exclude)gemini-artifacts/**' > codex.patch
+          printf '%s\n' "$GEMINI_SUMMARY" > codex-final-message.md
+          echo "Gemini 3.6 Flash" > maintenance-provider.txt
+          if [ -s codex.patch ]; then
+            echo "has_patch=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_patch=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload Gemini fallback patch
         if: steps.patch.outputs.has_patch == 'true'
         uses: actions/upload-artifact@v4
         with:
@@ -108,13 +250,17 @@ jobs:
           path: |
             codex.patch
             codex-final-message.md
+            maintenance-provider.txt
           if-no-files-found: error
           retention-days: 14
 
   open_pr:
     name: Open reviewable maintenance PR
-    needs: generate_patch
-    if: needs.generate_patch.outputs.has_patch == 'true'
+    needs: [generate_grok_patch, generate_gemini_patch]
+    if: >-
+      always() &&
+      (needs.generate_grok_patch.outputs.has_patch == 'true' ||
+      needs.generate_gemini_patch.outputs.has_patch == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -146,28 +292,34 @@ jobs:
           git commit -m "fix: implement $CANDIDATE_ID maintenance candidate"
           git push origin "$branch"
 
+          provider="$(tr -d '\r\n' < maintenance-provider.txt)"
           gh label create maintenance-in-progress --color 1D76DB --description "AI implementation PR is open" --force >/dev/null
           gh issue edit "$ISSUE_NUMBER" --add-label maintenance-in-progress
           pr_body="$(mktemp)"
           {
             echo "Closes #$ISSUE_NUMBER"
             echo
-            echo "Grok 4.5 generated this patch through the Codex runner after an authorized maintenance approval. Review all code, CI results, migrations, and operational impact before merging."
+            echo "$provider generated this patch after an authorized maintenance approval. Review all code, CI results, migrations, and operational impact before merging."
             echo
             echo "This workflow did not apply production DB changes, delete data, or deploy production."
           } > "$pr_body"
           pr_url="$(gh pr create \
             --base main \
             --head "$branch" \
-            --title "[$CANDIDATE_ID] Grok maintenance implementation" \
+            --title "[$CANDIDATE_ID] AI maintenance implementation" \
             --label maintenance \
             --body-file "$pr_body")"
-          gh issue comment "$ISSUE_NUMBER" --body="Grok 구현 PR을 생성했습니다: $pr_url"
+          gh issue comment "$ISSUE_NUMBER" --body="$provider 구현 PR을 생성했습니다: $pr_url"
 
   report_no_patch:
     name: Report no proposed change
-    needs: generate_patch
-    if: needs.generate_patch.outputs.has_patch == 'false'
+    needs: [generate_grok_patch, generate_gemini_patch]
+    if: >-
+      always() &&
+      ((needs.generate_grok_patch.outputs.agent_succeeded == 'true' &&
+      needs.generate_grok_patch.outputs.has_patch == 'false') ||
+      (needs.generate_gemini_patch.outputs.agent_succeeded == 'true' &&
+      needs.generate_gemini_patch.outputs.has_patch == 'false'))
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -177,12 +329,15 @@ jobs:
           GH_REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ inputs.candidate_issue }}
         run: |
-          gh issue comment "$ISSUE_NUMBER" --body="Grok 실행은 완료됐지만 제안할 코드 변경이 없었습니다. 실행 로그를 검토하고 후보 범위나 필요한 외부 정보를 보완해 주세요: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh issue comment "$ISSUE_NUMBER" --body="AI 구현 실행은 완료됐지만 제안할 코드 변경이 없었습니다. 실행 로그를 검토하고 후보 범위나 필요한 외부 정보를 보완해 주세요: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
   report_failure:
-    name: Report agent failure
-    needs: generate_patch
-    if: always() && needs.generate_patch.result == 'failure'
+    name: Report provider failure
+    needs: [generate_grok_patch, generate_gemini_patch]
+    if: >-
+      always() &&
+      needs.generate_grok_patch.outputs.agent_succeeded != 'true' &&
+      needs.generate_gemini_patch.outputs.agent_succeeded != 'true'
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -192,4 +347,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ inputs.candidate_issue }}
         run: |
-          gh issue comment "$ISSUE_NUMBER" --body="Grok 자동 구현이 실패했습니다. 코드·DB·운영에는 반영되지 않았습니다: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh issue comment "$ISSUE_NUMBER" --body="Grok 자동 구현과 Gemini 백업이 모두 실패했습니다. 코드·DB·운영에는 반영되지 않았습니다: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

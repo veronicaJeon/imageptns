@@ -48,7 +48,7 @@ jobs:
             gh api --method DELETE "repos/$GH_REPO/issues/$ISSUE_NUMBER/labels/maintenance-rejected" >/dev/null 2>&1 || true
             gh issue edit "$ISSUE_NUMBER" --add-label maintenance-approved
             decision="approved"
-            message="✅ @$AUTHOR 님이 \`$candidate_id\` 구현 착수를 승인했습니다. GitHub Actions Secret이 준비돼 있으면 Grok이 격리된 패치와 검토용 PR을 생성합니다. 운영 배포·DB 변경·데이터 삭제 승인은 별도입니다."
+            message="✅ @$AUTHOR 님이 \`$candidate_id\` 구현 착수를 승인했습니다. GitHub Actions Secret이 준비돼 있으면 Grok, 실패 시 Gemini 백업이 격리된 패치와 검토용 PR을 생성합니다. 운영 배포·DB 변경·데이터 삭제 승인은 별도입니다."
           else
             gh api --method DELETE "repos/$GH_REPO/issues/$ISSUE_NUMBER/labels/maintenance-approved" >/dev/null 2>&1 || true
             gh issue edit "$ISSUE_NUMBER" --add-label maintenance-rejected
@@ -59,23 +59,23 @@ jobs:
           echo "decision=$decision" >> "$GITHUB_OUTPUT"
           echo "candidate_id=$candidate_id" >> "$GITHUB_OUTPUT"
 
-      - name: Dispatch approved candidate to Grok
+      - name: Dispatch approved candidate to AI implementation
         if: steps.decision.outputs.decision == 'approved'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          GROK_CONFIGURED: ${{ secrets.GROK_API_KEY != '' }}
+          AI_CONFIGURED: ${{ secrets.GROK_API_KEY != '' || secrets.GEMINI_API_KEY != '' }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           CANDIDATE_ID: ${{ steps.decision.outputs.candidate_id }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ "$GROK_CONFIGURED" != "true" ]; then
-            gh issue comment "$ISSUE_NUMBER" --body="Grok 구현 워크플로는 준비됐지만 저장소 Secret \`GROK_API_KEY\`가 없어 자동 구현을 시작하지 못했습니다. 키 설정 후 승인 명령을 다시 실행해 주세요."
+          if [ "$AI_CONFIGURED" != "true" ]; then
+            gh issue comment "$ISSUE_NUMBER" --body="AI 구현 워크플로는 준비됐지만 저장소 Secret \`GROK_API_KEY\` 또는 \`GEMINI_API_KEY\`가 없어 자동 구현을 시작하지 못했습니다. 키 설정 후 승인 명령을 다시 실행해 주세요."
             exit 0
           fi
           gh workflow run maintenance-agent.yml \
             --ref main \
             -f candidate_issue="$ISSUE_NUMBER" \
             -f candidate_id="$CANDIDATE_ID"
-          gh issue comment "$ISSUE_NUMBER" --body="Grok 자동 구현 워크플로를 요청했습니다. 생성된 패치는 별도 \`codex/maintenance-…\` 브랜치와 PR에서 검토하며 운영 DB·데이터·배포는 변경하지 않습니다."
+          gh issue comment "$ISSUE_NUMBER" --body="AI 자동 구현 워크플로를 요청했습니다. Grok 실패 시 Gemini가 백업으로 실행됩니다. 생성된 패치는 별도 \`codex/maintenance-…\` 브랜치와 PR에서 검토하며 운영 DB·데이터·배포는 변경하지 않습니다."
