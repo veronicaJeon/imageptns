@@ -79,7 +79,9 @@ jobs:
           sandbox: workspace-write
           safety-strategy: drop-sudo
           allow-bots: true
-          codex-args: '["--ephemeral"]'
+          # xAI does not accept Codex's namespaced multi-agent tool schema.
+          # This maintenance task is deliberately single-agent anyway.
+          codex-args: '["--ephemeral","--disable","multi_agent"]'
 
       - name: Package patch without agent credentials
         id: patch
