@@ -76,7 +76,7 @@ GitHub 러너의 기존 서비스와 포트가 겹쳐 가짜 DB 장애 후보가
 4. API 키가 전달되지 않는 별도 job이 patch artifact를 적용해 `codex/maintenance-…` 브랜치와 PR을 생성한다.
 5. CI와 Preview 검증 뒤 사람이 PR을 검토·병합하고, DB 적용·데이터 작업·운영 배포는 각각 별도 승인을 받는다.
 
-`GROK_API_KEY`는 GitHub Actions Secret으로만 저장하며 애플리케이션·Vercel 환경이나 저장소 파일에는 넣지 않는다. 실행기는 `https://api.x.ai/v1/responses`에 `grok-4.5`를 요청한다. Codex CLI가 일반 Responses endpoint에는 `store: false`를 보내므로 xAI의 기본 30일 서버 저장을 사용하지 않지만, 프롬프트 수행에 필요한 후보 내용과 저장소 코드는 처리 중 xAI로 전송된다. OpenAI API 사용료는 발생하지 않으며 xAI 계정의 사용량·크레딧 정책은 별도로 적용된다.
+`GROK_API_KEY`는 GitHub Actions Secret으로만 저장하며 애플리케이션·Vercel 환경이나 저장소 파일에는 넣지 않는다. 실행기는 `https://api.x.ai/v1/responses`에 `grok-4.5`를 요청한다. Codex CLI가 일반 Responses endpoint에는 `store: false`를 보내므로 xAI의 기본 30일 서버 저장을 사용하지 않지만, 프롬프트 수행에 필요한 후보 내용과 저장소 코드는 처리 중 xAI로 전송된다. OpenAI API 사용료는 발생하지 않으며 xAI 계정의 사용량·크레딧 정책은 별도로 적용된다. xAI가 아직 지원하지 않는 최신 `namespace` 도구 형식을 피하기 위해 호환 확인된 Codex CLI 버전을 고정하고, 상향 시 승인→PR E2E를 다시 수행한다.
 
 ## 배포와 결과 누적
 

@@ -71,6 +71,9 @@ jobs:
           openai-api-key: ${{ secrets.GROK_API_KEY }}
           responses-api-endpoint: https://api.x.ai/v1/responses
           model: grok-4.5
+          # 0.146.1 emits the newer `namespace` tool shape that xAI's
+          # Responses API does not yet accept. Keep the last compatible CLI.
+          codex-version: 0.146.0
           prompt-file: .github/codex/prompts/maintenance-implementation.md
           output-file: codex-final-message.md
           sandbox: workspace-write
@@ -169,6 +172,7 @@ jobs:
     steps:
       - env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ inputs.candidate_issue }}
         run: |
           gh issue comment "$ISSUE_NUMBER" --body="Grok 실행은 완료됐지만 제안할 코드 변경이 없었습니다. 실행 로그를 검토하고 후보 범위나 필요한 외부 정보를 보완해 주세요: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
@@ -183,6 +187,7 @@ jobs:
     steps:
       - env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ inputs.candidate_issue }}
         run: |
           gh issue comment "$ISSUE_NUMBER" --body="Grok 자동 구현이 실패했습니다. 코드·DB·운영에는 반영되지 않았습니다: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
