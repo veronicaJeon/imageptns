@@ -65,6 +65,12 @@ function geminiText(payload) {
     .join("\n");
 }
 
+const RETRYABLE_STATUS = new Set([500, 502, 503, 504]);
+
+function retryDelay(attempt) {
+  return new Promise((resolve) => setTimeout(resolve, attempt * 3_000));
+}
+
 async function requestAdvice() {
   const key = process.env[config.keyName]?.trim();
   if (!key) return { status: "unconfigured", errorCode: `${config.keyName}_MISSING`, body: `${config.keyName}가 설정되지 않아 이번 검수를 실행하지 않았습니다.` };
@@ -84,20 +90,27 @@ async function requestAdvice() {
       };
 
   try {
-    const response = await fetch(request.url, {
-      method: "POST",
-      headers: request.headers,
-      body: JSON.stringify(request.body),
-      signal: AbortSignal.timeout(150_000),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const apiMessage = payload?.error?.message ?? payload?.error ?? `HTTP ${response.status}`;
-      return { status: "error", errorCode: `${config.provider.toUpperCase()}_${response.status}`, body: `${config.name} API 검수에 실패했습니다: ${safeMessage(apiMessage)}` };
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const response = await fetch(request.url, {
+        method: "POST",
+        headers: request.headers,
+        body: JSON.stringify(request.body),
+        signal: AbortSignal.timeout(90_000),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (RETRYABLE_STATUS.has(response.status) && attempt < 3) {
+          await retryDelay(attempt);
+          continue;
+        }
+        const apiMessage = payload?.error?.message ?? payload?.error ?? `HTTP ${response.status}`;
+        return { status: "error", errorCode: `${config.provider.toUpperCase()}_${response.status}`, body: `${config.name} API 검수에 실패했습니다: ${safeMessage(apiMessage)}` };
+      }
+      const advice = request.extract(payload).trim();
+      if (!advice) return { status: "error", errorCode: "EMPTY_RESPONSE", body: `${config.name}가 비어 있는 응답을 반환했습니다.` };
+      return { status: "success", body: advice.slice(0, 12_000) };
     }
-    const text = request.extract(payload).trim();
-    if (!text) return { status: "error", errorCode: "EMPTY_RESPONSE", body: `${config.name}가 비어 있는 응답을 반환했습니다.` };
-    return { status: "success", body: text.slice(0, 12_000) };
+    return { status: "error", errorCode: "RETRY_EXHAUSTED", body: `${config.name} API 재시도 횟수를 초과했습니다.` };
   } catch (error) {
     return { status: "error", errorCode: error?.name === "TimeoutError" ? "TIMEOUT" : "REQUEST_FAILED", body: `${config.name} API 검수에 실패했습니다: ${safeMessage(error?.message ?? error)}` };
   }

@@ -17,7 +17,7 @@
 | P1 | 제거 검토 | 미사용 AI SDK | Anthropic·Google Generative AI SDK가 실제 미사용임을 재확인하고 운영 의존성에서 제거한다. |
 | P1 | 완료·정기 관찰 | GitHub Actions Node 런타임 | checkout·setup-node v5와 고정된 Supabase setup action으로 앱·fresh migration CI가 통과했고 기존 Node 20 action 경고가 제거됐다. |
 | P1 | Codex 예약 개발 전환·첫 실행 검증 | 72시간 유지보수 루틴 | GitHub Actions의 Grok·Gemini 코드 수정 workflow를 제거하고 검사·고정 ID 후보·승인 대기열까지만 담당하도록 분리했다. Codex Scheduled task가 `codex-ready` 후보를 3일마다 격리 worktree에서 한 건씩 구현·검증해 draft PR을 만드는 첫 E2E 결과를 기록한다. |
-| P1 | 코드 완료·첫 자문 실행 검증 | 에이전트 활동현황 | GitHub 추적 이슈를 원장으로 GitHub 검사기, Grok·Gemini 자문, Codex 대기열·PR을 관리자 화면에 통합했다. 다음 강제 유지보수 실행에서 두 자문 API의 성공 또는 실패 보고와 운영 화면 표시를 검증한다. |
+| P1 | 운영 반영·실패 가시성 검증 완료 | 에이전트 활동현황 | GitHub 추적 이슈를 원장으로 GitHub 검사기, Grok·Gemini 자문, Codex 대기열·PR을 관리자 화면에 통합했다. 강제 실행 `31108201758`에서 결정론적 검사는 통과했고 Grok의 `XAI_400` 키 오류와 Gemini의 `GOOGLE_503` 일시 장애가 구조화 댓글로 보고됐다. Grok 키 교정과 다음 주기의 Gemini 회복 여부를 추적한다. |
 | P1 | 1단계 구현·운영 관찰 필요 | 중복 이미지 탐지 | 같은 사진가 SHA-256 exact 차단, 타 사진가 exact 및 엄격한 pHash+dHash 후보 관리자 표시, 사유 필수 예외승인, 공개 DB 제약, 삭제 지문 1년 보관을 구현했다. 기존 이미지 백필과 2~4주 오탐률 측정, 이의제기 SLA는 후속 과제다. |
 
 예약 작업은 2026-08-05 운영에서 데이터 정리와 AI 합성 진단이 모두 성공했다. 과거의 `CRON_SECRET` 수동 인증 불일치는 현재 실행 차단으로 재현되지 않아 관찰 항목으로 낮춘다.
