@@ -48,7 +48,7 @@ jobs:
             gh api --method DELETE "repos/$GH_REPO/issues/$ISSUE_NUMBER/labels/maintenance-rejected" >/dev/null 2>&1 || true
             gh issue edit "$ISSUE_NUMBER" --add-label maintenance-approved
             decision="approved"
-            message="✅ @$AUTHOR 님이 \`$candidate_id\` 구현 착수를 승인했습니다. 외부 개발 에이전트가 연결돼 있으면 작업 요청을 전달하며, 그렇지 않으면 승인 대기열에 유지됩니다. 운영 배포·DB 변경·데이터 삭제 승인은 별도입니다."
+            message="✅ @$AUTHOR 님이 \`$candidate_id\` 구현 착수를 승인했습니다. GitHub Actions Secret이 준비돼 있으면 Codex가 격리된 패치와 검토용 PR을 생성합니다. 운영 배포·DB 변경·데이터 삭제 승인은 별도입니다."
           else
             gh api --method DELETE "repos/$GH_REPO/issues/$ISSUE_NUMBER/labels/maintenance-approved" >/dev/null 2>&1 || true
             gh issue edit "$ISSUE_NUMBER" --add-label maintenance-rejected
@@ -63,6 +63,7 @@ jobs:
         if: steps.decision.outputs.decision == 'approved'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           CODEX_CONFIGURED: ${{ secrets.OPENAI_API_KEY != '' }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           CANDIDATE_ID: ${{ steps.decision.outputs.candidate_id }}
