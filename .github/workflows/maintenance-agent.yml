@@ -81,7 +81,7 @@ jobs:
           allow-bots: true
           # xAI does not accept Codex's namespaced multi-agent tool schema.
           # This maintenance task is deliberately single-agent anyway.
-          codex-args: '["--ephemeral","--disable","multi_agent"]'
+          codex-args: '["--ephemeral","--disable","multi_agent","--config","web_search=\"disabled\""]'
 
       - name: Package patch without agent credentials
         id: patch
