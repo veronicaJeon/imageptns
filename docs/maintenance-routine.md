@@ -8,12 +8,12 @@
 
 운영 상태와 시스템 정의의 차이를 72시간마다 발견하는 데서 멈추지 않고, 개선 후보 도출 → 결정 요청 → 작은 변경 → 검증 → 승인된 배포 → 결과 회고를 반복한다. 각 후보와 결정, PR, 배포 결과는 GitHub 이슈에 누적되어 다음 주기의 입력이 된다.
 
-GitHub Actions의 AI 구현 단계는 xAI 자격증명을 별도 Secret으로 사용한다. 예약 실행이 곧바로 임의 코드를 운영에 반영하지 않도록 다음 범위로 제한한다.
+GitHub Actions는 재현 가능한 검사와 개선 후보 관리만 담당한다. 실제 개발은 Codex Scheduled task가 격리된 worktree에서 수행하며, 예약 실행이 곧바로 임의 코드를 운영에 반영하지 않도록 다음 범위로 제한한다.
 
 - 검사 결과와 `operations-backlog.md`를 대조해 P0/P1 개선 후보를 결정론적으로 도출한다.
 - 후보마다 고정 ID를 가진 이슈를 생성하거나 최신 근거로 갱신하고, 해결된 후보는 자동 종료한다.
 - 저장소 권한자의 승인·거절 댓글을 검증하고 승인 대기열에 기록한다.
-- 승인된 후보는 우선 Codex GitHub Action 실행기가 xAI Responses API의 `grok-4.5`로 격리된 패치를 만든다. Grok이 실패하면 별도의 깨끗한 checkout에서 Google 공식 Gemini CLI Action의 `gemini-2.5-flash`가 한 번 백업 실행되며, 이후 별도 job이 검토용 PR을 연다.
+- 승인된 후보에는 `codex-ready` 라벨을 붙인다. Codex 예약 작업은 3일마다 한 후보를 선택해 격리된 worktree에서 구현·검증하고 draft PR을 만든다.
 - 승인 후 수동 배포 워크플로가 검증·운영 스모크와 결과 댓글을 남긴다.
 
 에이전트 연결 뒤에도 PR 병합, 운영 DB 적용, 데이터 삭제와 운영 배포는 각각의 명시적 승인 경계를 유지한다. 이는 개선을 하지 않는다는 뜻이 아니라 되돌리기 어려운 변경을 예약 작업의 판단만으로 실행하지 않는다는 뜻이다.
@@ -33,7 +33,7 @@ flowchart LR
   A["72시간 검사"] --> B["실패·운영 백로그 대조"]
   B --> C["고정 ID 개선 후보 이슈"]
   C --> D{"소유자 결정"}
-  D -->|승인| E["개발 에이전트 또는 담당자"]
+  D -->|승인| E["Codex Scheduled 개발"]
   D -->|거절·보류| C
   E --> F["작은 PR과 Preview 검증"]
   F --> G{"병합·운영 변경 승인"}
@@ -68,15 +68,15 @@ GitHub 러너의 기존 서비스와 포트가 겹쳐 가짜 DB 장애 후보가
 /reject MNT-XXXXXXXXXX
 ```
 
-승인은 해당 후보의 구현 착수 승인이다. 운영 배포, DB migration 적용, 운영 데이터 수정·삭제까지 포괄 승인하지 않는다. 승인을 받으면 다음 중 하나로 진행한다.
+승인은 해당 후보의 구현 착수 승인이다. 운영 배포, DB migration 적용, 운영 데이터 수정·삭제까지 포괄 승인하지 않는다. 승인을 받으면 다음 순서로 진행한다.
 
 1. 승인 workflow가 후보의 고정 ID와 승인자 권한을 검증한다.
-2. 저장소 Secret `GROK_API_KEY` 또는 `GEMINI_API_KEY` 중 하나가 있으면 `.github/workflows/maintenance-agent.yml`을 실행한다. 둘 다 없으면 이슈에 설정 필요 메시지를 남기고 대기한다.
-3. Grok job은 `contents: read`, `workspace-write`, `drop-sudo` 경계에서 후보를 재현하고 소스·테스트·문서 패치만 만든다. Grok 실패 시 Gemini job은 셸·네트워크 도구 없이 파일 읽기·검색·수정 도구만 허용하고, 후속 무자격증명 단계가 타입 검사와 테스트를 실행한다. 두 job 모두 운영 서비스, 원격 DB, 데이터 삭제, 커밋·푸시·배포는 허용하지 않는다.
-4. API 키가 전달되지 않는 별도 job이 patch artifact를 적용해 `codex/maintenance-…` 브랜치와 PR을 생성한다.
-5. CI와 Preview 검증 뒤 사람이 PR을 검토·병합하고, DB 적용·데이터 작업·운영 배포는 각각 별도 승인을 받는다.
+2. 승인 workflow가 `maintenance-approved`, `codex-ready` 라벨을 추가하고 `approval-required`를 제거한다. GitHub Actions는 여기서 코드 수정을 시작하지 않는다.
+3. Codex 예약 작업이 열린 `codex-ready` 후보 중 P0 우선으로 한 건을 선택해 현재 코드와 문서를 대조하고 문제를 재현한다.
+4. Codex는 격리된 worktree에서 소스·테스트·문서를 수정하고 전체 검증을 통과한 경우에만 `codex/maintenance-…` 브랜치와 draft PR을 만든다.
+5. PR을 만들면 `maintenance-in-progress`를 추가하고 `codex-ready`를 제거한다. CI와 Preview 검증 뒤 사람이 PR을 검토·병합하며, DB 적용·데이터 작업·운영 배포는 각각 별도 승인을 받는다.
 
-`GROK_API_KEY`와 `GEMINI_API_KEY`는 GitHub Actions Secret으로만 저장하며 애플리케이션·Vercel 환경이나 저장소 파일에는 넣지 않는다. 주 실행기는 `https://api.x.ai/v1/responses`에 `grok-4.5`를 요청한다. Codex CLI가 일반 Responses endpoint에는 `store: false`를 보내므로 xAI의 기본 30일 서버 저장을 사용하지 않지만, 프롬프트 수행에 필요한 후보 내용과 저장소 코드는 처리 중 xAI로 전송된다. OpenAI API 사용료는 발생하지 않으며 각 공급자 계정의 사용량·크레딧 정책은 별도로 적용된다. xAI가 아직 지원하지 않는 최신 `namespace` 도구 형식과 Codex 전용 웹 검색 인자를 피하기 위해 호환 확인된 Codex CLI 버전을 고정하고 다중 에이전트·웹 검색을 끈다. Gemini 백업은 안정 모델·CLI·공식 Action 커밋을 고정하고 텔레메트리와 네트워크·셸 도구를 끈다. 무료 등급 요청을 한 번의 작업이 과도하게 소진하지 않도록 세션을 최대 12턴으로 제한하고 필수 문서는 한 번에 읽는다. 버전 상향 시 승인→PR E2E를 다시 수행한다.
+Codex 작업의 상세 후보 선택, 변경 허용 범위, 검증과 실패 처리는 [Codex 유지보수 개발 작업](./codex-maintenance-runbook.md)을 따른다. 로컬 프로젝트를 사용하는 예약 작업은 Mac이 켜져 있고 Codex 앱이 실행 중이어야 한다. GitHub Actions의 검사·이슈 생성은 이에 의존하지 않으므로 Codex 실행이 지연돼도 운영 근거는 계속 누적된다.
 
 ## 배포와 결과 누적
 
@@ -105,6 +105,7 @@ GitHub 저장소 설정에서 `production` Environment required reviewer를 지�
 - 동일 후보가 새 이슈를 만들지 않고 같은 ID·이슈에 갱신되는지
 - 백로그에서 완료 처리된 후보가 다음 주기에 자동 종료되는지
 - 승인 댓글 작성자의 저장소 권한과 후보 ID가 검증되는지
+- 승인 후보에 `codex-ready`가 붙고 Codex 예약 작업이 한 건씩 처리하는지
 - `production` Environment에 required reviewer가 설정돼 있는지
 
 워크플로 자체가 장기간 실행되지 않으면 GitHub Actions 비활성화, 저장소 일정 실행 지연 또는 권한 변경을 먼저 확인한다. GitHub 예약 실행은 정확한 시각의 SLA가 아니므로 장애 감시는 기존 15분 운영 health 모니터가 계속 담당한다.

@@ -175,7 +175,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | CI | main/develop push·PR에서 운영 의존성 audit, 타입, 린트, 테스트, 빌드; 새 Supabase DB 마이그레이션·lint |
 | 배포 | 검증 후 Vercel Production 수동 배포 워크플로 또는 승인된 직접 배포 |
 | 가용성 | GitHub Actions가 15분 간격으로 `/api/health` 호출, 실패 이슈 자동 생성·복구 종료 |
-| 정기 유지보수 | 매일 예약 기동 후 마지막 성공으로부터 72시간이 지난 경우 audit·코드·fresh DB·운영 smoke를 실행하고 단일 추적 이슈에 결과 누적 |
+| 정기 유지보수 | GitHub Actions가 매일 예약 기동 후 마지막 성공으로부터 72시간이 지난 경우 audit·코드·fresh DB·운영 smoke를 실행하고 고정 ID 후보 이슈를 누적한다. 승인 후보의 실제 개발은 Codex Scheduled task가 격리 worktree에서 한 건씩 수행한다. |
 | Health | DB, Storage, 최근 공개 JPEG 무결성, Mistral 합성 진단 최신성 |
 | 예약 작업 | 매일 02:00 UTC 데이터·업로드·반려·한도 정리, 매일 03:00 UTC Mistral 합성 진단 |
 | 관측 | 관리자 운영 모니터링에 최근 24시간 가용성·응답·서버 오류·AI 이벤트 표시 |

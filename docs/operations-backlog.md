@@ -16,7 +16,7 @@
 | P1 | 도입 검토 | 외부 오류 추적·호출 알림 | 개인정보 마스킹을 전제로 P0 오류 즉시 알림과 release 연계를 추가한다. |
 | P1 | 제거 검토 | 미사용 AI SDK | Anthropic·Google Generative AI SDK가 실제 미사용임을 재확인하고 운영 의존성에서 제거한다. |
 | P1 | 완료·정기 관찰 | GitHub Actions Node 런타임 | checkout·setup-node v5와 고정된 Supabase setup action으로 앱·fresh migration CI가 통과했고 기존 Node 20 action 경고가 제거됐다. |
-| P1 | Grok+Gemini 구현 workflow E2E 진행 | 72시간 유지보수 루틴 | 승인 후보는 `grok-4.5`를 우선 사용하고 실패 시 셸·네트워크를 차단한 `gemini-2.5-flash`가 깨끗한 checkout에서 한 번 백업 실행하도록 구성했다. 실행 `31070772144`에서 Gemini 키 인증과 격리 실행을 확인했고, 실행 `31071234825`에서 2.5 Flash 요청도 기존 Flash 무료 등급 일일 20요청 한도를 공유해 첫 호출부터 차단됨을 확인했다. 12턴 제한은 유지하고 할당량 재설정 뒤 승인→PR E2E를 완료한다. |
+| P1 | Codex 예약 개발 전환·첫 실행 검증 | 72시간 유지보수 루틴 | GitHub Actions의 Grok·Gemini 코드 수정 workflow를 제거하고 검사·고정 ID 후보·승인 대기열까지만 담당하도록 분리했다. Codex Scheduled task가 `codex-ready` 후보를 3일마다 격리 worktree에서 한 건씩 구현·검증해 draft PR을 만드는 첫 E2E 결과를 기록한다. |
 | P1 | 1단계 구현·운영 관찰 필요 | 중복 이미지 탐지 | 같은 사진가 SHA-256 exact 차단, 타 사진가 exact 및 엄격한 pHash+dHash 후보 관리자 표시, 사유 필수 예외승인, 공개 DB 제약, 삭제 지문 1년 보관을 구현했다. 기존 이미지 백필과 2~4주 오탐률 측정, 이의제기 SLA는 후속 과제다. |
 
 예약 작업은 2026-08-05 운영에서 데이터 정리와 AI 합성 진단이 모두 성공했다. 과거의 `CRON_SECRET` 수동 인증 불일치는 현재 실행 차단으로 재현되지 않아 관찰 항목으로 낮춘다.

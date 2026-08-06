@@ -287,7 +287,7 @@ jobs:
             echo
             echo "- 활성 개선 후보: ${CANDIDATE_COUNT}건"
             echo "- 각 후보는 별도 이슈로 생성·갱신되며 \`/approve MNT-…\` 또는 \`/reject MNT-…\`로 결정합니다."
-            echo "- 승인된 후보는 연결된 개발 에이전트가 작은 PR로 구현합니다. 에이전트가 미연결이면 승인 대기 상태를 유지합니다."
+            echo "- 승인된 후보에는 \`codex-ready\` 라벨을 붙이며 Codex 예약 작업이 격리된 worktree에서 한 건씩 구현·검증합니다."
             echo "- 병합, DB 적용, 데이터 삭제, 운영 배포는 별도 승인 게이트를 통과해야 합니다."
             if [ "$failed" = false ]; then
               echo
@@ -298,6 +298,7 @@ jobs:
           gh label create maintenance --color 1D76DB --description "Scheduled maintenance and operational review" --force >/dev/null
           gh label create maintenance-candidate --color FBCA04 --description "Candidate derived by the maintenance improvement loop" --force >/dev/null
           gh label create approval-required --color D93F0B --description "Human decision is required" --force >/dev/null
+          gh label create codex-ready --color 5319E7 --description "Ready for the Codex scheduled development task" --force >/dev/null
           gh label create priority-p0 --color B60205 --description "Critical maintenance priority" --force >/dev/null
           gh label create priority-p1 --color D93F0B --description "High maintenance priority" --force >/dev/null
           if [ -z "$TRACKING_ISSUE" ]; then
@@ -363,6 +364,10 @@ jobs:
               gh issue edit "$existing_issue" --body-file "$candidate_body" >/dev/null
               if [ "$(gh issue view "$existing_issue" --json state --jq '.state')" = "CLOSED" ]; then
                 gh issue reopen "$existing_issue" >/dev/null
+                for stale_label in maintenance-approved maintenance-rejected maintenance-in-progress codex-ready; do
+                  gh api --method DELETE "repos/$GH_REPO/issues/$existing_issue/labels/$stale_label" >/dev/null 2>&1 || true
+                done
+                gh issue edit "$existing_issue" --add-label approval-required >/dev/null
                 gh issue comment "$existing_issue" --body="최근 점검에서 동일 후보가 다시 발견되어 재개했습니다." >/dev/null
               fi
             fi

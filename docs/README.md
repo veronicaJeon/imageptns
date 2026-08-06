@@ -9,6 +9,7 @@
 3. [운영 잔여 과제](./operations-backlog.md) — 미완료 과제, 우선순위, 검증 근거
 4. [공개 오픈 준비도 검토](./opening-readiness-review.md) — 오픈 게이트와 3일 유지보수 루틴 제안
 5. [72시간 유지보수 루틴](./maintenance-routine.md) — 개선 후보 도출·승인 대기열·수정·배포 결과 누적 절차
+6. [Codex 유지보수 개발 작업](./codex-maintenance-runbook.md) — 승인 후보 선택·격리 구현·검증·draft PR 경계
 
 ## 영역별 세부 규격
 
@@ -21,6 +22,7 @@
 | UI·디자인 | [디자인 시스템 가이드](./design-system-guidelines.md) |
 | 모니터링·장애대응 | [운영 모니터링 기준](./operations-monitoring.md) |
 | 정기 유지보수 | [72시간 유지보수 루틴](./maintenance-routine.md) |
+| Codex 예약 개발 | [Codex 유지보수 개발 작업](./codex-maintenance-runbook.md) |
 | 배포 | [운영 배포 인수인계](./production-deployment-handoff.md), [Vercel 배포 런북](./vercel-deployment-runbook.md) |
 | 온체인 | [운영 준비도](./onchain-production-readiness.md), [위험 등록부](./onchain-production-risk-register.md) |
 
