@@ -145,6 +145,7 @@ DB 스키마의 유일한 변경 경로는 `supabase/migrations`의 순번 마�
 | --- | --- | --- |
 | Supabase | 인증, DB, Storage | 핵심 기능 장애. health·외부 모니터 경보 후 Vercel·Supabase 상태와 로그 대조 |
 | Mistral | 선택적 이미지 메타데이터 생성 | 업로드 자체를 막지 않고 수동 입력을 제공. 합성 진단 36시간 초과 또는 실패 시 운영 경보 |
+| xAI·Google Gemini | 공개 GitHub 유지보수 근거의 독립 검수·위험 반론·개선 아이디어 | 실패·키 미설정·한도 초과를 비차단 보고하며 코드 수정과 후보 승인에는 사용하지 않음 |
 | Resend | 시스템 메일, 주문 거래문서, 문의 수신 Webhook, Auth SMTP | 주문 메일은 outbox에 성공·실패를 남기고 재전송. 전달 상태·Webhook 서명·운영 수신함과 핵심 메일 E2E를 정기 회귀 |
 | Google | OAuth와 운영 Gmail 수신함 | 이메일 가입과 직접 운영 수신함을 대체 경로로 유지 |
 | Vercel | 웹 호스팅·Cron | 이전 정상 배포 롤백과 GitHub 외부 헬스체크 사용 |
@@ -166,6 +167,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 - 일반 사용자는 `orders`를 직접 insert할 수 없고 서버 전용 원자적 주문 함수를 통해서만 표준 주문을 생성한다.
 - Cron은 `Authorization: Bearer CRON_SECRET`을 요구한다.
 - 운영 이벤트에는 요청 본문, 이미지, 이메일, 사용자 식별자와 비밀값을 저장하지 않으며 현재 90일 보관 후 삭제한다.
+- Grok·Gemini 자문에는 공개 GitHub 점검 보고와 유지보수 후보만 전달하며 비밀값, 개인정보, 비공개 이미지 URL과 운영 로그 원문을 전달하지 않는다.
 - 개인정보 처리 목적·항목·위탁·국외 이전·보유·파기는 공개 개인정보처리방침과 실제 구현이 일치해야 한다.
 
 ## 8. 운영·배포 기준
@@ -178,7 +180,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | 정기 유지보수 | GitHub Actions가 매일 예약 기동 후 마지막 성공으로부터 72시간이 지난 경우 audit·코드·fresh DB·운영 smoke를 실행하고 고정 ID 후보 이슈를 누적한다. 승인 후보의 실제 개발은 Codex Scheduled task가 격리 worktree에서 한 건씩 수행한다. |
 | Health | DB, Storage, 최근 공개 JPEG 무결성, Mistral 합성 진단 최신성 |
 | 예약 작업 | 매일 02:00 UTC 데이터·업로드·반려·한도 정리, 매일 03:00 UTC Mistral 합성 진단 |
-| 관측 | 관리자 운영 모니터링에 최근 24시간 가용성·응답·서버 오류·AI 이벤트 표시 |
+| 관측 | 관리자 운영 모니터링에 최근 24시간 가용성·응답·서버 오류·AI 이벤트를, 에이전트 활동현황에 GitHub 검사·Grok·Gemini 자문·Codex 대기열과 PR을 표시 |
 | 리전 | Vercel `icn1`, Supabase 운영 프로젝트와 로컬 프로젝트 분리 |
 
 초기 목표는 최근 24시간 가용성 99% 이상, 핵심 DB·Storage 점검 5초 이내, AI 합성 진단 36시간 이내 최신 상태다. GitHub 예약 실행은 SLA를 보장하지 않으므로 유료 공개와 트래픽 증가 전 전용 오류 추적·uptime 알림을 검토한다.
@@ -196,6 +198,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | 서버 비밀 | `SUPABASE_SERVICE_ROLE_KEY`, `MISTRAL_API_KEY`, `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `CRON_SECRET` |
 | 메일 운영 | `RESEND_FROM_EMAIL`, `OPS_EMAIL`, 진단용 `GMAIL_SMTP_USER`, `GMAIL_SMTP_PASS` |
 | AI 한도 | `AI_ANALYSIS_HOURLY_LIMIT`, `AI_ANALYSIS_DAILY_LIMIT` |
+| GitHub Actions 자문 | `GROK_API_KEY`, `GEMINI_API_KEY` — Vercel 애플리케이션에는 주입하지 않음 |
 | 계좌이체 | `BANK_TRANSFER_BANK_NAME`, `BANK_TRANSFER_ACCOUNT_NUMBER`, `BANK_TRANSFER_ACCOUNT_HOLDER`, `BANK_TRANSFER_ACCOUNT_LABEL` |
 | 기능 플래그 | `NEXT_PUBLIC_COMMERCE_ENABLED`, `NEXT_PUBLIC_ONCHAIN_ENABLED`, `NEXT_PUBLIC_PAYMENT_PASS_ENABLED`, `ALLOW_INCOMPLETE_DISCLOSURE_BETA` |
 | 비공개 결제·온체인 | Toss 키, Base RPC·계약·운영자 키, Arweave 설정 |

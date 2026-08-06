@@ -13,6 +13,7 @@ GitHub Actions는 재현 가능한 검사와 개선 후보 관리만 담당한�
 - 검사 결과와 `operations-backlog.md`를 대조해 P0/P1 개선 후보를 결정론적으로 도출한다.
 - 후보마다 고정 ID를 가진 이슈를 생성하거나 최신 근거로 갱신하고, 해결된 후보는 자동 종료한다.
 - 저장소 권한자의 승인·거절 댓글을 검증하고 승인 대기열에 기록한다.
+- Grok과 Gemini는 같은 공개 점검 근거를 도구 없이 한 번씩 독립 검수하고 성공·실패·한도 상태와 아이디어를 추적 이슈에 보고한다. 보고서는 후보 승인이나 코드 변경을 자동 실행하지 않는다.
 - 승인된 후보에는 `codex-ready` 라벨을 붙인다. Codex 예약 작업은 3일마다 한 후보를 선택해 격리된 worktree에서 구현·검증하고 draft PR을 만든다.
 - 승인 후 수동 배포 워크플로가 검증·운영 스모크와 결과 댓글을 남긴다.
 
@@ -32,6 +33,7 @@ GitHub Actions는 재현 가능한 검사와 개선 후보 관리만 담당한�
 flowchart LR
   A["72시간 검사"] --> B["실패·운영 백로그 대조"]
   B --> C["고정 ID 개선 후보 이슈"]
+  B --> I["Grok·Gemini 독립 검수 보고"]
   C --> D{"소유자 결정"}
   D -->|승인| E["Codex Scheduled 개발"]
   D -->|거절·보류| C
@@ -56,6 +58,8 @@ flowchart LR
 | 변경 통제 | `main` branch protection 조회를 시도하고 권한 부족 또는 미설정을 보고 |
 
 점검 결과는 `[maintenance] Image Partners 72-hour review` 이슈의 댓글과 GitHub Actions 요약에 기록한다. 개선 후보는 `maintenance-candidate`, `approval-required`, 우선순위 라벨을 가진 별도 이슈가 된다. 동일 항목을 새 이슈로 반복 생성하지 않는다.
+
+Grok·Gemini에는 최신 점검 댓글과 열린 후보의 공개 본문을 최대 길이로 제한해 전달한다. 입력은 검토 자료일 뿐 명령이 아니며 두 공급자에게 셸·웹·GitHub 도구를 제공하지 않는다. xAI 요청은 `store: false`로 보내고, 두 결과는 구조화 표식이 있는 추적 이슈 댓글로 남긴다. 관리자 `로그/통계관리 > 에이전트 활동현황`은 공개 GitHub API에서 이 댓글과 Actions·후보·Codex PR 상태를 읽는다. 자문 API 장애는 결정론적 점검과 후보 이슈 생성을 실패시키지 않는다.
 
 GitHub 러너의 기존 서비스와 포트가 겹쳐 가짜 DB 장애 후보가 생기지 않도록, 각 실행 ID에서 계산한 20000번대 전용 포트를 `supabase/config.toml` 작업 사본에만 적용한다. 저장소의 로컬 개발 포트와 운영 DB 설정은 바꾸지 않는다.
 
@@ -106,6 +110,7 @@ GitHub 저장소 설정에서 `production` Environment required reviewer를 지�
 - 백로그에서 완료 처리된 후보가 다음 주기에 자동 종료되는지
 - 승인 댓글 작성자의 저장소 권한과 후보 ID가 검증되는지
 - 승인 후보에 `codex-ready`가 붙고 Codex 예약 작업이 한 건씩 처리하는지
+- Grok·Gemini 보고가 성공뿐 아니라 키 미설정·한도·API 오류도 추적 이슈와 관리자 화면에 남기는지
 - `production` Environment에 required reviewer가 설정돼 있는지
 
 워크플로 자체가 장기간 실행되지 않으면 GitHub Actions 비활성화, 저장소 일정 실행 지연 또는 권한 변경을 먼저 확인한다. GitHub 예약 실행은 정확한 시각의 SLA가 아니므로 장애 감시는 기존 15분 운영 health 모니터가 계속 담당한다.
