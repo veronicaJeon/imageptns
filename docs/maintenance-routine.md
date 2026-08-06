@@ -8,12 +8,12 @@
 
 운영 상태와 시스템 정의의 차이를 72시간마다 발견하는 데서 멈추지 않고, 개선 후보 도출 → 결정 요청 → 작은 변경 → 검증 → 승인된 배포 → 결과 회고를 반복한다. 각 후보와 결정, PR, 배포 결과는 GitHub 이슈에 누적되어 다음 주기의 입력이 된다.
 
-GitHub Actions에는 현재 코드를 설계·수정할 AI 실행 자격증명이 없다. 따라서 예약 실행이 임의 코드를 만들었다고 가장하지 않는다. 지금 자동화되는 범위는 다음과 같다.
+GitHub Actions의 AI 구현 단계는 xAI 자격증명을 별도 Secret으로 사용한다. 예약 실행이 곧바로 임의 코드를 운영에 반영하지 않도록 다음 범위로 제한한다.
 
 - 검사 결과와 `operations-backlog.md`를 대조해 P0/P1 개선 후보를 결정론적으로 도출한다.
 - 후보마다 고정 ID를 가진 이슈를 생성하거나 최신 근거로 갱신하고, 해결된 후보는 자동 종료한다.
 - 저장소 권한자의 승인·거절 댓글을 검증하고 승인 대기열에 기록한다.
-- 승인된 후보는 OpenAI 공식 Codex GitHub Action이 격리된 패치를 만들고 별도 job이 검토용 PR을 연다.
+- 승인된 후보는 Codex GitHub Action 실행기가 xAI Responses API의 `grok-4.5`로 격리된 패치를 만들고 별도 job이 검토용 PR을 연다.
 - 승인 후 수동 배포 워크플로가 검증·운영 스모크와 결과 댓글을 남긴다.
 
 에이전트 연결 뒤에도 PR 병합, 운영 DB 적용, 데이터 삭제와 운영 배포는 각각의 명시적 승인 경계를 유지한다. 이는 개선을 하지 않는다는 뜻이 아니라 되돌리기 어려운 변경을 예약 작업의 판단만으로 실행하지 않는다는 뜻이다.
@@ -71,12 +71,12 @@ GitHub 러너의 기존 서비스와 포트가 겹쳐 가짜 DB 장애 후보가
 승인은 해당 후보의 구현 착수 승인이다. 운영 배포, DB migration 적용, 운영 데이터 수정·삭제까지 포괄 승인하지 않는다. 승인을 받으면 다음 중 하나로 진행한다.
 
 1. 승인 workflow가 후보의 고정 ID와 승인자 권한을 검증한다.
-2. 저장소 Secret `OPENAI_API_KEY`가 있으면 `.github/workflows/maintenance-agent.yml`을 실행한다. 없으면 이슈에 설정 필요 메시지를 남기고 대기한다.
-3. Codex job은 `contents: read`, `workspace-write`, `drop-sudo` 경계에서 후보를 재현하고 소스·테스트·문서 패치만 만든다. 운영 서비스, 원격 DB, 데이터 삭제, 커밋·푸시·배포는 허용하지 않는다.
+2. 저장소 Secret `GROK_API_KEY`가 있으면 `.github/workflows/maintenance-agent.yml`을 실행한다. 없으면 이슈에 설정 필요 메시지를 남기고 대기한다.
+3. Grok job은 `contents: read`, `workspace-write`, `drop-sudo` 경계에서 후보를 재현하고 소스·테스트·문서 패치만 만든다. 운영 서비스, 원격 DB, 데이터 삭제, 커밋·푸시·배포는 허용하지 않는다.
 4. API 키가 전달되지 않는 별도 job이 patch artifact를 적용해 `codex/maintenance-…` 브랜치와 PR을 생성한다.
 5. CI와 Preview 검증 뒤 사람이 PR을 검토·병합하고, DB 적용·데이터 작업·운영 배포는 각각 별도 승인을 받는다.
 
-현재 `OPENAI_API_KEY`가 저장소에 설정되지 않았으므로 자동 구현 workflow는 준비됐지만 실행 자격증명 연결이 남아 있다. 키는 GitHub Actions Secret으로만 저장하며 애플리케이션·Vercel 환경이나 저장소 파일에는 넣지 않는다.
+`GROK_API_KEY`는 GitHub Actions Secret으로만 저장하며 애플리케이션·Vercel 환경이나 저장소 파일에는 넣지 않는다. 실행기는 `https://api.x.ai/v1/responses`에 `grok-4.5`를 요청한다. Codex CLI가 일반 Responses endpoint에는 `store: false`를 보내므로 xAI의 기본 30일 서버 저장을 사용하지 않지만, 프롬프트 수행에 필요한 후보 내용과 저장소 코드는 처리 중 xAI로 전송된다. OpenAI API 사용료는 발생하지 않으며 xAI 계정의 사용량·크레딧 정책은 별도로 적용된다.
 
 ## 배포와 결과 누적
 

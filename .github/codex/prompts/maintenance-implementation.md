@@ -6,4 +6,4 @@ Implement the smallest coherent source, test, and documentation change that sati
 
 You may propose a forward-only migration file when the approved candidate requires schema changes, but do not connect to or mutate any remote database. Do not access production services, change external settings, delete operational data, commit, push, merge, publish, send messages, or deploy. Do not read or print secrets. If required business information, credentials, destructive authorization, or an external decision is missing, make no speculative change and explain the exact blocker in the final message.
 
-Finish with a concise summary of files changed, verification run, remaining risks, and any separate approval required. All changes will be converted to a patch and opened as a reviewable PR by a later job that has no OpenAI credential.
+Finish with a concise summary of files changed, verification run, remaining risks, and any separate approval required. All changes will be converted to a patch and opened as a reviewable PR by a later job that has no AI-provider credential.

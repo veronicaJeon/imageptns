@@ -1,4 +1,4 @@
-name: Codex maintenance implementation
+name: Grok maintenance implementation
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   generate_patch:
-    name: Generate isolated Codex patch
+    name: Generate isolated Grok patch
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -62,11 +62,15 @@ jobs:
       - name: Install project dependencies
         run: npm ci
 
-      - name: Run Codex implementation agent
+      - name: Run Grok-backed implementation agent
         id: codex
         uses: openai/codex-action@v1
         with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          # The action's input name is provider-neutral in practice: it forwards
+          # this bearer token to the configured Responses API endpoint.
+          openai-api-key: ${{ secrets.GROK_API_KEY }}
+          responses-api-endpoint: https://api.x.ai/v1/responses
+          model: grok-4.5
           prompt-file: .github/codex/prompts/maintenance-implementation.md
           output-file: codex-final-message.md
           sandbox: workspace-write
@@ -137,23 +141,23 @@ jobs:
           git commit -m "fix: implement $CANDIDATE_ID maintenance candidate"
           git push origin "$branch"
 
-          gh label create maintenance-in-progress --color 1D76DB --description "Codex implementation PR is open" --force >/dev/null
+          gh label create maintenance-in-progress --color 1D76DB --description "AI implementation PR is open" --force >/dev/null
           gh issue edit "$ISSUE_NUMBER" --add-label maintenance-in-progress
           pr_body="$(mktemp)"
           {
             echo "Closes #$ISSUE_NUMBER"
             echo
-            echo "Codex generated this patch after an authorized maintenance approval. Review all code, CI results, migrations, and operational impact before merging."
+            echo "Grok 4.5 generated this patch through the Codex runner after an authorized maintenance approval. Review all code, CI results, migrations, and operational impact before merging."
             echo
             echo "This workflow did not apply production DB changes, delete data, or deploy production."
           } > "$pr_body"
           pr_url="$(gh pr create \
             --base main \
             --head "$branch" \
-            --title "[$CANDIDATE_ID] Codex maintenance implementation" \
+            --title "[$CANDIDATE_ID] Grok maintenance implementation" \
             --label maintenance \
             --body-file "$pr_body")"
-          gh issue comment "$ISSUE_NUMBER" --body="Codex 구현 PR을 생성했습니다: $pr_url"
+          gh issue comment "$ISSUE_NUMBER" --body="Grok 구현 PR을 생성했습니다: $pr_url"
 
   report_no_patch:
     name: Report no proposed change
@@ -167,7 +171,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ inputs.candidate_issue }}
         run: |
-          gh issue comment "$ISSUE_NUMBER" --body="Codex 실행은 완료됐지만 제안할 코드 변경이 없었습니다. 실행 로그를 검토하고 후보 범위나 필요한 외부 정보를 보완해 주세요: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh issue comment "$ISSUE_NUMBER" --body="Grok 실행은 완료됐지만 제안할 코드 변경이 없었습니다. 실행 로그를 검토하고 후보 범위나 필요한 외부 정보를 보완해 주세요: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
   report_failure:
     name: Report agent failure
@@ -181,4 +185,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ inputs.candidate_issue }}
         run: |
-          gh issue comment "$ISSUE_NUMBER" --body="Codex 자동 구현이 실패했습니다. 코드·DB·운영에는 반영되지 않았습니다: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh issue comment "$ISSUE_NUMBER" --body="Grok 자동 구현이 실패했습니다. 코드·DB·운영에는 반영되지 않았습니다: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
