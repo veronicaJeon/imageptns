@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { detachImageFromAboutPage } from "@/lib/about/library-assets";
-import { sendImageApproved, sendImageRejected } from "@/lib/email/resend";
+import { sendImageRejected } from "@/lib/email/resend";
 import { recordAdminAuditLog } from "@/lib/admin/audit";
 
 async function requireAdmin() {
@@ -177,7 +177,7 @@ export async function PATCH(
 
   // Fire-and-forget notification — never block the response
   const photographerId = data.photographer_id;
-  if (photographerId) {
+  if (photographerId && action === "reject") {
     (async () => {
       const [profileRes, authRes] = await Promise.all([
         admin.from("profiles").select("full_name").eq("id", photographerId).single(),
@@ -188,11 +188,7 @@ export async function PATCH(
       if (!email) return;
       const assetId = data.asset_id ?? data.id;
 
-      if (action === "approve") {
-        await sendImageApproved({ photographerEmail: email, photographerName: name, imageTitle: data.title, assetId });
-      } else {
-        await sendImageRejected({ photographerEmail: email, photographerName: name, imageTitle: data.title, assetId, reason: rejection_reason! });
-      }
+      await sendImageRejected({ photographerEmail: email, photographerName: name, imageTitle: data.title, assetId, reason: rejection_reason! });
     })().catch(console.error);
   }
 
