@@ -119,10 +119,6 @@ const NEW_UPLOAD_COPY = {
     promotionalTitle: "이미지파트너스 홍보 활용 허용 (선택)",
     promotionalBody: "선택하면 이미지파트너스가 서비스 소개 페이지와 공식 홍보물에 이 이미지의 워터마크 없는 저해상도 파생본을 사용할 수 있습니다. 원본 파일은 공개되지 않으며, 허용은 이후 철회할 수 있습니다.",
     promotionalAutomaticTitle: "홍보 활용 범위 자동 적용",
-    opsNotificationTitle: "운영팀에 업로드 알림 보내기",
-    opsNotificationBody: "여러 이미지를 올릴 때도 검토 알림은 1회 종합 메일로 발송됩니다.",
-    opsNotificationSent: (count: number) => `운영팀에 ${count}개 이미지 요약 알림을 보냈습니다.`,
-    opsNotificationFailed: "이미지는 업로드됐지만 운영팀 알림 메일은 발송하지 못했습니다.",
     submit: "선택 이미지 업로드",
     reviewHelp: "제출한 이미지는 운영팀 검토 후 라이브러리에 노출됩니다. 검토에는 1-3 영업일이 소요됩니다.",
   },
@@ -211,10 +207,6 @@ const NEW_UPLOAD_COPY = {
     promotionalTitle: "Allow Image Partners promotional use (optional)",
     promotionalBody: "If selected, Image Partners may use a resized, unwatermarked derivative on service pages and official promotions. The original file remains private, and you may withdraw permission later.",
     promotionalAutomaticTitle: "Promotional use is included automatically",
-    opsNotificationTitle: "Send upload alert to operations",
-    opsNotificationBody: "For multi-image uploads, review alerts are sent as one summary email.",
-    opsNotificationSent: (count: number) => `Sent a ${count}-image summary alert to operations.`,
-    opsNotificationFailed: "Images were uploaded, but the operations alert email could not be sent.",
     submit: "Upload selected images",
     reviewHelp: "Submitted images appear in the library after operations review. Review usually takes 1-3 business days.",
   },
@@ -248,10 +240,6 @@ interface UploadDraft extends UploadDraftReadiness {
   uploadStatus: DraftStatus;
   progress: number;
   errorMsg: string;
-}
-
-interface CreatedUploadImage {
-  id: string;
 }
 
 const EMPTY_LOCALIZED_DRAFT: LocalizedDraft = {
@@ -376,7 +364,6 @@ function NewUploadContent() {
   const [authorshipDeclaration, setAuthorshipDeclaration] = useState<AuthorshipDeclaration | "">("");
   const [factualityAgreed, setFactualityAgreed] = useState(false);
   const [promotionalUseAllowed, setPromotionalUseAllowed] = useState(false);
-  const [opsNotificationEnabled, setOpsNotificationEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [pageDone, setPageDone] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -793,7 +780,6 @@ function NewUploadContent() {
         authorship_declaration: authorshipDeclaration,
         factuality_attested: factualityAgreed,
         promotional_use_allowed: Boolean(automaticPromotionBasis) || promotionalUseAllowed,
-        send_ops_notification: false,
       }),
     });
 
@@ -806,9 +792,7 @@ function NewUploadContent() {
       throw new Error(err?.error ?? "Failed to save");
     }
 
-    const saved = await saveRes.json() as { image?: CreatedUploadImage };
     updateDraft(draft.id, (current) => ({ ...current, uploadStatus: "done", progress: 100, errorMsg: "" }));
-    return saved.image ?? null;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -822,12 +806,10 @@ function NewUploadContent() {
     setErrorMsg("");
     setNoticeMsg("");
     let failed = 0;
-    const uploadedImageIds: string[] = [];
 
     for (const draft of drafts.filter((item) => item.uploadStatus !== "done")) {
       try {
-        const uploaded = await submitDraft(draft);
-        if (uploaded?.id) uploadedImageIds.push(uploaded.id);
+        await submitDraft(draft);
       } catch (err) {
         failed += 1;
         updateDraft(draft.id, (current) => ({
@@ -842,24 +824,6 @@ function NewUploadContent() {
     if (failed > 0) {
       setErrorMsg(copy.partialFailed(failed));
       return;
-    }
-
-    if (opsNotificationEnabled && uploadedImageIds.length > 0) {
-      try {
-        const notifyRes = await fetch("/api/uploads/notify-batch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageIds: uploadedImageIds }),
-        });
-        if (notifyRes.ok) {
-          const result = await notifyRes.json().catch(() => null) as { notified?: number } | null;
-          setNoticeMsg(copy.opsNotificationSent(result?.notified ?? uploadedImageIds.length));
-        } else {
-          setNoticeMsg(copy.opsNotificationFailed);
-        }
-      } catch {
-        setNoticeMsg(copy.opsNotificationFailed);
-      }
     }
 
     setPageDone(true);
@@ -883,7 +847,6 @@ function NewUploadContent() {
           <span className="material-symbols-outlined text-6xl text-primary">check_circle</span>
           <h2 className="font-headline text-xl font-extrabold text-on-surface">{copy.doneTitle}</h2>
           <p className="text-sm text-on-surface-variant">{copy.doneBody}</p>
-          {noticeMsg && <p className="text-xs font-semibold text-primary">{noticeMsg}</p>}
         </div>
       )}
 
@@ -1359,18 +1322,6 @@ function NewUploadContent() {
                 </label>
               )}
 
-              <label className="flex cursor-pointer gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 transition-colors hover:border-outline">
-                <input
-                  type="checkbox"
-                  checked={opsNotificationEnabled}
-                  onChange={(e) => setOpsNotificationEnabled(e.target.checked)}
-                  className="mt-1 h-4 w-4 shrink-0 accent-primary"
-                />
-                <span>
-                  <span className="block text-sm font-bold text-on-surface">{copy.opsNotificationTitle}</span>
-                  <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{copy.opsNotificationBody}</span>
-                </span>
-              </label>
             </>
           )}
 
