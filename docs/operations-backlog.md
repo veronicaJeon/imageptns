@@ -19,7 +19,7 @@
 | P1 | Codex 예약 개발 전환·첫 실행 검증 | 72시간 유지보수 루틴 | GitHub Actions의 Grok·Gemini 코드 수정 workflow를 제거하고 검사·고정 ID 후보·승인 대기열까지만 담당하도록 분리했다. Codex Scheduled task가 `codex-ready` 후보를 3일마다 격리 worktree에서 한 건씩 구현·검증해 draft PR을 만드는 첫 E2E 결과를 기록한다. |
 | P1 | 운영 반영·실패 가시성 검증 완료 | 에이전트 활동현황 | GitHub 추적 이슈를 원장으로 GitHub 검사기, Grok·Gemini 자문, Codex 대기열·PR을 관리자 화면에 통합했다. 강제 실행 `31108201758`에서 결정론적 검사는 통과했고 Grok의 `XAI_400` 키 오류와 Gemini의 `GOOGLE_503` 일시 장애가 구조화 댓글로 보고됐다. Grok 키 교정과 다음 주기의 Gemini 회복 여부를 추적한다. |
 | P1 | 1단계 구현·운영 관찰 필요 | 중복 이미지 탐지 | 같은 사진가 SHA-256 exact 차단, 타 사진가 exact 및 엄격한 pHash+dHash 후보 관리자 표시, 사유 필수 예외승인, 공개 DB 제약, 삭제 지문 1년 보관을 구현했다. 기존 이미지 백필과 2~4주 오탐률 측정, 이의제기 SLA는 후속 과제다. |
-| P1 | 1단계 구현·2단계 기반 준비·운영 승인 대기 | 사진으로 검색 | 중복 탐지 지문을 재사용하는 비저장 근접 사진 검색 API와 라이브러리 UI를 구현했다. 의미 검색은 다중 공급자·모델 버전 임베딩 스키마, service-role 전용 cosine RPC, 기본 OFF 설정, 혼합 순위·평가 도구까지만 준비했다. Voyage·NVIDIA 후보를 같은 50건 이상 평가셋으로 비교하고 이미지 질의 capability, 국외 이전·보유·학습 정책, 비용·p95 기준을 승인한 뒤 어댑터·백필·UI를 별도 활성화한다. |
+| P1 | 1단계 구현·다중 모델 평가 장치 준비·평가 자산/키 대기 | 사진으로 검색 | 중복 탐지 지문을 재사용하는 비저장 근접 사진 검색 API와 라이브러리 UI를 구현했다. 의미 검색은 다중 공급자·모델 버전 임베딩 스키마, service-role 전용 cosine RPC, 기본 OFF 설정, 혼합 순위와 retrieval/reranking/caption-bridge 분리 평가 도구까지 준비했다. Voyage와 Nemotron Embed는 text→image, Voyage만 공식 image→image, Nemotron Rerank는 text 후보 재정렬, Gemma 4·Nemotron Omni·Llama Vision은 생성형 caption 참고군으로 구분한다. 비개인 600~1,000장·한국어 160질의·이미지 80질의 평가셋, 로컬 키와 공급자 개인정보 설정을 승인한 뒤 실제 API 시험과 어댑터를 별도 수행한다. |
 | P1 | 정책 반영·회귀 유지 | 사진작가 이메일 알림 | 업로드 완료·이미지 승인 메일을 제거하고 신청 결정·권한 정지·정산·이미지 반려·이미지 의뢰 초대처럼 행동이 필요한 사건만 발송한다. 관리자 심사 대기열과 사진작가 상태 화면을 기준으로 회귀한다. |
 | P1 | 완료·회귀 유지 | 운영 의존성 audit | 2026-08-11 배포 전 검증에서 high advisory가 보고된 `nanoid 3.3.16`과 `js-yaml 4.3.0`을 각각 3.3.18과 4.3.1로 lockfile 갱신했다. 운영 의존성 audit 0건과 전체 회귀를 확인한다. |
 
