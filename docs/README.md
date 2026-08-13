@@ -18,7 +18,7 @@
 | 사용자 화면 용어 | [서비스 표준 용어](./service-terminology.md) |
 | 이미지 상태·노출 | [이미지 상태와 화면 노출 기준](./image-state-visibility.md) |
 | 중복 이미지 | [중복 이미지 탐지·차단 제안](./duplicate-image-detection-proposal.md) |
-| 사진으로 검색 | [사진으로 검색 1단계 설계](./superpowers/specs/2026-08-11-photo-search-design.md) |
+| 사진으로 검색 | [사진으로 검색 1단계 설계](./superpowers/specs/2026-08-11-photo-search-design.md), [의미 기반 검색 2단계 설계](./superpowers/specs/2026-08-13-semantic-image-search-design.md) |
 | 운영정책 | [운영정책 문서함](./operating-policy-handbook.md) |
 | UI·디자인 | [디자인 시스템 가이드](./design-system-guidelines.md) |
 | 모니터링·장애대응 | [운영 모니터링 기준](./operations-monitoring.md) |
