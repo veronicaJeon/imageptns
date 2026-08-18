@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { detachImageFromAboutPage } from "@/lib/about/library-assets";
 import { sendImageRejected } from "@/lib/email/resend";
 import { recordAdminAuditLog } from "@/lib/admin/audit";
+import { getSemanticImageSearchConfig } from "@/lib/images/semantic-embedding";
+import { buildSemanticEmbeddingQueueRow } from "@/lib/images/semantic-indexing";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -143,6 +145,27 @@ export async function PATCH(
         after: { duplicate_review_status: "overridden" },
         reason: duplicateOverrideReason,
       });
+    }
+
+    // Approval stays fast and authoritative: persist only a pending job here.
+    // A separate worker fetches the approved asset and calls the provider.
+    try {
+      const queueRow = buildSemanticEmbeddingQueueRow(data, getSemanticImageSearchConfig());
+      if (queueRow) {
+        const { error: queueError } = await admin
+          .from("image_semantic_embeddings")
+          .upsert(queueRow, {
+            onConflict: "image_id,provider,model,model_version",
+            ignoreDuplicates: true,
+          });
+        if (queueError) console.error("Failed to queue semantic embedding after approval", queueError.message);
+      }
+    } catch (error) {
+      // Search configuration or queue failures must not roll back image approval.
+      console.error(
+        "Failed to prepare semantic embedding after approval",
+        error instanceof Error ? error.message : "unknown error",
+      );
     }
   } else {
     const rejectedAt = new Date().toISOString();
