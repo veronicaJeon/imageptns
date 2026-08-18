@@ -36,6 +36,18 @@ Nemotron Rerank는 한국어 “나무 테이블 위에 놓인 빨간 사과” 
 
 이 파일럿은 서로 매우 다른 단일 주제 16개로 구성돼 두 retriever 모두 만점을 받았다. 따라서 API 연결, 차원, 한국어 기본 정합성과 image-query capability를 확인하는 smoke 근거일 뿐 공급자 품질 우열을 판정하지 않는다. 본선 평가는 설계대로 비개인 600~1,000장, 한국어 160질의, image query 80개와 0~3 관련도 판정을 사용해야 한다.
 
+## 지연 예산에 따른 제외 결정
+
+2026-08-18 제품 결정으로 대화형 검색은 외부 호출 p95 1.5초, 업로드 후 비동기 이미지 캡션은 단일 이미지 p95 5초를 예산으로 둔다.
+
+- Nemotron Rerank VL은 6.65초로 대화형 검색 후보에서 제외한다. 검색은 임베딩 cosine 결과를 직접 반환한다.
+- Gemma 4 31B는 20.58초, Llama 3.2 90B Vision은 60초 timeout으로 캡션 후보에서 제외한다.
+- Gemma 4 26B는 hosted 404로 제외한다.
+- Nemotron Omni 30B는 3.39초로 비동기 캡션 후보에 남기되, 업로드 응답을 기다리게 하지 않고 품질·p95 본선 검증 전 운영 연결하지 않는다.
+- Voyage와 Nemotron Embed는 검색 후보로 유지한다. 단일 text smoke가 각각 약 0.29초·0.87초였을 뿐이므로 동시성 조건의 p95 본선은 별도로 측정한다.
+
+제외 모델은 감사 근거에 남지만 모델 레지스트리에서 `excluded`이고 수동 runner도 다시 호출하지 않는다.
+
 ## 재실행
 
 키는 `.env.local`에 두고 평가 이미지를 `.semantic-evaluation/corpus`와 `.semantic-evaluation/queries`에 준비한다.
@@ -44,7 +56,7 @@ Nemotron Rerank는 한국어 “나무 테이블 위에 놓인 빨간 사과” 
 npm run eval:semantic:smoke
 ```
 
-생성형 VLM 호출을 생략하고 retrieval·reranker만 재현하려면 다음을 사용한다.
+비동기 캡션 후보인 Nemotron Omni 호출을 생략하고 retrieval만 재현하려면 다음을 사용한다.
 
 ```bash
 npm run eval:semantic:smoke -- --skip-generative

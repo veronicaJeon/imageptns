@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   assertEmbeddingRetrievalModel,
+  ASYNC_CAPTION_LATENCY_BUDGET_MS,
+  INTERACTIVE_SEARCH_LATENCY_BUDGET_MS,
   isRuntimeActivationEligible,
   SEMANTIC_MODEL_CANDIDATES,
   supportsEvaluationTrack,
@@ -55,7 +57,7 @@ describe("semantic model registry", () => {
     expect(() => assertEmbeddingRetrievalModel(generative)).toThrow("generative-vision");
   });
 
-  it("registers named generative VLMs only for caption-bridge experiments", () => {
+  it("keeps only the sub-five-second VLM as a caption candidate", () => {
     const modelIds = SEMANTIC_MODEL_CANDIDATES.map((model) => model.model);
     expect(modelIds).toContain("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning");
     expect(modelIds).toContain("google/gemma-4-31b-it");
@@ -63,10 +65,22 @@ describe("semantic model registry", () => {
     expect(modelIds).toContain("meta/llama-3.2-90b-vision-instruct");
     expect(modelIds.some((id) => id.toLowerCase().includes("muse-glimmer"))).toBe(false);
 
-    const gemma = SEMANTIC_MODEL_CANDIDATES.find((model) => model.model === "google/gemma-4-31b-it")!;
-    expect(supportsEvaluationStage(gemma, "image-to-image", "caption-bridge")).toBe(true);
-    expect(supportsEvaluationStage(gemma, "text-to-image", "retrieval")).toBe(false);
-    expect(isRuntimeActivationEligible(gemma)).toBe(false);
+    const omni = SEMANTIC_MODEL_CANDIDATES.find(
+      (model) => model.model === "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+    )!;
+    expect(omni.lifecycle).toBe("candidate");
+    expect(omni.observedLatencyMilliseconds).toBeLessThan(ASYNC_CAPTION_LATENCY_BUDGET_MS);
+    expect(supportsEvaluationStage(omni, "image-to-image", "caption-bridge")).toBe(true);
+
+    for (const modelName of ["google/gemma-4-31b-it", "google/gemma-4-26b-a4b-it", "meta/llama-3.2-90b-vision-instruct"]) {
+      const excluded = SEMANTIC_MODEL_CANDIDATES.find((model) => model.model === modelName)!;
+      expect(excluded.lifecycle).toBe("excluded");
+      expect(isRuntimeActivationEligible(excluded)).toBe(false);
+    }
+
+    const reranker = SEMANTIC_MODEL_CANDIDATES.find((model) => model.role === "vision-reranker")!;
+    expect(reranker.lifecycle).toBe("excluded");
+    expect(reranker.observedLatencyMilliseconds).toBeGreaterThan(INTERACTIVE_SEARCH_LATENCY_BUDGET_MS);
   });
 
   it("rejects duplicate ids and invalid embedding dimensions", () => {

@@ -10,7 +10,7 @@ export interface SemanticEvaluationPlanItem {
   modelId: string;
   track: SemanticEvaluationTrack;
   stage: SemanticEvaluationStage;
-  status: "ready" | "benchmark-only" | "experimental" | "unsupported";
+  status: "ready" | "benchmark-only" | "experimental" | "excluded" | "unsupported";
 }
 
 export interface RecordedSemanticEvaluationRun {
@@ -51,7 +51,9 @@ export function createSemanticEvaluationPlan(
     modelId: model.id,
     track,
     stage,
-    status: !supportsEvaluationStage(model, track, stage)
+    status: model.lifecycle === "excluded"
+      ? "excluded" as const
+      : !supportsEvaluationStage(model, track, stage)
       ? "unsupported" as const
       : stage === "caption-bridge" ? "experimental" as const
       : model.lifecycle === "deprecated" ? "benchmark-only" as const : "ready" as const,

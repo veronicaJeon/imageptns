@@ -18,10 +18,10 @@ Voyage와 NVIDIA Build/NIM의 검색 품질을 같은 비개인 평가셋으로 
 | 1차 retrieval | `voyage-multimodal-3.5` | 한국어·영어 text→image, image→image |
 | 1차 retrieval | `nvidia/llama-nemotron-embed-vl-1b-v2` | text query→image document만; image query는 `unsupported` |
 | 1차 참고군 | `nvidia/nvclip-vit-h-14` | image/text 공동 공간이지만 deprecated이므로 `benchmark-only` |
-| 2차 reranking | `nvidia/llama-nemotron-rerank-vl-1b-v2` | text query의 image 후보 top-50 재정렬 |
+| 제외 | `nvidia/llama-nemotron-rerank-vl-1b-v2` | 파일럿 약 6.65초로 대화형 검색 1.5초 예산 초과 |
 | caption bridge | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` | query image를 설명문으로 바꾼 간접 검색 실험 |
-| caption bridge | `google/gemma-4-31b-it`, `google/gemma-4-26b-a4b-it` | 이미지 설명·속성 추출 후 간접 검색 실험 |
-| caption bridge 참고군 | `meta/llama-3.2-90b-vision-instruct` | 영어 단일 이미지 이해 참고; 검색 임베딩으로 취급하지 않음 |
+| 제외 | `google/gemma-4-31b-it`, `google/gemma-4-26b-a4b-it` | 31B는 약 20.58초, 26B는 hosted 404로 캡션 후보 제외 |
+| 제외 | `meta/llama-3.2-90b-vision-instruct` | 60초 timeout으로 캡션·검색 후보 제외 |
 
 `Muse Glimmer 30B`는 NVIDIA 공식 Build/NIM 카탈로그에서 확인되지 않은 이름이므로 등록하지 않는다. 가장 가까운 실제 30B 후보는 Nemotron 3 Nano Omni이며, 이것도 임베딩이 아니라 text/image/video/audio 입력에서 텍스트를 생성하는 VLM이다. Build의 “Image-Text Retrieval” 태그만으로 chat completion 모델을 임베딩으로 간주하지 않는다.
 
@@ -40,7 +40,7 @@ Voyage와 NVIDIA Build/NIM의 검색 품질을 같은 비개인 평가셋으로 
 
 1차 retrieval의 주 지표는 카테고리 macro nDCG@10이다. Recall@10·50, Precision@5, MRR@10, no-relevant@10, p50/p95/p99 지연, 429·실패·재시도율과 실측 비용 단위를 함께 기록한다. 95% bootstrap 신뢰구간을 계산하고 nDCG 차이가 0.02 미만이거나 신뢰구간이 0을 포함하면 실질 동률로 본다.
 
-2차 reranking은 1차 모델 자체 top-50과 모든 retriever의 union top-50을 각각 입력으로 삼아 ΔnDCG@10, ΔRecall@5와 추가 p95를 기록한다. 생성형 VLM caption bridge는 직접 검색 품질표에 합치지 않고 caption 오류, 추가 지연과 retrieval 손실을 별도 표시한다. 공식 지원이 없는 track은 0점이 아니라 `unsupported`, deprecated 모델은 `benchmark-only`, caption 경유는 `experimental`로 남긴다.
+대화형 검색의 단일 외부 호출 p95 예산은 1.5초, 업로드 후 비동기 캡션의 단일 이미지 p95 예산은 5초다. 예산을 넘거나 endpoint가 가용하지 않은 모델은 품질과 관계없이 `excluded`로 기록하고 평가 runner와 실제 후보 경로에서 호출하지 않는다. 생성형 VLM caption bridge는 직접 검색 품질표에 합치지 않고 caption 오류, 추가 지연과 retrieval 손실을 별도 표시한다. 공식 지원이 없는 track은 `unsupported`, deprecated 모델은 `benchmark-only`, 캡션 경유는 `experimental`로 남긴다.
 
 ## 실행 전 게이트
 

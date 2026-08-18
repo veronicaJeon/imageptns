@@ -117,7 +117,21 @@ const imageQueries = await Promise.all(manifest.imageQueries.map(async (item) =>
   ...item,
   dataUrl: await imageDataUrl(join(evaluationRoot, "queries", item.file)),
 })));
-const report = { generatedAt: new Date().toISOString(), corpusSize: corpus.length, providers: {}, reranker: {}, generativeSmoke: {} };
+const report = {
+  generatedAt: new Date().toISOString(),
+  corpusSize: corpus.length,
+  providers: {},
+  reranker: {
+    status: "excluded",
+    reason: "Observed 6.65 second latency exceeded the 1.5 second interactive-search budget",
+  },
+  generativeSmoke: {},
+  excludedModels: [
+    { model: "google/gemma-4-31b-it", reason: "20.58 second caption latency exceeded the 5 second budget" },
+    { model: "google/gemma-4-26b-a4b-it", reason: "Hosted endpoint returned 404" },
+    { model: "meta/llama-3.2-90b-vision-instruct", reason: "Timed out at 60 seconds" },
+  ],
+};
 
 let previousVoyageRequestAt = 0;
 async function voyageEmbed(contents, inputType) {
@@ -178,28 +192,8 @@ try {
   report.providers.nvidia = { status: "failed", error: error.message };
 }
 
-try {
-  const response = await postJson("https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-nemotron-rerank-vl-1b-v2/reranking", credentials.nvidia, {
-    model: "nvidia/llama-nemotron-rerank-vl-1b-v2",
-    query: { text: manifest.corpus[0].ko },
-    passages: corpus.map((item) => ({ image: item.dataUrl })),
-    truncate: "END",
-  });
-  report.reranker = {
-    status: "completed", latencyMs: response.latencyMs, expected: "apple",
-    top5: response.payload.rankings.slice(0, 5).map((item) => ({ id: corpus[item.index].id, logit: item.logit })),
-  };
-} catch (error) {
-  report.reranker = { status: "failed", error: error.message };
-}
-
 if (!process.argv.includes("--skip-generative")) {
-  const models = [
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-    "google/gemma-4-31b-it",
-    "google/gemma-4-26b-a4b-it",
-    "meta/llama-3.2-90b-vision-instruct",
-  ];
+  const models = ["nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"];
   for (const model of models) {
     try {
       const response = await postJson("https://integrate.api.nvidia.com/v1/chat/completions", credentials.nvidia, {

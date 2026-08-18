@@ -27,4 +27,11 @@ describe("semantic evaluation runner policy", () => {
     expect(runner).toContain("VOYAGE_MIN_INTERVAL_MS || 21_000");
     expect(runner).toContain('process.argv.includes("--skip-generative")');
   });
+
+  it("does not call models that exceeded the product latency budgets", () => {
+    expect(runner).not.toContain("ai.api.nvidia.com/v1/retrieval");
+    expect(runner).not.toContain('const models = [\n    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",');
+    expect(runner).toContain('const models = ["nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"]');
+    expect(runner).toContain('model: "google/gemma-4-31b-it", reason:');
+  });
 });

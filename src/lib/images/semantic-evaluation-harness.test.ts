@@ -32,7 +32,13 @@ describe("semantic model evaluation harness", () => {
       modelId: "nvidia-build:gemma-4-31b-it",
       track: "image-to-image",
       stage: "caption-bridge",
-      status: "experimental",
+      status: "excluded",
+    });
+    expect(plan).toContainEqual({
+      modelId: "nvidia:nemotron-rerank-vl-1b-v2",
+      track: "text-to-image",
+      stage: "reranking",
+      status: "excluded",
     });
   });
 
