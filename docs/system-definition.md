@@ -1,7 +1,7 @@
 # Image Partners 시스템 정의서
 
 > 상태: 기준
-> 기준일: 2026-08-11
+> 기준일: 2026-08-13
 > 대상 환경: `https://www.imagepartners.kr` 운영 및 로컬 Supabase 개발 환경
 > 변경 규칙: [문서 기반 개발 규칙](./document-driven-development.md)
 
@@ -96,6 +96,7 @@ flowchart LR
 
 - 구매자는 공개·승인·활성 이미지에 한해 검색, 상세 열람, 장바구니와 사용권 흐름을 이용한다.
 - 사진으로 검색 1단계는 검색 입력을 저장하거나 외부 AI로 보내지 않고 업로드 중복 탐지와 같은 SHA-256·pHash·dHash 생성기를 재사용한다. 동일 또는 리사이즈·재인코딩·가벼운 편집본을 최대 20건까지 찾으며, 주제·분위기만 비슷한 의미 기반 검색은 제공하지 않는다.
+- 의미 기반 검색 2단계의 다중 모델 임베딩 저장소, service-role 전용 cosine RPC, 공급자 계약과 혼합 순위 평가 도구는 운영 비활성 상태로 준비돼 있다. 외부 공급자·모델, 국외 이전 고지, 평가셋과 비용 기준을 승인하고 서버 기능 플래그를 켜기 전에는 외부 호출·백필·사용자 결과 노출을 하지 않는다.
 - 라이브러리는 20개 단위 추가 로딩과 명시적 더보기 동작을 제공한다.
 - 원하는 이미지가 없으면 최소 필수 정보로 이미지 요청을 접수한다. 운영자는 후보를 연결하고 대상 사진작가에게 이미지 의뢰 초대 메일을 보내며, 사진작가는 배정된 요청에 응답할 수 있다.
 - 회사소개 전시 이미지는 원본 URL을 공개하지 않고, 권리·활용 동의가 유효한 라이브러리 이미지로 별도 전시본을 생성한다.
@@ -127,7 +128,7 @@ flowchart LR
 | 도메인 | 핵심 데이터 |
 | --- | --- |
 | 계정·권한 | `auth.users`, `profiles`, `photographer_applications`, `profile_withdrawal_requests` |
-| 이미지 | `images`, `image_categories`, `image_category_assignments`, `upload_sessions`, `image_deletion_requests`, `image_purge_logs` |
+| 이미지 | `images`, `image_categories`, `image_category_assignments`, `upload_sessions`, `image_deletion_requests`, `image_purge_logs`, 운영 비활성 `image_semantic_embeddings` |
 | 구매자 활동 | `favorites`, `collections`, `collection_items`, `contact_submissions`, 이미지 요청 후보·응답 테이블 |
 | 거래 | `license_types`, `orders`, `order_items`, `order_email_outbox`, `downloads`, `image_price_overrides`, 계좌이체 상태, 정산·지급 원장 |
 | 콘텐츠·정책 | `notices`, `legal_documents`, `business_disclosures`, 회사소개·라이브러리 안내·광고 설정 |
@@ -204,6 +205,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | 서버 비밀 | `SUPABASE_SERVICE_ROLE_KEY`, `MISTRAL_API_KEY`, `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `CRON_SECRET` |
 | 메일 운영 | `RESEND_FROM_EMAIL`, `OPS_EMAIL`, 진단용 `GMAIL_SMTP_USER`, `GMAIL_SMTP_PASS` |
 | AI 한도 | `AI_ANALYSIS_HOURLY_LIMIT`, `AI_ANALYSIS_DAILY_LIMIT` |
+| 의미 검색(운영 비활성) | `SEMANTIC_IMAGE_SEARCH_ENABLED`, `SEMANTIC_EMBEDDING_PROVIDER`, `SEMANTIC_EMBEDDING_MODEL`, `SEMANTIC_EMBEDDING_MODEL_VERSION`, `SEMANTIC_EMBEDDING_DIMENSIONS`; 공급자 키는 선정 후 별도 승인 |
 | GitHub Actions 자문 | `GROK_API_KEY`, `GEMINI_API_KEY` — Vercel 애플리케이션에는 주입하지 않음 |
 | 계좌이체 | `BANK_TRANSFER_BANK_NAME`, `BANK_TRANSFER_ACCOUNT_NUMBER`, `BANK_TRANSFER_ACCOUNT_HOLDER`, `BANK_TRANSFER_ACCOUNT_LABEL` |
 | 기능 플래그 | `NEXT_PUBLIC_COMMERCE_ENABLED`, `NEXT_PUBLIC_ONCHAIN_ENABLED`, `NEXT_PUBLIC_PAYMENT_PASS_ENABLED`, `ALLOW_INCOMPLETE_DISCLOSURE_BETA` |
