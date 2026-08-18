@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { createImageFingerprint } from "@/lib/images/fingerprint";
+import { readKeywordFirstSearchThresholds } from "@/lib/images/keyword-first-search";
+import { getSemanticImageSearchConfig } from "@/lib/images/semantic-embedding";
 import { buyerCanViewImage } from "@/lib/images/state-visibility";
+import { VoyageMultimodalEmbeddingProvider } from "@/lib/images/voyage-multimodal";
 import {
   PHOTO_SEARCH_MAX_CANDIDATES,
   PHOTO_SEARCH_MAX_FILE_BYTES,
@@ -167,6 +170,86 @@ export async function POST(req: NextRequest) {
   }));
   const matches = rankVisualMatches(queryFingerprint, candidates);
   const rowByImageId = new Map(publicRows.map((row) => [row.image!.id, row]));
+
+  if (matches.length === 0) {
+    try {
+      const config = getSemanticImageSearchConfig();
+      if (config.queryEnabled && config.provider === "voyage") {
+        const semanticRate = await consumeDistributedRateLimit({
+          scope: "semantic-photo-search",
+          identity: requestIdentity(req.headers),
+          limit: 2,
+          windowSeconds: 60,
+        });
+        if (semanticRate.allowed) {
+          const normalizedQuery = await sharp(input)
+            .rotate()
+            .resize({ width: 1_024, height: 1_024, fit: "inside", withoutEnlargement: true })
+            .jpeg({ quality: 85 })
+            .toBuffer();
+          const provider = new VoyageMultimodalEmbeddingProvider({
+            apiKey: process.env.VOYAGE_API_KEY ?? "",
+            model: config.model!,
+            modelVersion: config.modelVersion!,
+            dimensions: config.dimensions!,
+          });
+          const embedding = await provider.embedImageQuery({
+            purpose: "query",
+            bytes: normalizedQuery,
+            mimeType: "image/jpeg",
+          });
+          const { semanticMinimum } = readKeywordFirstSearchThresholds();
+          const { data: semanticData, error: semanticError } = await admin.rpc("match_semantic_image_embeddings", {
+            p_query_embedding: embedding,
+            p_provider: config.provider,
+            p_model: config.model,
+            p_model_version: config.modelVersion,
+            p_match_count: 20,
+            p_min_similarity: semanticMinimum,
+          });
+          if (semanticError) throw new Error(semanticError.message);
+          const semanticIds = ((semanticData ?? []) as Array<{ image_id: string }>).map((row) => row.image_id);
+          if (semanticIds.length > 0) {
+            const { data: semanticImages, error: semanticImagesError } = await admin
+              .from("images")
+              .select("id, asset_id, title, title_ko, title_en, category, storage_path_preview, width, height, photographer_id, copyright_license, free_usage_policy, status, lifecycle_status, is_published, photographer:profiles!photographer_id(full_name)")
+              .in("id", semanticIds)
+              .eq("status", "approved")
+              .eq("lifecycle_status", "active")
+              .eq("is_published", true);
+            if (semanticImagesError) throw new Error(semanticImagesError.message);
+            const semanticById = new Map(((semanticImages ?? []) as unknown as NonNullable<FingerprintSearchRow["image"]>[])
+              .map((image) => [image.id, image]));
+            const images = semanticIds.flatMap((imageId) => {
+              const image = semanticById.get(imageId);
+              if (!image || !buyerCanViewImage(image) || !image.storage_path_preview) return [];
+              const src = admin.storage.from("images-preview").getPublicUrl(image.storage_path_preview).data.publicUrl;
+              return [{
+                id: image.id,
+                assetId: image.asset_id,
+                title: image.title,
+                titleKo: image.title_ko,
+                titleEn: image.title_en,
+                category: image.category,
+                photographerId: image.photographer_id,
+                photographer: firstPhotographer(image.photographer)?.full_name ?? "",
+                src,
+                alt: image.title,
+                width: image.width ?? 800,
+                height: image.height ?? 600,
+                copyrightLicense: image.copyright_license,
+                freeUsagePolicy: image.free_usage_policy,
+                photoMatchKind: "semantic",
+              }];
+            });
+            return NextResponse.json({ images }, { headers: PRIVATE_NO_STORE });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[photo-search] semantic fallback unavailable", error instanceof Error ? error.message : "unknown");
+    }
+  }
 
   const images = matches.flatMap((match) => {
     const row = rowByImageId.get(match.imageId);

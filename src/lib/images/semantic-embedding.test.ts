@@ -8,6 +8,8 @@ import {
 
 const baseEnvironment = {
   SEMANTIC_IMAGE_SEARCH_ENABLED: "true",
+  SEMANTIC_IMAGE_INDEXING_ENABLED: "true",
+  SEMANTIC_IMAGE_QUERY_ENABLED: "true",
   SEMANTIC_EMBEDDING_PROVIDER: "voyage",
   SEMANTIC_EMBEDDING_MODEL: "multimodal-model",
   SEMANTIC_EMBEDDING_MODEL_VERSION: "2026-08",
@@ -16,20 +18,34 @@ const baseEnvironment = {
 
 describe("semantic image embedding configuration", () => {
   it("stays disabled by default without validating provider settings", () => {
-    expect(getSemanticImageSearchConfig({})).toEqual({ enabled: false });
+    expect(getSemanticImageSearchConfig({})).toEqual({
+      enabled: false,
+      indexingEnabled: false,
+      queryEnabled: false,
+    });
     expect(getSemanticImageSearchConfig({
       SEMANTIC_IMAGE_SEARCH_ENABLED: "false",
       SEMANTIC_EMBEDDING_PROVIDER: "unsupported",
-    })).toEqual({ enabled: false });
+    })).toEqual({ enabled: false, indexingEnabled: false, queryEnabled: false });
   });
 
   it.each(["voyage", "nvidia"] as const)("accepts the %s provider only when explicitly enabled", (provider) => {
     expect(getSemanticImageSearchConfig({ ...baseEnvironment, SEMANTIC_EMBEDDING_PROVIDER: provider })).toEqual({
       enabled: true,
+      indexingEnabled: true,
+      queryEnabled: true,
       provider,
       model: "multimodal-model",
       modelVersion: "2026-08",
       dimensions: 512,
+    });
+  });
+
+  it("requires an explicit per-path flag before loading provider configuration", () => {
+    expect(getSemanticImageSearchConfig({ SEMANTIC_IMAGE_SEARCH_ENABLED: "true" })).toEqual({
+      enabled: true,
+      indexingEnabled: false,
+      queryEnabled: false,
     });
   });
 

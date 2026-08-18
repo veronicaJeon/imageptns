@@ -26,7 +26,7 @@ export function buildSemanticEmbeddingQueueRow(
   image: SemanticIndexableImage,
   config: SemanticImageSearchConfig,
 ): SemanticEmbeddingQueueRow | null {
-  if (!config.enabled) return null;
+  if (!config.enabled || config.indexingEnabled !== true) return null;
   if (
     image.status !== "approved"
     || image.lifecycle_status !== "active"
