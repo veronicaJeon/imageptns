@@ -1,0 +1,30 @@
+{
+  "corpus": [
+    { "id": "apple", "file": "01-apple.jpg", "ko": "나무 테이블 위에 놓인 빨간 사과", "en": "a red apple on a wooden table" },
+    { "id": "mug", "file": "02-mug.jpg", "ko": "비 오는 창가에 놓인 파란 도자기 머그컵", "en": "a blue ceramic mug beside a rainy window" },
+    { "id": "bicycle", "file": "03-bicycle.jpg", "ko": "붉은 벽돌 벽 앞의 노란 자전거", "en": "a yellow bicycle against a red brick wall" },
+    { "id": "misty-forest", "file": "04-misty-forest.jpg", "ko": "안개가 짙게 낀 고요한 침엽수 숲", "en": "a quiet evergreen forest covered in fog" },
+    { "id": "sunset-ocean", "file": "05-sunset-ocean.jpg", "ko": "따뜻한 주황빛 노을이 비치는 바다", "en": "warm orange sunset reflected on the ocean" },
+    { "id": "white-kitchen", "file": "06-white-kitchen.jpg", "ko": "밝고 미니멀한 흰색 빈 주방", "en": "a bright minimal empty white kitchen" },
+    { "id": "succulent", "file": "07-succulent.jpg", "ko": "점토 화분에 심긴 초록 다육식물", "en": "a green succulent in a clay pot" },
+    { "id": "books", "file": "08-books.jpg", "ko": "나무 탁자 위에 쌓인 오래된 책", "en": "a stack of old books on a wooden table" },
+    { "id": "snowy-street", "file": "09-snowy-street.jpg", "ko": "사람이 없는 눈 덮인 겨울 거리", "en": "an empty snow-covered winter street" },
+    { "id": "abstract-paper", "file": "10-abstract-paper.jpg", "ko": "선명한 원색의 추상 종이 도형", "en": "bold primary colored abstract paper shapes" },
+    { "id": "noodles", "file": "11-noodles.jpg", "ko": "김이 나는 따뜻한 국수 한 그릇", "en": "a steaming bowl of hot noodles" },
+    { "id": "camera", "file": "12-camera.jpg", "ko": "책상 위의 빈티지 카메라", "en": "a vintage camera on a desk" },
+    { "id": "purple-flowers", "file": "13-purple-flowers.jpg", "ko": "유리 화병에 꽂힌 보라색 꽃", "en": "purple flowers in a glass vase" },
+    { "id": "concrete-architecture", "file": "14-concrete-architecture.jpg", "ko": "그림자가 드리운 미니멀 콘크리트 건축", "en": "minimal concrete architecture with strong shadows" },
+    { "id": "reading-chair", "file": "15-reading-chair.jpg", "ko": "따뜻하고 아늑한 빈 독서 의자", "en": "a warm cozy empty reading chair" },
+    { "id": "mountain-lake", "file": "16-mountain-lake.jpg", "ko": "흐린 하늘 아래 산으로 둘러싸인 호수", "en": "a mountain lake under a cloudy sky" }
+  ],
+  "imageQueries": [
+    { "relevantId": "apple", "file": "01-apple.jpg" },
+    { "relevantId": "mug", "file": "02-mug.jpg" },
+    { "relevantId": "bicycle", "file": "03-bicycle.jpg" },
+    { "relevantId": "misty-forest", "file": "04-misty-forest.jpg" },
+    { "relevantId": "sunset-ocean", "file": "05-sunset-ocean.jpg" },
+    { "relevantId": "white-kitchen", "file": "06-white-kitchen.jpg" },
+    { "relevantId": "succulent", "file": "07-succulent.jpg" },
+    { "relevantId": "mountain-lake", "file": "08-mountain-lake.jpg" }
+  ]
+}
