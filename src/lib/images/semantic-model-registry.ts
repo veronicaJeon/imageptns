@@ -6,8 +6,11 @@ import type {
 
 export type SemanticModelProvider = "voyage" | "nvidia";
 export type SemanticEvaluationTrack = "image-to-image" | "text-to-image";
-export type SemanticModelLifecycle = "candidate" | "deprecated";
+export type SemanticModelLifecycle = "candidate" | "deprecated" | "excluded";
 export type SemanticEvaluationStage = "retrieval" | "reranking" | "caption-bridge";
+
+export const INTERACTIVE_SEARCH_LATENCY_BUDGET_MS = 1_500;
+export const ASYNC_CAPTION_LATENCY_BUDGET_MS = 5_000;
 
 interface SemanticModelDescriptorBase {
   id: string;
@@ -16,6 +19,8 @@ interface SemanticModelDescriptorBase {
   modelVersion: string;
   lifecycle: SemanticModelLifecycle;
   publisher: "voyage" | "nvidia" | "google" | "meta";
+  observedLatencyMilliseconds?: number;
+  exclusionReason?: string;
 }
 
 export interface EmbeddingRetrievalModelDescriptor extends SemanticModelDescriptorBase {
@@ -130,8 +135,10 @@ export const SEMANTIC_MODEL_CANDIDATES = [
     provider: "nvidia",
     model: "nvidia/llama-nemotron-rerank-vl-1b-v2",
     modelVersion: "provider-managed",
-    lifecycle: "candidate",
+    lifecycle: "excluded",
     publisher: "nvidia",
+    observedLatencyMilliseconds: 6_654,
+    exclusionReason: "Observed reranking latency exceeded the 1.5 second interactive-search budget",
     role: "vision-reranker",
     capabilities: {
       textQueryWithImageDocuments: true,
@@ -146,6 +153,7 @@ export const SEMANTIC_MODEL_CANDIDATES = [
     modelVersion: "provider-managed",
     lifecycle: "candidate",
     role: "generative-vision",
+    observedLatencyMilliseconds: 3_388,
     capabilities: { imageInput: true, textInput: true, supportedPromptLanguages: "unverified" },
   },
   {
@@ -154,8 +162,10 @@ export const SEMANTIC_MODEL_CANDIDATES = [
     publisher: "google",
     model: "google/gemma-4-31b-it",
     modelVersion: "provider-managed",
-    lifecycle: "candidate",
+    lifecycle: "excluded",
     role: "generative-vision",
+    observedLatencyMilliseconds: 20_576,
+    exclusionReason: "Observed caption latency exceeded the 5 second asynchronous-caption budget",
     capabilities: { imageInput: true, textInput: true, supportedPromptLanguages: "multilingual" },
   },
   {
@@ -164,8 +174,9 @@ export const SEMANTIC_MODEL_CANDIDATES = [
     publisher: "google",
     model: "google/gemma-4-26b-a4b-it",
     modelVersion: "provider-managed",
-    lifecycle: "candidate",
+    lifecycle: "excluded",
     role: "generative-vision",
+    exclusionReason: "NVIDIA hosted chat endpoint returned 404 during the connectivity pilot",
     capabilities: { imageInput: true, textInput: true, supportedPromptLanguages: "multilingual" },
   },
   {
@@ -174,8 +185,10 @@ export const SEMANTIC_MODEL_CANDIDATES = [
     publisher: "meta",
     model: "meta/llama-3.2-90b-vision-instruct",
     modelVersion: "provider-managed",
-    lifecycle: "candidate",
+    lifecycle: "excluded",
     role: "generative-vision",
+    observedLatencyMilliseconds: 60_000,
+    exclusionReason: "Timed out at 60 seconds during the caption connectivity pilot",
     capabilities: { imageInput: true, textInput: true, supportedPromptLanguages: "english-only" },
   },
 ] as const satisfies readonly SemanticModelDescriptor[];
