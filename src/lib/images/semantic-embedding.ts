@@ -50,6 +50,8 @@ export interface SemanticImageEmbeddingProvider {
 
 export interface SemanticImageSearchConfig {
   enabled: boolean;
+  indexingEnabled?: boolean;
+  queryEnabled?: boolean;
   provider?: SemanticEmbeddingProviderName;
   model?: string;
   modelVersion?: string;
@@ -59,6 +61,8 @@ export interface SemanticImageSearchConfig {
 export interface SemanticImageSearchEnvironment {
   [key: string]: string | undefined;
   SEMANTIC_IMAGE_SEARCH_ENABLED?: string;
+  SEMANTIC_IMAGE_INDEXING_ENABLED?: string;
+  SEMANTIC_IMAGE_QUERY_ENABLED?: string;
   SEMANTIC_EMBEDDING_PROVIDER?: string;
   SEMANTIC_EMBEDDING_MODEL?: string;
   SEMANTIC_EMBEDDING_MODEL_VERSION?: string;
@@ -74,7 +78,15 @@ function required(value: string | undefined, label: string) {
 export function getSemanticImageSearchConfig(
   environment: SemanticImageSearchEnvironment = process.env,
 ): SemanticImageSearchConfig {
-  if (environment.SEMANTIC_IMAGE_SEARCH_ENABLED !== "true") return { enabled: false };
+  if (environment.SEMANTIC_IMAGE_SEARCH_ENABLED !== "true") {
+    return { enabled: false, indexingEnabled: false, queryEnabled: false };
+  }
+
+  const indexingEnabled = environment.SEMANTIC_IMAGE_INDEXING_ENABLED === "true";
+  const queryEnabled = environment.SEMANTIC_IMAGE_QUERY_ENABLED === "true";
+  if (!indexingEnabled && !queryEnabled) {
+    return { enabled: true, indexingEnabled: false, queryEnabled: false };
+  }
 
   const provider = required(environment.SEMANTIC_EMBEDDING_PROVIDER, "SEMANTIC_EMBEDDING_PROVIDER");
   if (provider !== "voyage" && provider !== "nvidia") {
@@ -89,6 +101,8 @@ export function getSemanticImageSearchConfig(
 
   return {
     enabled: true,
+    indexingEnabled,
+    queryEnabled,
     provider,
     model: required(environment.SEMANTIC_EMBEDDING_MODEL, "SEMANTIC_EMBEDDING_MODEL"),
     modelVersion: required(environment.SEMANTIC_EMBEDDING_MODEL_VERSION, "SEMANTIC_EMBEDDING_MODEL_VERSION"),

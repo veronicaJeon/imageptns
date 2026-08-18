@@ -198,7 +198,8 @@ export default function LibraryPage() {
       if (commercialOnly) params.set("commercial", "true");
       if (derivativesOnly) params.set("derivatives", "true");
 
-      const res = await fetch(`/api/images?${params}`);
+      const endpoint = debouncedQuery ? "/api/images/search" : "/api/images";
+      const res = await fetch(`${endpoint}?${params}`);
       if (!res.ok) throw new Error();
       const { images: data, hasMore: moreAvailable } = await res.json() as { images?: ImageCardData[]; hasMore?: boolean };
 

@@ -4,6 +4,8 @@ import type { SemanticImageSearchConfig } from "./semantic-embedding";
 
 const enabledConfig: SemanticImageSearchConfig = {
   enabled: true,
+  indexingEnabled: true,
+  queryEnabled: false,
   provider: "voyage",
   model: "voyage-multimodal-3.5",
   modelVersion: "2026-08",
@@ -42,5 +44,13 @@ describe("semantic catalog indexing eligibility", () => {
 
   it("does not queue work while semantic search is disabled", () => {
     expect(buildSemanticEmbeddingQueueRow(approvedImage, { enabled: false })).toBeNull();
+  });
+
+  it("does not queue work when only interactive queries are enabled", () => {
+    expect(buildSemanticEmbeddingQueueRow(approvedImage, {
+      ...enabledConfig,
+      indexingEnabled: false,
+      queryEnabled: true,
+    })).toBeNull();
   });
 });
