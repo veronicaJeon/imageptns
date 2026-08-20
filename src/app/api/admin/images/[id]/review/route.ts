@@ -156,7 +156,7 @@ export async function PATCH(
           .from("image_semantic_embeddings")
           .upsert(queueRow, {
             onConflict: "image_id,provider,model,model_version",
-            ignoreDuplicates: true,
+            ignoreDuplicates: false,
           });
         if (queueError) console.error("Failed to queue semantic embedding after approval", queueError.message);
       }

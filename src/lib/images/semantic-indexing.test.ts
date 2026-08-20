@@ -29,6 +29,15 @@ describe("semantic catalog indexing eligibility", () => {
       model_version: "2026-08",
       dimension: 512,
       status: "pending",
+      embedding: null,
+      source_sha256: null,
+      attempt_count: 0,
+      last_attempted_at: null,
+      embedded_at: null,
+      next_attempt_at: null,
+      last_error_code: null,
+      last_error_message: null,
+      claim_token: null,
     });
   });
 

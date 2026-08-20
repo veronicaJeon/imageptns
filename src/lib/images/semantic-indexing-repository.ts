@@ -10,6 +10,18 @@ export function createSupabaseSemanticIndexingRepository(): SemanticIndexingRepo
   const admin = createAdminClient();
 
   return {
+    async enqueueEligibleImages({ provider, model, modelVersion, dimensions, batchSize }) {
+      const { data, error } = await admin.rpc("enqueue_semantic_embedding_backfill", {
+        p_provider: provider,
+        p_model: model,
+        p_model_version: modelVersion,
+        p_dimension: dimensions,
+        p_batch_size: batchSize,
+      });
+      if (error) throw new Error("Semantic indexing enqueue failed");
+      return Number(data ?? 0);
+    },
+
     async claimJobs({ provider, model, modelVersion, batchSize }) {
       const { data, error } = await admin.rpc("claim_semantic_embedding_jobs", {
         p_provider: provider,

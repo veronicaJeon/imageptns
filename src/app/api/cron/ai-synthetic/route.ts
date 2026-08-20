@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runAiSyntheticCheck } from "@/lib/monitoring/ai-synthetic";
 import { authorizeCronRequest } from "@/lib/security/cron";
+import { runScheduledAiIndexing } from "@/lib/images/semantic-indexing-schedule";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -12,5 +13,14 @@ export async function GET(request: Request) {
   }
 
   const result = await runAiSyntheticCheck("cron");
-  return NextResponse.json(result, { status: result.ok ? 200 : 503 });
+  let semantic;
+  try {
+    semantic = await runScheduledAiIndexing();
+  } catch {
+    semantic = { ok: false as const, error: "AI indexing run failed" };
+  }
+  return NextResponse.json(
+    { mistral: result, indexing: semantic },
+    { status: result.ok && semantic.ok ? 200 : 503 },
+  );
 }

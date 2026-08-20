@@ -27,6 +27,13 @@ export interface SemanticIndexingImage {
 }
 
 export interface SemanticIndexingRepository {
+  enqueueEligibleImages(input: {
+    provider: string;
+    model: string;
+    modelVersion: string;
+    dimensions: number;
+    batchSize: number;
+  }): Promise<number>;
   claimJobs(input: {
     provider: string;
     model: string;
@@ -47,6 +54,10 @@ export interface SemanticIndexingRepository {
     message: string;
     retryable: boolean;
   }): Promise<void>;
+}
+
+export interface SemanticIndexingRunSummary extends SemanticIndexingWorkerSummary {
+  queued: number;
 }
 
 export interface SemanticIndexingWorkerSummary {
@@ -181,4 +192,22 @@ export async function runSemanticIndexingWorker(input: {
   }
 
   return summary;
+}
+
+export async function runSemanticIndexingCycle(input: {
+  repository: SemanticIndexingRepository;
+  provider: SemanticImageEmbeddingProvider;
+  batchSize?: number;
+}): Promise<SemanticIndexingRunSummary> {
+  const batchSize = boundedBatchSize(input.batchSize);
+  const descriptor = input.provider.descriptor;
+  const queued = await input.repository.enqueueEligibleImages({
+    provider: descriptor.provider,
+    model: descriptor.model,
+    modelVersion: descriptor.modelVersion,
+    dimensions: descriptor.dimensions,
+    batchSize,
+  });
+  const result = await runSemanticIndexingWorker({ ...input, batchSize });
+  return { queued, ...result };
 }

@@ -98,7 +98,8 @@ flowchart LR
 - 라이브러리의 기존 방향 필터를 유지하며, 한국어 `가로`·`세로`·`정사각형`과 영어의 명확한 방향 표현을 검색어에 포함해도 같은 `orientation_class` 조건으로 검색한다. 영어 `landscape`·`portrait`는 주제 의미와 충돌하지 않도록 단독 검색 또는 명시적인 `orientation` 표현에서만 방향으로 해석한다.
 - 문장 검색은 제목·태그를 최우선, 설명·AI 보조 캡션을 다음, 카테고리를 보조 신호로 평가한다. 임계값을 넘는 키워드 결과가 있으면 해당 결과만 점수순으로 제공하고 외부 임베딩 공급자를 호출하지 않는다. 키워드가 약할 때만 의미 검색 후보가 될 수 있으며, 두 점수가 모두 임계값 미만이면 결과를 제공하지 않는다.
 - 사진으로 검색 1단계는 검색 입력을 저장하거나 외부 AI로 보내지 않고 업로드 중복 탐지와 같은 SHA-256·pHash·dHash 생성기를 재사용한다. 동일 또는 리사이즈·재인코딩·가벼운 편집본을 최대 20건까지 찾으며, 주제·분위기만 비슷한 의미 기반 검색은 제공하지 않는다.
-- 의미 기반 검색 2단계의 다중 모델 임베딩 저장소, 승인 후 작업 대기열, service-role 전용 cosine RPC, Voyage 어댑터와 재시도 작업자는 운영 비활성 상태로 준비돼 있다. 인덱싱과 질의 기능 플래그를 각각 켜기 전에는 외부 호출·백필·의미 검색 결과 노출을 하지 않는다. Voyage 처리국·재위탁자·DPA 확인과 운영 키 등록 전에는 두 플래그를 모두 끈 상태를 유지한다.
+- 의미 기반 검색 2단계는 Voyage `voyage-multimodal-3.5` 512차원 임베딩을 사용한다. 관리자 승인·공개 뒤에만 작업을 등록하고, 매일 제한된 수의 기존 승인 이미지를 같은 큐에 백필한다. 문장 검색은 강한 키워드 결과가 없을 때만, 사진 검색은 SHA-256·pHash·dHash 결과가 없을 때만 의미 검색으로 넘어가며 임계값 미만이면 결과를 제공하지 않는다. 검색용 사진은 EXIF·파일명을 제거한 축소 사본만 전송하고 저장하지 않는다. 인덱싱과 질의는 독립 플래그로 즉시 중단할 수 있다.
+- NVIDIA 자동 캡션은 사진작가가 작성한 제목·설명을 덮어쓰지 않는 비동기 보조 신호로 구현한다. NVIDIA Build 무료 endpoint는 운영 이용이 금지된 Trial이므로 `NVIDIA_API_PRODUCTION_ENTITLED=true`가 확인되기 전에는 운영 호출하지 않는다. 대화형 재정렬은 측정 지연이 예산을 초과해 운영 경로에서 제외한다.
 - 라이브러리는 20개 단위 추가 로딩과 명시적 더보기 동작을 제공한다.
 - 원하는 이미지가 없으면 최소 필수 정보로 이미지 요청을 접수한다. 운영자는 후보를 연결하고 대상 사진작가에게 이미지 의뢰 초대 메일을 보내며, 사진작가는 배정된 요청에 응답할 수 있다.
 - 회사소개 전시 이미지는 원본 URL을 공개하지 않고, 권리·활용 동의가 유효한 라이브러리 이미지로 별도 전시본을 생성한다.
@@ -207,7 +208,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | 서버 비밀 | `SUPABASE_SERVICE_ROLE_KEY`, `MISTRAL_API_KEY`, `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `CRON_SECRET` |
 | 메일 운영 | `RESEND_FROM_EMAIL`, `OPS_EMAIL`, 진단용 `GMAIL_SMTP_USER`, `GMAIL_SMTP_PASS` |
 | AI 한도 | `AI_ANALYSIS_HOURLY_LIMIT`, `AI_ANALYSIS_DAILY_LIMIT` |
-| 의미 검색(운영 비활성) | `SEMANTIC_IMAGE_SEARCH_ENABLED`, `SEMANTIC_IMAGE_INDEXING_ENABLED`, `SEMANTIC_IMAGE_QUERY_ENABLED`, `SEMANTIC_EMBEDDING_PROVIDER`, `SEMANTIC_EMBEDDING_MODEL`, `SEMANTIC_EMBEDDING_MODEL_VERSION`, `SEMANTIC_EMBEDDING_DIMENSIONS`, `KEYWORD_SEARCH_STRONG_THRESHOLD`, `SEMANTIC_SEARCH_MIN_SIMILARITY`; `VOYAGE_API_KEY`는 외부 처리 조건 확인 후 서버 비밀로 등록 |
+| 의미 검색·보조 캡션 | `SEMANTIC_IMAGE_SEARCH_ENABLED`, `SEMANTIC_IMAGE_INDEXING_ENABLED`, `SEMANTIC_IMAGE_QUERY_ENABLED`, `SEMANTIC_EMBEDDING_PROVIDER`, `SEMANTIC_EMBEDDING_MODEL`, `SEMANTIC_EMBEDDING_MODEL_VERSION`, `SEMANTIC_EMBEDDING_DIMENSIONS`, `KEYWORD_SEARCH_STRONG_THRESHOLD`, `SEMANTIC_SEARCH_MIN_SIMILARITY`, `VOYAGE_API_KEY`; NVIDIA는 `NVIDIA_API_KEY`, `NVIDIA_CAPTIONING_ENABLED`, `NVIDIA_API_PRODUCTION_ENTITLED`, `NVIDIA_CAPTION_MODEL`, `NVIDIA_CAPTION_MODEL_VERSION` |
 | GitHub Actions 자문 | `GROK_API_KEY`, `GEMINI_API_KEY` — Vercel 애플리케이션에는 주입하지 않음 |
 | 계좌이체 | `BANK_TRANSFER_BANK_NAME`, `BANK_TRANSFER_ACCOUNT_NUMBER`, `BANK_TRANSFER_ACCOUNT_HOLDER`, `BANK_TRANSFER_ACCOUNT_LABEL` |
 | 기능 플래그 | `NEXT_PUBLIC_COMMERCE_ENABLED`, `NEXT_PUBLIC_ONCHAIN_ENABLED`, `NEXT_PUBLIC_PAYMENT_PASS_ENABLED`, `ALLOW_INCOMPLETE_DISCLOSURE_BETA` |
@@ -254,6 +255,6 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 - 2026-08-09 사진작가 이메일을 행동 필요·권한·금전·반려·이미지 의뢰 중심으로 정리하고 업로드 완료·이미지 승인 메일을 제거했다. 정책 회귀 테스트와 전체 타입·린트·테스트·빌드로 검증한다.
 - 2026-08-11 배포 전 공급망 검사에서 보고된 `nanoid`와 `js-yaml` high advisory를 안전한 패치 버전으로 lockfile 갱신하고 운영 의존성 audit 0건을 확인했다.
 - 2026-08-14 기존 라이브러리 방향 필터를 유지하면서 한국어·영어 방향 검색어를 구조화된 방향 조건으로 해석하고, 주제 의미가 있는 영어 검색어와 명시적 필터 충돌을 회귀 테스트로 보호했다.
-- 2026-08-18 제목·태그 우선의 가중 키워드 검색과 외부 전송 없는 사진 지문 검색을 운영 기준에 추가했다. 승인 후에만 임베딩 작업을 생성하는 Voyage 런타임과 의미 검색 저장소는 처리국·DPA 및 운영 키 확인 전까지 인덱싱·질의 플래그를 분리해 비활성 상태로 유지한다.
+- 2026-08-21 Voyage 학습 사용 거부와 처리방침 고지를 전제로 승인 후 임베딩, 기존 승인 이미지 제한 백필, 한국어 문장·사진 의미 fallback을 운영 기준에 추가했다. NVIDIA 캡션은 별도 운영 이용권 확인 전까지 비활성으로 둔다.
 
 이 문서 갱신 시 날짜, 변경된 시스템 경계, 관련 마이그레이션·테스트·운영 검증을 이 절에 추가한다. 배포 ID처럼 자주 바뀌는 값은 이 문서가 아니라 배포 인수인계 기록에서 관리한다.

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SemanticImageEmbeddingProvider } from "./semantic-embedding";
 import {
   runSemanticIndexingWorker,
+  runSemanticIndexingCycle,
   type ClaimedSemanticEmbeddingJob,
   type SemanticIndexingImage,
   type SemanticIndexingRepository,
@@ -30,6 +31,7 @@ const image: SemanticIndexingImage = {
 
 function setup() {
   const repository: SemanticIndexingRepository = {
+    enqueueEligibleImages: vi.fn().mockResolvedValue(0),
     claimJobs: vi.fn().mockResolvedValue([job]),
     loadImage: vi.fn().mockResolvedValue(image),
     downloadPreview: vi.fn().mockResolvedValue(new Blob([Uint8Array.from([1, 2, 3])], { type: "image/webp" })),
@@ -51,6 +53,23 @@ function setup() {
 }
 
 describe("semantic indexing worker", () => {
+  it("enqueues eligible approved images before claiming the next bounded batch", async () => {
+    const { repository, provider } = setup();
+    vi.mocked(repository.enqueueEligibleImages).mockResolvedValue(2);
+
+    const result = await runSemanticIndexingCycle({ repository, provider, batchSize: 100 });
+
+    expect(repository.enqueueEligibleImages).toHaveBeenCalledWith({
+      provider: "voyage",
+      model: "voyage-multimodal-3.5",
+      modelVersion: "provider-managed",
+      dimensions: 2,
+      batchSize: 3,
+    });
+    expect(result.queued).toBe(2);
+    expect(result.ready).toBe(1);
+  });
+
   it("downloads an approved preview server-side and completes the claimed job", async () => {
     const { repository, provider } = setup();
     const result = await runSemanticIndexingWorker({ repository, provider, batchSize: 100 });

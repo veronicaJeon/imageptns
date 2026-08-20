@@ -15,6 +15,15 @@ export interface SemanticEmbeddingQueueRow {
   model_version: string;
   dimension: number;
   status: "pending";
+  embedding: null;
+  source_sha256: null;
+  attempt_count: 0;
+  last_attempted_at: null;
+  embedded_at: null;
+  next_attempt_at: null;
+  last_error_code: null;
+  last_error_message: null;
+  claim_token: null;
 }
 
 /**
@@ -43,5 +52,14 @@ export function buildSemanticEmbeddingQueueRow(
     model_version: config.modelVersion!,
     dimension: config.dimensions!,
     status: "pending",
+    embedding: null,
+    source_sha256: null,
+    attempt_count: 0,
+    last_attempted_at: null,
+    embedded_at: null,
+    next_attempt_at: null,
+    last_error_code: null,
+    last_error_message: null,
+    claim_token: null,
   };
 }
