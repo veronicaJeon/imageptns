@@ -259,7 +259,7 @@ export default function AdminPage() {
             </div>
             <AdminButton onClick={() => void runSemanticBackfill()} disabled={semanticRunning} size="md">
               <span className={`material-symbols-outlined text-base ${semanticRunning ? "animate-spin" : ""}`}>autorenew</span>
-              {semanticRunning ? "처리 중" : "최대 3건 처리"}
+              {semanticRunning ? "처리 중" : "1건 처리"}
             </AdminButton>
           </div>
         </section>
