@@ -83,6 +83,14 @@ interface ImageRow {
   photographer: { id: string; full_name: string; avatar_url: string | null; wallet_address?: string | null } | null;
 }
 
+type SemanticIndexingStatus = {
+  pending: number;
+  processing: number;
+  ready: number;
+  failed: number;
+  stale: number;
+};
+
 function displayKo(value: string | null | undefined, fallback: string | null | undefined = "") {
   return value?.trim() || fallback?.trim() || "-";
 }
@@ -95,6 +103,9 @@ export default function AdminPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [forbidden, setForbidden] = useState(false);
+  const [semanticStatus, setSemanticStatus] = useState<SemanticIndexingStatus | null>(null);
+  const [semanticRunning, setSemanticRunning] = useState(false);
+  const [semanticMessage, setSemanticMessage] = useState<string | null>(null);
 
   // Per-image reject UI state
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -134,6 +145,32 @@ export default function AdminPage() {
       window.clearInterval(intervalId);
     };
   }, [tab, fetchImages]);
+
+  const fetchSemanticStatus = useCallback(async () => {
+    const res = await fetch("/api/admin/semantic-indexing", { cache: "no-store" });
+    const data = await res.json().catch(() => null) as { embeddings?: SemanticIndexingStatus; error?: string } | null;
+    if (!res.ok || !data?.embeddings) throw new Error(data?.error || "의미 검색 인덱스 상태를 불러오지 못했습니다.");
+    setSemanticStatus(data.embeddings);
+  }, []);
+
+  useEffect(() => {
+    void fetchSemanticStatus().catch(() => undefined);
+  }, [fetchSemanticStatus]);
+
+  async function runSemanticBackfill() {
+    setSemanticRunning(true);
+    setSemanticMessage(null);
+    try {
+      const res = await fetch("/api/admin/semantic-indexing", { method: "POST" });
+      if (!res.ok) throw new Error("백필 워커 실행에 실패했습니다.");
+      await fetchSemanticStatus();
+      setSemanticMessage("백필 워커 1회 실행을 완료했습니다.");
+    } catch (error) {
+      setSemanticMessage(error instanceof Error ? error.message : "백필 워커 실행에 실패했습니다.");
+    } finally {
+      setSemanticRunning(false);
+    }
+  }
 
   async function handleAction(
     id: string,
@@ -208,6 +245,24 @@ export default function AdminPage() {
             다시 시도
           </button>
         </div>
+      )}
+
+      {semanticStatus && (
+        <section className="mb-6 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-ghost">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="text-sm font-bold text-on-surface">의미 검색 인덱스</h2>
+              <p className="mt-1 text-xs text-outline">
+                대기 {semanticStatus.pending} · 처리 중 {semanticStatus.processing} · 완료 {semanticStatus.ready} · 실패 {semanticStatus.failed} · 갱신 필요 {semanticStatus.stale}
+              </p>
+              {semanticMessage && <p className="mt-2 text-xs font-semibold text-primary">{semanticMessage}</p>}
+            </div>
+            <AdminButton onClick={() => void runSemanticBackfill()} disabled={semanticRunning} size="md">
+              <span className={`material-symbols-outlined text-base ${semanticRunning ? "animate-spin" : ""}`}>autorenew</span>
+              {semanticRunning ? "처리 중" : "최대 3건 처리"}
+            </AdminButton>
+          </div>
+        </section>
       )}
 
       {/* Tabs */}
