@@ -6,6 +6,8 @@ describe("operations automation policy", () => {
   const monitor = readFileSync(".github/workflows/production-monitor.yml", "utf8");
   const weekly = readFileSync(".github/workflows/maintenance-routine.yml", "utf8");
   const candidates = readFileSync("scripts/derive-maintenance-candidates.mjs", "utf8");
+  const runbook = readFileSync("docs/codex-maintenance-runbook.md", "utf8");
+  const prompt = readFileSync(".github/codex/prompts/maintenance-implementation.md", "utf8");
 
   it("publishes safe release identity and daily review freshness in health", () => {
     expect(health).toContain("operations_daily_review");
@@ -26,5 +28,13 @@ describe("operations automation policy", () => {
     expect(weekly).toContain("release_alignment");
     expect(candidates).toContain("일일 운영관리자 경고 조사");
     expect(candidates).toContain("main·Production 릴리스 정합성 복구");
+  });
+
+  it("requires a weekly human-like product discovery review", () => {
+    expect(runbook).toContain("주간 심층 제품 리뷰");
+    expect(runbook).toContain("구매자의 탐색·검색·문의·주문·다운로드");
+    expect(runbook).toContain("사실과 추론을 구분");
+    expect(prompt).toContain("weekly deep product review");
+    expect(prompt).toContain("product improvement opportunities");
   });
 });

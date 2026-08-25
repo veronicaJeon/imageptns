@@ -141,8 +141,8 @@ export async function GET() {
         }),
         {
           id: "codex",
-          name: "Codex 개발 에이전트",
-          role: "승인 후보 구현·검증·draft PR",
+          name: "Codex 운영·제품 에이전트",
+          role: "일일 운영 진단·주간 제품 발견·승인 후보 구현",
           status: inProgressCount > 0 ? "running" : readyCount > 0 ? "warning" : "idle",
           detail: inProgressCount > 0 ? `${inProgressCount}건 구현 진행 중` : readyCount > 0 ? `${readyCount}건 개발 대기` : "승인된 대기 작업 없음",
           lastActivityAt: maintenancePulls[0]?.updatedAt ?? candidates.find((candidate) => candidate.labels.includes("codex-ready"))?.updatedAt ?? null,

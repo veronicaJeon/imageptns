@@ -190,6 +190,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | 배포 | 검증 후 Vercel Production 수동 배포 워크플로 또는 승인된 직접 배포 |
 | 가용성 | GitHub Actions가 15분 간격으로 `/api/health`를 호출해 DB·Storage·순환 이미지 샘플·AI·일일 운영 점검·main/Production SHA를 확인하고 실패 이슈를 자동 생성·복구 종료 |
 | 일일 운영관리 | Vercel cron이 이미지 전체 무결성, 처리 SLA, 임베딩·이메일·서버 오류와 핵심 활동을 집계한다. Codex Scheduled task는 같은 지표와 GitHub 근거를 읽기 전용으로 재검증하고 새 후보를 최대 3건 기록한다. |
+| 주간 제품 발견 | Codex Scheduled task가 신규 변경, 7일·30일 운영 추세와 구매자·사진가·관리자 여정을 종합 검토해 오류 외에도 가치·운영 효율·발견성·품질 개선 후보를 최대 3건 제안한다. |
 | 주간 유지보수 | GitHub Actions가 매일 예약 기동 후 마지막 성공으로부터 7일이 지난 경우 audit·코드·fresh DB·운영 smoke·릴리스 정합성을 실행하고 고정 ID 후보 이슈를 누적한다. 승인 후보의 실제 개발은 Codex Scheduled task가 한 건씩 수행한다. |
 | Health | DB, Storage, 최근 공개 JPEG 무결성, Mistral 합성 진단 최신성 |
 | 예약 작업 | 매일 02:00 UTC 데이터·업로드·반려·한도 정리, 매일 03:00 UTC Mistral 합성 진단 |
