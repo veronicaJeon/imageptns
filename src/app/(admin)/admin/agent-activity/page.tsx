@@ -234,7 +234,7 @@ export default function AgentActivityPage() {
             <AdminListSurface className="p-10 text-center xl:col-span-2">
               <span className="material-symbols-outlined text-4xl text-outline">smart_toy</span>
               <p className="mt-3 text-sm font-bold text-on-surface">아직 검수 보고가 없습니다.</p>
-              <p className="mt-1 text-xs text-outline">다음 72시간 점검 뒤 Grok과 Gemini의 성공 또는 실패 결과가 모두 표시됩니다.</p>
+              <p className="mt-1 text-xs text-outline">다음 주간 제품·코드 점검 뒤 Grok과 Gemini의 성공 또는 실패 결과가 모두 표시됩니다.</p>
             </AdminListSurface>
           )}
         </div>

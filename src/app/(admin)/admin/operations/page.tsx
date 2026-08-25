@@ -24,7 +24,18 @@ interface OperationsPayload {
     requestErrors: number;
     aiChecks: number;
     aiFailures: number;
-    latestRetentionRun: { status: string; started_at: string; completed_at: string | null } | null;
+    latestRetentionRun: { result: Record<string, unknown>; created_at: string } | null;
+    dailyReview: {
+      status: "ok" | "warning" | "error";
+      checkedAt: string;
+      durationMs: number | null;
+      findingCount: number | null;
+      findings: string[];
+      publicImages: number | null;
+      readyEmbeddings: number | null;
+      activityEvents: number | null;
+      previousActivityEvents: number | null;
+    } | null;
   };
   events: OperationalEvent[];
 }
@@ -161,6 +172,44 @@ export default function OperationsPage() {
           </div>
         ))}
       </div>
+
+      <section className="mt-6 rounded-xl bg-surface-container-lowest p-5 shadow-ghost">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-on-surface">일일 운영관리자 점검</h2>
+            <p className="mt-1 text-xs text-outline">이미지 무결성, 처리 지연, 임베딩·이메일 실패와 최근 활동을 매일 확인합니다.</p>
+          </div>
+          <span className={`w-fit rounded-full px-3 py-1 text-[10px] font-bold ${
+            summary?.dailyReview?.status ? STATUS_STYLE[summary.dailyReview.status] : STATUS_STYLE.warning
+          }`}>
+            {summary?.dailyReview?.status === "ok" ? "정상" : summary?.dailyReview?.status === "error" ? "즉시 조치" : summary?.dailyReview ? "확인 필요" : "실행 전"}
+          </span>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {[
+            ["공개 이미지", summary?.dailyReview?.publicImages ?? "-"],
+            ["검색 임베딩", summary?.dailyReview?.readyEmbeddings ?? "-"],
+            ["24시간 운영 활동", summary?.dailyReview?.activityEvents == null
+              ? "-"
+              : `${summary.dailyReview.activityEvents} / 직전 ${summary.dailyReview.previousActivityEvents ?? "-"}`],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-lg bg-surface-container-low p-4">
+              <p className="text-[11px] font-bold text-outline">{label}</p>
+              <p className="mt-1 text-xl font-black text-on-surface">{value}</p>
+            </div>
+          ))}
+        </div>
+        {(summary?.dailyReview?.findings.length ?? 0) > 0 ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {summary?.dailyReview?.findings.map((finding) => (
+              <span key={finding} className="rounded-full bg-amber-50 px-2.5 py-1 font-mono text-[10px] font-bold text-amber-700">{finding}</span>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 text-xs text-outline">{summary?.dailyReview ? "현재 조치가 필요한 운영 항목이 없습니다." : "새 일일 cron 배포 후 첫 결과가 표시됩니다."}</p>
+        )}
+        {summary?.dailyReview?.checkedAt && <p className="mt-3 text-[10px] text-outline">최근 실행 {new Date(summary.dailyReview.checkedAt).toLocaleString("ko-KR")}</p>}
+      </section>
 
       <section className="mt-6 rounded-xl bg-surface-container-lowest p-5 shadow-ghost">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

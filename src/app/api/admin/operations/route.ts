@@ -31,9 +31,9 @@ export async function GET() {
       .limit(1000),
     admin
       .from("data_retention_runs")
-      .select("status, started_at, completed_at")
+      .select("result, created_at")
       .eq("dry_run", false)
-      .order("started_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
   ]);
@@ -43,6 +43,7 @@ export async function GET() {
   const availability = events.filter((event) => event.event_type === "synthetic_health_check");
   const ai = events.filter((event) => event.component === "ai");
   const requestErrors = events.filter((event) => event.event_type === "request_error");
+  const latestDailyReview = events.find((event) => event.event_type === "operations_daily_review") ?? null;
   const successfulAvailability = availability.filter((event) => event.status === "ok").length;
   const averageLatencyMs = availability.length
     ? Math.round(availability.reduce((sum, event) => sum + (event.duration_ms ?? 0), 0) / availability.length)
@@ -58,6 +59,27 @@ export async function GET() {
       aiChecks: ai.length,
       aiFailures: ai.filter((event) => event.status === "error").length,
       latestRetentionRun: retentionResult.data ?? null,
+      dailyReview: latestDailyReview ? {
+        status: latestDailyReview.status,
+        checkedAt: latestDailyReview.created_at,
+        durationMs: latestDailyReview.duration_ms,
+        findingCount: typeof latestDailyReview.metadata?.findingCount === "number"
+          ? latestDailyReview.metadata.findingCount
+          : null,
+        findings: latestDailyReview.message?.split(", ").filter(Boolean) ?? [],
+        publicImages: typeof latestDailyReview.metadata?.publicImages === "number"
+          ? latestDailyReview.metadata.publicImages
+          : null,
+        readyEmbeddings: typeof latestDailyReview.metadata?.readyEmbeddings === "number"
+          ? latestDailyReview.metadata.readyEmbeddings
+          : null,
+        activityEvents: typeof latestDailyReview.metadata?.activityEvents === "number"
+          ? latestDailyReview.metadata.activityEvents
+          : null,
+        previousActivityEvents: typeof latestDailyReview.metadata?.previousActivityEvents === "number"
+          ? latestDailyReview.metadata.previousActivityEvents
+          : null,
+      } : null,
     },
     events: events.slice(0, 100),
   });

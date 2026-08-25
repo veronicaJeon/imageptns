@@ -12,11 +12,11 @@
 | P0 | 완료·정기 회귀 | 계좌이체 주문 신뢰성 | 원자 생성, idempotency, 동의 스냅샷, 접수·승인·취소 메일 outbox, 직접 insert 차단을 운영 반영했다. 임시 계정 E2E는 주문·승인·취소·메일·다운로드를 확인하고 데이터를 정리한다. |
 | P0 | 훈련 필요 | DB·Storage 백업 복구 | 격리 Supabase에서 복구와 참조 무결성을 검증하고 측정된 RTO/RPO를 기록한다. |
 | P0 | 저장소 권한 필요 | main·Production 배포 게이트 | main 필수 CI·PR 승인과 Production Environment 승인자를 설정한다. |
-| P1 | 결함 확인 | 운영 모니터링 컬럼·경로 | `data_retention_runs`의 실제 `result/created_at`을 조회하고 AI cron 이벤트 경로를 바로잡는다. |
+| P1 | 코드 수정·검증 대기 | 운영 모니터링 컬럼·경로 | 일일 운영관리자 점검 변경에서 `data_retention_runs.result/created_at` 조회와 실제 AI cron 이벤트 경로로 수정했다. CI·운영 반영 후 관리자 화면과 첫 cron 기록을 확인한다. |
 | P1 | 도입 검토 | 외부 오류 추적·호출 알림 | 개인정보 마스킹을 전제로 P0 오류 즉시 알림과 release 연계를 추가한다. |
 | P1 | 제거 검토 | 미사용 AI SDK | Anthropic·Google Generative AI SDK가 실제 미사용임을 재확인하고 운영 의존성에서 제거한다. |
 | P1 | 완료·정기 관찰 | GitHub Actions Node 런타임 | checkout·setup-node v5와 고정된 Supabase setup action으로 앱·fresh migration CI가 통과했고 기존 Node 20 action 경고가 제거됐다. |
-| P1 | Codex 예약 개발 전환·첫 실행 검증 | 72시간 유지보수 루틴 | GitHub Actions의 Grok·Gemini 코드 수정 workflow를 제거하고 검사·고정 ID 후보·승인 대기열까지만 담당하도록 분리했다. Codex Scheduled task가 `codex-ready` 후보를 3일마다 격리 worktree에서 한 건씩 구현·검증해 draft PR을 만드는 첫 E2E 결과를 기록한다. |
+| P1 | 일일 운영 진단 개편·첫 실행 검증 | 운영관리자 자동 점검 | Codex가 매일 읽기 전용 운영 점검을 수행하고 재현 가능한 새 후보를 최대 3건 기록한다. 승인 후보는 한 건씩 구현하며, 첫 일일 cron·Scheduled 실행에서 이미지·SLA·임베딩·이메일·활동 지표와 중복 방지를 확인한다. |
 | P1 | 운영 반영·실패 가시성 검증 완료 | 에이전트 활동현황 | GitHub 추적 이슈를 원장으로 GitHub 검사기, Grok·Gemini 자문, Codex 대기열·PR을 관리자 화면에 통합했다. 강제 실행 `31108201758`에서 결정론적 검사는 통과했고 Grok의 `XAI_400` 키 오류와 Gemini의 `GOOGLE_503` 일시 장애가 구조화 댓글로 보고됐다. Grok 키 교정과 다음 주기의 Gemini 회복 여부를 추적한다. |
 | P1 | 1단계 구현·운영 관찰 필요 | 중복 이미지 탐지 | 같은 사진가 SHA-256 exact 차단, 타 사진가 exact 및 엄격한 pHash+dHash 후보 관리자 표시, 사유 필수 예외승인, 공개 DB 제약, 삭제 지문 1년 보관을 구현했다. 기존 이미지 백필과 2~4주 오탐률 측정, 이의제기 SLA는 후속 과제다. |
 | P1 | 운영 전환 진행·백필 관찰 필요 | 사진으로 검색·이미지 캡션 | Voyage 운영 키, 결제수단, 학습 사용 거부와 공개 처리방침을 유지하고 `analysis-v1` 비공개 무워터마크 사본 기반으로 기존 승인 이미지를 재색인한다. 새 입력 버전의 ready/failed/stale, 사본 생성 실패, 임계값별 무결과율을 관찰한다. NVIDIA 비동기 캡션은 같은 사본을 사용하지만 Build 무료 Trial은 운영 사용이 금지되므로 운영 구독 또는 self-host 권한 확인 전 `NVIDIA_CAPTIONING_ENABLED=false`를 유지한다. 6초대 재정렬은 대화형 예산 초과로 제외한다. |

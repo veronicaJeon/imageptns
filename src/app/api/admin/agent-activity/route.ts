@@ -123,7 +123,7 @@ export async function GET() {
           name: "GitHub 검사기",
           role: "검사·이슈·개선 후보 도출",
           status: !latestRun ? "idle" : latestRun.status !== "completed" ? "running" : latestRun.conclusion === "success" ? "healthy" : "error",
-          detail: !latestRun ? "실행 기록 없음" : latestRun.status !== "completed" ? "72시간 점검 실행 중" : latestRun.conclusion === "success" ? "최근 점검 통과" : `최근 점검 ${latestRun.conclusion ?? "실패"}`,
+          detail: !latestRun ? "실행 기록 없음" : latestRun.status !== "completed" ? "주간 제품·코드 점검 실행 중" : latestRun.conclusion === "success" ? "최근 점검 통과" : `최근 점검 ${latestRun.conclusion ?? "실패"}`,
           lastActivityAt: latestRun?.updated_at ?? null,
           url: latestRun?.html_url ?? `${REPOSITORY_URL}/actions/workflows/maintenance-routine.yml`,
         },

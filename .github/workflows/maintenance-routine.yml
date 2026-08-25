@@ -1,14 +1,14 @@
-name: 72-hour maintenance review
+name: Weekly product and code review
 
 on:
   schedule:
     # GitHub schedules run daily; the due job performs the real review only
-    # when 72 hours have elapsed since the last successful review.
+    # when seven days have elapsed since the last successful review.
     - cron: "41 0 * * *"
   workflow_dispatch:
     inputs:
       force:
-        description: Run even when the 72-hour interval has not elapsed
+        description: Run even when the weekly interval has not elapsed
         required: false
         type: boolean
         default: true
@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   due:
-    name: Check 72-hour interval
+    name: Check weekly interval
     runs-on: ubuntu-latest
     outputs:
       due: ${{ steps.interval.outputs.due }}
@@ -58,7 +58,7 @@ jobs:
           else
             now_epoch="$(date -u +%s)"
             last_epoch="$(date -u -d "$last_success_at" +%s)"
-            if [ $((now_epoch - last_epoch)) -ge 259200 ]; then
+            if [ $((now_epoch - last_epoch)) -ge 604800 ]; then
               due=true
             fi
           fi
@@ -68,7 +68,7 @@ jobs:
             echo "issue_number=$issue_number"
             echo "last_success_at=$last_success_at"
           } >> "$GITHUB_OUTPUT"
-          echo "Maintenance review due: $due"
+          echo "Weekly product review due: $due"
 
   review:
     name: Run maintenance review
@@ -160,17 +160,40 @@ jobs:
           set -euo pipefail
           response_file="$(mktemp)"
           http_code="$(curl --silent --show-error --location --retry 2 --retry-all-errors --connect-timeout 10 --max-time 30 --output "$response_file" --write-out '%{http_code}' https://www.imagepartners.kr/api/health)"
-          node - "$response_file" "$http_code" <<'NODE'
+          node - "$response_file" "$http_code" "$GITHUB_OUTPUT" <<'NODE'
           const fs = require("fs");
-          const [file, code] = process.argv.slice(2);
+          const [file, code, output] = process.argv.slice(2);
           const payload = JSON.parse(fs.readFileSync(file, "utf8"));
           const healthy = code === "200"
             && payload?.checks?.database?.status === "ok"
             && payload?.checks?.storage?.status === "ok"
             && payload?.checks?.previewIntegrity?.status === "ok"
             && !["error", "stale"].includes(payload?.checks?.ai?.status);
+          const operations = payload?.checks?.operations?.status ?? "unknown";
+          fs.appendFileSync(output, `operations_review=${operations}\n`);
           if (!healthy) process.exit(1);
           console.log(JSON.stringify({ status: payload.status, durationMs: payload.durationMs, checks: payload.checks }));
+          NODE
+
+      - name: Check main and Production release alignment
+        id: release_alignment
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          curl --silent --show-error --location --fail --retry 2 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 --output "$response_file" \
+            https://www.imagepartners.kr/api/health
+          node - "$response_file" "$GITHUB_SHA" <<'NODE'
+          const fs = require("fs");
+          const [file, expectedSha] = process.argv.slice(2);
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          if (payload?.release?.commitSha !== expectedSha || payload?.release?.commitRef !== "main") {
+            console.error(JSON.stringify({ expectedSha: expectedSha.slice(0, 12), deployedRef: payload?.release?.commitRef ?? null }));
+            process.exit(1);
+          }
+          console.log(JSON.stringify({ releaseAligned: true, commit: expectedSha.slice(0, 12) }));
           NODE
 
       - name: Check public routes
@@ -225,7 +248,7 @@ jobs:
         if: always()
         env:
           MAINTENANCE_RESULTS: >-
-            {"install":"${{ steps.install.outcome }}","audit":"${{ steps.audit.outcome }}","typecheck":"${{ steps.typecheck.outcome }}","lint":"${{ steps.lint.outcome }}","test":"${{ steps.test.outcome }}","build":"${{ steps.build.outcome }}","supabase_cli":"${{ steps.supabase_cli.outcome }}","database_start":"${{ steps.database_start.outcome }}","database_lint":"${{ steps.database_lint.outcome }}","health":"${{ steps.health.outcome }}","smoke":"${{ steps.smoke.outcome }}","checkout_readiness":"${{ steps.checkout_readiness.outcome }}","branch_protection":"${{ steps.branch_protection.outputs.result || 'unverified' }}"}
+            {"install":"${{ steps.install.outcome }}","audit":"${{ steps.audit.outcome }}","typecheck":"${{ steps.typecheck.outcome }}","lint":"${{ steps.lint.outcome }}","test":"${{ steps.test.outcome }}","build":"${{ steps.build.outcome }}","supabase_cli":"${{ steps.supabase_cli.outcome }}","database_start":"${{ steps.database_start.outcome }}","database_lint":"${{ steps.database_lint.outcome }}","health":"${{ steps.health.outcome }}","operations_review":"${{ steps.health.outputs.operations_review || 'unknown' }}","release_alignment":"${{ steps.release_alignment.outcome }}","smoke":"${{ steps.smoke.outcome }}","checkout_readiness":"${{ steps.checkout_readiness.outcome }}","branch_protection":"${{ steps.branch_protection.outputs.result || 'unverified' }}"}
         run: |
           node scripts/derive-maintenance-candidates.mjs "$RUNNER_TEMP/maintenance-candidates.json"
           echo "count=$(jq length "$RUNNER_TEMP/maintenance-candidates.json")" >> "$GITHUB_OUTPUT"
@@ -248,6 +271,8 @@ jobs:
           DATABASE_START: ${{ steps.database_start.outcome }}
           DATABASE_LINT: ${{ steps.database_lint.outcome }}
           HEALTH: ${{ steps.health.outcome }}
+          OPERATIONS_REVIEW: ${{ steps.health.outputs.operations_review || 'unknown' }}
+          RELEASE_ALIGNMENT: ${{ steps.release_alignment.outcome }}
           SMOKE: ${{ steps.smoke.outcome }}
           CHECKOUT_READINESS: ${{ steps.checkout_readiness.outcome }}
           BRANCH_PROTECTION: ${{ steps.branch_protection.outputs.result || 'unverified' }}
@@ -256,13 +281,13 @@ jobs:
         run: |
           set -euo pipefail
           failed=false
-          for result in "$INSTALL" "$AUDIT" "$TYPECHECK" "$LINT" "$TEST" "$BUILD" "$SUPABASE_CLI" "$DATABASE_START" "$DATABASE_LINT" "$HEALTH" "$SMOKE" "$CHECKOUT_READINESS"; do
+          for result in "$INSTALL" "$AUDIT" "$TYPECHECK" "$LINT" "$TEST" "$BUILD" "$SUPABASE_CLI" "$DATABASE_START" "$DATABASE_LINT" "$HEALTH" "$RELEASE_ALIGNMENT" "$SMOKE" "$CHECKOUT_READINESS"; do
             if [ "$result" != "success" ]; then failed=true; fi
           done
 
           report_file="$(mktemp)"
           {
-            echo "## 72시간 유지보수 점검 — $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "## 주간 제품·코드 점검 — $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             echo
             echo "- 기준 커밋: \`$GITHUB_SHA\`"
             echo "- 실행: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
@@ -281,6 +306,8 @@ jobs:
             echo "| Fresh DB migration | $DATABASE_START |"
             echo "| DB schema lint | $DATABASE_LINT |"
             echo "| 운영 health | $HEALTH |"
+            echo "| 일일 운영관리자 점검 | $OPERATIONS_REVIEW |"
+            echo "| main·Production 정합성 | $RELEASE_ALIGNMENT |"
             echo "| 공개 경로 smoke | $SMOKE |"
             echo "| 계좌이체 공개 경계 | $CHECKOUT_READINESS |"
             echo "| main 보호 확인 | $BRANCH_PROTECTION |"
@@ -306,7 +333,7 @@ jobs:
           if [ -z "$TRACKING_ISSUE" ]; then
             TRACKING_ISSUE="$(gh api --method POST "repos/$GH_REPO/issues" \
               -f title="[maintenance] Image Partners 72-hour review" \
-              -f body="이 이슈는 72시간 유지보수 점검 결과를 누적합니다. 자동 점검은 운영 상태를 변경하지 않습니다." \
+              -f body="이 이슈는 주간 제품·코드 점검 결과를 누적합니다. 자동 점검은 운영 상태를 변경하지 않습니다." \
               -f 'labels[]=maintenance' \
               --jq '.number')"
           fi
@@ -417,7 +444,7 @@ jobs:
           fi
 
           latest_report="$(gh api --paginate "repos/$GH_REPO/issues/$tracking_issue/comments" \
-            --jq '[.[] | select(.body | contains("## 72시간 유지보수 점검"))] | last.body // "점검 보고 없음"')"
+            --jq '[.[] | select((.body | contains("## 주간 제품·코드 점검")) or (.body | contains("## 72시간 유지보수 점검")))] | last.body // "점검 보고 없음"')"
           candidates="$(gh issue list --state open --label maintenance-candidate --limit 50 \
             --json number,title,body,labels,url,updatedAt \
             --jq 'map({number,title,body:(.body[0:4000]),labels:(.labels | map(.name)),url,updatedAt})')"

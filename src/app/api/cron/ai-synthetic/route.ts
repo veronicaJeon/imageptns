@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: authorization.error }, { status: authorization.status });
   }
 
-  const result = await runAiSyntheticCheck("cron");
+  const result = await runAiSyntheticCheck("ai-cron");
   let semantic;
   try {
     semantic = await runScheduledAiIndexing();

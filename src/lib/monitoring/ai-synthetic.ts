@@ -14,7 +14,15 @@ async function syntheticImageDataUrl() {
   return `data:image/jpeg;base64,${bytes.toString("base64")}`;
 }
 
-export async function runAiSyntheticCheck(source: "admin" | "cron") {
+type AiSyntheticSource = "admin" | "ai-cron" | "operations-cron";
+
+function sourceRoute(source: AiSyntheticSource) {
+  if (source === "admin") return "/api/admin/operations";
+  if (source === "operations-cron") return "/api/cron/operations-review";
+  return "/api/cron/ai-synthetic";
+}
+
+export async function runAiSyntheticCheck(source: AiSyntheticSource) {
   const startedAt = Date.now();
   try {
     const result = await analyzeWithMistral(await syntheticImageDataUrl(), "ko");
@@ -26,7 +34,7 @@ export async function runAiSyntheticCheck(source: "admin" | "cron") {
       component: "ai",
       provider: "mistral",
       status: "ok",
-      route: source === "admin" ? "/api/admin/operations" : "/api/cron/auto-reject-stale",
+      route: sourceRoute(source),
       statusCode: 200,
       durationMs: Date.now() - startedAt,
       metadata: { source, tagCount: result.tags.length },
@@ -39,7 +47,7 @@ export async function runAiSyntheticCheck(source: "admin" | "cron") {
       component: "ai",
       provider: "mistral",
       status: "error",
-      route: source === "admin" ? "/api/admin/operations" : "/api/cron/auto-reject-stale",
+      route: sourceRoute(source),
       statusCode: 503,
       durationMs: Date.now() - startedAt,
       errorCode: "synthetic_check_failed",

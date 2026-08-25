@@ -10,7 +10,7 @@
       "schedule": "0 2 * * *"
     },
     {
-      "path": "/api/cron/ai-synthetic",
+      "path": "/api/cron/operations-review",
       "schedule": "0 3 * * *"
     }
   ]
