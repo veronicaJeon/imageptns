@@ -1,6 +1,11 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { applyWatermark, createWatermarkedThumbnail, resizeWatermarkedPreview } from "./watermark";
+import {
+  applyWatermark,
+  applyWatermarkToAnalysisDerivative,
+  createWatermarkedThumbnail,
+  resizeWatermarkedPreview,
+} from "./watermark";
 
 async function sampleImage(width: number, height: number) {
   return sharp({
@@ -32,6 +37,15 @@ describe("watermark utilities", () => {
 
     expect(metadata.width).toBe(80);
     expect(metadata.height).toBe(240);
+  });
+
+  it("adds a watermark to an already-prepared clean derivative without resizing it", async () => {
+    const input = await sampleImage(1_200, 800);
+    const output = await applyWatermarkToAnalysisDerivative(input);
+    const metadata = await sharp(output).metadata();
+
+    expect(metadata.width).toBe(1_200);
+    expect(metadata.height).toBe(800);
   });
 
   it("resizes already-watermarked previews without adding another watermark layer", async () => {

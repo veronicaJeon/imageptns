@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     .from("images")
     .select(`
       id, asset_id, title, status, lifecycle_status,
-      storage_path_preview, storage_path_full, storage_path_original, original_filename,
+      storage_path_preview, storage_path_analysis, storage_path_full, storage_path_original, original_filename,
       sales_count, proof_status, proof_tx_hash,
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
       proof_arweave_confirmed_at

@@ -71,11 +71,22 @@ export async function applyWatermark(input: Buffer, rotationDegrees: unknown = 0
   const w = base.info.width || 800;
   const h = base.info.height || 600;
 
-  return sharp(base.data)
+  return applyWatermarkToAnalysisDerivative(base.data, w, h);
+  // No catch — let errors propagate so callers know the watermark failed
+}
+
+export async function applyWatermarkToAnalysisDerivative(
+  input: Buffer,
+  knownWidth?: number,
+  knownHeight?: number,
+): Promise<Buffer> {
+  const metadata = knownWidth && knownHeight ? null : await sharp(input).metadata();
+  const w = knownWidth ?? metadata?.width ?? 800;
+  const h = knownHeight ?? metadata?.height ?? 600;
+  return sharp(input)
     .composite([{ input: Buffer.from(watermarkSvg(w, h)), blend: "over" }])
     .jpeg({ quality: 88 })
     .toBuffer();
-  // No catch — let errors propagate so callers know the watermark failed
 }
 
 export async function createWatermarkedThumbnail(input: Buffer, width = 320, height = 240, rotationDegrees: unknown = 0): Promise<Buffer> {

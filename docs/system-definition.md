@@ -1,7 +1,7 @@
 # Image Partners 시스템 정의서
 
 > 상태: 기준
-> 기준일: 2026-08-05
+> 기준일: 2026-08-13
 > 대상 환경: `https://www.imagepartners.kr` 운영 및 로컬 Supabase 개발 환경
 > 변경 규칙: [문서 기반 개발 규칙](./document-driven-development.md)
 
@@ -11,7 +11,7 @@ Image Partners는 기존 거래처 실무자가 익숙한 라이브러리 중심
 
 현재 제공 범위는 다음과 같다.
 
-- 공개 라이브러리 검색·분류·상세·유사 이미지 탐색
+- 공개 라이브러리 텍스트·사진 지문 검색, 분류·상세·유사 이미지 탐색
 - 이미지 요청 및 운영자·사진작가 후속 처리
 - 무료 사용권 확정
 - 유료 이미지의 계좌이체 요청, 관리자 입금 확인, 원본 다운로드 권한 제공
@@ -83,7 +83,7 @@ flowchart LR
 
 1. 승인된 사진작가가 최대 20개, 파일당 최대 100MB의 지원 형식 이미지를 선택한다.
 2. 서버가 사용자 소유의 만료 시간과 1회 사용 조건을 가진 업로드 세션을 발급한다.
-3. 원본은 비공개 Storage에 올라가고, 서버가 미리보기·썸네일과 메타데이터를 생성한다.
+3. 원본은 비공개 Storage에 올라가고, 서버가 방향을 보정해 메타데이터 없는 1,600px 비공개 분석 사본을 만든다. 공개 미리보기·썸네일은 이 깨끗한 사본에 워터마크를 합성해 생성한다.
 4. 사진작가는 제목·설명·키워드를 직접 입력하거나 Mistral 보조 분석을 선택할 수 있다.
 5. 신규 이미지는 `pending + active + is_published=false`로 저장된다.
 6. 관리자가 승인하면 공개되고 사진작가 목록에 상태를 반영한다. 승인 메일은 발송하지 않는다. 반려하면 사진작가에게 이메일과 화면으로 사유와 재검토 경로를 제공한다.
@@ -95,6 +95,11 @@ flowchart LR
 ### 4.3 라이브러리와 이미지 요청
 
 - 구매자는 공개·승인·활성 이미지에 한해 검색, 상세 열람, 장바구니와 사용권 흐름을 이용한다.
+- 라이브러리의 기존 방향 필터를 유지하며, 한국어 `가로`·`세로`·`정사각형`과 영어의 명확한 방향 표현을 검색어에 포함해도 같은 `orientation_class` 조건으로 검색한다. 영어 `landscape`·`portrait`는 주제 의미와 충돌하지 않도록 단독 검색 또는 명시적인 `orientation` 표현에서만 방향으로 해석한다.
+- 문장 검색은 제목·태그를 최우선, 설명·AI 보조 캡션을 다음, 카테고리를 보조 신호로 평가한다. 임계값을 넘는 키워드 결과가 있으면 해당 결과만 점수순으로 제공하고 외부 임베딩 공급자를 호출하지 않는다. 키워드가 약할 때만 의미 검색 후보가 될 수 있으며, 두 점수가 모두 임계값 미만이면 결과를 제공하지 않는다.
+- 사진으로 검색 1단계는 검색 입력을 저장하거나 외부 AI로 보내지 않고 업로드 중복 탐지와 같은 SHA-256·pHash·dHash 생성기를 재사용한다. 동일 또는 리사이즈·재인코딩·가벼운 편집본을 최대 20건까지 찾으며, 주제·분위기만 비슷한 의미 기반 검색은 제공하지 않는다.
+- 의미 기반 검색 2단계는 Voyage `voyage-multimodal-3.5` 512차원 임베딩을 사용한다. 카탈로그 이미지는 워터마크·EXIF·파일명을 포함하지 않는 긴 변 1,600px 이하 `analysis-v1` 비공개 사본만 공급자에 전송한다. 사본은 업로드 때 생성하고 기존 승인 이미지는 새 입력 버전 백필 중 비공개 원본에서 지연 생성한다. 관리자 승인·공개 뒤에만 임베딩 작업을 등록하며, 기존 워터마크 입력 벡터와 새 사본 벡터는 내부 모델 버전으로 분리한다. 문장 검색은 강한 키워드 결과가 없을 때만, 사진 검색은 SHA-256·pHash·dHash 결과가 없을 때만 의미 검색으로 넘어가며 임계값 미만이면 결과를 제공하지 않는다. 이용자가 검색에 넣은 사진은 EXIF·파일명을 제거한 축소 사본만 전송하고 저장하지 않는다. 인덱싱과 질의는 독립 플래그로 즉시 중단할 수 있다.
+- NVIDIA 자동 캡션은 사진작가가 작성한 제목·설명을 덮어쓰지 않는 비동기 보조 신호로 구현한다. NVIDIA Build 무료 endpoint는 운영 이용이 금지된 Trial이므로 `NVIDIA_API_PRODUCTION_ENTITLED=true`가 확인되기 전에는 운영 호출하지 않는다. 대화형 재정렬은 측정 지연이 예산을 초과해 운영 경로에서 제외한다.
 - 라이브러리는 20개 단위 추가 로딩과 명시적 더보기 동작을 제공한다.
 - 원하는 이미지가 없으면 최소 필수 정보로 이미지 요청을 접수한다. 운영자는 후보를 연결하고 대상 사진작가에게 이미지 의뢰 초대 메일을 보내며, 사진작가는 배정된 요청에 응답할 수 있다.
 - 회사소개 전시 이미지는 원본 URL을 공개하지 않고, 권리·활용 동의가 유효한 라이브러리 이미지로 별도 전시본을 생성한다.
@@ -126,7 +131,7 @@ flowchart LR
 | 도메인 | 핵심 데이터 |
 | --- | --- |
 | 계정·권한 | `auth.users`, `profiles`, `photographer_applications`, `profile_withdrawal_requests` |
-| 이미지 | `images`, `image_categories`, `image_category_assignments`, `upload_sessions`, `image_deletion_requests`, `image_purge_logs` |
+| 이미지 | `images`, `image_categories`, `image_category_assignments`, `upload_sessions`, `image_deletion_requests`, `image_purge_logs`, 운영 비활성 `image_semantic_embeddings` |
 | 구매자 활동 | `favorites`, `collections`, `collection_items`, `contact_submissions`, 이미지 요청 후보·응답 테이블 |
 | 거래 | `license_types`, `orders`, `order_items`, `order_email_outbox`, `downloads`, `image_price_overrides`, 계좌이체 상태, 정산·지급 원장 |
 | 콘텐츠·정책 | `notices`, `legal_documents`, `business_disclosures`, 회사소개·라이브러리 안내·광고 설정 |
@@ -136,6 +141,7 @@ flowchart LR
 Storage 경계:
 
 - `images-original`: 업로드 원본. 소유자 업로드와 서버 처리 전용이며 공개 읽기 금지
+- `images-analysis`: 방향 보정·축소·메타데이터 제거를 마친 무워터마크 분석 사본. 서비스 역할의 임베딩·캡션·워터마크 생성 경로만 읽고 공개·로그인 사용자 읽기 정책은 두지 않음
 - `images-preview`: 공개 가능한 워터마크·썸네일 파생본
 - `images-full`: 원본급 이용 파일. 일반 로그인 사용자 전체 읽기 금지, 주문·권한 확인 경로로 제공
 - `avatars`: 공개 프로필 이미지
@@ -162,10 +168,12 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 
 - 로그인 후 이동 경로는 동일 출처 상대 경로로 제한한다.
 - 비공개 원본과 서비스 역할 키는 클라이언트에 노출하지 않는다.
+- 비공개 분석 사본 경로와 무워터마크 파일은 공개 API·브라우저·로그에 노출하지 않고, 완전삭제·실패·만료 정리에서 원본과 함께 제거한다.
 - AI 분석은 승인된 사진작가만 사용하며 요청 크기·형식과 시간·일간 쿼터를 검사한다.
 - 업로드는 소유권, 만료, 미사용 세션을 확인하고 실패·만료 원본을 자동 정리한다.
 - 중복 후보는 `duplicate_review_status=required`인 동안 DB 제약으로 공개할 수 없다. 관리자가 후보와 비교하고 사유를 남겨 `overridden`으로 승인한 경우에만 공개할 수 있다.
 - 삭제된 이미지의 지문은 재등록 우회를 줄이기 위해 1년간 보관하며, 사진가 화면에는 타 사진가나 후보 이미지 정보를 노출하지 않는다.
+- 사진 검색은 최대 25MB 원본을 브라우저에서 긴 변 1,600px, 3.5MB 이하 검색본으로 축소해 EXIF와 원래 파일명을 제거한 뒤 전송하고 서버에서 3메가픽셀 한도를 다시 검사한다. IP당 분당 20회 한도를 적용하며 원본·검색본·EXIF·파일명·계산한 지문을 DB, Storage, 로그와 응답에 남기지 않고 공개·승인·활성 이미지의 지문만 비교한다.
 - 관리자 API는 서버에서 관리자 역할을 확인하고 중요 변경은 감사 기록을 남긴다.
 - 공개 쓰기 API는 입력 크기, 스키마, 분산 rate limit을 적용한다.
 - 일반 사용자는 `orders`를 직접 insert할 수 없고 서버 전용 원자적 주문 함수를 통해서만 표준 주문을 생성한다.
@@ -202,6 +210,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | 서버 비밀 | `SUPABASE_SERVICE_ROLE_KEY`, `MISTRAL_API_KEY`, `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `CRON_SECRET` |
 | 메일 운영 | `RESEND_FROM_EMAIL`, `OPS_EMAIL`, 진단용 `GMAIL_SMTP_USER`, `GMAIL_SMTP_PASS` |
 | AI 한도 | `AI_ANALYSIS_HOURLY_LIMIT`, `AI_ANALYSIS_DAILY_LIMIT` |
+| 의미 검색·보조 캡션 | `SEMANTIC_IMAGE_SEARCH_ENABLED`, `SEMANTIC_IMAGE_INDEXING_ENABLED`, `SEMANTIC_IMAGE_QUERY_ENABLED`, `SEMANTIC_EMBEDDING_PROVIDER`, `SEMANTIC_EMBEDDING_MODEL`, `SEMANTIC_EMBEDDING_MODEL_VERSION`, `SEMANTIC_EMBEDDING_DIMENSIONS`, `KEYWORD_SEARCH_STRONG_THRESHOLD`, `SEMANTIC_SEARCH_MIN_SIMILARITY`, `VOYAGE_API_KEY`; NVIDIA는 `NVIDIA_API_KEY`, `NVIDIA_CAPTIONING_ENABLED`, `NVIDIA_API_PRODUCTION_ENTITLED`, `NVIDIA_CAPTION_MODEL`, `NVIDIA_CAPTION_MODEL_VERSION` |
 | GitHub Actions 자문 | `GROK_API_KEY`, `GEMINI_API_KEY` — Vercel 애플리케이션에는 주입하지 않음 |
 | 계좌이체 | `BANK_TRANSFER_BANK_NAME`, `BANK_TRANSFER_ACCOUNT_NUMBER`, `BANK_TRANSFER_ACCOUNT_HOLDER`, `BANK_TRANSFER_ACCOUNT_LABEL` |
 | 기능 플래그 | `NEXT_PUBLIC_COMMERCE_ENABLED`, `NEXT_PUBLIC_ONCHAIN_ENABLED`, `NEXT_PUBLIC_PAYMENT_PASS_ENABLED`, `ALLOW_INCOMPLETE_DISCLOSURE_BETA` |
@@ -247,5 +256,8 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 - 주문 원자 생성·동의 스냅샷·idempotency·거래 메일 outbox 구현과 80개 파일·336개 테스트, 타입·빌드 검증
 - 2026-08-09 사진작가 이메일을 행동 필요·권한·금전·반려·이미지 의뢰 중심으로 정리하고 업로드 완료·이미지 승인 메일을 제거했다. 정책 회귀 테스트와 전체 타입·린트·테스트·빌드로 검증한다.
 - 2026-08-11 배포 전 공급망 검사에서 보고된 `nanoid`와 `js-yaml` high advisory를 안전한 패치 버전으로 lockfile 갱신하고 운영 의존성 audit 0건을 확인했다.
+- 2026-08-14 기존 라이브러리 방향 필터를 유지하면서 한국어·영어 방향 검색어를 구조화된 방향 조건으로 해석하고, 주제 의미가 있는 영어 검색어와 명시적 필터 충돌을 회귀 테스트로 보호했다.
+- 2026-08-21 Voyage 학습 사용 거부와 처리방침 고지를 전제로 승인 후 임베딩, 기존 승인 이미지 제한 백필, 한국어 문장·사진 의미 fallback을 운영 기준에 추가했다. NVIDIA 캡션은 별도 운영 이용권 확인 전까지 비활성으로 둔다.
+- 2026-08-26 임베딩·캡션·공개 시안의 공통 입력을 1,600px 비공개 무워터마크 `analysis-v1` 사본으로 분리하고, 기존 워터마크 입력 벡터와 새 벡터를 혼합하지 않는 재색인 기준을 추가했다.
 
 이 문서 갱신 시 날짜, 변경된 시스템 경계, 관련 마이그레이션·테스트·운영 검증을 이 절에 추가한다. 배포 ID처럼 자주 바뀌는 값은 이 문서가 아니라 배포 인수인계 기록에서 관리한다.

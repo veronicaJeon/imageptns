@@ -62,3 +62,6 @@ Thumbs.db
 
 # local feature worktrees
 .worktrees/
+
+# local semantic-search evaluation images and API run artifacts
+.semantic-evaluation/

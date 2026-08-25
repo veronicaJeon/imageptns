@@ -9,6 +9,7 @@ import {
 import { authorizeCronRequest } from "@/lib/security/cron";
 import { uploadPathBelongsToUser } from "@/lib/uploads/security";
 import { dispatchPendingOrderEmails } from "@/lib/orders/email-outbox";
+import { analysisDerivativePath } from "@/lib/images/analysis-derivative";
 
 export const maxDuration = 60;
 
@@ -53,6 +54,7 @@ async function purgeExpiredUploadSessions(admin: ReturnType<typeof createAdminCl
   const rows = (data ?? []).filter((row) => uploadPathBelongsToUser(row.storage_path, row.user_id));
   const originalPaths = rows.map((row) => row.storage_path);
   const previewPaths = rows.flatMap((row) => [row.storage_path, `thumbs/${row.storage_path}`]);
+  const analysisPaths = rows.map((row) => analysisDerivativePath(row.storage_path));
 
   for (let index = 0; index < originalPaths.length; index += 100) {
     const { error: storageError } = await admin.storage
@@ -69,6 +71,15 @@ async function purgeExpiredUploadSessions(admin: ReturnType<typeof createAdminCl
       .remove(previewPaths.slice(index, index + 100));
     if (storageError) {
       console.error("[auto-reject-stale] expired preview cleanup failed:", storageError.message);
+      return { ok: false as const };
+    }
+  }
+  for (let index = 0; index < analysisPaths.length; index += 100) {
+    const { error: storageError } = await admin.storage
+      .from("images-analysis")
+      .remove(analysisPaths.slice(index, index + 100));
+    if (storageError) {
+      console.error("[auto-reject-stale] expired analysis derivative cleanup failed:", storageError.message);
       return { ok: false as const };
     }
   }
@@ -119,7 +130,7 @@ async function purgeExpiredPhotographerHiddenImages(admin: ReturnType<typeof cre
     .from("images")
     .select(`
       id, asset_id, title, status, lifecycle_status, is_published,
-      photographer_id, storage_path_preview, storage_path_full, storage_path_original, original_filename,
+      photographer_id, storage_path_preview, storage_path_analysis, storage_path_full, storage_path_original, original_filename,
       file_size_mb, width, height, sales_count, proof_status, proof_tx_hash,
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
       proof_arweave_confirmed_at, created_at, deleted_at, archived_at, unpublished_at,

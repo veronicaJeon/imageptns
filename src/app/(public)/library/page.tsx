@@ -9,6 +9,10 @@ import { CategoryPill } from "@/components/ui/CategoryPill";
 import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
 import { LibraryAdCard } from "@/components/ads/LibraryAdCard";
 import type { PublicLibraryAd } from "@/lib/ads/campaigns";
+import {
+  PHOTO_SEARCH_SELECTED_MAX_FILE_BYTES,
+  preparePhotoSearchImage,
+} from "@/lib/images/photo-search-client";
 
 const PAGE_SIZE_OPTIONS = [20, 40, 60] as const;
 const FILTER_PANEL_STORAGE_KEY = "imagepartners.library.filters-collapsed";
@@ -45,6 +49,14 @@ const LIBRARY_PAGE_COPY = {
     endOfResults: "모든 이미지를 확인했습니다.",
     collapseFilters: "필터 영역 접기",
     expandFilters: "필터 영역 펼치기",
+    photoSearch: "사진으로 검색",
+    photoSearchFile: "사진 검색 파일 선택",
+    photoSearching: "사진을 비교하고 있습니다…",
+    photoSearchActive: "선택한 사진과 동일하거나 가깝게 편집된 결과입니다.",
+    photoSearchHint: "주제만 비슷한 사진은 텍스트 검색을 이용해 주세요. 검색 사진은 저장하지 않습니다.",
+    photoSearchEnd: "사진 검색 종료",
+    photoSearchTooLarge: "선택하는 사진은 25MB 이하여야 합니다.",
+    photoSearchFailed: "사진을 검색하지 못했습니다. 다른 파일로 다시 시도해 주세요.",
   },
   en: {
     filter: "Filters",
@@ -56,6 +68,14 @@ const LIBRARY_PAGE_COPY = {
     endOfResults: "You have reached the end.",
     collapseFilters: "Collapse filters",
     expandFilters: "Expand filters",
+    photoSearch: "Search by photo",
+    photoSearchFile: "Choose photo search file",
+    photoSearching: "Comparing the photo…",
+    photoSearchActive: "Results identical to or lightly edited from your photo.",
+    photoSearchHint: "Use text search for similar subjects. Your search photo is not stored.",
+    photoSearchEnd: "End photo search",
+    photoSearchTooLarge: "The selected photo must be 25MB or smaller.",
+    photoSearchFailed: "We could not search this photo. Try another file.",
   },
 } as const;
 
@@ -87,8 +107,12 @@ export default function LibraryPage() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [adCampaign, setAdCampaign] = useState<PublicLibraryAd | null>(null);
+  const [photoSearchActive, setPhotoSearchActive] = useState(false);
+  const [photoSearching, setPhotoSearching] = useState(false);
+  const [photoSearchError, setPhotoSearchError] = useState("");
 
   const blurTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
   const requestSeqRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -174,7 +198,8 @@ export default function LibraryPage() {
       if (commercialOnly) params.set("commercial", "true");
       if (derivativesOnly) params.set("derivatives", "true");
 
-      const res = await fetch(`/api/images?${params}`);
+      const endpoint = debouncedQuery ? "/api/images/search" : "/api/images";
+      const res = await fetch(`${endpoint}?${params}`);
       if (!res.ok) throw new Error();
       const { images: data, hasMore: moreAvailable } = await res.json() as { images?: ImageCardData[]; hasMore?: boolean };
 
@@ -201,9 +226,10 @@ export default function LibraryPage() {
   }, [category, sort, orientation, pageSize, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly]);
 
   useEffect(() => {
+    if (photoSearchActive) return;
     setHasMore(false);
     void fetchImages(0, false);
-  }, [category, sort, orientation, pageSize, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [category, sort, orientation, pageSize, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly, photoSearchActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadMore = useCallback(() => {
     if (loading || loadingMore || loadingMoreRef.current || !hasMore) return;
@@ -238,6 +264,47 @@ export default function LibraryPage() {
       }
       return next;
     });
+  }
+
+  async function handlePhotoSearch(file: File | undefined) {
+    if (!file || photoSearching) return;
+    if (file.size > PHOTO_SEARCH_SELECTED_MAX_FILE_BYTES) {
+      setPhotoSearchError(copy.photoSearchTooLarge);
+      return;
+    }
+
+    requestSeqRef.current += 1;
+    setPhotoSearching(true);
+    setPhotoSearchError("");
+    setLoading(false);
+    setLoadingMore(false);
+    setHasMore(false);
+
+    try {
+      const preparedFile = await preparePhotoSearchImage(file);
+      const formData = new FormData();
+      formData.set("image", preparedFile);
+      const response = await fetch("/api/images/search-by-photo", {
+        method: "POST",
+        body: formData,
+        cache: "no-store",
+      });
+      const result = await response.json() as { images?: ImageCardData[] };
+      if (!response.ok) throw new Error(copy.photoSearchFailed);
+      setImages(result.images ?? []);
+      setPhotoSearchActive(true);
+      setShowSuggestions(false);
+    } catch (error) {
+      setPhotoSearchError(error instanceof Error && error.message ? error.message : copy.photoSearchFailed);
+    } finally {
+      setPhotoSearching(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
+  }
+
+  function endPhotoSearch() {
+    setPhotoSearchActive(false);
+    setPhotoSearchError("");
   }
 
   const activeFilterCount = [
@@ -285,8 +352,26 @@ export default function LibraryPage() {
             <div className="relative order-1 col-span-3 md:order-none md:col-span-1">
               <div className="relative overflow-hidden rounded-lg border border-outline-variant/60 bg-surface-container-low shadow-ghost ring-1 ring-black/5 transition-colors focus-within:border-primary/60 focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary/20">
                 <span className="material-symbols-outlined pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-2xl text-outline">search</span>
-                <input type="text" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={l.hero.searchPlaceholder} className="h-14 w-full bg-transparent pl-14 pr-12 text-base text-on-surface placeholder:text-outline outline-none md:h-16" onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }} onBlur={() => { blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 150); }} onKeyDown={(event) => { if (event.key === "Escape") setShowSuggestions(false); }} />
-                {query && <button onClick={() => { setQuery(""); setSuggestions([]); setShowSuggestions(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-outline" aria-label="Clear search"><span className="material-symbols-outlined text-xl">close</span></button>}
+                <input type="text" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={l.hero.searchPlaceholder} className="h-14 w-full bg-transparent pl-14 pr-24 text-base text-on-surface placeholder:text-outline outline-none md:h-16" onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }} onBlur={() => { blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 150); }} onKeyDown={(event) => { if (event.key === "Escape") setShowSuggestions(false); }} />
+                {query && <button onClick={() => { setQuery(""); setSuggestions([]); setShowSuggestions(false); }} className="absolute right-12 top-1/2 -translate-y-1/2 p-2 text-outline" aria-label="Clear search"><span className="material-symbols-outlined text-xl">close</span></button>}
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  aria-label={copy.photoSearchFile}
+                  onChange={(event) => void handlePhotoSearch(event.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={photoSearching}
+                  className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-outline transition-colors hover:bg-primary/10 hover:text-primary disabled:cursor-wait disabled:opacity-50"
+                  aria-label={photoSearching ? copy.photoSearching : copy.photoSearch}
+                  title={copy.photoSearch}
+                >
+                  <span className={`material-symbols-outlined text-xl ${photoSearching ? "animate-pulse" : ""}`} aria-hidden="true">photo_camera</span>
+                </button>
               </div>
               {showSuggestions && suggestions.length > 0 && <ul className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg bg-white shadow-lg">{suggestions.map((suggestion) => <li key={suggestion}><button className="w-full px-5 py-2.5 text-left text-sm hover:bg-surface-container-low" onMouseDown={() => { if (blurTimerRef.current) clearTimeout(blurTimerRef.current); setQuery(suggestion); setShowSuggestions(false); }}>{suggestion}</button></li>)}</ul>}
             </div>
@@ -358,6 +443,19 @@ export default function LibraryPage() {
       <section className="py-12 px-6 md:px-8 bg-surface-container-low min-h-[60vh]">
         <div className={`mx-auto grid max-w-[1680px] gap-8 ${showAdCampaign ? "2xl:grid-cols-[minmax(0,1fr)_240px]" : ""}`}>
           <div className="min-w-0">
+            {(photoSearchActive || photoSearchError || photoSearching) && (
+              <div className={`mb-6 rounded-2xl border p-4 md:flex md:items-center md:justify-between ${photoSearchError ? "border-error/30 bg-error-container/30" : "border-primary/25 bg-primary/5"}`} role={photoSearchError ? "alert" : "status"}>
+                <div>
+                  <p className="text-sm font-bold text-on-surface">{photoSearchError || (photoSearching ? copy.photoSearching : copy.photoSearchActive)}</p>
+                  {!photoSearchError && !photoSearching && <p className="mt-1 text-xs text-on-surface-variant">{copy.photoSearchHint}</p>}
+                </div>
+                {photoSearchActive && (
+                  <button type="button" onClick={endPhotoSearch} className="mt-3 inline-flex h-10 items-center rounded-full border border-primary/30 px-4 text-xs font-bold text-primary hover:bg-primary/10 md:mt-0">
+                    {copy.photoSearchEnd}
+                  </button>
+                )}
+              </div>
+            )}
             {loading ? (
               <div className="flex items-center justify-center py-40 text-outline">
                 <span className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />

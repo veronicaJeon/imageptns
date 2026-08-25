@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     .from("images")
     .select(`
       id, asset_id, title, status, lifecycle_status, is_published,
-      photographer_id, storage_path_preview, storage_path_full, storage_path_original, original_filename,
+      photographer_id, storage_path_preview, storage_path_analysis, storage_path_full, storage_path_original, original_filename,
       file_size_mb, width, height, sales_count, proof_status, proof_tx_hash,
       proof_arweave_original_tx_id, proof_arweave_metadata_tx_id, proof_arweave_manifest_tx_id,
       proof_arweave_confirmed_at, created_at,

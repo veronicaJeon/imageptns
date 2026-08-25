@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { categoryCodesForImage, getImageCategoryCodeMap, getImageIdsForCategory } from "@/lib/images/category-server";
+import { resolveOrientationSearch, type OrientationFilter } from "@/lib/images/orientation-search";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const PAGE_SIZE = 20;
@@ -55,9 +56,13 @@ export async function GET(req: NextRequest) {
   const educationFreeOnly = searchParams.get("educationFree") === "true";
   const commercialOnly = searchParams.get("commercial") === "true";
   const derivativesOnly = searchParams.get("derivatives") === "true";
-  const orientation = searchParams.get("orientation") ?? "all";
-  if (!["all", "landscape", "portrait", "square"].includes(orientation)) {
+  const rawOrientation = searchParams.get("orientation") ?? "all";
+  if (!["all", "landscape", "portrait", "square"].includes(rawOrientation)) {
     return NextResponse.json({ error: "orientation is not supported" }, { status: 400 });
+  }
+  const resolvedSearch = resolveOrientationSearch(query, rawOrientation as OrientationFilter);
+  if (resolvedSearch.conflictingOrientations) {
+    return NextResponse.json({ images: [], hasMore: false });
   }
   const hasUsageFilters = freeOnly || educationFreeOnly || commercialOnly || derivativesOnly;
 
@@ -86,12 +91,12 @@ export async function GET(req: NextRequest) {
       : q.eq("category", category);
   }
 
-  if (query) {
-    q = q.textSearch("fts", query, { type: "plain" });
+  if (resolvedSearch.textQuery) {
+    q = q.textSearch("fts", resolvedSearch.textQuery, { type: "plain" });
   }
 
-  if (orientation !== "all") {
-    q = q.eq("orientation_class", orientation);
+  if (resolvedSearch.effectiveOrientation !== "all") {
+    q = q.eq("orientation_class", resolvedSearch.effectiveOrientation);
   }
 
   if (educationFreeOnly) {
@@ -110,11 +115,11 @@ export async function GET(req: NextRequest) {
 
   // The search_images RPC does not accept publishing controls yet, so relevant
   // searches fall through to the table query to avoid exposing hidden images.
-  const useRpcSearch = false && sort === "relevant" && query && !hasUsageFilters;
+  const useRpcSearch = false && sort === "relevant" && resolvedSearch.textQuery && !hasUsageFilters;
 
   if (useRpcSearch) {
     const { data: rpcData, error: rpcError } = await supabase.rpc("search_images", {
-      search_query:    query,
+      search_query:    resolvedSearch.textQuery,
       category_filter: category === "all" ? "" : category,
       lim:             limit,
       off:             offset,

@@ -16,6 +16,7 @@ export interface HardDeleteImageRow extends HardDeleteImageInput {
   title: string;
   photographer_id: string | null;
   storage_path_preview: string | null;
+  storage_path_analysis: string | null;
   storage_path_full: string | null;
   storage_path_original: string | null;
   original_filename: string | null;
@@ -166,6 +167,7 @@ export function storagePathsForHardDelete(image: HardDeleteImageRow) {
       image.storage_path_preview,
       image.storage_path_preview ? `thumbs/${image.storage_path_preview}` : null,
     ]),
+    analysis: uniqueStrings([image.storage_path_analysis]),
   };
 }
 
@@ -193,6 +195,12 @@ export async function removeHardDeleteStorageFiles(
     const { error } = await admin.storage.from("images-preview").remove(paths.previews);
     if (error) errors.push(`preview: ${error.message}`);
     else removed += paths.previews.length;
+  }
+
+  if (paths.analysis.length > 0) {
+    const { error } = await admin.storage.from("images-analysis").remove(paths.analysis);
+    if (error) errors.push(`analysis: ${error.message}`);
+    else removed += paths.analysis.length;
   }
 
   return { paths, errors, removed };
