@@ -105,7 +105,9 @@ export function getSemanticImageSearchConfig(
     queryEnabled,
     provider,
     model: required(environment.SEMANTIC_EMBEDDING_MODEL, "SEMANTIC_EMBEDDING_MODEL"),
-    modelVersion: required(environment.SEMANTIC_EMBEDDING_MODEL_VERSION, "SEMANTIC_EMBEDDING_MODEL_VERSION"),
+    modelVersion: analysisBackedModelVersion(
+      required(environment.SEMANTIC_EMBEDDING_MODEL_VERSION, "SEMANTIC_EMBEDDING_MODEL_VERSION"),
+    ),
     dimensions,
   };
 }
@@ -125,3 +127,4 @@ export function validateEmbeddingVector(values: number[], expectedDimensions: nu
   }
   return values;
 }
+import { analysisBackedModelVersion } from "./analysis-derivative";

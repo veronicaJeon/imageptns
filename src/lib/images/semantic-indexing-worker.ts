@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import type { SemanticImageEmbeddingProvider } from "./semantic-embedding";
 import { VoyageEmbeddingError } from "./voyage-multimodal";
+import { AnalysisDerivativeError } from "./analysis-derivative";
 
 export const SEMANTIC_INDEXING_DEFAULT_BATCH_SIZE = 1;
 export const SEMANTIC_INDEXING_MAX_BATCH_SIZE = 3;
@@ -23,7 +23,16 @@ export interface SemanticIndexingImage {
   lifecycle_status: string | null;
   is_published: boolean;
   approved_at: string | null;
-  storage_path_preview: string | null;
+  storage_path_original: string | null;
+  storage_path_analysis: string | null;
+  analysis_derivative_version: string | null;
+  upload_rotation_degrees: number | null;
+}
+
+export interface SemanticAnalysisInput {
+  bytes: Uint8Array;
+  mimeType: "image/jpeg";
+  sourceSha256: string;
 }
 
 export interface SemanticIndexingRepository {
@@ -41,7 +50,7 @@ export interface SemanticIndexingRepository {
     batchSize: number;
   }): Promise<ClaimedSemanticEmbeddingJob[]>;
   loadImage(imageId: string): Promise<SemanticIndexingImage | null>;
-  downloadPreview(storagePath: string): Promise<Blob>;
+  loadAnalysisInput(image: SemanticIndexingImage): Promise<SemanticAnalysisInput>;
   completeJob(input: {
     job: ClaimedSemanticEmbeddingJob;
     embedding: number[];
@@ -93,18 +102,12 @@ function boundedBatchSize(value: number | undefined) {
   return Math.min(Math.max(value, 1), SEMANTIC_INDEXING_MAX_BATCH_SIZE);
 }
 
-function previewMimeType(blob: Blob, storagePath: string) {
-  if (blob.type === "image/jpeg" || blob.type === "image/png" || blob.type === "image/webp") return blob.type;
-  const extension = storagePath.split("?")[0].toLowerCase();
-  if (extension.endsWith(".jpg") || extension.endsWith(".jpeg")) return "image/jpeg" as const;
-  if (extension.endsWith(".png")) return "image/png" as const;
-  if (extension.endsWith(".webp")) return "image/webp" as const;
-  throw new IndexingJobError("UNSUPPORTED_PREVIEW_TYPE", false, "Preview image type is unsupported");
-}
-
 function sanitizedFailure(error: unknown) {
   if (error instanceof VoyageEmbeddingError) {
     return { code: error.code, retryable: error.retryable, message: "Embedding provider request failed" };
+  }
+  if (error instanceof AnalysisDerivativeError) {
+    return { code: error.code, retryable: error.retryable, message: "Analysis derivative processing failed" };
   }
   if (error instanceof IndexingJobError) {
     return { code: error.code, retryable: error.retryable, message: error.message };
@@ -152,19 +155,14 @@ export async function runSemanticIndexingWorker(input: {
         summary.stale += 1;
         continue;
       }
-      if (!image.storage_path_preview) {
-        throw new IndexingJobError("PREVIEW_PATH_MISSING", false, "Approved image preview is missing");
+      const analysis = await repository.loadAnalysisInput(image);
+      if (analysis.bytes.length < 1 || analysis.bytes.length > SEMANTIC_INDEXING_MAX_IMAGE_BYTES) {
+        throw new IndexingJobError("ANALYSIS_SIZE_INVALID", false, "Analysis derivative size is invalid");
       }
-
-      const preview = await repository.downloadPreview(image.storage_path_preview);
-      if (preview.size < 1 || preview.size > SEMANTIC_INDEXING_MAX_IMAGE_BYTES) {
-        throw new IndexingJobError("PREVIEW_SIZE_INVALID", false, "Preview image size is invalid");
-      }
-      const bytes = new Uint8Array(await preview.arrayBuffer());
       const embedding = await provider.embedImageDocument({
         purpose: "document",
-        bytes,
-        mimeType: previewMimeType(preview, image.storage_path_preview),
+        bytes: analysis.bytes,
+        mimeType: analysis.mimeType,
       });
 
       // A reviewer may unpublish/archive the image while the provider request is
@@ -179,7 +177,7 @@ export async function runSemanticIndexingWorker(input: {
       const completed = await repository.completeJob({
         job,
         embedding,
-        sourceSha256: createHash("sha256").update(bytes).digest("hex"),
+        sourceSha256: analysis.sourceSha256,
       });
       if (completed) summary.ready += 1;
       else summary.stale += 1;

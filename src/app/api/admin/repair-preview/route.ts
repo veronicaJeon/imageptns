@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { applyWatermark, createWatermarkedThumbnail } from "@/lib/utils/watermark";
+import { applyWatermarkToAnalysisDerivative, createWatermarkedThumbnail } from "@/lib/utils/watermark";
 import { storageBinaryBody } from "@/lib/supabase/storage-body";
 import { authorizeCronRequest } from "@/lib/security/cron";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { recordOperationalEvent } from "@/lib/monitoring/events";
+import { ensureAnalysisDerivative } from "@/lib/images/analysis-derivative-server";
 
 export const maxDuration = 60;
 
@@ -12,6 +13,9 @@ interface RepairPreviewImageRow {
   id: string;
   storage_path_original: string | null;
   storage_path_preview: string | null;
+  storage_path_analysis: string | null;
+  analysis_derivative_version: string | null;
+  upload_rotation_degrees: number | null;
 }
 
 export async function POST(req: NextRequest) {
@@ -33,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   const { data: img, error: fetchErr } = await admin
     .from("images")
-    .select("id, storage_path_original, storage_path_preview")
+    .select("id, storage_path_original, storage_path_preview, storage_path_analysis, analysis_derivative_version, upload_rotation_degrees")
     .eq("id", image_id)
     .single();
 
@@ -47,17 +51,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No original path on record" }, { status: 400 });
   }
 
-  const { data: downloaded, error: downloadErr } = await admin.storage
-    .from("images-original")
-    .download(originalPath);
-
-  if (downloadErr || !downloaded) {
-    return NextResponse.json({ error: `Download failed: ${downloadErr?.message}` }, { status: 500 });
+  let analysis;
+  try {
+    analysis = await ensureAnalysisDerivative(admin, image);
+  } catch {
+    return NextResponse.json({ error: "Analysis derivative generation failed" }, { status: 500 });
   }
-
-  const buffer = Buffer.from(await downloaded.arrayBuffer());
-  const watermarked = await applyWatermark(buffer);
-  const thumbnail = await createWatermarkedThumbnail(buffer);
+  const watermarked = await applyWatermarkToAnalysisDerivative(
+    analysis.bytes,
+    analysis.width || undefined,
+    analysis.height || undefined,
+  );
+  const thumbnail = await createWatermarkedThumbnail(analysis.bytes);
 
   const { error: uploadErr } = await admin.storage
     .from("images-preview")

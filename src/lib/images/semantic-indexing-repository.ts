@@ -1,4 +1,5 @@
 import "server-only";
+import { ensureAnalysisDerivative } from "./analysis-derivative-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   ClaimedSemanticEmbeddingJob,
@@ -36,17 +37,20 @@ export function createSupabaseSemanticIndexingRepository(): SemanticIndexingRepo
     async loadImage(imageId) {
       const { data, error } = await admin
         .from("images")
-        .select("id, status, lifecycle_status, is_published, approved_at, storage_path_preview")
+        .select("id, status, lifecycle_status, is_published, approved_at, storage_path_original, storage_path_analysis, analysis_derivative_version, upload_rotation_degrees")
         .eq("id", imageId)
         .maybeSingle();
       if (error) throw new Error("Semantic indexing image lookup failed");
       return data as SemanticIndexingImage | null;
     },
 
-    async downloadPreview(storagePath) {
-      const { data, error } = await admin.storage.from("images-preview").download(storagePath);
-      if (error || !data) throw new Error("Semantic indexing preview download failed");
-      return data;
+    async loadAnalysisInput(image) {
+      const derivative = await ensureAnalysisDerivative(admin, image);
+      return {
+        bytes: new Uint8Array(derivative.bytes),
+        mimeType: derivative.mimeType,
+        sourceSha256: derivative.sourceSha256,
+      };
     },
 
     async completeJob({ job, embedding, sourceSha256 }) {

@@ -8,6 +8,7 @@ import {
   type SemanticIndexingRepository,
 } from "./semantic-indexing-worker";
 import { VoyageEmbeddingError } from "./voyage-multimodal";
+import { AnalysisDerivativeError } from "./analysis-derivative";
 
 const job: ClaimedSemanticEmbeddingJob = {
   id: "job-1",
@@ -26,7 +27,10 @@ const image: SemanticIndexingImage = {
   lifecycle_status: "active",
   is_published: true,
   approved_at: "2026-08-18T00:00:00.000Z",
-  storage_path_preview: "photographer/image.webp",
+  storage_path_original: "photographer/image.tiff",
+  storage_path_analysis: "photographer/image.tiff.analysis-v1.jpg",
+  analysis_derivative_version: "analysis-v1",
+  upload_rotation_degrees: 0,
 };
 
 function setup() {
@@ -34,7 +38,11 @@ function setup() {
     enqueueEligibleImages: vi.fn().mockResolvedValue(0),
     claimJobs: vi.fn().mockResolvedValue([job]),
     loadImage: vi.fn().mockResolvedValue(image),
-    downloadPreview: vi.fn().mockResolvedValue(new Blob([Uint8Array.from([1, 2, 3])], { type: "image/webp" })),
+    loadAnalysisInput: vi.fn().mockResolvedValue({
+      bytes: Uint8Array.from([1, 2, 3]),
+      mimeType: "image/jpeg",
+      sourceSha256: "039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81",
+    }),
     completeJob: vi.fn().mockResolvedValue(true),
     markStale: vi.fn().mockResolvedValue(undefined),
     markFailed: vi.fn().mockResolvedValue(undefined),
@@ -70,16 +78,16 @@ describe("semantic indexing worker", () => {
     expect(result.ready).toBe(1);
   });
 
-  it("downloads an approved preview server-side and completes the claimed job", async () => {
+  it("loads a private clean derivative server-side and completes the claimed job", async () => {
     const { repository, provider } = setup();
     const result = await runSemanticIndexingWorker({ repository, provider, batchSize: 100 });
 
     expect(repository.claimJobs).toHaveBeenCalledWith(expect.objectContaining({ batchSize: 3 }));
-    expect(repository.downloadPreview).toHaveBeenCalledWith("photographer/image.webp");
+    expect(repository.loadAnalysisInput).toHaveBeenCalledWith(image);
     expect(provider.embedImageDocument).toHaveBeenCalledWith(expect.objectContaining({
       purpose: "document",
       bytes: Uint8Array.from([1, 2, 3]),
-      mimeType: "image/webp",
+      mimeType: "image/jpeg",
     }));
     expect(repository.loadImage).toHaveBeenCalledTimes(2);
     expect(repository.completeJob).toHaveBeenCalledWith(expect.objectContaining({
@@ -102,7 +110,7 @@ describe("semantic indexing worker", () => {
     const result = await runSemanticIndexingWorker({ repository, provider });
 
     expect(repository.markStale).toHaveBeenCalledWith(job, "IMAGE_NOT_INDEXABLE");
-    expect(repository.downloadPreview).not.toHaveBeenCalled();
+    expect(repository.loadAnalysisInput).not.toHaveBeenCalled();
     expect(provider.embedImageDocument).not.toHaveBeenCalled();
     expect(result.stale).toBe(1);
   });
@@ -136,5 +144,23 @@ describe("semantic indexing worker", () => {
       retryable: true,
     });
     expect(result).toEqual({ claimed: 1, ready: 0, failed: 1, stale: 0, retryable: 1 });
+  });
+
+  it("does not call the provider when a legacy original cannot create a clean derivative", async () => {
+    const { repository, provider } = setup();
+    vi.mocked(repository.loadAnalysisInput).mockRejectedValue(
+      new AnalysisDerivativeError("ANALYSIS_SOURCE_MISSING", false),
+    );
+
+    const result = await runSemanticIndexingWorker({ repository, provider });
+
+    expect(provider.embedImageDocument).not.toHaveBeenCalled();
+    expect(repository.markFailed).toHaveBeenCalledWith({
+      job,
+      code: "ANALYSIS_SOURCE_MISSING",
+      message: "Analysis derivative processing failed",
+      retryable: false,
+    });
+    expect(result.failed).toBe(1);
   });
 });

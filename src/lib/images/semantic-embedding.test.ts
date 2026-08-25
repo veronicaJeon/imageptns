@@ -36,7 +36,7 @@ describe("semantic image embedding configuration", () => {
       queryEnabled: true,
       provider,
       model: "multimodal-model",
-      modelVersion: "2026-08",
+      modelVersion: "2026-08+analysis-v1",
       dimensions: 512,
     });
   });

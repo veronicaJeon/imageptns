@@ -3,9 +3,13 @@ import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { previewUrl } from "@/lib/supabase/storage";
-import { applyWatermark, createWatermarkedThumbnail } from "@/lib/utils/watermark";
+import { applyWatermarkToAnalysisDerivative, createWatermarkedThumbnail } from "@/lib/utils/watermark";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
-import { normalizeRotationDegrees } from "@/lib/images/orientation";
+import { normalizeRotationDegrees, rotatedDimensions } from "@/lib/images/orientation";
+import {
+  analysisDerivativePath,
+  createAnalysisDerivative,
+} from "@/lib/images/analysis-derivative";
 import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryInput, syncImageCategoryAssignments } from "@/lib/images/category-server";
 import { requireApprovedPhotographer } from "@/lib/photographers/approval";
 import type { AuthorshipDeclaration } from "@/lib/onchain/registration";
@@ -258,11 +262,29 @@ export async function POST(req: NextRequest) {
     if (!reservation?.fingerprint_id) throw new Error("Failed to reserve image fingerprint");
     fingerprintReservationId = reservation.fingerprint_id;
 
-    const watermarked = await applyWatermark(buffer, uploadRotationDegrees);
-    const thumbnail = await createWatermarkedThumbnail(buffer, 320, 240, uploadRotationDegrees);
-    const watermarkedMetadata = await sharp(watermarked).metadata();
-    const displayWidth = watermarkedMetadata.width ?? verifiedImage.width;
-    const displayHeight = watermarkedMetadata.height ?? verifiedImage.height;
+    const analysis = await createAnalysisDerivative(buffer, uploadRotationDegrees);
+    const analysisPath = analysisDerivativePath(storage_path_original);
+    const watermarked = await applyWatermarkToAnalysisDerivative(
+      analysis.bytes,
+      analysis.width,
+      analysis.height,
+    );
+    const thumbnail = await createWatermarkedThumbnail(analysis.bytes, 320, 240);
+    const displayDimensions = rotatedDimensions(
+      verifiedImage.width,
+      verifiedImage.height,
+      uploadRotationDegrees,
+    );
+    const displayWidth = displayDimensions.width ?? verifiedImage.width;
+    const displayHeight = displayDimensions.height ?? verifiedImage.height;
+
+    const { error: analysisError } = await admin.storage
+      .from("images-analysis")
+      .upload(analysisPath, storageBinaryBody(analysis.bytes), {
+        contentType: analysis.mimeType,
+        upsert: true,
+      });
+    if (analysisError) throw analysisError;
 
     const { error: previewError } = await admin.storage
       .from("images-preview")
@@ -290,6 +312,8 @@ export async function POST(req: NextRequest) {
         storage_path_original,
         original_filename: typeof original_filename === "string" ? original_filename.trim().slice(0, 255) : null,
         storage_path_preview: storage_path_original,
+        storage_path_analysis: analysisPath,
+        analysis_derivative_version: analysis.version,
         storage_path_full: storage_path_original,
         width: displayWidth,
         height: displayHeight,
@@ -354,7 +378,13 @@ export async function POST(req: NextRequest) {
       console.error("[uploads] Failed to mark upload session consumed", consumedError);
     }
 
-    return NextResponse.json({ image: data }, { status: 201 });
+    return NextResponse.json({
+      image: {
+        ...data,
+        storage_path_analysis: undefined,
+        analysis_derivative_version: undefined,
+      },
+    }, { status: 201 });
   } catch (err) {
     console.error("[uploads] Upload processing failed:", err);
     if (createdImageId) {
@@ -368,6 +398,9 @@ export async function POST(req: NextRequest) {
       admin.storage.from("images-preview").remove([
         storage_path_original,
         `thumbs/${storage_path_original}`,
+      ]),
+      admin.storage.from("images-analysis").remove([
+        analysisDerivativePath(storage_path_original),
       ]),
       admin
         .from("upload_sessions")

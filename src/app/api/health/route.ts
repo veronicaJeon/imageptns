@@ -30,13 +30,17 @@ async function timedCheck(check: () => Promise<{ error: { message: string } | nu
 export async function GET() {
   const startedAt = Date.now();
   const admin = createAdminClient();
-  const [database, storage, previewIntegrity, latestAiResult] = await Promise.all([
+  const [database, storage, analysisStorage, previewIntegrity, latestAiResult] = await Promise.all([
     timedCheck(async () => {
       const result = await admin.from("platform_commerce_settings").select("id").eq("id", true).maybeSingle();
       return { error: result.error };
     }),
     timedCheck(async () => {
       const result = await admin.storage.from("images-preview").list("", { limit: 1 });
+      return { error: result.error };
+    }),
+    timedCheck(async () => {
+      const result = await admin.storage.from("images-analysis").list("", { limit: 1 });
       return { error: result.error };
     }),
     timedCheck(async () => {
@@ -85,6 +89,7 @@ export async function GET() {
 
   const coreHealthy = database.status === "ok"
     && storage.status === "ok"
+    && analysisStorage.status === "ok"
     && previewIntegrity.status === "ok";
   const degraded = !coreHealthy || ai.status === "error" || ai.status === "stale";
   const durationMs = Date.now() - startedAt;
@@ -99,6 +104,7 @@ export async function GET() {
     metadata: {
       database: database.status,
       storage: storage.status,
+      analysisStorage: analysisStorage.status,
       previewIntegrity: previewIntegrity.status,
       ai: ai.status,
     },
@@ -107,7 +113,7 @@ export async function GET() {
   return NextResponse.json(
     {
       status: degraded ? "degraded" : "ok",
-      checks: { database, storage, previewIntegrity, ai },
+      checks: { database, storage, analysisStorage, previewIntegrity, ai },
       durationMs,
       timestamp: new Date().toISOString(),
     },
@@ -115,7 +121,7 @@ export async function GET() {
       status: coreHealthy ? 200 : 503,
       headers: {
         "Cache-Control": "no-store",
-        "Server-Timing": `total;dur=${durationMs}, db;dur=${database.latencyMs}, storage;dur=${storage.latencyMs}, preview;dur=${previewIntegrity.latencyMs}`,
+        "Server-Timing": `total;dur=${durationMs}, db;dur=${database.latencyMs}, storage;dur=${storage.latencyMs}, analysis;dur=${analysisStorage.latencyMs}, preview;dur=${previewIntegrity.latencyMs}`,
       },
     },
   );
