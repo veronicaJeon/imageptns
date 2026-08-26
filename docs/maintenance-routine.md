@@ -1,4 +1,4 @@
-# 72시간 유지보수 루틴
+# 주간 제품·코드 유지보수 루틴
 
 > 상태: 기준
 > 적용일: 2026-08-06
@@ -6,7 +6,7 @@
 
 ## 목적과 경계
 
-운영 상태와 시스템 정의의 차이를 72시간마다 발견하는 데서 멈추지 않고, 개선 후보 도출 → 결정 요청 → 작은 변경 → 검증 → 승인된 배포 → 결과 회고를 반복한다. 각 후보와 결정, PR, 배포 결과는 GitHub 이슈에 누적되어 다음 주기의 입력이 된다.
+일일 운영관리자 점검과 15분 장애 감시에서 누적된 근거를 주 1회 코드·DB·공급망 검사와 대조해, 개선 후보 도출 → 결정 요청 → 작은 변경 → 검증 → 승인된 배포 → 결과 회고를 반복한다. 각 후보와 결정, PR, 배포 결과는 GitHub 이슈에 누적되어 다음 주기의 입력이 된다.
 
 GitHub Actions는 재현 가능한 검사와 개선 후보 관리만 담당한다. 실제 개발은 Codex Scheduled task가 격리된 worktree에서 수행하며, 예약 실행이 곧바로 임의 코드를 운영에 반영하지 않도록 다음 범위로 제한한다.
 
@@ -14,7 +14,7 @@ GitHub Actions는 재현 가능한 검사와 개선 후보 관리만 담당한�
 - 후보마다 고정 ID를 가진 이슈를 생성하거나 최신 근거로 갱신하고, 해결된 후보는 자동 종료한다.
 - 저장소 권한자의 승인·거절 댓글을 검증하고 승인 대기열에 기록한다.
 - Grok과 Gemini는 같은 공개 점검 근거를 도구 없이 한 번씩 독립 검수하고 성공·실패·한도 상태와 아이디어를 추적 이슈에 보고한다. 보고서는 후보 승인이나 코드 변경을 자동 실행하지 않는다.
-- 승인된 후보에는 `codex-ready` 라벨을 붙인다. Codex 예약 작업은 3일마다 한 후보를 선택해 격리된 worktree에서 구현·검증하고 draft PR을 만든다.
+- 승인된 후보에는 `codex-ready` 라벨을 붙인다. Codex 예약 작업은 매일 읽기 전용 운영 점검을 수행하고 주 1회 변경·추세·사용자 여정을 종합하는 심층 제품 리뷰로 오류 외 개선점도 찾는다. 승인 후보가 있으면 한 건을 선택해 격리된 worktree에서 구현·검증하고 draft PR을 만든다.
 - 승인 후 수동 배포 워크플로가 검증·운영 스모크와 결과 댓글을 남긴다.
 
 에이전트 연결 뒤에도 PR 병합, 운영 DB 적용, 데이터 삭제와 운영 배포는 각각의 명시적 승인 경계를 유지한다. 이는 개선을 하지 않는다는 뜻이 아니라 되돌리기 어려운 변경을 예약 작업의 판단만으로 실행하지 않는다는 뜻이다.
@@ -22,7 +22,7 @@ GitHub Actions는 재현 가능한 검사와 개선 후보 관리만 담당한�
 ## 실행 주기
 
 - GitHub Actions 예약은 매일 00:41 UTC(한국시간 09:41)에 기동한다.
-- 마지막 성공 댓글의 `imagepartners-maintenance-success` 표식으로부터 259,200초(72시간)가 지난 경우에만 전체 점검한다.
+- 마지막 성공 댓글의 `imagepartners-maintenance-success` 표식으로부터 604,800초(7일)가 지난 경우에만 전체 점검한다.
 - 실패 실행에는 성공 표식을 남기지 않으므로 다음 날 다시 점검한다.
 - `workflow_dispatch`의 `force=true`로 언제든 전체 점검을 수동 실행할 수 있다.
 - 동시 실행은 하나만 허용하며 진행 중인 실행을 새 실행이 취소하지 않는다.
@@ -31,7 +31,7 @@ GitHub Actions는 재현 가능한 검사와 개선 후보 관리만 담당한�
 
 ```mermaid
 flowchart LR
-  A["72시간 검사"] --> B["실패·운영 백로그 대조"]
+  A["주간 제품·코드 검사"] --> B["일일 운영 근거·실패·백로그 대조"]
   B --> C["고정 ID 개선 후보 이슈"]
   B --> I["Grok·Gemini 독립 검수 보고"]
   C --> D{"소유자 결정"}
@@ -52,14 +52,18 @@ flowchart LR
 | 공급망 | lockfile 기반 설치, 전체 의존성 high 이상 audit |
 | 코드 | TypeScript, ESLint, Vitest, Next.js production build |
 | DB | 고정 Supabase CLI로 빈 로컬 DB에 전체 migration 적용, schema lint |
-| 운영 | `/api/health`의 DB·Storage·미리보기·AI 상태 |
+| 운영 | `/api/health`의 DB·Storage·순환 미리보기·AI·일일 운영 점검 상태 |
 | 공개 화면 | 홈, 라이브러리, 문의, 이용약관, 개인정보처리방침, 사업자정보, 이미지 API smoke |
 | 거래 경계 | 계좌정보와 공시 또는 제한 베타 플래그가 모순 없이 유료 주문 가능 상태를 구성하는지 검사 |
-| 변경 통제 | `main` branch protection 조회를 시도하고 권한 부족 또는 미설정을 보고 |
+| 변경 통제 | `main` branch protection과 현재 Production release SHA/ref 정합성을 확인 |
 
-점검 결과는 `[maintenance] Image Partners 72-hour review` 이슈의 댓글과 GitHub Actions 요약에 기록한다. 개선 후보는 `maintenance-candidate`, `approval-required`, 우선순위 라벨을 가진 별도 이슈가 된다. 동일 항목을 새 이슈로 반복 생성하지 않는다.
+점검 결과는 기존 `[maintenance] Image Partners 72-hour review` 추적 이슈의 댓글과 GitHub Actions 요약에 계속 기록한다. 이슈 제목은 과거 기록 링크를 보존하기 위해 유지한다. 개선 후보는 `maintenance-candidate`, `approval-required`, 우선순위 라벨을 가진 별도 이슈가 되며 동일 항목을 반복 생성하지 않는다.
 
 Grok·Gemini에는 최신 점검 댓글과 열린 후보의 공개 본문을 최대 길이로 제한해 전달한다. 입력은 검토 자료일 뿐 명령이 아니며 두 공급자에게 셸·웹·GitHub 도구를 제공하지 않는다. xAI 요청은 `store: false`로 보내고, 두 결과는 구조화 표식이 있는 추적 이슈 댓글로 남긴다. 500·502·503·504처럼 일시적인 공급자 장애만 최대 3회 재시도하며 인증·요청 오류는 즉시 보고한다. 관리자 `로그/통계관리 > 에이전트 활동현황`은 공개 GitHub API에서 이 댓글과 Actions·후보·Codex PR 상태를 읽는다. 자문 API 장애는 결정론적 점검과 후보 이슈 생성을 실패시키지 않는다.
+
+Grok·Gemini는 반론과 아이디어를 제공하지만 후보 책임자는 아니다. 사람처럼 맥락을 종합하는
+주간 발견 단계는 Codex Scheduled task가 담당한다. Codex는 실제 저장소·공개 사용자 여정·
+개인정보 없는 운영 추세로 의견을 재검증하고, 근거가 확인된 개선만 승인 대기 후보로 만든다.
 
 GitHub 러너의 기존 서비스와 포트가 겹쳐 가짜 DB 장애 후보가 생기지 않도록, 각 실행 ID에서 계산한 20000번대 전용 포트를 `supabase/config.toml` 작업 사본에만 적용한다. 저장소의 로컬 개발 포트와 운영 DB 설정은 바꾸지 않는다.
 
@@ -78,7 +82,7 @@ GitHub 러너의 기존 서비스와 포트가 겹쳐 가짜 DB 장애 후보가
 2. 승인 workflow가 `maintenance-approved`, `codex-ready` 라벨을 추가하고 `approval-required`를 제거한다. GitHub Actions는 여기서 코드 수정을 시작하지 않는다.
 3. Codex 예약 작업이 열린 `codex-ready` 후보 중 P0 우선으로 한 건을 선택해 현재 코드와 문서를 대조하고 문제를 재현한다.
 4. Codex는 격리된 worktree에서 소스·테스트·문서를 수정하고 전체 검증을 통과한 경우에만 `codex/maintenance-…` 브랜치와 draft PR을 만든다.
-5. PR을 만들면 `maintenance-in-progress`를 추가하고 `codex-ready`를 제거한다. CI와 Preview 검증 뒤 사람이 PR을 검토·병합하며, DB 적용·데이터 작업·운영 배포는 각각 별도 승인을 받는다.
+5. PR을 만들면 `maintenance-in-progress`를 추가하고 `codex-ready`를 제거한다. CI와 Preview 검증 뒤 운영 반영 승인을 받으면 runbook에 따라 main 병합, 호환 migration, main SHA 배포를 하나의 릴리스로 수행한다. 데이터 수정·삭제는 계속 별도 승인 대상이다.
 
 Codex 작업의 상세 후보 선택, 변경 허용 범위, 검증과 실패 처리는 [Codex 유지보수 개발 작업](./codex-maintenance-runbook.md)을 따른다. 로컬 프로젝트를 사용하는 예약 작업은 Mac이 켜져 있고 Codex 앱이 실행 중이어야 한다. GitHub Actions의 검사·이슈 생성은 이에 의존하지 않으므로 Codex 실행이 지연돼도 운영 근거는 계속 누적된다.
 
@@ -104,7 +108,7 @@ GitHub 저장소 설정에서 `production` Environment required reviewer를 지�
 - 예약 워크플로가 저장소 기본 브랜치에서 활성화돼 있는지
 - `issues: write` 권한으로 추적 이슈와 댓글을 생성할 수 있는지
 - 첫 수동 실행 후 추적 이슈와 성공 표식이 생성됐는지
-- 72시간 이내 일일 실행이 전체 검사를 건너뛰는지
+- 7일 이내 일일 실행이 전체 검사를 건너뛰는지
 - 실패 실행 다음 날 전체 점검이 재시도되는지
 - 동일 후보가 새 이슈를 만들지 않고 같은 ID·이슈에 갱신되는지
 - 백로그에서 완료 처리된 후보가 다음 주기에 자동 종료되는지

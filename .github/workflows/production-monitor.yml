@@ -33,11 +33,14 @@ jobs:
             && payload?.checks?.storage?.status === "ok"
             && payload?.checks?.previewIntegrity?.status === "ok";
           const aiHealthy = !["error", "stale"].includes(payload?.checks?.ai?.status);
-          if (!coreHealthy || !aiHealthy) {
+          const operationsHealthy = !["error", "stale"].includes(payload?.checks?.operations?.status);
+          const releaseAligned = payload?.release?.commitSha === process.env.GITHUB_SHA
+            && payload?.release?.commitRef === "main";
+          if (!coreHealthy || !aiHealthy || !operationsHealthy || !releaseAligned) {
             console.error(JSON.stringify({ code, status: payload?.status, checks: payload?.checks }));
             process.exit(1);
           }
-          console.log(JSON.stringify({ code, status: payload.status, durationMs: payload.durationMs, checks: payload.checks }));
+          console.log(JSON.stringify({ code, status: payload.status, durationMs: payload.durationMs, checks: payload.checks, releaseAligned }));
           NODE
 
       - name: Open or update incident issue

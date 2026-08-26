@@ -120,7 +120,7 @@ export default function AgentActivityPage() {
         <div>
           <h1 className="font-headline text-2xl font-extrabold text-on-surface">에이전트 활동현황</h1>
           <p className="mt-1 max-w-3xl text-sm text-outline">
-            GitHub는 검사와 후보 도출, Grok·Gemini는 독립 검수와 아이디어, Codex는 승인된 개발을 담당합니다. 외부 에이전트의 의견은 자동 결정이 아니라 관리자 검토 자료입니다.
+            GitHub는 결정론적 검사, Grok·Gemini는 독립 반론, Codex는 일일 운영 진단·주간 제품 발견과 승인된 개발을 담당합니다. 외부 에이전트의 의견은 자동 결정이 아니라 관리자 검토 자료입니다.
           </p>
         </div>
         <AdminButton onClick={() => void load()} disabled={loading} variant="primary">
@@ -234,7 +234,7 @@ export default function AgentActivityPage() {
             <AdminListSurface className="p-10 text-center xl:col-span-2">
               <span className="material-symbols-outlined text-4xl text-outline">smart_toy</span>
               <p className="mt-3 text-sm font-bold text-on-surface">아직 검수 보고가 없습니다.</p>
-              <p className="mt-1 text-xs text-outline">다음 72시간 점검 뒤 Grok과 Gemini의 성공 또는 실패 결과가 모두 표시됩니다.</p>
+              <p className="mt-1 text-xs text-outline">다음 주간 제품·코드 점검 뒤 Grok과 Gemini의 성공 또는 실패 결과가 모두 표시됩니다.</p>
             </AdminListSurface>
           )}
         </div>

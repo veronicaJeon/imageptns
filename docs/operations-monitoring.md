@@ -2,12 +2,12 @@
 
 ## 현재 구성
 
-- `GET /api/health`: 운영 DB와 공개 `images-preview`, 비공개 `images-analysis` 스토리지를 각각 최대 5초 안에 확인한다. 최근 Mistral 합성 진단 결과도 함께 반환한다.
+- `GET /api/health`: 운영 DB와 공개 `images-preview`, 비공개 `images-analysis` 스토리지를 각각 최대 5초 안에 확인한다. 15분마다 최신·최초 이미지 방향을 바꾸어 최대 12개의 실제 JPEG를 확인하고, 최근 Mistral 합성 진단·일일 운영관리자 점검·Vercel release SHA/ref도 함께 반환한다.
 - GitHub Actions `Production monitor`: 운영 URL을 매시 7·22·37·52분에 외부에서 호출한다.
-- 실패 시 `[monitor] Production health check failed` GitHub 이슈를 한 건만 유지하고, 같은 장애의 추가 실패는 댓글로 누적한다. 복구되면 자동 종료한다.
+- 실패 시 `[monitor] Production health check failed` GitHub 이슈를 한 건만 유지하고, 같은 장애의 추가 실패는 댓글로 누적한다. DB·Storage·이미지·AI·일일 점검 오류뿐 아니라 배포 SHA/ref가 원격 `main`과 다를 때도 실패한다. 복구되면 자동 종료한다.
 - 관리자 `로그/통계관리 > 운영 모니터링`: 최근 24시간 가용성, 응답시간, 포착된 서버 오류, AI 성공·실패와 운영 이벤트를 표시한다.
-- 관리자 `로그/통계관리 > 에이전트 활동현황`: GitHub 72시간 검사, Grok·Gemini 자문 보고, 승인 후보 대기열과 Codex draft PR을 공개 GitHub 근거와 함께 표시한다.
-- 관리자 AI 진단과 매일 `/api/cron/ai-synthetic` 진단은 고객 사진 대신 단색 합성 JPEG를 사용해 실제 Mistral 모델·인증·응답 파서를 확인한다. 결제 공개 전까지 사용하지 않는 구독 갱신 cron 슬롯을 이 진단에 사용한다.
+- 관리자 `로그/통계관리 > 에이전트 활동현황`: GitHub 주간 제품·코드 검사, Grok·Gemini 자문 보고, 승인 후보 대기열과 Codex draft PR을 공개 GitHub 근거와 함께 표시한다.
+- 매일 `/api/cron/operations-review`는 고객 사진 전체의 공개 미리보기 무결성, 처리 SLA, 분석 사본·임베딩·이메일·서버 오류와 최근 핵심 활동을 개인정보 없이 집계한다. 같은 실행에서 단색 합성 JPEG로 Mistral을 확인하고 Voyage/NVIDIA 대기열도 한 건씩 처리한다. 결제 공개 전까지 사용하지 않는 구독 갱신 cron 슬롯을 이 일일 점검에 사용한다.
 - 운영 이벤트에는 요청 본문, 이미지, 이메일, 사용자 식별자 또는 API 키를 저장하지 않는다. 90일이 지난 이벤트는 매일 삭제한다.
 
 ## 초기 경보 기준

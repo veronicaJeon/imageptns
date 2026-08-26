@@ -30,7 +30,8 @@ async function timedCheck(check: () => Promise<{ error: { message: string } | nu
 export async function GET() {
   const startedAt = Date.now();
   const admin = createAdminClient();
-  const [database, storage, analysisStorage, previewIntegrity, latestAiResult] = await Promise.all([
+  const reversePreviewSample = Math.floor(Date.now() / (15 * 60 * 1000)) % 2 === 1;
+  const [database, storage, analysisStorage, previewIntegrity, latestAiResult, latestOperationsResult] = await Promise.all([
     timedCheck(async () => {
       const result = await admin.from("platform_commerce_settings").select("id").eq("id", true).maybeSingle();
       return { error: result.error };
@@ -51,8 +52,8 @@ export async function GET() {
         .eq("lifecycle_status", "active")
         .eq("is_published", true)
         .not("storage_path_preview", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(3);
+        .order("created_at", { ascending: reversePreviewSample })
+        .limit(12);
       if (error) return { error };
 
       for (const image of data ?? []) {
@@ -77,6 +78,13 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    admin
+      .from("operational_events")
+      .select("status, created_at, duration_ms, error_code, metadata")
+      .eq("event_type", "operations_daily_review")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const latestAi = latestAiResult.data;
@@ -87,11 +95,28 @@ export async function GET() {
       ? { status: "stale" as const, checkedAt: latestAi.created_at, latencyMs: latestAi.duration_ms }
       : { status: latestAi.status === "ok" ? "ok" as const : "error" as const, checkedAt: latestAi.created_at, latencyMs: latestAi.duration_ms };
 
+  const latestOperations = latestOperationsResult.data;
+  const operationsAgeMs = latestOperations ? Date.now() - new Date(latestOperations.created_at).getTime() : null;
+  const operations = !latestOperations
+    ? { status: "unknown" as const, checkedAt: null, latencyMs: null, findingCount: null }
+    : operationsAgeMs != null && operationsAgeMs > 36 * 60 * 60 * 1000
+      ? { status: "stale" as const, checkedAt: latestOperations.created_at, latencyMs: latestOperations.duration_ms, findingCount: null }
+      : {
+          status: latestOperations.status as "ok" | "warning" | "error",
+          checkedAt: latestOperations.created_at,
+          latencyMs: latestOperations.duration_ms,
+          findingCount: typeof latestOperations.metadata?.findingCount === "number" ? latestOperations.metadata.findingCount : null,
+        };
+
   const coreHealthy = database.status === "ok"
     && storage.status === "ok"
     && analysisStorage.status === "ok"
     && previewIntegrity.status === "ok";
-  const degraded = !coreHealthy || ai.status === "error" || ai.status === "stale";
+  const degraded = !coreHealthy
+    || ai.status === "error"
+    || ai.status === "stale"
+    || operations.status === "error"
+    || operations.status === "stale";
   const durationMs = Date.now() - startedAt;
 
   await recordOperationalEvent({
@@ -107,13 +132,18 @@ export async function GET() {
       analysisStorage: analysisStorage.status,
       previewIntegrity: previewIntegrity.status,
       ai: ai.status,
+      operations: operations.status,
     },
   });
 
   return NextResponse.json(
     {
       status: degraded ? "degraded" : "ok",
-      checks: { database, storage, analysisStorage, previewIntegrity, ai },
+      checks: { database, storage, analysisStorage, previewIntegrity, ai, operations },
+      release: {
+        commitSha: process.env.VERCEL_GIT_COMMIT_SHA?.trim() || null,
+        commitRef: process.env.VERCEL_GIT_COMMIT_REF?.trim() || null,
+      },
       durationMs,
       timestamp: new Date().toISOString(),
     },

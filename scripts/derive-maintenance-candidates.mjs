@@ -24,6 +24,8 @@ const checkDefinitions = {
   health: ["P0", "운영 health 이상 복구", "실패한 구성요소를 재현하고 사용자 영향·롤백 여부를 먼저 판단한다."],
   smoke: ["P0", "공개 핵심 경로 장애 복구", "실패 경로와 HTTP 상태를 확인하고 Preview 검증 후 운영 반영한다."],
   checkout_readiness: ["P0", "계좌이체 공개 경계 복구", "계좌·공시·베타 플래그의 모순을 해소하고 주문 E2E를 재실행한다."],
+  operations_review: ["P1", "일일 운영관리자 경고 조사", "운영 지연·누락·실패 지표를 재현하고 담당 조치 또는 코드 수정으로 해소한다."],
+  release_alignment: ["P0", "main·Production 릴리스 정합성 복구", "운영 배포 SHA와 원격 main을 일치시키고 배포 게이트의 회귀 검사를 추가한다."],
 };
 
 function candidateId(source, title) {
