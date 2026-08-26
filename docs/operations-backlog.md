@@ -12,7 +12,7 @@
 | P0 | 완료·정기 회귀 | 계좌이체 주문 신뢰성 | 원자 생성, idempotency, 동의 스냅샷, 접수·승인·취소 메일 outbox, 직접 insert 차단을 운영 반영했다. 임시 계정 E2E는 주문·승인·취소·메일·다운로드를 확인하고 데이터를 정리한다. |
 | P0 | 훈련 필요 | DB·Storage 백업 복구 | 격리 Supabase에서 복구와 참조 무결성을 검증하고 측정된 RTO/RPO를 기록한다. |
 | P0 | 저장소 권한 필요 | main·Production 배포 게이트 | main 필수 CI·PR 승인과 Production Environment 승인자를 설정한다. |
-| P1 | 코드 수정·검증 대기 | 운영 모니터링 컬럼·경로 | 일일 운영관리자 점검 변경에서 `data_retention_runs.result/created_at` 조회와 실제 AI cron 이벤트 경로로 수정했다. CI·운영 반영 후 관리자 화면과 첫 cron 기록을 확인한다. |
+| P1 | 운영 핫픽스 검증 중 | 운영 모니터링 컬럼·경로 | 일일 운영관리자 점검 변경에서 잘못된 컬럼·이벤트 경로를 수정했다. 2026-08-26 첫 운영 호출에서 새 cron 함수의 Sharp/libvips 누락을 확인해 운영 점검·별도 인덱싱·관리자 인덱싱 함수에 Linux 런타임 파일을 포함했으며, 재배포 후 첫 cron 기록과 관리자 화면을 확인한다. |
 | P1 | 도입 검토 | 외부 오류 추적·호출 알림 | 개인정보 마스킹을 전제로 P0 오류 즉시 알림과 release 연계를 추가한다. |
 | P1 | 제거 검토 | 미사용 AI SDK | Anthropic·Google Generative AI SDK가 실제 미사용임을 재확인하고 운영 의존성에서 제거한다. |
 | P1 | 완료·정기 관찰 | GitHub Actions Node 런타임 | checkout·setup-node v5와 고정된 Supabase setup action으로 앱·fresh migration CI가 통과했고 기존 Node 20 action 경고가 제거됐다. |

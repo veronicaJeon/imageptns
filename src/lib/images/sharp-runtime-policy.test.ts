@@ -11,5 +11,8 @@ describe("Vercel Sharp runtime packaging", () => {
     expect(config).toContain('"/api/images/thumbnail": sharpRuntimeFiles');
     expect(config).toContain('"/api/images/search-by-photo": sharpRuntimeFiles');
     expect(config).toContain('"/api/uploads": sharpRuntimeFiles');
+    expect(config).toContain('"/api/admin/semantic-indexing": sharpRuntimeFiles');
+    expect(config).toContain('"/api/cron/operations-review": sharpRuntimeFiles');
+    expect(config).toContain('"/api/cron/semantic-indexing": sharpRuntimeFiles');
   });
 });
