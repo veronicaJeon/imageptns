@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AdminButton,
   AdminChip,
   adminStatusTone,
 } from "@/components/admin/AdminPrimitives";
+import { cn } from "@/lib/utils/cn";
 
 interface PaymentRequest {
   id: string;
@@ -56,10 +57,28 @@ const STATUS_LABELS: Record<string, string> = {
   not_applicable: "-",
 };
 
+type RequestTab = "pending" | "processed" | "all";
+
+function isPendingRequest(request: PaymentRequest) {
+  return request.status === "pending" && request.offline_payment_status === "requested";
+}
+
+function isOverdueRequest(request: PaymentRequest) {
+  const requestedAt = request.offline_payment_requested_at ?? request.created_at;
+  return isPendingRequest(request) && Date.now() - new Date(requestedAt).getTime() >= 24 * 60 * 60 * 1000;
+}
+
 export default function AdminPaymentRequestsPage() {
   const [requests, setRequests] = useState<PaymentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [tab, setTab] = useState<RequestTab>("pending");
+
+  const pendingCount = useMemo(() => requests.filter(isPendingRequest).length, [requests]);
+  const processedCount = requests.length - pendingCount;
+  const visibleRequests = useMemo(() => requests.filter((request) => (
+    tab === "all" || (tab === "pending" ? isPendingRequest(request) : !isPendingRequest(request))
+  )), [requests, tab]);
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
@@ -123,27 +142,54 @@ export default function AdminPaymentRequestsPage() {
   return (
     <div className="mx-auto w-full max-w-[1500px] p-4 md:p-8 lg:p-10">
       <div className="mb-8">
-        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">결제요청목록</h1>
-        <p className="mt-1 text-sm text-outline">계좌이체 요청을 확인하고 입금 확인 후 주문 확정 또는 취소 처리합니다.</p>
+        <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">입금 확인 요청</h1>
+        <p className="mt-1 text-sm text-outline">구매자의 계좌이체 요청을 확인하고 실제 입금 확인 후 주문 확정 또는 취소 처리합니다.</p>
+      </div>
+
+      <div className="mb-6 grid grid-cols-3 gap-1 rounded-lg bg-surface-container-lowest p-1 shadow-ghost sm:w-fit">
+        {([
+          { key: "pending", label: `확인 대기 ${pendingCount}` },
+          { key: "processed", label: `처리 완료 ${processedCount}` },
+          { key: "all", label: `전체 ${requests.length}` },
+        ] as const).map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={cn(
+              "rounded-lg px-3 py-2 text-xs font-bold transition-colors sm:px-4",
+              tab === key ? "bg-primary text-white" : "text-on-surface-variant hover:bg-surface-container-high",
+            )}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {loading ? (
         <div className="flex min-h-[40vh] items-center justify-center">
           <span className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
-      ) : requests.length === 0 ? (
+      ) : visibleRequests.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-24 text-outline">
-          <span className="material-symbols-outlined text-5xl">receipt_long</span>
-          <p>계좌이체 요청이 없습니다.</p>
+          <span className="material-symbols-outlined text-5xl">{tab === "pending" ? "check_circle" : "receipt_long"}</span>
+          <p>{tab === "pending" ? "입금 확인 대기 요청이 없습니다." : "해당 요청이 없습니다."}</p>
         </div>
       ) : (
         <div className="grid gap-4">
-          {requests.map((request) => {
-            const pending = request.status === "pending" && request.offline_payment_status === "requested";
+          {visibleRequests.map((request) => {
+            const pending = isPendingRequest(request);
+            const overdue = isOverdueRequest(request);
             const failedEmails = request.order_email_outbox?.filter((email) => email.status === "failed") ?? [];
             const pendingEmails = request.order_email_outbox?.filter((email) => email.status === "pending" || email.status === "sending") ?? [];
             return (
-              <article key={request.id} className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-ghost">
+              <article
+                key={request.id}
+                className={cn(
+                  "rounded-lg border bg-surface-container-lowest p-5 shadow-ghost",
+                  overdue ? "border-error/50" : "border-outline-variant/30",
+                )}
+              >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -151,6 +197,7 @@ export default function AdminPaymentRequestsPage() {
                       <AdminChip tone={adminStatusTone(request.offline_payment_status)}>
                         {STATUS_LABELS[request.offline_payment_status] ?? request.offline_payment_status}
                       </AdminChip>
+                      {overdue && <AdminChip tone="danger">24시간 초과</AdminChip>}
                     </div>
                     <p className="mt-1 text-sm text-on-surface-variant">
                       {request.billing_name || request.buyer?.full_name || "이름 없음"} · {request.billing_email || "이메일 없음"}

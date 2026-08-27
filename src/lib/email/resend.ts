@@ -297,7 +297,7 @@ export async function notifyOpsBankTransferRequested(opts: {
   await sendEmail({
     to: OPS_EMAIL,
     replyTo: opts.buyerEmail,
-    subject: `[계좌이체 요청] ${opts.orderNumber} — ₩${opts.totalKrw.toLocaleString("ko-KR")}`,
+    subject: `[입금 확인 요청] ${opts.orderNumber} — ₩${opts.totalKrw.toLocaleString("ko-KR")}`,
     html: `
       <p><strong>구매자:</strong> ${escapeHtml(opts.buyerName)} (${escapeHtml(opts.buyerEmail)})</p>
       <p><strong>주문번호:</strong> ${escapeHtml(opts.orderNumber)}</p>
