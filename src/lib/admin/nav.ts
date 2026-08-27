@@ -2,11 +2,15 @@ export interface AdminNavItem {
   href: string;
   icon: string;
   label: string;
+  countKey?: AdminPendingCountKey;
 }
 
+export type AdminPendingCountKey = "general" | "photo" | "payment";
+
 export const ADMIN_NAV_PRIMARY_ITEMS: AdminNavItem[] = [
-  { href: "/admin/support", icon: "support_agent", label: "일반 문의" },
-  { href: "/admin/photo-requests", icon: "add_photo_alternate", label: "이미지 문의" },
+  { href: "/admin/support", icon: "support_agent", label: "일반 문의", countKey: "general" },
+  { href: "/admin/photo-requests", icon: "add_photo_alternate", label: "이미지 문의", countKey: "photo" },
+  { href: "/admin/payment-requests", icon: "account_balance", label: "입금 확인 요청", countKey: "payment" },
 ];
 
 export interface AdminNavGroup {
@@ -46,7 +50,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     icon: "payments",
     label: "비용/정산관리",
     items: [
-      { href: "/admin/payment-requests", icon: "account_balance", label: "결제요청목록" },
       { href: "/admin/payouts", icon: "payments", label: "정산 관리" },
     ],
   },

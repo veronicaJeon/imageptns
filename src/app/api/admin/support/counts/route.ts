@@ -7,7 +7,7 @@ export async function GET() {
   if (!adminUser) return forbidden();
 
   const admin = createAdminClient();
-  const [generalResult, photoResult] = await Promise.all([
+  const [generalResult, photoResult, paymentResult] = await Promise.all([
     admin
       .from("contact_submissions")
       .select("id", { count: "exact", head: true })
@@ -18,11 +18,17 @@ export async function GET() {
       .select("id", { count: "exact", head: true })
       .eq("inquiry_type", "photo_request")
       .eq("request_status", "submitted"),
+    admin
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .eq("payment_provider", "bank_transfer")
+      .eq("offline_payment_status", "requested"),
   ]);
 
-  if (generalResult.error || photoResult.error) {
+  if (generalResult.error || photoResult.error || paymentResult.error) {
     return NextResponse.json(
-      { error: generalResult.error?.message ?? photoResult.error?.message },
+      { error: generalResult.error?.message ?? photoResult.error?.message ?? paymentResult.error?.message },
       { status: 500 },
     );
   }
@@ -30,5 +36,6 @@ export async function GET() {
   return NextResponse.json({
     general: generalResult.count ?? 0,
     photo: photoResult.count ?? 0,
+    payment: paymentResult.count ?? 0,
   });
 }

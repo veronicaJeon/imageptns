@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/store/auth";
 import {
   ADMIN_NAV_GROUPS,
   ADMIN_NAV_PRIMARY_ITEMS,
+  type AdminPendingCountKey,
   adminNavGroupIsActive,
   adminNavItemIsActive,
   defaultOpenAdminGroups,
@@ -19,7 +20,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, init, signOut } = useAuth();
   const [openGroupIds, setOpenGroupIds] = useState<string[]>(() => defaultOpenAdminGroups(ADMIN_NAV_GROUPS, pathname));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [inquiryCounts, setInquiryCounts] = useState({ general: 0, photo: 0 });
+  const [pendingCounts, setPendingCounts] = useState<Record<AdminPendingCountKey, number>>({
+    general: 0,
+    photo: 0,
+    payment: 0,
+  });
   const visibleOpenGroupIds = useMemo(() => {
     const activeGroups = defaultOpenAdminGroups(ADMIN_NAV_GROUPS, pathname);
     return Array.from(new Set([...openGroupIds, ...activeGroups]));
@@ -31,12 +36,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const loadCounts = () => fetch("/api/admin/support/counts")
       .then((response) => response.ok ? response.json() : null)
       .then((data) => {
-        if (active && data) setInquiryCounts({ general: data.general ?? 0, photo: data.photo ?? 0 });
+        if (active && data) setPendingCounts({
+          general: data.general ?? 0,
+          photo: data.photo ?? 0,
+          payment: data.payment ?? 0,
+        });
       })
       .catch(() => {});
     loadCounts();
-    const timer = window.setInterval(loadCounts, 60_000);
-    return () => { active = false; window.clearInterval(timer); };
+    const refreshOnFocus = () => loadCounts();
+    window.addEventListener("focus", refreshOnFocus);
+    const timer = window.setInterval(loadCounts, 30_000);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refreshOnFocus);
+      window.clearInterval(timer);
+    };
   }, [pathname]);
 
   function toggleGroup(groupId: string) {
@@ -96,9 +111,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   function renderPrimaryItems(mode: "desktop" | "mobile") {
-    return ADMIN_NAV_PRIMARY_ITEMS.map(({ href, icon, label }) => {
+    return ADMIN_NAV_PRIMARY_ITEMS.map(({ href, icon, label, countKey }) => {
       const isActive = adminNavItemIsActive(href, pathname);
-      const count = href === "/admin/support" ? inquiryCounts.general : inquiryCounts.photo;
+      const count = countKey ? pendingCounts[countKey] : 0;
       return (
         <Link
           key={href}
