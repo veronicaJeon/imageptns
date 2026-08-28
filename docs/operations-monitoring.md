@@ -4,6 +4,7 @@
 
 - `GET /api/health`: 운영 DB와 공개 `images-preview`, 비공개 `images-analysis` 스토리지를 각각 최대 5초 안에 확인한다. 15분마다 최신·최초 이미지 방향을 바꾸어 최대 12개의 실제 JPEG를 확인하고, 최근 Mistral 합성 진단·일일 운영관리자 점검·Vercel release SHA/ref도 함께 반환한다.
 - GitHub Actions `Production monitor`: 운영 URL을 매시 7·22·37·52분에 외부에서 호출한다.
+- 수동 Production 배포 검증은 health와 공개 핵심 경로에 더해 `한강` 키워드 검색이 HTTP 200으로 `서울 한강 풍경`을 반환하는지 확인한다. 검색 API 오류를 빈 결과로 간주하지 않는다.
 - 실패 시 `[monitor] Production health check failed` GitHub 이슈를 한 건만 유지하고, 같은 장애의 추가 실패는 댓글로 누적한다. DB·Storage·이미지·AI·일일 점검 오류뿐 아니라 배포 SHA/ref가 원격 `main`과 다를 때도 실패한다. 복구되면 자동 종료한다.
 - 관리자 `로그/통계관리 > 운영 모니터링`: 최근 24시간 가용성, 응답시간, 포착된 서버 오류, AI 성공·실패와 운영 이벤트를 표시한다.
 - 관리자 `로그/통계관리 > 에이전트 활동현황`: GitHub 주간 제품·코드 검사, Grok·Gemini 자문 보고, 승인 후보 대기열과 Codex draft PR을 공개 GitHub 근거와 함께 표시한다.

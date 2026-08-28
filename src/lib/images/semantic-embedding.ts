@@ -1,3 +1,5 @@
+import { analysisBackedModelVersion } from "./analysis-derivative-version";
+
 export const SEMANTIC_EMBEDDING_MAX_DIMENSIONS = 4_000;
 
 export type SemanticEmbeddingProviderName = "voyage" | "nvidia";
@@ -127,4 +129,3 @@ export function validateEmbeddingVector(values: number[], expectedDimensions: nu
   }
   return values;
 }
-import { analysisBackedModelVersion } from "./analysis-derivative";

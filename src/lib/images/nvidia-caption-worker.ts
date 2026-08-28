@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateNvidiaCaption, NvidiaCaptionError } from "./nvidia-caption";
 import { isSemanticIndexableImage, type SemanticIndexingImage } from "./semantic-indexing-worker";
 import { ensureAnalysisDerivative } from "./analysis-derivative-server";
-import { analysisBackedModelVersion } from "./analysis-derivative";
+import { analysisBackedModelVersion } from "./analysis-derivative-version";
 
 interface CaptionJob {
   id: string;

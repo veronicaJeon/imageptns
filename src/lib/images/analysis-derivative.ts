@@ -1,10 +1,19 @@
 import sharp from "sharp";
 import { normalizeRotationDegrees } from "./orientation";
+import {
+  ANALYSIS_DERIVATIVE_JPEG_QUALITY,
+  ANALYSIS_DERIVATIVE_MAX_BYTES,
+  ANALYSIS_DERIVATIVE_MAX_EDGE,
+  ANALYSIS_DERIVATIVE_VERSION,
+} from "./analysis-derivative-version";
 
-export const ANALYSIS_DERIVATIVE_VERSION = "analysis-v1";
-export const ANALYSIS_DERIVATIVE_MAX_EDGE = 1_600;
-export const ANALYSIS_DERIVATIVE_JPEG_QUALITY = 82;
-export const ANALYSIS_DERIVATIVE_MAX_BYTES = 10 * 1024 * 1024;
+export {
+  ANALYSIS_DERIVATIVE_JPEG_QUALITY,
+  ANALYSIS_DERIVATIVE_MAX_BYTES,
+  ANALYSIS_DERIVATIVE_MAX_EDGE,
+  ANALYSIS_DERIVATIVE_VERSION,
+  analysisBackedModelVersion,
+} from "./analysis-derivative-version";
 
 export class AnalysisDerivativeError extends Error {
   constructor(
@@ -26,12 +35,6 @@ export interface AnalysisDerivative {
 
 export function analysisDerivativePath(originalPath: string) {
   return `${originalPath}.${ANALYSIS_DERIVATIVE_VERSION}.jpg`;
-}
-
-export function analysisBackedModelVersion(providerModelVersion: string) {
-  const normalized = providerModelVersion.trim();
-  const suffix = `+${ANALYSIS_DERIVATIVE_VERSION}`;
-  return normalized.endsWith(suffix) ? normalized : `${normalized}${suffix}`;
 }
 
 export async function createAnalysisDerivative(

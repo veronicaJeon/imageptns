@@ -57,6 +57,9 @@ const LIBRARY_PAGE_COPY = {
     photoSearchEnd: "사진 검색 종료",
     photoSearchTooLarge: "선택하는 사진은 25MB 이하여야 합니다.",
     photoSearchFailed: "사진을 검색하지 못했습니다. 다른 파일로 다시 시도해 주세요.",
+    textSearchFailed: "검색 결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    imageLoadFailed: "이미지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    retry: "다시 시도",
   },
   en: {
     filter: "Filters",
@@ -76,6 +79,9 @@ const LIBRARY_PAGE_COPY = {
     photoSearchEnd: "End photo search",
     photoSearchTooLarge: "The selected photo must be 25MB or smaller.",
     photoSearchFailed: "We could not search this photo. Try another file.",
+    textSearchFailed: "We could not load the search results. Please try again shortly.",
+    imageLoadFailed: "We could not load the images. Please try again shortly.",
+    retry: "Try again",
   },
 } as const;
 
@@ -110,6 +116,7 @@ export default function LibraryPage() {
   const [photoSearchActive, setPhotoSearchActive] = useState(false);
   const [photoSearching, setPhotoSearching] = useState(false);
   const [photoSearchError, setPhotoSearchError] = useState("");
+  const [libraryError, setLibraryError] = useState("");
 
   const blurTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -187,6 +194,7 @@ export default function LibraryPage() {
       loadingMoreRef.current = false;
       setLoadingMore(false);
       setLoading(true);
+      setLibraryError("");
     }
 
     try {
@@ -206,6 +214,7 @@ export default function LibraryPage() {
       if (requestSeq !== requestSeqRef.current) return;
 
       const nextImages = (data ?? []).slice(0, pageSize);
+      setLibraryError("");
       setImages((current) => {
         if (!append) return nextImages;
         const existingIds = new Set(current.map((image) => image.id));
@@ -215,6 +224,7 @@ export default function LibraryPage() {
     } catch {
       if (requestSeq !== requestSeqRef.current) return;
       if (!append) setImages([]);
+      setLibraryError(debouncedQuery ? copy.textSearchFailed : copy.imageLoadFailed);
       setHasMore(false);
     } finally {
       if (append) loadingMoreRef.current = false;
@@ -223,7 +233,7 @@ export default function LibraryPage() {
         else setLoading(false);
       }
     }
-  }, [category, sort, orientation, pageSize, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly]);
+  }, [category, sort, orientation, pageSize, debouncedQuery, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly, copy.imageLoadFailed, copy.textSearchFailed]);
 
   useEffect(() => {
     if (photoSearchActive) return;
@@ -456,11 +466,19 @@ export default function LibraryPage() {
                 )}
               </div>
             )}
+            {libraryError && (
+              <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-error/30 bg-error-container/30 p-4 md:flex-row md:items-center md:justify-between" role="alert">
+                <p className="text-sm font-bold text-on-error-container">{libraryError}</p>
+                <button type="button" onClick={() => void fetchImages(0, false)} className="inline-flex h-10 items-center justify-center rounded-full border border-error/30 px-4 text-xs font-bold text-error hover:bg-error/10">
+                  {copy.retry}
+                </button>
+              </div>
+            )}
             {loading ? (
               <div className="flex items-center justify-center py-40 text-outline">
                 <span className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : images.length === 0 ? (
+            ) : libraryError && images.length === 0 ? null : images.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-40 gap-4 text-center text-outline">
                 <span className="material-symbols-outlined text-6xl">image_search</span>
                 <p className="text-base">{l.noResults}</p>

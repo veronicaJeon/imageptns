@@ -85,6 +85,20 @@ jobs:
               --connect-timeout 10 --max-time 30 --output /dev/null \
               "https://www.imagepartners.kr${path}"
           done
+          search_response="$(mktemp)"
+          curl --silent --show-error --location --fail --retry 3 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 --output "$search_response" \
+            "https://www.imagepartners.kr/api/images/search?query=%ED%95%9C%EA%B0%95&limit=20"
+          node - "$search_response" <<'NODE'
+          const fs = require("fs");
+          const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const found = Array.isArray(payload.images)
+            && payload.images.some((image) => image?.title === "서울 한강 풍경");
+          if (!found) {
+            console.error("Production keyword search did not return the known Han River image.");
+            process.exit(1);
+          }
+          NODE
 
       - name: Record deployment result on maintenance candidate
         if: always() && inputs.candidate_issue != ''
