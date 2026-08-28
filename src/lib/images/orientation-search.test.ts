@@ -22,6 +22,11 @@ describe("parseOrientationSearch", () => {
   it.each([
     ["제주 가로 사진", "제주", "landscape"],
     ["서울 세로이미지", "서울", "portrait"],
+    ["한강 가로사진", "한강", "landscape"],
+    ["한강 세로사진", "한강", "portrait"],
+    ["한강 정사각형 사진", "한강", "square"],
+    ["한강 정방형 이미지", "한강", "square"],
+    ["한강 스퀘어 사진", "한강", "square"],
     ["seoul horizontal", "seoul", "landscape"],
     ["vertical Seoul", "Seoul", "portrait"],
     ["Seoul portrait orientation", "Seoul", "portrait"],
