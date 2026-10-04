@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordAdminAuditLog } from "@/lib/admin/audit";
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  if (!await requireAdminUser()) return forbidden();
+  const adminUser = await requireAdminUser();
+  if (!adminUser) return forbidden();
   const { id } = await context.params;
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -20,16 +22,36 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   if (typeof body?.is_active === "boolean") update.is_active = body.is_active;
 
   const admin = createAdminClient();
+  const { data: before } = await admin.from("library_guidance_messages").select("*").eq("id", id).maybeSingle();
   const { data, error } = await admin.from("library_guidance_messages").update(update).eq("id", id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await recordAdminAuditLog(admin, {
+    actorId: adminUser.id,
+    action: "library_guidance.updated",
+    targetType: "library_guidance_message",
+    targetId: id,
+    targetLabel: data?.content_ko ?? null,
+    before: before ?? null,
+    after: data ?? null,
+  });
   return NextResponse.json({ message: data });
 }
 
 export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  if (!await requireAdminUser()) return forbidden();
+  const adminUser = await requireAdminUser();
+  if (!adminUser) return forbidden();
   const { id } = await context.params;
   const admin = createAdminClient();
+  const { data: before } = await admin.from("library_guidance_messages").select("*").eq("id", id).maybeSingle();
   const { error } = await admin.from("library_guidance_messages").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await recordAdminAuditLog(admin, {
+    actorId: adminUser.id,
+    action: "library_guidance.deleted",
+    targetType: "library_guidance_message",
+    targetId: id,
+    targetLabel: before?.content_ko ?? null,
+    before: before ?? null,
+  });
   return NextResponse.json({ ok: true });
 }
