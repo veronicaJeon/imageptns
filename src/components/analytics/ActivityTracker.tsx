@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { ACTIVITY_SESSION_KEY as SESSION_KEY } from "@/lib/analytics/search-event";
 
-const SESSION_KEY = "imageptns.activitySessionId";
 const PRESENCE_INTERVAL_MS = 30_000;
 
 function sessionId() {
