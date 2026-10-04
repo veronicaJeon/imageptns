@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, requestIp } from "@/lib/security/rate-limit";
 
 export const revalidate = 0;
+
+const SUGGESTION_LIMIT = 8;
 
 export async function GET(req: NextRequest) {
   const q = (new URL(req.url).searchParams.get("q") ?? "").trim().slice(0, 80);
@@ -23,48 +25,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ suggestions: [] });
   }
 
-  const supabase = await createClient();
-  const pattern = `%${q}%`;
-
-  const [titlesRes, tagsRes] = await Promise.all([
-    supabase
-      .from("images")
-      .select("title")
-      .eq("status", "approved")
-      .eq("lifecycle_status", "active")
-      .eq("is_published", true)
-      .ilike("title", pattern)
-      .limit(5),
-    supabase
-      .from("images")
-      .select("tags")
-      .eq("status", "approved")
-      .eq("lifecycle_status", "active")
-      .eq("is_published", true)
-      .limit(200),
-  ]);
-
-  const seen = new Set<string>();
-  const titles: string[] = [];
-
-  for (const row of (titlesRes.data ?? []) as { title: string }[]) {
-    if (row.title && !seen.has(row.title.toLowerCase())) {
-      seen.add(row.title.toLowerCase());
-      titles.push(row.title);
-    }
+  // Titles and tags of every public image, matched literally in the database;
+  // terms starting with the query come first, then the most used terms.
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("suggest_search_terms", {
+    p_query: q,
+    p_limit: SUGGESTION_LIMIT,
+  });
+  if (error) {
+    console.error("[search-suggest] suggestion lookup failed", error.message);
+    return NextResponse.json({ suggestions: [] });
   }
 
-  const lq = q.toLowerCase();
-  const tags: string[] = [];
-
-  for (const row of (tagsRes.data ?? []) as { tags: string[] }[]) {
-    for (const tag of row.tags ?? []) {
-      if (tag.toLowerCase().includes(lq) && !seen.has(tag.toLowerCase())) {
-        seen.add(tag.toLowerCase());
-        tags.push(tag);
-      }
-    }
-  }
-
-  return NextResponse.json({ suggestions: [...titles, ...tags].slice(0, 8) });
+  const suggestions = ((data ?? []) as { term: string }[])
+    .map((row) => row.term)
+    .filter((term): term is string => typeof term === "string" && term.length > 0);
+  return NextResponse.json({ suggestions });
 }
