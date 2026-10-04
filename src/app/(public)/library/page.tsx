@@ -58,6 +58,7 @@ const LIBRARY_PAGE_COPY = {
     photoSearchTooLarge: "선택하는 사진은 25MB 이하여야 합니다.",
     photoSearchFailed: "사진을 검색하지 못했습니다. 다른 파일로 다시 시도해 주세요.",
     textSearchFailed: "검색 결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    partialMatch: "모든 검색어가 들어간 이미지가 없어 일부 검색어가 일치하는 이미지를 보여드립니다.",
     imageLoadFailed: "이미지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     retry: "다시 시도",
   },
@@ -80,6 +81,7 @@ const LIBRARY_PAGE_COPY = {
     photoSearchTooLarge: "The selected photo must be 25MB or smaller.",
     photoSearchFailed: "We could not search this photo. Try another file.",
     textSearchFailed: "We could not load the search results. Please try again shortly.",
+    partialMatch: "No image matched every search word, so these images match some of them.",
     imageLoadFailed: "We could not load the images. Please try again shortly.",
     retry: "Try again",
   },
@@ -117,6 +119,7 @@ export default function LibraryPage() {
   const [photoSearching, setPhotoSearching] = useState(false);
   const [photoSearchError, setPhotoSearchError] = useState("");
   const [libraryError, setLibraryError] = useState("");
+  const [partialMatch, setPartialMatch] = useState(false);
 
   const blurTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -209,12 +212,13 @@ export default function LibraryPage() {
       const endpoint = debouncedQuery ? "/api/images/search" : "/api/images";
       const res = await fetch(`${endpoint}?${params}`);
       if (!res.ok) throw new Error();
-      const { images: data, hasMore: moreAvailable } = await res.json() as { images?: ImageCardData[]; hasMore?: boolean };
+      const { images: data, hasMore: moreAvailable, searchSource } = await res.json() as { images?: ImageCardData[]; hasMore?: boolean; searchSource?: string };
 
       if (requestSeq !== requestSeqRef.current) return;
 
       const nextImages = (data ?? []).slice(0, pageSize);
       setLibraryError("");
+      if (!append) setPartialMatch(searchSource === "keyword_partial");
       setImages((current) => {
         if (!append) return nextImages;
         const existingIds = new Set(current.map((image) => image.id));
@@ -223,7 +227,10 @@ export default function LibraryPage() {
       setHasMore(Boolean(moreAvailable));
     } catch {
       if (requestSeq !== requestSeqRef.current) return;
-      if (!append) setImages([]);
+      if (!append) {
+        setImages([]);
+        setPartialMatch(false);
+      }
       setLibraryError(debouncedQuery ? copy.textSearchFailed : copy.imageLoadFailed);
       setHasMore(false);
     } finally {
@@ -465,6 +472,11 @@ export default function LibraryPage() {
                   </button>
                 )}
               </div>
+            )}
+            {partialMatch && !photoSearchActive && images.length > 0 && (
+              <p className="mb-6 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 text-sm text-on-surface-variant" role="status">
+                {copy.partialMatch}
+              </p>
             )}
             {libraryError && (
               <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-error/30 bg-error-container/30 p-4 md:flex-row md:items-center md:justify-between" role="alert">

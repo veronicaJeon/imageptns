@@ -3,6 +3,7 @@ import {
   DEFAULT_KEYWORD_STRONG_THRESHOLD,
   DEFAULT_SEMANTIC_MIN_SIMILARITY,
   chooseKeywordFirstSearchResults,
+  choosePartialKeywordResults,
   readKeywordFirstSearchThresholds,
 } from "./keyword-first-search";
 
@@ -98,5 +99,26 @@ describe("keyword-first search threshold configuration", () => {
       keywordStrong: DEFAULT_KEYWORD_STRONG_THRESHOLD,
       semanticMinimum: DEFAULT_SEMANTIC_MIN_SIMILARITY,
     });
+  });
+});
+
+describe("partial keyword results", () => {
+  it("returns partial matches in score order with their own source", () => {
+    expect(choosePartialKeywordResults([
+      { imageId: "one-term", keywordScore: 0.14 },
+      { imageId: "two-terms", keywordScore: 0.25 },
+      { imageId: "one-term", keywordScore: 0.1 },
+    ])).toEqual({
+      source: "keyword_partial",
+      shouldRequestSemanticFallback: false,
+      imageIds: ["two-terms", "one-term"],
+    });
+  });
+
+  it("returns no results for empty or invalid partial scores", () => {
+    expect(choosePartialKeywordResults([
+      { imageId: "zero", keywordScore: 0 },
+      { imageId: "nan", keywordScore: Number.NaN },
+    ])).toEqual({ source: "none", shouldRequestSemanticFallback: false, imageIds: [] });
   });
 });

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getImageIdsForCategory } from "@/lib/images/category-server";
-import { chooseKeywordFirstSearchResults, readKeywordFirstSearchThresholds } from "@/lib/images/keyword-first-search";
+import {
+  chooseKeywordFirstSearchResults,
+  choosePartialKeywordResults,
+  readKeywordFirstSearchThresholds,
+} from "@/lib/images/keyword-first-search";
 import { resolveOrientationSearch, type OrientationFilter } from "@/lib/images/orientation-search";
 import { getSemanticImageSearchConfig } from "@/lib/images/semantic-embedding";
 import { VoyageMultimodalEmbeddingProvider } from "@/lib/images/voyage-multimodal";
@@ -97,7 +101,7 @@ export async function GET(request: NextRequest) {
   const thresholds = readKeywordFirstSearchThresholds();
   const admin = createAdminClient();
 
-  const { data: keywordData, error: keywordError } = await admin.rpc("rank_keyword_images", {
+  const rankKeywordImages = (matchAny: boolean) => admin.rpc("rank_keyword_images", {
     p_search_query: resolved.textQuery,
     p_category_filter: category === "all" ? "" : category,
     p_orientation_filter: resolved.effectiveOrientation,
@@ -108,16 +112,22 @@ export async function GET(request: NextRequest) {
     p_match_count: MAX_RANKED_CANDIDATES,
     p_offset: 0,
     p_min_score: thresholds.keywordStrong,
+    // Sent only for the partial step so the strict call keeps working against
+    // a database that does not have migration 078 applied yet.
+    ...(matchAny ? { p_match_any: true } : {}),
   });
+  const toKeywordSignals = (rows: unknown) => ((rows ?? []) as RankedRow[]).map((row) => ({
+    imageId: row.image_id,
+    keywordScore: Number(row.keyword_score),
+  }));
+
+  const { data: keywordData, error: keywordError } = await rankKeywordImages(false);
   if (keywordError) {
     console.error("[image-search] keyword ranking failed", keywordError.message);
     return NextResponse.json({ error: "Image search is temporarily unavailable" }, { status: 503 });
   }
 
-  const keywordSignals = ((keywordData ?? []) as RankedRow[]).map((row) => ({
-    imageId: row.image_id,
-    keywordScore: Number(row.keyword_score),
-  }));
+  const keywordSignals = toKeywordSignals(keywordData);
   let decision = chooseKeywordFirstSearchResults(keywordSignals, undefined, thresholds);
 
   if (decision.shouldRequestSemanticFallback) {
@@ -158,6 +168,17 @@ export async function GET(request: NextRequest) {
       console.error("[image-search] semantic fallback unavailable", error instanceof Error ? error.message : "unknown");
     }
     decision = chooseKeywordFirstSearchResults(keywordSignals, semanticSignals, thresholds);
+  }
+
+  // Multi-term queries with no strict or semantic result fall back to images
+  // that contain only some of the terms; the client labels them as partial.
+  if (decision.source === "none" && /\s/.test(resolved.textQuery.trim())) {
+    const { data: partialData, error: partialError } = await rankKeywordImages(true);
+    if (partialError) {
+      console.error("[image-search] partial keyword ranking failed", partialError.message);
+    } else {
+      decision = choosePartialKeywordResults(toKeywordSignals(partialData));
+    }
   }
 
   let rankedIds = decision.imageIds;
