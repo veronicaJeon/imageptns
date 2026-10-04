@@ -95,7 +95,8 @@ export default function LibraryPage() {
   const [query, setQuery]             = useState("");
   const [category, setCategory]       = useState("all");
   const [categories, setCategories]   = useState<ImageCategory[]>(() => [...DEFAULT_IMAGE_CATEGORIES]);
-  const [sort, setSort]               = useState<SortKey>("newest");
+  // Until the visitor picks a sort, searches use relevance and browsing uses newest.
+  const [chosenSort, setChosenSort]   = useState<SortKey | null>(null);
   const [orientation, setOrientation] = useState<OrientationKey>("all");
   const [pageSize, setPageSize]       = useState<number>(PAGE_SIZE_OPTIONS[0]);
   const [freeOnly, setFreeOnly]       = useState(false);
@@ -107,6 +108,7 @@ export default function LibraryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore]         = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const sort: SortKey = chosenSort ?? (debouncedQuery ? "relevant" : "newest");
   const [guidance, setGuidance]       = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -354,7 +356,7 @@ export default function LibraryPage() {
             <label className="order-2 flex h-12 min-w-0 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-3 text-left md:order-none md:h-16 md:px-4">
               <span className="material-symbols-outlined text-xl text-outline">swap_vert</span>
               <span className="sr-only">{l.sort.label}</span>
-              <select value={sort} onChange={(event) => setSort(event.target.value as SortKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={l.sort.label}>
+              <select value={sort} onChange={(event) => setChosenSort(event.target.value as SortKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={l.sort.label}>
                 {SORT_KEYS.map((key) => <option key={key} value={key}>{l.sort[key]}</option>)}
               </select>
             </label>

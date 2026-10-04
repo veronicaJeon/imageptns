@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getImageIdsForCategory } from "@/lib/images/category-server";
 import { chooseKeywordFirstSearchResults, readKeywordFirstSearchThresholds } from "@/lib/images/keyword-first-search";
+import { parseSearchSort, sortRankedImages } from "@/lib/images/search-sort";
 import { resolveOrientationSearch, type OrientationFilter } from "@/lib/images/orientation-search";
 import { getSemanticImageSearchConfig } from "@/lib/images/semantic-embedding";
 import { VoyageMultimodalEmbeddingProvider } from "@/lib/images/voyage-multimodal";
@@ -32,6 +33,8 @@ interface ImageRow {
   photographer_id: string | null;
   copyright_license: string | null;
   free_usage_policy: string | null;
+  created_at: string | null;
+  sales_count: number | null;
   photographer?: { full_name: string | null } | { full_name: string | null }[] | null;
 }
 
@@ -87,6 +90,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(browseUrl, 307);
   }
 
+  const sort = parseSearchSort(searchParams.get("sort"));
   const limit = boundedInteger(searchParams.get("limit"), 20, 1, 100);
   const offset = boundedInteger(searchParams.get("offset"), 0, 0, 10_000);
   const category = searchParams.get("category") ?? "";
@@ -165,15 +169,17 @@ export async function GET(request: NextRequest) {
     const allowedCategoryIds = new Set(await getImageIdsForCategory(admin, category) ?? []);
     rankedIds = rankedIds.filter((imageId) => allowedCategoryIds.has(imageId));
   }
-  const pageIds = rankedIds.slice(offset, offset + limit);
-  if (pageIds.length === 0) {
+  if (rankedIds.length === 0) {
     return NextResponse.json({ images: [], hasMore: false, searchSource: decision.source }, { headers: PRIVATE_NO_STORE });
   }
 
+  // Load every ranked candidate (at most MAX_RANKED_CANDIDATES) with the public
+  // visibility and usage filters applied before paginating, so semantic results
+  // that a filter removes never leave short pages or a false "load more".
   let imageQuery = admin
     .from("images")
-    .select("id, asset_id, title, title_ko, title_en, category, storage_path_preview, width, height, photographer_id, copyright_license, free_usage_policy, photographer:profiles!photographer_id(full_name)")
-    .in("id", pageIds)
+    .select("id, asset_id, title, title_ko, title_en, category, storage_path_preview, width, height, photographer_id, copyright_license, free_usage_policy, created_at, sales_count, photographer:profiles!photographer_id(full_name)")
+    .in("id", rankedIds)
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
     .eq("is_published", true);
@@ -189,14 +195,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Image search is temporarily unavailable" }, { status: 503 });
   }
   const byId = new Map(((imageData ?? []) as unknown as ImageRow[]).map((image) => [image.id, image]));
-  const images = pageIds.flatMap((imageId) => {
-    const image = byId.get(imageId);
-    return image ? [imageResponse(admin, image)] : [];
-  });
+  const matchingImages = sortRankedImages(
+    rankedIds.flatMap((imageId) => {
+      const image = byId.get(imageId);
+      return image ? [image] : [];
+    }),
+    sort,
+  );
+  const images = matchingImages.slice(offset, offset + limit).map((image) => imageResponse(admin, image));
 
   return NextResponse.json({
     images,
-    hasMore: rankedIds.length > offset + limit,
+    hasMore: matchingImages.length > offset + limit,
     searchSource: decision.source,
   }, { headers: PRIVATE_NO_STORE });
 }
