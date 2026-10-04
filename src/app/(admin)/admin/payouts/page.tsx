@@ -86,6 +86,7 @@ export default function AdminPayoutsPage() {
       if (!res.ok) {
         const { error } = await res.json();
         alert(error);
+        if (res.status === 409) fetchPayouts(tab);
         return;
       }
       // Remove from current filtered tab (unless viewing all)
