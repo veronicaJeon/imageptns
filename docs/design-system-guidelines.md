@@ -1,5 +1,12 @@
 # Image Partners Design System Guidelines
 
+## Typography and color baseline
+
+- Image Partners is a library of Korean photographs, so the photographs carry the color. Interface chrome stays close to neutral with one restrained brand green.
+- All text uses Pretendard (`--font-body`, `--font-display`, `--font-headline` share one stack) so Korean renders with the same typeface on every device. Do not reintroduce Latin-only display fonts for Korean copy.
+- Do not use neon or fluorescent accents. `primary-container` is a pale, low-saturation green in both themes, and dark mode uses a softened green rather than a fluorescent one.
+- Do not add gradient fills, frosted-glass (backdrop blur) panels, or template names from generated design kits. Primary actions use a solid brand color; the top navigation uses an opaque surface with a hairline border.
+
 ## Navigation emphasis and hover policy
 
 - Priority navigation items may use the brand primary color without adding a persistent filled background that could be mistaken for a selected state.
