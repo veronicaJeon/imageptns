@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { notifyOpsSourcingRevision } from "@/lib/email/resend";
+import { reopenSourcingRequestForRevision, revisionReasonLabels } from "@/lib/sourcing/revision";
 import { canRequestRevision, revisionLimitNotice } from "@/lib/sourcing/status";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const admin = createAdminClient();
   const { data: requestRow, error: requestError } = await admin
     .from("contact_submissions")
-    .select("id, email, buyer_id, buyer_sourcing_status")
+    .select("id, name, email, subject, buyer_id, buyer_sourcing_status")
     .eq("id", id)
     .eq("inquiry_type", "photo_request")
     .single();
@@ -71,14 +73,30 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  await admin
+  const { error: reopenError } = await admin
     .from("contact_submissions")
-    .update({
-      buyer_sourcing_status: "under_review",
-      internal_sourcing_status: "drafting",
-      updated_at: new Date().toISOString(),
-    })
+    .update(reopenSourcingRequestForRevision(new Date().toISOString()))
     .eq("id", id);
+
+  if (reopenError) {
+    console.error("[sourcing/revision] failed to reopen request", { requestId: id, error: reopenError.message });
+  }
+
+  try {
+    await notifyOpsSourcingRevision({
+      name: requestRow.name ?? "",
+      email: requestRow.email ?? user.email,
+      subject: requestRow.subject ?? "이미지 요청",
+      round: revisionCount + 1,
+      reasons: revisionReasonLabels(reasons),
+      message,
+    });
+  } catch (emailError) {
+    console.error("[sourcing/revision] ops notification failed", {
+      requestId: id,
+      error: emailError instanceof Error ? emailError.message : String(emailError),
+    });
+  }
 
   return NextResponse.json({ revision: data }, { status: 201 });
 }
