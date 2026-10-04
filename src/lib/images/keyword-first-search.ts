@@ -21,7 +21,7 @@ export interface KeywordFirstThresholds {
 }
 
 export interface KeywordFirstSearchDecision {
-  source: "keyword" | "semantic" | "none";
+  source: "keyword" | "semantic" | "keyword_partial" | "none";
   shouldRequestSemanticFallback: boolean;
   imageIds: string[];
 }
@@ -100,5 +100,26 @@ export function chooseKeywordFirstSearchResults(
   );
   return semanticImageIds.length > 0
     ? { source: "semantic", shouldRequestSemanticFallback: false, imageIds: semanticImageIds }
+    : { source: "none", shouldRequestSemanticFallback: false, imageIds: [] };
+}
+
+/**
+ * Last step of the cascade for multi-term queries: when neither the strict
+ * all-terms keyword search nor the semantic fallback produced results, images
+ * that contain only some of the terms may be shown as partial matches.
+ */
+export function choosePartialKeywordResults(
+  partialSignals: readonly KeywordSearchSignal[],
+): KeywordFirstSearchDecision {
+  const imageIds = uniqueRankedIds(
+    partialSignals,
+    (signal) => signal.keywordScore,
+    (signal) => signal.imageId,
+    // The RPC already applied the per-matched-term minimum; the returned mean
+    // over all terms is intentionally lower, so only reject invalid scores.
+    Number.MIN_VALUE,
+  );
+  return imageIds.length > 0
+    ? { source: "keyword_partial", shouldRequestSemanticFallback: false, imageIds }
     : { source: "none", shouldRequestSemanticFallback: false, imageIds: [] };
 }

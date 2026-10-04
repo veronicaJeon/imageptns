@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getImageIdsForCategory } from "@/lib/images/category-server";
-import { chooseKeywordFirstSearchResults, readKeywordFirstSearchThresholds } from "@/lib/images/keyword-first-search";
+import {
+  chooseKeywordFirstSearchResults,
+  choosePartialKeywordResults,
+  readKeywordFirstSearchThresholds,
+} from "@/lib/images/keyword-first-search";
+import { parseSearchSort, sortRankedImages } from "@/lib/images/search-sort";
 import { resolveOrientationSearch, type OrientationFilter } from "@/lib/images/orientation-search";
 import { getSemanticImageSearchConfig } from "@/lib/images/semantic-embedding";
 import { VoyageMultimodalEmbeddingProvider } from "@/lib/images/voyage-multimodal";
@@ -32,6 +37,8 @@ interface ImageRow {
   photographer_id: string | null;
   copyright_license: string | null;
   free_usage_policy: string | null;
+  created_at: string | null;
+  sales_count: number | null;
   photographer?: { full_name: string | null } | { full_name: string | null }[] | null;
 }
 
@@ -87,6 +94,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(browseUrl, 307);
   }
 
+  const sort = parseSearchSort(searchParams.get("sort"));
   const limit = boundedInteger(searchParams.get("limit"), 20, 1, 100);
   const offset = boundedInteger(searchParams.get("offset"), 0, 0, 10_000);
   const category = searchParams.get("category") ?? "";
@@ -97,7 +105,7 @@ export async function GET(request: NextRequest) {
   const thresholds = readKeywordFirstSearchThresholds();
   const admin = createAdminClient();
 
-  const { data: keywordData, error: keywordError } = await admin.rpc("rank_keyword_images", {
+  const rankKeywordImages = (matchAny: boolean) => admin.rpc("rank_keyword_images", {
     p_search_query: resolved.textQuery,
     p_category_filter: category === "all" ? "" : category,
     p_orientation_filter: resolved.effectiveOrientation,
@@ -108,16 +116,22 @@ export async function GET(request: NextRequest) {
     p_match_count: MAX_RANKED_CANDIDATES,
     p_offset: 0,
     p_min_score: thresholds.keywordStrong,
+    // Sent only for the partial step so the strict call keeps working against
+    // a database that does not have migration 078 applied yet.
+    ...(matchAny ? { p_match_any: true } : {}),
   });
+  const toKeywordSignals = (rows: unknown) => ((rows ?? []) as RankedRow[]).map((row) => ({
+    imageId: row.image_id,
+    keywordScore: Number(row.keyword_score),
+  }));
+
+  const { data: keywordData, error: keywordError } = await rankKeywordImages(false);
   if (keywordError) {
     console.error("[image-search] keyword ranking failed", keywordError.message);
     return NextResponse.json({ error: "Image search is temporarily unavailable" }, { status: 503 });
   }
 
-  const keywordSignals = ((keywordData ?? []) as RankedRow[]).map((row) => ({
-    imageId: row.image_id,
-    keywordScore: Number(row.keyword_score),
-  }));
+  const keywordSignals = toKeywordSignals(keywordData);
   let decision = chooseKeywordFirstSearchResults(keywordSignals, undefined, thresholds);
 
   if (decision.shouldRequestSemanticFallback) {
@@ -160,20 +174,33 @@ export async function GET(request: NextRequest) {
     decision = chooseKeywordFirstSearchResults(keywordSignals, semanticSignals, thresholds);
   }
 
+  // Multi-term queries with no strict or semantic result fall back to images
+  // that contain only some of the terms; the client labels them as partial.
+  if (decision.source === "none" && /\s/.test(resolved.textQuery.trim())) {
+    const { data: partialData, error: partialError } = await rankKeywordImages(true);
+    if (partialError) {
+      console.error("[image-search] partial keyword ranking failed", partialError.message);
+    } else {
+      decision = choosePartialKeywordResults(toKeywordSignals(partialData));
+    }
+  }
+
   let rankedIds = decision.imageIds;
   if (decision.source === "semantic" && category && category !== "all") {
     const allowedCategoryIds = new Set(await getImageIdsForCategory(admin, category) ?? []);
     rankedIds = rankedIds.filter((imageId) => allowedCategoryIds.has(imageId));
   }
-  const pageIds = rankedIds.slice(offset, offset + limit);
-  if (pageIds.length === 0) {
+  if (rankedIds.length === 0) {
     return NextResponse.json({ images: [], hasMore: false, searchSource: decision.source }, { headers: PRIVATE_NO_STORE });
   }
 
+  // Load every ranked candidate (at most MAX_RANKED_CANDIDATES) with the public
+  // visibility and usage filters applied before paginating, so semantic results
+  // that a filter removes never leave short pages or a false "load more".
   let imageQuery = admin
     .from("images")
-    .select("id, asset_id, title, title_ko, title_en, category, storage_path_preview, width, height, photographer_id, copyright_license, free_usage_policy, photographer:profiles!photographer_id(full_name)")
-    .in("id", pageIds)
+    .select("id, asset_id, title, title_ko, title_en, category, storage_path_preview, width, height, photographer_id, copyright_license, free_usage_policy, created_at, sales_count, photographer:profiles!photographer_id(full_name)")
+    .in("id", rankedIds)
     .eq("status", "approved")
     .eq("lifecycle_status", "active")
     .eq("is_published", true);
@@ -189,14 +216,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Image search is temporarily unavailable" }, { status: 503 });
   }
   const byId = new Map(((imageData ?? []) as unknown as ImageRow[]).map((image) => [image.id, image]));
-  const images = pageIds.flatMap((imageId) => {
-    const image = byId.get(imageId);
-    return image ? [imageResponse(admin, image)] : [];
-  });
+  const matchingImages = sortRankedImages(
+    rankedIds.flatMap((imageId) => {
+      const image = byId.get(imageId);
+      return image ? [image] : [];
+    }),
+    sort,
+  );
+  const images = matchingImages.slice(offset, offset + limit).map((image) => imageResponse(admin, image));
 
   return NextResponse.json({
     images,
-    hasMore: rankedIds.length > offset + limit,
+    hasMore: matchingImages.length > offset + limit,
     searchSource: decision.source,
   }, { headers: PRIVATE_NO_STORE });
 }
