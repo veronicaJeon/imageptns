@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const route = readFileSync(join(process.cwd(), "src/app/api/images/search/route.ts"), "utf8");
 const suggestRoute = readFileSync(join(process.cwd(), "src/app/api/search/suggest/route.ts"), "utf8");
-const suggestMigration = readFileSync(join(process.cwd(), "supabase/migrations/077_search_term_suggestions.sql"), "utf8");
+const suggestMigration = readFileSync(join(process.cwd(), "supabase/migrations/079_search_term_suggestions.sql"), "utf8");
 const page = readFileSync(join(process.cwd(), "src/app/(public)/library/page.tsx"), "utf8");
 
 describe("search result pagination and sorting", () => {
