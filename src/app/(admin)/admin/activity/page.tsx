@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminChip, AdminInlineMetrics } from "@/components/admin/AdminPrimitives";
+import { summarizeZeroResultQueries } from "@/lib/analytics/search-event";
 import { cn } from "@/lib/utils/cn";
 
 type EventType =
@@ -114,6 +115,11 @@ export default function AdminActivityPage() {
     [eventType],
   );
 
+  const zeroResultQueries = useMemo(
+    () => (eventType === "search" ? summarizeZeroResultQueries(events) : []),
+    [eventType, events],
+  );
+
   if (forbidden) {
     return (
       <div className="p-10 flex flex-col items-center justify-center min-h-[60vh] gap-4 text-outline">
@@ -162,6 +168,25 @@ export default function AdminActivityPage() {
           </select>
         </label>
       </div>
+
+      {!loading && eventType === "search" && (
+        <section className="mb-6 rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-ghost">
+          <h2 className="font-headline text-base font-bold text-on-surface">결과 없는 검색어</h2>
+          <p className="mt-1 text-xs text-outline">아래 기록 중 첫 화면 결과가 0건이었던 검색어입니다. 태그 보강이나 이미지 수급에 참고하세요.</p>
+          {zeroResultQueries.length === 0 ? (
+            <p className="mt-4 text-sm text-on-surface-variant">최근 기록에 결과 없는 검색어가 없습니다.</p>
+          ) : (
+            <ol className="mt-4 divide-y divide-outline-variant/30">
+              {zeroResultQueries.map((item) => (
+                <li key={item.query} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span className="min-w-0 truncate font-bold text-on-surface">{item.query}</span>
+                  <span className="shrink-0 text-xs text-outline">{item.count.toLocaleString("ko-KR")}회 · {formatDateTime(item.lastSeenAt)}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center min-h-[40vh]">

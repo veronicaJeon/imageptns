@@ -9,6 +9,8 @@ import { CategoryPill } from "@/components/ui/CategoryPill";
 import { DEFAULT_IMAGE_CATEGORIES, type ImageCategory } from "@/lib/images/categories";
 import { LibraryAdCard } from "@/components/ads/LibraryAdCard";
 import type { PublicLibraryAd } from "@/lib/ads/campaigns";
+import { sendLibrarySearchEvent } from "@/lib/analytics/search-event";
+import { buildPhotoRequestHref } from "@/lib/contact/photo-request-draft";
 import {
   PHOTO_SEARCH_SELECTED_MAX_FILE_BYTES,
   preparePhotoSearchImage,
@@ -58,8 +60,15 @@ const LIBRARY_PAGE_COPY = {
     photoSearchTooLarge: "선택하는 사진은 25MB 이하여야 합니다.",
     photoSearchFailed: "사진을 검색하지 못했습니다. 다른 파일로 다시 시도해 주세요.",
     textSearchFailed: "검색 결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    partialMatch: "모든 검색어가 들어간 이미지가 없어 일부 검색어가 일치하는 이미지를 보여드립니다.",
     imageLoadFailed: "이미지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     retry: "다시 시도",
+    noResultsTitle: (query: string) => `‘${query}’에 맞는 이미지가 아직 없습니다.`,
+    noResultsFiltered: "적용한 필터를 풀면 결과가 나올 수 있습니다.",
+    clearFilters: "필터 모두 해제",
+    browseCategories: "카테고리로 둘러보기",
+    requestImage: "이 주제로 이미지 요청하기",
+    requestImageHint: "찾는 사진을 알려주시면 보유 이미지와 촬영 가능 여부를 확인해 드립니다.",
   },
   en: {
     filter: "Filters",
@@ -80,8 +89,15 @@ const LIBRARY_PAGE_COPY = {
     photoSearchTooLarge: "The selected photo must be 25MB or smaller.",
     photoSearchFailed: "We could not search this photo. Try another file.",
     textSearchFailed: "We could not load the search results. Please try again shortly.",
+    partialMatch: "No image matched every search word, so these images match some of them.",
     imageLoadFailed: "We could not load the images. Please try again shortly.",
     retry: "Try again",
+    noResultsTitle: (query: string) => `No images match “${query}” yet.`,
+    noResultsFiltered: "Clearing the filters you applied may show results.",
+    clearFilters: "Clear all filters",
+    browseCategories: "Browse by category",
+    requestImage: "Request images on this topic",
+    requestImageHint: "Tell us what you need and we will check our library and shooting options.",
   },
 } as const;
 
@@ -95,7 +111,8 @@ export default function LibraryPage() {
   const [query, setQuery]             = useState("");
   const [category, setCategory]       = useState("all");
   const [categories, setCategories]   = useState<ImageCategory[]>(() => [...DEFAULT_IMAGE_CATEGORIES]);
-  const [sort, setSort]               = useState<SortKey>("newest");
+  // Until the visitor picks a sort, searches use relevance and browsing uses newest.
+  const [chosenSort, setChosenSort]   = useState<SortKey | null>(null);
   const [orientation, setOrientation] = useState<OrientationKey>("all");
   const [pageSize, setPageSize]       = useState<number>(PAGE_SIZE_OPTIONS[0]);
   const [freeOnly, setFreeOnly]       = useState(false);
@@ -107,6 +124,7 @@ export default function LibraryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore]         = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const sort: SortKey = chosenSort ?? (debouncedQuery ? "relevant" : "newest");
   const [guidance, setGuidance]       = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -117,6 +135,7 @@ export default function LibraryPage() {
   const [photoSearching, setPhotoSearching] = useState(false);
   const [photoSearchError, setPhotoSearchError] = useState("");
   const [libraryError, setLibraryError] = useState("");
+  const [partialMatch, setPartialMatch] = useState(false);
 
   const blurTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -184,6 +203,16 @@ export default function LibraryPage() {
     return () => clearTimeout(t);
   }, [query]);
 
+  const filtersActive = category !== "all" || orientation !== "all" || freeOnly || educationFreeOnly || commercialOnly || derivativesOnly;
+  function clearFilters() {
+    setCategory("all");
+    setOrientation("all");
+    setFreeOnly(false);
+    setEducationFreeOnly(false);
+    setCommercialOnly(false);
+    setDerivativesOnly(false);
+  }
+
   const fetchImages = useCallback(async (offset = 0, append = false) => {
     if (append && loadingMoreRef.current) return;
     const requestSeq = ++requestSeqRef.current;
@@ -209,12 +238,29 @@ export default function LibraryPage() {
       const endpoint = debouncedQuery ? "/api/images/search" : "/api/images";
       const res = await fetch(`${endpoint}?${params}`);
       if (!res.ok) throw new Error();
-      const { images: data, hasMore: moreAvailable } = await res.json() as { images?: ImageCardData[]; hasMore?: boolean };
+      const { images: data, hasMore: moreAvailable, searchSource } = await res.json() as { images?: ImageCardData[]; hasMore?: boolean; searchSource?: string };
 
       if (requestSeq !== requestSeqRef.current) return;
 
       const nextImages = (data ?? []).slice(0, pageSize);
       setLibraryError("");
+      if (!append) setPartialMatch(searchSource === "keyword_partial");
+      if (debouncedQuery && !append) {
+        sendLibrarySearchEvent({
+          query: debouncedQuery,
+          resultCount: nextImages.length,
+          hasMore: Boolean(moreAvailable),
+          searchSource,
+          category,
+          orientation,
+          usageFilters: [
+            freeOnly && "free",
+            educationFreeOnly && "educationFree",
+            commercialOnly && "commercial",
+            derivativesOnly && "derivatives",
+          ].filter((value): value is string => Boolean(value)),
+        });
+      }
       setImages((current) => {
         if (!append) return nextImages;
         const existingIds = new Set(current.map((image) => image.id));
@@ -223,7 +269,10 @@ export default function LibraryPage() {
       setHasMore(Boolean(moreAvailable));
     } catch {
       if (requestSeq !== requestSeqRef.current) return;
-      if (!append) setImages([]);
+      if (!append) {
+        setImages([]);
+        setPartialMatch(false);
+      }
       setLibraryError(debouncedQuery ? copy.textSearchFailed : copy.imageLoadFailed);
       setHasMore(false);
     } finally {
@@ -354,7 +403,7 @@ export default function LibraryPage() {
             <label className="order-2 flex h-12 min-w-0 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-3 text-left md:order-none md:h-16 md:px-4">
               <span className="material-symbols-outlined text-xl text-outline">swap_vert</span>
               <span className="sr-only">{l.sort.label}</span>
-              <select value={sort} onChange={(event) => setSort(event.target.value as SortKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={l.sort.label}>
+              <select value={sort} onChange={(event) => setChosenSort(event.target.value as SortKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={l.sort.label}>
                 {SORT_KEYS.map((key) => <option key={key} value={key}>{l.sort[key]}</option>)}
               </select>
             </label>
@@ -466,6 +515,11 @@ export default function LibraryPage() {
                 )}
               </div>
             )}
+            {partialMatch && !photoSearchActive && images.length > 0 && (
+              <p className="mb-6 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 text-sm text-on-surface-variant" role="status">
+                {copy.partialMatch}
+              </p>
+            )}
             {libraryError && (
               <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-error/30 bg-error-container/30 p-4 md:flex-row md:items-center md:justify-between" role="alert">
                 <p className="text-sm font-bold text-on-error-container">{libraryError}</p>
@@ -479,10 +533,40 @@ export default function LibraryPage() {
                 <span className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : libraryError && images.length === 0 ? null : images.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-40 gap-4 text-center text-outline">
-                <span className="material-symbols-outlined text-6xl">image_search</span>
-                <p className="text-base">{l.noResults}</p>
-              </div>
+              debouncedQuery.trim() && !photoSearchActive ? (
+                <div className="mx-auto flex max-w-2xl flex-col gap-6 py-20 text-on-surface-variant">
+                  <div>
+                    <p className="text-lg font-bold text-on-surface">{copy.noResultsTitle(debouncedQuery.trim())}</p>
+                    {filtersActive && <p className="mt-2 text-sm">{copy.noResultsFiltered}</p>}
+                  </div>
+                  {filtersActive && (
+                    <button type="button" onClick={clearFilters} className="inline-flex h-10 w-fit items-center rounded-full border border-primary/30 px-4 text-xs font-bold text-primary hover:bg-primary/10">
+                      {copy.clearFilters}
+                    </button>
+                  )}
+                  <div>
+                    <p className="mb-3 text-xs font-semibold text-outline">{copy.browseCategories}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {categories.filter((item) => item.active !== false).map((item) => (
+                        <button key={item.code} type="button" onClick={() => { setQuery(""); setCategory(item.code); }} className="h-9 rounded-full bg-surface-container-lowest px-4 text-xs font-bold text-on-surface hover:bg-surface-container">
+                          {lang === "ko" ? item.ko : item.en}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="border-t border-outline-variant pt-6">
+                    <Link href={buildPhotoRequestHref({ query: debouncedQuery, category, freeOnly, educationFreeOnly, commercialOnly, derivativesOnly })} className="inline-flex h-11 items-center rounded-full bg-primary px-5 text-sm font-bold text-white hover:bg-primary/90">
+                      {copy.requestImage}
+                    </Link>
+                    <p className="mt-2 text-xs">{copy.requestImageHint}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-40 gap-4 text-center text-outline">
+                  <span className="material-symbols-outlined text-6xl">image_search</span>
+                  <p className="text-base">{l.noResults}</p>
+                </div>
+              )
             ) : (
               <>
                 <MasonryGrid>
