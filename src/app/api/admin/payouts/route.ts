@@ -2,8 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPayoutApproved, sendPayoutRejected } from "@/lib/email/resend";
+import { recordAdminAuditLog } from "@/lib/admin/audit";
+import {
+  PAYOUT_ACTIONABLE_STATUSES,
+  type PayoutAction,
+  isPayoutAction,
+  isPayoutActionable,
+  normalizePayoutNote,
+  payoutActionUpdates,
+  payoutAuditAction,
+} from "@/lib/admin/payouts";
 
-interface PayoutNotificationRow {
+interface PayoutRow {
+  id: string;
+  status: string;
+  note: string | null;
+  paid_at: string | null;
   period: string;
   total_net_krw: number;
   photographer_id: string;
@@ -55,79 +69,97 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ payouts: data ?? [] });
 }
 
-interface ActionBody {
-  payout_id: string;
-  action: "approve" | "reject";
-  note?: string;
-}
-
 export async function POST(req: NextRequest) {
   const user = await requireAdmin();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const body: ActionBody = await req.json();
-  const { payout_id, action, note } = body;
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+  const payoutId = typeof body.payout_id === "string" ? body.payout_id : "";
+  const action = body.action;
+  const note = normalizePayoutNote(body.note);
 
-  if (!payout_id || !action) {
+  if (!payoutId || !action) {
     return NextResponse.json({ error: "payout_id and action are required" }, { status: 400 });
   }
-  if (action !== "approve" && action !== "reject") {
+  if (!isPayoutAction(action)) {
     return NextResponse.json({ error: "action must be 'approve' or 'reject'" }, { status: 400 });
   }
 
   const admin = createAdminClient();
 
-  // Verify payout exists
-  const { data: existing, error: fetchError } = await admin
+  const { data: existingData, error: fetchError } = await admin
     .from("payouts")
-    .select("id, status")
-    .eq("id", payout_id)
+    .select("id, status, note, paid_at, period, total_net_krw, photographer_id")
+    .eq("id", payoutId)
     .single();
+  const existing = existingData as PayoutRow | null;
 
   if (fetchError || !existing) {
     return NextResponse.json({ error: "Payout not found" }, { status: 404 });
   }
-
-  const updates: Record<string, unknown> =
-    action === "approve"
-      ? { status: "paid", paid_at: new Date().toISOString(), note: note ?? null }
-      : { status: "rejected", note: note ?? null };
-
-  const { data: payout, error: updateError } = await admin
-    .from("payouts")
-    .update(updates)
-    .eq("id", payout_id)
-    .select()
-    .single();
-
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
-
-  // Fire-and-forget payout notification email
-  if (existing) {
-    (async () => {
-      const { data: payoutFullData } = await admin
-        .from("payouts")
-        .select("period, total_net_krw, photographer_id")
-        .eq("id", payout_id)
-        .single();
-      const payoutFull = payoutFullData as PayoutNotificationRow | null;
-      if (!payoutFull) return;
-
-      const [profileRes, authRes] = await Promise.all([
-        admin.from("profiles").select("full_name").eq("id", payoutFull.photographer_id).single(),
-        admin.auth.admin.getUserById(payoutFull.photographer_id),
-      ]);
-      const email = authRes.data.user?.email;
-      const name  = profileRes.data?.full_name ?? "사진작가";
-      if (!email) return;
-
-      if (action === "approve") {
-        await sendPayoutApproved({ photographerEmail: email, photographerName: name, period: payoutFull.period, netKrw: payoutFull.total_net_krw });
-      } else {
-        await sendPayoutRejected({ photographerEmail: email, photographerName: name, period: payoutFull.period, netKrw: payoutFull.total_net_krw, note: note });
-      }
-    })().catch(console.error);
+  if (!isPayoutActionable(existing.status)) {
+    return NextResponse.json({ error: "이미 처리된 정산 요청입니다. 목록을 새로고침해 주세요." }, { status: 409 });
   }
 
-  return NextResponse.json({ payout });
+  // 상태 조건부 갱신: 동시에 두 번 눌러도 한 번만 처리된다.
+  const { data: payout, error: updateError } = await admin
+    .from("payouts")
+    .update(payoutActionUpdates(action, note, new Date()))
+    .eq("id", payoutId)
+    .in("status", [...PAYOUT_ACTIONABLE_STATUSES])
+    .select()
+    .maybeSingle();
+
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  if (!payout) {
+    return NextResponse.json({ error: "이미 처리된 정산 요청입니다. 목록을 새로고침해 주세요." }, { status: 409 });
+  }
+
+  const email = await notifyPhotographer(admin, existing, action, note);
+
+  await recordAdminAuditLog(admin, {
+    actorId: user.id,
+    action: payoutAuditAction(action),
+    targetType: "payout",
+    targetId: payoutId,
+    targetLabel: existing.period,
+    before: { status: existing.status, note: existing.note, paid_at: existing.paid_at },
+    after: { status: payout.status, note: payout.note, paid_at: payout.paid_at },
+    reason: note,
+    metadata: { total_net_krw: existing.total_net_krw, photographer_id: existing.photographer_id, email },
+  });
+
+  return NextResponse.json({ payout, email });
+}
+
+type NotificationResult = "sent" | "failed" | "skipped";
+
+async function notifyPhotographer(
+  admin: ReturnType<typeof createAdminClient>,
+  payout: PayoutRow,
+  action: PayoutAction,
+  note: string | null,
+): Promise<NotificationResult> {
+  try {
+    const [profileRes, authRes] = await Promise.all([
+      admin.from("profiles").select("full_name").eq("id", payout.photographer_id).single(),
+      admin.auth.admin.getUserById(payout.photographer_id),
+    ]);
+    const email = authRes.data.user?.email;
+    if (!email) return "skipped";
+    const name = profileRes.data?.full_name ?? "사진작가";
+    const message = {
+      photographerEmail: email,
+      photographerName: name,
+      period: payout.period,
+      netKrw: payout.total_net_krw,
+    };
+
+    if (action === "approve") await sendPayoutApproved(message);
+    else await sendPayoutRejected({ ...message, note: note ?? undefined });
+    return "sent";
+  } catch (error) {
+    console.error("[admin/payouts] notification failed", { payoutId: payout.id, error });
+    return "failed";
+  }
 }

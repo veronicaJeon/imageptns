@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordAdminAuditLog } from "@/lib/admin/audit";
 
 function stringValue(value: unknown, max = 200) {
   return String(value ?? "").trim().slice(0, max);
@@ -24,6 +25,12 @@ export async function PATCH(
   }
 
   const admin = createAdminClient();
+  const { data: before } = await admin
+    .from("image_categories")
+    .select("code, label_ko, label_en, sort_order, active")
+    .eq("code", code)
+    .maybeSingle();
+
   const { data, error } = await admin
     .from("image_categories")
     .update({
@@ -40,6 +47,16 @@ export async function PATCH(
   if (error || !data) {
     return NextResponse.json({ error: error?.message ?? "카테고리를 찾을 수 없습니다." }, { status: 404 });
   }
+
+  await recordAdminAuditLog(admin, {
+    actorId: adminUser.id,
+    action: "image_category.updated",
+    targetType: "image_category",
+    targetId: data.code,
+    targetLabel: data.label_ko,
+    before: before ?? null,
+    after: data,
+  });
 
   return NextResponse.json({
     category: {
