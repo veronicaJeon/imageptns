@@ -4,7 +4,8 @@ import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { buildPhotoRequestInviteRecipients, formatPhotoRequestBudget } from "@/lib/contact/photo-request-invites";
 import { sendPhotoRequestInviteEmails } from "@/lib/email/contact";
 import { sendPhotoRequestInvite } from "@/lib/email/resend";
-import { sendSupportStatusUpdate } from "@/lib/email/resend";
+import { sendGeneralInquiryReply, sendSupportStatusUpdate } from "@/lib/email/resend";
+import { normalizeGeneralInquiryReply } from "@/lib/contact/general-reply";
 import { candidateImageEligibility } from "@/lib/sourcing/candidates";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -46,6 +47,16 @@ interface ContactSubmissionRow {
   assignee: { id: string; full_name: string | null } | { id: string; full_name: string | null }[] | null;
   matches?: PhotoRequestMatchRow[] | null;
   answers?: SourcingAnswerRow[] | null;
+  revisions?: SourcingRevisionRow[] | null;
+}
+
+interface SourcingRevisionRow {
+  id: string;
+  contact_submission_id?: string;
+  round: number;
+  reasons: string[] | null;
+  message: string;
+  created_at: string;
 }
 
 interface PhotoRequestMatchRow {
@@ -110,6 +121,8 @@ interface SourcingAnswerRow {
 
 type SupportPostBody = {
   action?: unknown;
+  id?: unknown;
+  reply?: unknown;
   requestId?: unknown;
   limit?: unknown;
   matchIds?: unknown;
@@ -272,6 +285,7 @@ function mapPhotoSubmission(submission: ContactSubmissionRow) {
       sourcing_purposes: submission.sourcing_purposes ?? [],
       matches: submission.matches ?? [],
       answers: submission.answers ?? [],
+      revisions: submission.revisions ?? [],
     },
   };
 }
@@ -331,9 +345,26 @@ async function hydrateSourcingAnswers(
     ]);
   }
 
+  const { data: revisionData, error: revisionError } = await admin
+    .from("sourcing_request_revisions")
+    .select("id, contact_submission_id, round, reasons, message, created_at")
+    .in("contact_submission_id", requestIds)
+    .order("round", { ascending: true });
+
+  if (revisionError) throw revisionError;
+
+  const revisionsByRequestId = new Map<string, SourcingRevisionRow[]>();
+  for (const revision of (revisionData ?? []) as SourcingRevisionRow[]) {
+    revisionsByRequestId.set(revision.contact_submission_id ?? "", [
+      ...(revisionsByRequestId.get(revision.contact_submission_id ?? "") ?? []),
+      revision,
+    ]);
+  }
+
   return submissions.map((submission) => ({
     ...submission,
     answers: answersByRequestId.get(submission.id) ?? [],
+    revisions: revisionsByRequestId.get(submission.id) ?? [],
   }));
 }
 
@@ -471,6 +502,10 @@ export async function POST(req: NextRequest) {
   if (!adminUser) return forbidden();
 
   const body = await req.json().catch(() => null) as SupportPostBody | null;
+
+  if (body?.action === "reply_general_inquiry") {
+    return replyGeneralInquiry(body, adminUser.id);
+  }
 
   if (body?.action === "send_photo_request_invites") {
     return sendPhotoRequestInvites(body, adminUser.id);
@@ -697,6 +732,81 @@ async function addSelectedPhotoRequestMatches(body: SupportPostBody, adminUserId
   });
 }
 
+async function replyGeneralInquiry(body: SupportPostBody, adminUserId: string) {
+  const id = typeof body.id === "string" ? body.id.trim() : "";
+  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+  let reply: string;
+  try {
+    reply = normalizeGeneralInquiryReply(body.reply);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid reply" }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const { data: before, error: beforeError } = await admin
+    .from("contact_submissions")
+    .select("*")
+    .eq("id", id)
+    .eq("inquiry_type", "general")
+    .single();
+
+  if (beforeError || !before) return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
+  const row = before as ContactSubmissionRow;
+  if (!row.email) return NextResponse.json({ error: "고객 이메일이 없어 답변을 보낼 수 없습니다." }, { status: 400 });
+
+  // Send first: the inquiry is only marked answered once the customer has the reply.
+  try {
+    await sendGeneralInquiryReply({
+      name: row.name ?? "고객",
+      email: row.email,
+      subject: row.subject ?? "문의",
+      originalMessage: row.message ?? "",
+      reply,
+    });
+  } catch (error) {
+    console.error("[admin/support] general reply email failed", {
+      submissionId: id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json({ error: "답변 메일을 보내지 못했습니다. 이메일 설정을 확인해주세요." }, { status: 502 });
+  }
+
+  const now = new Date().toISOString();
+  const { data, error } = await admin
+    .from("contact_submissions")
+    .update({
+      admin_reply: reply,
+      admin_replied_at: now,
+      admin_replied_by: adminUserId,
+      status: "resolved",
+      resolved_at: now,
+      updated_at: now,
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json(
+      { error: `답변 메일은 발송되었지만 기록하지 못했습니다: ${error.message}`, emailDelivery: "sent" },
+      { status: 500 },
+    );
+  }
+
+  await recordAdminAuditLog(admin, {
+    actorId: adminUserId,
+    action: "contact_submission.replied",
+    targetType: "contact_submission",
+    targetId: id,
+    targetLabel: data.subject,
+    before,
+    after: data,
+  });
+
+  return NextResponse.json({ submission: data, emailDelivery: "sent" });
+}
+
 async function saveSourcingAnswerDraft(body: SupportPostBody, adminUserId: string) {
   const requestId = typeof body.requestId === "string" ? body.requestId.trim() : "";
   const answerText = typeof body.answerText === "string" ? body.answerText.trim() : "";
@@ -727,10 +837,18 @@ async function saveSourcingAnswerDraft(body: SupportPostBody, adminUserId: strin
     return NextResponse.json({ error: "Sourcing request not found" }, { status: 404 });
   }
 
+  const { count: revisionCount, error: revisionCountError } = await admin
+    .from("sourcing_request_revisions")
+    .select("id", { count: "exact", head: true })
+    .eq("contact_submission_id", requestId);
+
+  if (revisionCountError) return NextResponse.json({ error: revisionCountError.message }, { status: 500 });
+
   const { data, error } = await admin
     .from("sourcing_request_answers")
     .insert({
       contact_submission_id: requestId,
+      revision_round: Math.min(3, revisionCount ?? 0),
       answer_text: answerText || null,
       rights_result: rightsResult,
       rights_explanation: rightsExplanation,

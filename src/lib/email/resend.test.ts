@@ -164,4 +164,87 @@ describe("Resend routing", () => {
       },
     });
   });
+
+  describe("inquiry answers and revisions", () => {
+    function stubResend() {
+      vi.stubEnv("RESEND_API_KEY", "test-key");
+      vi.stubEnv("OPS_EMAIL", "imgptns@gmail.com");
+      vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://www.imagepartners.kr");
+      const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "email-x" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+      vi.stubGlobal("fetch", fetchMock);
+      return () => JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body)) as Record<string, string>;
+    }
+
+    it("emails the general inquiry answer itself, escaped, without a site link", async () => {
+      const sentBody = stubResend();
+      const { sendGeneralInquiryReply } = await import("./resend");
+      await sendGeneralInquiryReply({
+        name: "고객",
+        email: "customer@example.com",
+        subject: "라이선스 문의",
+        originalMessage: "교재에 써도 되나요?",
+        reply: "가능합니다.\n<출처 표기> 필요",
+      });
+
+      const body = sentBody();
+      expect(body.to).toBe("customer@example.com");
+      expect(body.subject).toContain("문의에 답변드립니다");
+      expect(body.html).toContain("가능합니다.\n&lt;출처 표기&gt; 필요");
+      expect(body.html).toContain("교재에 써도 되나요?");
+      expect(body.html).not.toContain("/contact");
+    });
+
+    it("does not send general inquiry status mail to a page without the answer", async () => {
+      const sentBody = stubResend();
+      const { sendSupportStatusUpdate } = await import("./resend");
+      await sendSupportStatusUpdate({
+        name: "고객",
+        email: "customer@example.com",
+        subject: "문의",
+        status: "resolved",
+        inquiryType: "general",
+      });
+
+      const body = sentBody();
+      expect(body.html).not.toContain("/contact");
+      expect(body.html).not.toContain("답변 내용을 확인해 주세요");
+      expect(body.subject).toContain("처리 완료");
+    });
+
+    it("keeps the dashboard link for image request status mail", async () => {
+      const sentBody = stubResend();
+      const { sendSupportStatusUpdate } = await import("./resend");
+      await sendSupportStatusUpdate({
+        name: "구매자",
+        email: "buyer@example.com",
+        subject: "이미지 요청",
+        status: "resolved",
+        inquiryType: "photo_request",
+      });
+
+      expect(sentBody().html).toContain("https://www.imagepartners.kr/dashboard/sourcing");
+    });
+
+    it("notifies the operations inbox about a buyer revision", async () => {
+      const sentBody = stubResend();
+      const { notifyOpsSourcingRevision } = await import("./resend");
+      await notifyOpsSourcingRevision({
+        name: "구매자",
+        email: "buyer@example.com",
+        subject: "[이미지 요청] 한강",
+        round: 2,
+        reasons: ["장소가 다름"],
+        message: "여의도 쪽으로 부탁드립니다.",
+      });
+
+      const body = sentBody();
+      expect(body).toMatchObject({ to: "imgptns@gmail.com", reply_to: "buyer@example.com" });
+      expect(body.subject).toContain("수정요청 2회차");
+      expect(body.html).toContain("장소가 다름");
+      expect(body.html).toContain("/admin/photo-requests");
+    });
+  });
 });
