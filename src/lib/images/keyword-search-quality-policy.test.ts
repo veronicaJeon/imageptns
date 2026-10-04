@@ -46,4 +46,8 @@ describe("partial keyword fallback in the search route", () => {
     expect(route).toContain('decision.source === "none"');
     expect(route).toContain("choosePartialKeywordResults(");
   });
+
+  it("keeps the strict call compatible with the previous RPC signature", () => {
+    expect(route).toContain("...(matchAny ? { p_match_any: true } : {})");
+  });
 });

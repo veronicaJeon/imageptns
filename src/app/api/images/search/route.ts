@@ -112,7 +112,9 @@ export async function GET(request: NextRequest) {
     p_match_count: MAX_RANKED_CANDIDATES,
     p_offset: 0,
     p_min_score: thresholds.keywordStrong,
-    p_match_any: matchAny,
+    // Sent only for the partial step so the strict call keeps working against
+    // a database that does not have migration 078 applied yet.
+    ...(matchAny ? { p_match_any: true } : {}),
   });
   const toKeywordSignals = (rows: unknown) => ((rows ?? []) as RankedRow[]).map((row) => ({
     imageId: row.image_id,
