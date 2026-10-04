@@ -6,7 +6,8 @@ import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/i18n/store";
 import { createClient } from "@/lib/supabase/client";
-import { getSafeRelativePath } from "@/lib/routing/canonical";
+import { buildSiteUrl, getSafeRelativePath } from "@/lib/routing/canonical";
+import { isEmailNotConfirmedError, loginQueryNotice } from "@/lib/auth/auth-feedback";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
@@ -20,9 +21,20 @@ function LoginForm() {
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
   const [hideQueryError, setHideQueryError] = useState(false);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+  const queryNotice = hideQueryError ? null : loginQueryNotice(searchParams.get("error"));
   const queryError =
-    !hideQueryError && searchParams.get("error") === "oauth" ? a.errorOAuth : null;
+    queryNotice === "oauth"
+      ? a.errorOAuth
+      : queryNotice === "confirmation_link"
+        ? a.errorConfirmationLink
+        : queryNotice === "recovery_link"
+          ? a.errorRecoveryLink
+          : null;
   const displayedError = error ?? queryError;
+  const showResend = needsConfirmation || queryNotice === "confirmation_link";
   const safeNext = getSafeRelativePath(searchParams.get("next"), "/library");
   const googleLoginUrl = `/api/auth/google?next=${encodeURIComponent(
     safeNext,
@@ -33,15 +45,36 @@ function LoginForm() {
     setLoading(true);
     setHideQueryError(true);
     setError(null);
+    setResendNotice(null);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      setError(a.errorCredentials);
+      const unconfirmed = isEmailNotConfirmedError(error);
+      setNeedsConfirmation(unconfirmed);
+      setError(unconfirmed ? a.errorEmailNotConfirmed : a.errorCredentials);
       setLoading(false);
     } else {
       await fetch("/api/auth/login-event", { method: "POST" }).catch(() => {});
       window.location.href = safeNext;
     }
+  }
+
+  async function handleResendConfirmation() {
+    const target = email.trim().toLowerCase();
+    if (!target) {
+      setResendNotice(a.resendNeedEmail);
+      return;
+    }
+    setResendLoading(true);
+    setResendNotice(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: target,
+      options: { emailRedirectTo: buildSiteUrl("/api/auth/callback") },
+    });
+    setResendNotice(error ? a.resendFailed : a.resendSent);
+    setResendLoading(false);
   }
 
   return (
@@ -57,6 +90,26 @@ function LoginForm() {
           <span className="material-symbols-outlined text-base">error</span>
           {displayedError}
         </div>
+      )}
+
+      {showResend && (
+        <div className="-mt-3 mb-6 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={handleResendConfirmation}
+            disabled={resendLoading}
+            className="self-start text-sm font-semibold text-primary hover:underline disabled:opacity-50"
+          >
+            {a.resendConfirmation}
+          </button>
+          {resendNotice && <p className="text-xs text-on-surface-variant">{resendNotice}</p>}
+        </div>
+      )}
+
+      {queryNotice === "recovery_link" && (
+        <Link href="/forgot-password" className="-mt-3 mb-6 inline-block text-sm font-semibold text-primary hover:underline">
+          {a.requestNewReset}
+        </Link>
       )}
 
       {/* Google OAuth */}

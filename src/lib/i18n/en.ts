@@ -12,6 +12,9 @@ export interface Translations {
       emailLabel: string; emailPlaceholder: string; passwordLabel: string;
       passwordPlaceholder: string; forgotPassword: string; submitBtn: string;
       noAccount: string; signupLink: string; errorOAuth: string; errorCredentials: string;
+      errorEmailNotConfirmed: string; errorConfirmationLink: string; errorRecoveryLink: string;
+      resendConfirmation: string; resendSent: string; resendNeedEmail: string; resendFailed: string;
+      requestNewReset: string;
     };
     signup: {
       title: string; subtitle: string; roleLabel: string;
@@ -20,6 +23,7 @@ export interface Translations {
       emailLabel: string; emailPlaceholder: string; passwordLabel: string;
       passwordPlaceholder: string; submitBtn: string; hasAccount: string; loginLink: string;
       terms: string; termsLink: string; and: string; privacyLink: string;
+      googlePhotographerHint: string;
     };
     brand: { tagline: string; quote: string };
   };
@@ -227,6 +231,14 @@ export const en: Translations = {
       signupLink: "Sign up",
       errorOAuth: "Authentication failed. Please try again.",
       errorCredentials: "Invalid email or password.",
+      errorEmailNotConfirmed: "Your email address has not been verified yet. Click the link in the verification email, or send it again below.",
+      errorConfirmationLink: "This verification link has expired or was already used. Enter your email and send a new verification email.",
+      errorRecoveryLink: "This password reset link has expired or was already used. Please request a new one.",
+      resendConfirmation: "Resend verification email",
+      resendSent: "We sent a new verification email. Please also check your spam folder.",
+      resendNeedEmail: "Enter your email address first.",
+      resendFailed: "We couldn't send the verification email. Please try again in a minute.",
+      requestNewReset: "Request a new reset link",
     },
     signup: {
       title: "Join Image Partners.",
@@ -251,6 +263,7 @@ export const en: Translations = {
       termsLink: "Terms of Service",
       and: "and",
       privacyLink: "Privacy Policy",
+      googlePhotographerHint: "If you continue with Google, you will enter your phone number and activity regions on the settings page right after signing in to complete your photographer application.",
     },
     brand: {
       tagline: "Photographs are proof of the past.",
