@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordAdminAuditLog } from "@/lib/admin/audit";
 import { previewUrl } from "@/lib/supabase/storage";
 
 async function requireAdmin() {
@@ -45,6 +46,8 @@ interface OnchainClaimRecord extends Record<string, unknown> {
 interface ExistingClaimRecord {
   settlement_provider: string;
   claim_status: string;
+  claim_review_status?: string | null;
+  claim_review_note?: string | null;
 }
 
 function firstRecord<T>(record: OneOrMany<T>) {
@@ -153,7 +156,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const { data: existing, error: fetchError } = await admin
     .from("earnings_ledger")
-    .select("id, settlement_provider, claim_status")
+    .select("id, settlement_provider, claim_status, claim_review_status, claim_review_note")
     .eq("id", ledger_id)
     .single();
 
@@ -198,6 +201,20 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+
+  await recordAdminAuditLog(admin, {
+    actorId: user.id,
+    action: `onchain_claim.${ACTION_TO_STATUS[action]}`,
+    targetType: "earnings_ledger",
+    targetId: ledger_id,
+    before: {
+      claim_review_status: existingClaim.claim_review_status ?? null,
+      claim_review_note: existingClaim.claim_review_note ?? null,
+    },
+    after: { claim_review_status: ACTION_TO_STATUS[action], claim_review_note: note },
+    reason: note,
+    metadata: { claim_status: existingClaim.claim_status },
+  });
 
   return NextResponse.json({
     claim: withPreviewUrl(claim as unknown as OnchainClaimRecord),

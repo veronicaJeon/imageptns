@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { listImageCategories } from "@/lib/images/category-server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordAdminAuditLog } from "@/lib/admin/audit";
 
 const CODE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 
@@ -49,6 +50,17 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (data) {
+    await recordAdminAuditLog(admin, {
+      actorId: adminUser.id,
+      action: "image_category.created",
+      targetType: "image_category",
+      targetId: data.code,
+      targetLabel: data.label_ko,
+      after: data,
+    });
+  }
 
   return NextResponse.json({
     category: data ? {

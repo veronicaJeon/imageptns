@@ -4,7 +4,11 @@ import { detachImageFromAboutPage } from "@/lib/about/library-assets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeLicensePrice } from "@/lib/commerce/pricing";
 import { previewUrl } from "@/lib/supabase/storage";
+import { recordAdminAuditLog } from "@/lib/admin/audit";
+import { type PriceOverride, diffImageEdit, sortPriceOverrides, staleOverrideCodes } from "@/lib/admin/image-edit-audit";
 import { categoryCodesForImage, getImageCategoryCodeMap, normalizeImageCategoryInput, syncImageCategoryAssignments } from "@/lib/images/category-server";
+
+const IMAGE_EDIT_COLUMNS = "id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, is_published, storage_path_preview";
 
 function normalizeTags(value: unknown) {
   if (!Array.isArray(value)) return [];
@@ -73,6 +77,40 @@ export async function PATCH(
   if (!title) return NextResponse.json({ error: "제목은 필수입니다." }, { status: 400 });
   if (categoryInput.codes.length === 0) return NextResponse.json({ error: "카테고리는 필수입니다." }, { status: 400 });
 
+  // 가격 입력을 먼저 검증해 잘못된 가격 때문에 이미지 정보만 반쯤 저장되는 일을 막는다.
+  const priceOverrides = body.priceOverrides && typeof body.priceOverrides === "object"
+    ? body.priceOverrides as Record<string, unknown>
+    : {};
+
+  let overrideRows: { image_id: string; license_code: string; price_krw: number; updated_by: string }[];
+  try {
+    overrideRows = Object.entries(priceOverrides).map(([licenseCode, price]) => ({
+      image_id: id,
+      license_code: licenseCode,
+      price_krw: normalizeLicensePrice(price),
+      updated_by: adminUser.id,
+    }));
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid price override" }, { status: 400 });
+  }
+
+  const [{ data: beforeImage, error: beforeError }, { data: beforeOverrideData, error: beforeOverridesError }] = await Promise.all([
+    admin
+      .from("images")
+      .select(IMAGE_EDIT_COLUMNS)
+      .eq("id", id)
+      .single(),
+    admin
+      .from("image_price_overrides")
+      .select("license_code, price_krw")
+      .eq("image_id", id),
+  ]);
+
+  if (beforeError || !beforeImage) return NextResponse.json({ error: beforeError?.message ?? "Image not found" }, { status: 404 });
+  if (beforeOverridesError) return NextResponse.json({ error: beforeOverridesError.message }, { status: 500 });
+  const beforeOverrides = (beforeOverrideData ?? []) as PriceOverride[];
+  const beforeCategoryCodes = categoryCodesForImage(await getImageCategoryCodeMap(admin, [id]), id, beforeImage.category);
+
   const isPublished = Boolean(body.is_published);
   const { data: image, error: imageError } = await admin
     .from("images")
@@ -93,7 +131,7 @@ export async function PATCH(
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .select("id, asset_id, title, title_ko, title_en, description, description_ko, description_en, category, tags, tags_ko, tags_en, status, is_published, storage_path_preview")
+    .select(IMAGE_EDIT_COLUMNS)
     .single();
 
   if (imageError || !image) return NextResponse.json({ error: imageError?.message ?? "Image update failed" }, { status: 500 });
@@ -101,35 +139,41 @@ export async function PATCH(
   await syncImageCategoryAssignments(admin, id, categoryInput.codes);
   if (!isPublished) await detachImageFromAboutPage(admin, id);
 
-  const priceOverrides = body.priceOverrides && typeof body.priceOverrides === "object"
-    ? body.priceOverrides as Record<string, unknown>
-    : {};
+  if (overrideRows.length > 0) {
+    const { error: upsertError } = await admin
+      .from("image_price_overrides")
+      .upsert(overrideRows, { onConflict: "image_id,license_code" });
 
-  let overrideRows: { image_id: string; license_code: string; price_krw: number; updated_by: string }[];
-  try {
-    overrideRows = Object.entries(priceOverrides).map(([licenseCode, price]) => ({
-      image_id: id,
-      license_code: licenseCode,
-      price_krw: normalizeLicensePrice(price),
-      updated_by: adminUser.id,
-    }));
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid price override" }, { status: 400 });
+    if (upsertError) return NextResponse.json({ error: upsertError.message }, { status: 500 });
   }
 
-  const { error: deleteError } = await admin
-    .from("image_price_overrides")
-    .delete()
-    .eq("image_id", id);
-
-  if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
-
-  if (overrideRows.length > 0) {
-    const { error: insertError } = await admin
+  const staleCodes = staleOverrideCodes(beforeOverrides, overrideRows);
+  if (staleCodes.length > 0) {
+    const { error: deleteError } = await admin
       .from("image_price_overrides")
-      .insert(overrideRows);
+      .delete()
+      .eq("image_id", id)
+      .in("license_code", staleCodes);
 
-    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  }
+
+  const afterOverrides = sortPriceOverrides(overrideRows);
+  const diff = diffImageEdit(
+    { ...beforeImage, category_codes: beforeCategoryCodes, price_overrides: sortPriceOverrides(beforeOverrides) },
+    { ...image, category_codes: categoryInput.codes, price_overrides: afterOverrides },
+  );
+  if (diff.changedFields.length > 0) {
+    await recordAdminAuditLog(admin, {
+      actorId: adminUser.id,
+      action: "image.edited",
+      targetType: "image",
+      targetId: id,
+      targetLabel: image.asset_id ?? image.title,
+      before: diff.before,
+      after: diff.after,
+      metadata: { changed_fields: diff.changedFields },
+    });
   }
 
   return NextResponse.json({
@@ -137,7 +181,7 @@ export async function PATCH(
       ...image,
       category_codes: categoryInput.codes,
       storage_path_preview: previewUrl(image.storage_path_preview),
-      price_overrides: overrideRows.map(({ license_code, price_krw }) => ({ license_code, price_krw })),
+      price_overrides: afterOverrides,
     },
   });
 }
