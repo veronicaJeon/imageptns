@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  join(process.cwd(), "supabase/migrations/076_keyword_search_infix_partial_category.sql"),
+  join(process.cwd(), "supabase/migrations/078_keyword_search_infix_partial_category.sql"),
   "utf8",
 );
 const route = readFileSync(join(process.cwd(), "src/app/api/images/search/route.ts"), "utf8");
