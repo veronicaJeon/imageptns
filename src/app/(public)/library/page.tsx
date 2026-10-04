@@ -60,6 +60,7 @@ const LIBRARY_PAGE_COPY = {
     photoSearchTooLarge: "선택하는 사진은 25MB 이하여야 합니다.",
     photoSearchFailed: "사진을 검색하지 못했습니다. 다른 파일로 다시 시도해 주세요.",
     textSearchFailed: "검색 결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    partialMatch: "모든 검색어가 들어간 이미지가 없어 일부 검색어가 일치하는 이미지를 보여드립니다.",
     imageLoadFailed: "이미지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     retry: "다시 시도",
     noResultsTitle: (query: string) => `‘${query}’에 맞는 이미지가 아직 없습니다.`,
@@ -88,6 +89,7 @@ const LIBRARY_PAGE_COPY = {
     photoSearchTooLarge: "The selected photo must be 25MB or smaller.",
     photoSearchFailed: "We could not search this photo. Try another file.",
     textSearchFailed: "We could not load the search results. Please try again shortly.",
+    partialMatch: "No image matched every search word, so these images match some of them.",
     imageLoadFailed: "We could not load the images. Please try again shortly.",
     retry: "Try again",
     noResultsTitle: (query: string) => `No images match “${query}” yet.`,
@@ -109,7 +111,8 @@ export default function LibraryPage() {
   const [query, setQuery]             = useState("");
   const [category, setCategory]       = useState("all");
   const [categories, setCategories]   = useState<ImageCategory[]>(() => [...DEFAULT_IMAGE_CATEGORIES]);
-  const [sort, setSort]               = useState<SortKey>("newest");
+  // Until the visitor picks a sort, searches use relevance and browsing uses newest.
+  const [chosenSort, setChosenSort]   = useState<SortKey | null>(null);
   const [orientation, setOrientation] = useState<OrientationKey>("all");
   const [pageSize, setPageSize]       = useState<number>(PAGE_SIZE_OPTIONS[0]);
   const [freeOnly, setFreeOnly]       = useState(false);
@@ -121,6 +124,7 @@ export default function LibraryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore]         = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const sort: SortKey = chosenSort ?? (debouncedQuery ? "relevant" : "newest");
   const [guidance, setGuidance]       = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -131,6 +135,7 @@ export default function LibraryPage() {
   const [photoSearching, setPhotoSearching] = useState(false);
   const [photoSearchError, setPhotoSearchError] = useState("");
   const [libraryError, setLibraryError] = useState("");
+  const [partialMatch, setPartialMatch] = useState(false);
 
   const blurTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -239,6 +244,7 @@ export default function LibraryPage() {
 
       const nextImages = (data ?? []).slice(0, pageSize);
       setLibraryError("");
+      if (!append) setPartialMatch(searchSource === "keyword_partial");
       if (debouncedQuery && !append) {
         sendLibrarySearchEvent({
           query: debouncedQuery,
@@ -263,7 +269,10 @@ export default function LibraryPage() {
       setHasMore(Boolean(moreAvailable));
     } catch {
       if (requestSeq !== requestSeqRef.current) return;
-      if (!append) setImages([]);
+      if (!append) {
+        setImages([]);
+        setPartialMatch(false);
+      }
       setLibraryError(debouncedQuery ? copy.textSearchFailed : copy.imageLoadFailed);
       setHasMore(false);
     } finally {
@@ -394,7 +403,7 @@ export default function LibraryPage() {
             <label className="order-2 flex h-12 min-w-0 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-3 text-left md:order-none md:h-16 md:px-4">
               <span className="material-symbols-outlined text-xl text-outline">swap_vert</span>
               <span className="sr-only">{l.sort.label}</span>
-              <select value={sort} onChange={(event) => setSort(event.target.value as SortKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={l.sort.label}>
+              <select value={sort} onChange={(event) => setChosenSort(event.target.value as SortKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={l.sort.label}>
                 {SORT_KEYS.map((key) => <option key={key} value={key}>{l.sort[key]}</option>)}
               </select>
             </label>
@@ -505,6 +514,11 @@ export default function LibraryPage() {
                   </button>
                 )}
               </div>
+            )}
+            {partialMatch && !photoSearchActive && images.length > 0 && (
+              <p className="mb-6 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 text-sm text-on-surface-variant" role="status">
+                {copy.partialMatch}
+              </p>
             )}
             {libraryError && (
               <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-error/30 bg-error-container/30 p-4 md:flex-row md:items-center md:justify-between" role="alert">
