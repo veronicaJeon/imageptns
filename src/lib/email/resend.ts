@@ -533,8 +533,19 @@ export async function sendSupportStatusUpdate(opts: {
 }) {
   const name = escapeHtml(opts.name || "고객");
   const subject = escapeHtml(opts.subject);
-  const statusLabel = opts.status === "resolved" ? "답변 완료" : "검토 중";
-  const destination = opts.inquiryType === "photo_request" ? "/dashboard/sourcing" : "/contact";
+  const isPhotoRequest = opts.inquiryType === "photo_request";
+  const statusLabel = opts.status === "resolved"
+    ? (isPhotoRequest ? "답변 완료" : "처리 완료")
+    : "검토 중";
+  // General inquiries have no answer page on the site: the answer itself is
+  // sent by email (sendGeneralInquiryReply), so this notice links nowhere.
+  const detail = opts.status === "resolved"
+    ? (isPhotoRequest
+      ? "답변 내용을 확인해 주세요."
+      : "추가로 궁금하신 점은 이 메일에 회신해 주세요.")
+    : (isPhotoRequest
+      ? "담당자가 내용을 확인하고 있습니다. 처리가 완료되면 다시 알려드리겠습니다."
+      : "담당자가 내용을 확인하고 있습니다. 답변은 이 메일 주소로 보내드리겠습니다.");
 
   await sendEmail({
     to: opts.email,
@@ -542,9 +553,69 @@ export async function sendSupportStatusUpdate(opts: {
     html: `
       <p>${name}님, 안녕하세요.</p>
       <p>문의 <strong>${subject}</strong>의 처리 상태가 <strong>${statusLabel}</strong>으로 변경되었습니다.</p>
-      <p>${opts.status === "resolved" ? "답변 내용을 확인해 주세요." : "담당자가 내용을 확인하고 있습니다. 처리가 완료되면 다시 알려드리겠습니다."}</p>
-      <p><a href="${buildSiteUrl(destination)}">Image Partners에서 확인하기 →</a></p>
+      <p>${detail}</p>
+      ${isPhotoRequest ? `<p><a href="${buildSiteUrl("/dashboard/sourcing")}">Image Partners에서 확인하기 →</a></p>` : ""}
       <br><p>Image Partners 팀 드림</p>
+    `,
+  });
+}
+
+export async function sendGeneralInquiryReply(opts: {
+  name: string;
+  email: string;
+  subject: string;
+  originalMessage: string;
+  reply: string;
+}) {
+  const name = escapeHtml(opts.name || "고객");
+  const subject = escapeHtml(opts.subject);
+  const reply = escapeHtml(opts.reply);
+  const originalMessage = escapeHtml(opts.originalMessage);
+
+  await sendEmail({
+    to: opts.email,
+    replyTo: PUBLIC_CONTACT_EMAIL,
+    subject: `[Image Partners] 문의에 답변드립니다 — ${opts.subject}`,
+    html: `
+      <p>${name}님, 안녕하세요.</p>
+      <p>문의 <strong>${subject}</strong>에 대한 답변입니다.</p>
+      <div style="white-space:pre-wrap;line-height:1.6">${reply}</div>
+      <p>추가로 궁금하신 점은 이 메일에 회신해 주세요.</p>
+      <br><p>Image Partners 팀 드림</p>
+      <hr>
+      <p style="color:#666;font-size:12px">보내주신 문의</p>
+      <div style="white-space:pre-wrap;color:#666;font-size:12px">${originalMessage}</div>
+    `,
+  });
+}
+
+export async function notifyOpsSourcingRevision(opts: {
+  name: string;
+  email: string;
+  subject: string;
+  round: number;
+  reasons: string[];
+  message: string;
+}) {
+  const name = escapeHtml(opts.name || "구매자");
+  const email = escapeHtml(opts.email);
+  const subject = escapeHtml(opts.subject);
+  const reasons = opts.reasons.map(escapeHtml).join(", ");
+  const message = escapeHtml(opts.message);
+
+  await sendEmail({
+    to: OPS_EMAIL,
+    replyTo: opts.email,
+    subject: `[이미지 요청 수정요청 ${opts.round}회차] ${opts.subject} — ${opts.name || "구매자"}`,
+    html: `
+      <p>구매자가 답변을 받은 이미지 요청에 수정요청을 보냈습니다. 요청은 대기 중으로 돌아갔습니다.</p>
+      <p><strong>요청:</strong> ${subject}</p>
+      <p><strong>요청자:</strong> ${name} (${email})</p>
+      <p><strong>회차:</strong> ${opts.round}회차 / 최대 3회</p>
+      ${reasons ? `<p><strong>사유:</strong> ${reasons}</p>` : ""}
+      <p><strong>내용:</strong></p>
+      <div style="white-space:pre-wrap">${message}</div>
+      <p><a href="${buildSiteUrl("/admin/photo-requests")}">이미지 문의 운영에서 확인하기 →</a></p>
     `,
   });
 }

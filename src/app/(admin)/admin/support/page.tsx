@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AdminButton, AdminChip, AdminInlineMetrics } from "@/components/admin/AdminPrimitives";
+import { revisionReasonLabels, unansweredRevisions } from "@/lib/sourcing/revision";
 import { cn } from "@/lib/utils/cn";
 
 type SupportStatus = "pending" | "in_progress" | "resolved";
@@ -104,6 +105,14 @@ interface SourcingAnswer {
   candidates?: SourcingCandidate[] | null;
 }
 
+interface SourcingRevision {
+  id: string;
+  round: number;
+  reasons: string[] | null;
+  message: string;
+  created_at: string;
+}
+
 interface PhotoRequestDetail {
   id: string;
   title: string | null;
@@ -127,6 +136,7 @@ interface PhotoRequestDetail {
   sourcing_purposes: string[] | null;
   matches: PhotoMatch[];
   answers?: SourcingAnswer[] | null;
+  revisions?: SourcingRevision[] | null;
 }
 
 interface SupportSubmission {
@@ -144,6 +154,8 @@ interface SupportSubmission {
   created_at: string;
   updated_at: string | null;
   resolved_at: string | null;
+  admin_reply?: string | null;
+  admin_replied_at?: string | null;
   assignee?: { id: string; full_name: string | null } | null;
   photo_request?: PhotoRequestDetail;
 }
@@ -350,6 +362,7 @@ export default function AdminSupportPage() {
   const [kind] = useState<SupportKind>(fixedKind);
   const [submissions, setSubmissions] = useState<SupportSubmission[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [actioning, setActioning] = useState<string | null>(null);
@@ -433,6 +446,41 @@ export default function AdminSupportPage() {
       await fetchSubmissions(tab, kind);
     } catch (error) {
       alert(error instanceof Error ? error.message : "문의 상태를 저장하지 못했습니다.");
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  async function sendGeneralReply(submission: SupportSubmission) {
+    if (submission.kind !== "general") return;
+    const reply = (replyDrafts[submission.id] ?? "").trim();
+    if (!reply) {
+      alert("답변 내용을 입력해주세요.");
+      return;
+    }
+    if (!submission.email) {
+      alert("고객 이메일이 없어 답변을 보낼 수 없습니다.");
+      return;
+    }
+    if (!window.confirm(`${submission.email}로 답변 메일을 보내고 이 문의를 처리 완료로 바꿀까요?`)) return;
+
+    setActioning(submission.id);
+    try {
+      const res = await fetch("/api/admin/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reply_general_inquiry", id: submission.id, reply }),
+      });
+      if (res.status === 403) {
+        setForbidden(true);
+        return;
+      }
+      const body = await res.json().catch(() => null) as { error?: string } | null;
+      if (!res.ok) throw new Error(body?.error ?? "답변 메일을 보내지 못했습니다.");
+      setReplyDrafts((prev) => ({ ...prev, [submission.id]: "" }));
+      await fetchSubmissions(tab, kind);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "답변 메일을 보내지 못했습니다.");
     } finally {
       setActioning(null);
     }
@@ -643,6 +691,8 @@ export default function AdminSupportPage() {
             const photoRequest = submission.photo_request;
             const matchCount = photoRequest?.matches?.length ?? 0;
             const candidateCount = candidateMatchIds(photoRequest?.matches).length;
+            const revisions = photoRequest?.revisions ?? [];
+            const openRevisions = unansweredRevisions(revisions, photoRequest?.answers);
 
             return (
               <div
@@ -680,6 +730,11 @@ export default function AdminSupportPage() {
                       <AdminChip tone={isPhotoRequest ? "primary" : "neutral"}>
                         {isPhotoRequest ? "이미지 의뢰" : "일반 문의"}
                       </AdminChip>
+                      {openRevisions.length > 0 && (
+                        <AdminChip tone="danger">
+                          수정요청 {openRevisions[openRevisions.length - 1].round}회차
+                        </AdminChip>
+                      )}
                       <AdminChip tone={priorityTone(submission.priority)}>
                         {PRIORITY_LABELS[submission.priority ?? "normal"] ?? submission.priority}
                       </AdminChip>
@@ -784,6 +839,84 @@ export default function AdminSupportPage() {
                         </div>
                       )}
                       </div>
+                    </div>
+                  )}
+
+                  {isPhotoRequest && revisions.length > 0 && (
+                    <div className={cn(
+                      "rounded-lg border p-4",
+                      openRevisions.length > 0 ? "border-error/30 bg-error/5" : "border-outline-variant/30",
+                    )}>
+                      <p className={cn(
+                        "text-[10px] font-bold uppercase tracking-widest",
+                        openRevisions.length > 0 ? "text-error" : "text-outline",
+                      )}>
+                        구매자 수정요청 {revisions.length}/3
+                      </p>
+                      {openRevisions.length > 0 && (
+                        <p className="mt-1 text-xs text-on-surface-variant">
+                          아직 답하지 않은 수정요청이 있습니다. 아래 답변 초안을 고쳐 다시 발송해주세요.
+                        </p>
+                      )}
+                      <div className="mt-3 flex flex-col gap-3">
+                        {revisions.map((revision) => {
+                          const isOpen = openRevisions.some((open) => open.id === revision.id);
+                          return (
+                            <div key={revision.id} className="rounded-lg bg-surface-container-lowest p-3 ring-1 ring-outline-variant/40">
+                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                                <span className="font-bold text-on-surface">{revision.round}회차</span>
+                                <span className="text-outline">{formatDate(revision.created_at)}</span>
+                                <AdminChip tone={isOpen ? "danger" : "neutral"}>{isOpen ? "답변 필요" : "답변함"}</AdminChip>
+                              </div>
+                              {revisionReasonLabels(revision.reasons).length > 0 && (
+                                <p className="mt-2 text-xs text-on-surface-variant">
+                                  사유: {revisionReasonLabels(revision.reasons).join(", ")}
+                                </p>
+                              )}
+                              <p className="mt-1 whitespace-pre-wrap text-sm text-on-surface">{revision.message}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {!isPhotoRequest && (
+                    <div className="rounded-lg border border-outline-variant/30 p-4">
+                      {submission.admin_reply ? (
+                        <>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                            보낸 답변 · {formatDate(submission.admin_replied_at)}
+                          </p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm text-on-surface">{submission.admin_reply}</p>
+                          <p className="mt-2 text-xs text-outline">
+                            추가 안내가 필요하면 고객 이메일 주소로 직접 회신해주세요.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-outline">고객에게 답변</label>
+                          <textarea
+                            value={replyDrafts[submission.id] ?? ""}
+                            onChange={(event) => setReplyDrafts((prev) => ({ ...prev, [submission.id]: event.target.value }))}
+                            rows={5}
+                            maxLength={5000}
+                            placeholder="고객에게 보낼 답변을 입력하세요. 이 내용이 그대로 메일로 발송되고 기록됩니다."
+                            className="mt-2 w-full rounded-lg bg-surface-container-lowest px-3 py-2 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary resize-y"
+                          />
+                          <div className="mt-2 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => sendGeneralReply(submission)}
+                              disabled={isBusy || !(replyDrafts[submission.id] ?? "").trim()}
+                              className="flex items-center gap-1.5 rounded bg-primary px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                            >
+                              <span className="material-symbols-outlined text-sm">send</span>
+                              답변 메일 보내기
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -1030,7 +1163,7 @@ export default function AdminSupportPage() {
                         ) : (
                           <span className="material-symbols-outlined text-sm">check_circle</span>
                         )}
-                        답변 완료
+                        {isPhotoRequest ? "답변 완료" : "답변 없이 처리 완료"}
                       </button>
                     )}
                     {isPhotoRequest && submission.status_group !== "pending" && (
