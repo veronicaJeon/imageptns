@@ -68,6 +68,17 @@ export default function SettingsPage() {
   const [cancelDone, setCancelDone] = useState(false);
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const [upgradeDone, setUpgradeDone] = useState(false);
+  const [applicationPrompt, setApplicationPrompt] = useState<"complete_info" | null>(null);
+
+  useEffect(() => {
+    // Google photographer signups land here to enter contact details, which are
+    // intentionally kept out of OAuth redirect URLs.
+    const value = new URLSearchParams(window.location.search).get("photographer_application");
+    if (value === "complete_info" || value === "missing_info") {
+      setApplicationPrompt("complete_info");
+      document.getElementById("photographer-application")?.scrollIntoView({ block: "start" });
+    }
+  }, []);
   const [upgradeError, setUpgradeError] = useState("");
   const [walletConnecting, setWalletConnecting] = useState(false);
   const [walletError, setWalletError] = useState("");
@@ -462,7 +473,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Role Management */}
-      <section className="mb-10">
+      <section id="photographer-application" className="mb-10 scroll-mt-24">
         <h2 className="text-xs font-bold text-outline uppercase tracking-widest mb-6 pb-3 border-b border-outline-variant/20">
           계정 역할
         </h2>
@@ -490,6 +501,11 @@ export default function SettingsPage() {
           </div>
         ) : (
           <div className="p-5 bg-surface-container-low rounded-lg flex flex-col gap-4">
+            {applicationPrompt === "complete_info" && photographerStatus === "none" && (
+              <p className="px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 text-sm text-on-surface">
+                가입이 완료되었습니다. 연락처와 주요 활동 지역을 입력하고 사진작가 신청을 눌러 신청을 마쳐주세요.
+              </p>
+            )}
             <div className="flex items-start gap-3">
               <span className="material-symbols-outlined text-xl text-outline mt-0.5">
                 {photographerStatus === "suspended" ? "do_not_disturb_on" : "shopping_bag"}

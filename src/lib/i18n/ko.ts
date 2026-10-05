@@ -25,6 +25,14 @@ export const ko: Translations = {
       signupLink: "회원가입",
       errorOAuth: "인증에 실패했습니다. 다시 시도해주세요.",
       errorCredentials: "이메일 또는 비밀번호가 올바르지 않습니다.",
+      errorEmailNotConfirmed: "아직 이메일 인증이 완료되지 않았습니다. 인증 메일의 링크를 누르거나 아래에서 인증 메일을 다시 받아주세요.",
+      errorConfirmationLink: "인증 링크가 만료되었거나 이미 사용되었습니다. 이메일을 입력하고 인증 메일을 다시 받아주세요.",
+      errorRecoveryLink: "비밀번호 재설정 링크가 만료되었거나 이미 사용되었습니다. 다시 요청해주세요.",
+      resendConfirmation: "인증 메일 다시 보내기",
+      resendSent: "인증 메일을 다시 보냈습니다. 스팸함도 확인해주세요.",
+      resendNeedEmail: "이메일을 먼저 입력해주세요.",
+      resendFailed: "인증 메일을 보내지 못했습니다. 1분 뒤 다시 시도해주세요.",
+      requestNewReset: "재설정 링크 다시 요청하기",
     },
     signup: {
       title: "이미지파트너스에 가입하세요.",
@@ -49,6 +57,7 @@ export const ko: Translations = {
       termsLink: "이용약관",
       and: "및",
       privacyLink: "개인정보처리방침",
+      googlePhotographerHint: "구글로 가입하면 로그인 직후 설정 화면에서 연락처와 주요 활동 지역을 입력해 사진작가 신청을 마칩니다.",
     },
     brand: {
       tagline: "이미지는 과거의 증명입니다.",

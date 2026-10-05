@@ -7,6 +7,7 @@ import { useLang } from "@/lib/i18n/store";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { RadioCard } from "@/components/ui/RadioCard";
+import { buildGoogleSignupPath } from "@/lib/auth/auth-feedback";
 
 type Role = "buyer" | "photographer";
 
@@ -45,11 +46,7 @@ export default function SignupPage() {
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
-  const googleSignupUrl = `/api/auth/google?next=${encodeURIComponent(
-    "/dashboard",
-  )}&role=${role}&organization=${encodeURIComponent(organization.trim())}&phone_number=${encodeURIComponent(
-    phoneNumber.trim(),
-  )}&primary_activity_regions=${encodeURIComponent(activityRegions.trim())}&bio=${encodeURIComponent(bio.trim())}`;
+  const googleSignupUrl = buildGoogleSignupPath(role);
 
   async function handleEmailSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -198,16 +195,12 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={() => {
-                  if (role === "photographer" && (!phoneNumber.trim() || !activityRegions.trim())) {
-                    setError("사진작가 신청을 위해 연락처와 주요 활동 지역을 입력해주세요.");
-                    return;
-                  }
                   setLoading(true);
                   setError(null);
                   window.location.assign(googleSignupUrl);
                 }}
                 disabled={loading}
-                className="w-full min-w-0 min-h-12 px-4 py-3 flex items-center justify-center gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low transition-colors text-sm font-semibold leading-snug text-center text-on-surface disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+                className={`w-full min-w-0 min-h-12 px-4 py-3 flex items-center justify-center gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low transition-colors text-sm font-semibold leading-snug text-center text-on-surface disabled:opacity-50 disabled:cursor-not-allowed ${role === "photographer" ? "mb-3" : "mb-6"}`}
               >
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="shrink-0">
                   <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
@@ -217,6 +210,9 @@ export default function SignupPage() {
                 </svg>
                 <span className="min-w-0 break-words">{a.googleBtn}</span>
               </button>
+              {role === "photographer" && (
+                <p className="mb-6 text-xs text-on-surface-variant leading-relaxed">{a.googlePhotographerHint}</p>
+              )}
 
               {/* Divider */}
               <div className="flex items-center gap-4 mb-6">

@@ -4,6 +4,7 @@ import {
   getCanonicalRedirectOrigin,
   getSafeRelativePath,
 } from "@/lib/routing/canonical";
+import { confirmationFailureQuery } from "@/lib/auth/auth-feedback";
 import { createClient } from "@/lib/supabase/server";
 
 const EMAIL_OTP_TYPES = new Set<EmailOtpType>([
@@ -42,5 +43,7 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.redirect(`${redirectOrigin}/login?error=auth_confirmation`);
+  return NextResponse.redirect(
+    `${redirectOrigin}/login?error=${confirmationFailureQuery(requestedType)}`,
+  );
 }
