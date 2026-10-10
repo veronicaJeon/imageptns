@@ -140,7 +140,7 @@ flowchart LR
 | 이미지 | `images`, `image_categories`, `image_category_assignments`, `upload_sessions`, `image_deletion_requests`, `image_purge_logs`, 운영 비활성 `image_semantic_embeddings` |
 | 구매자 활동 | `favorites`, `collections`, `collection_items`, `contact_submissions`, 이미지 요청 후보·응답 테이블 |
 | 거래 | `license_types`, `orders`, `order_items`, `order_email_outbox`, `downloads`, `image_price_overrides`, 계좌이체 상태, 정산·지급 원장 |
-| 콘텐츠·정책 | `notices`, `legal_documents`, `business_disclosures`, 회사소개·라이브러리 안내·광고 설정 |
+| 콘텐츠·정책 | `notices`, `legal_documents`, `business_disclosures`, `about_page_content`, `auth_page_content`, 라이브러리 안내·광고 설정 |
 | 운영·보안 | `admin_audit_logs`, `user_events`, `operational_events`, `api_rate_limit_windows`, `data_retention_runs` |
 | 비공개 기능 | 구독, Toss, 온체인 주문·등록·청구·정산 관련 테이블 |
 

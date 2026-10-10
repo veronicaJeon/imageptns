@@ -16,6 +16,7 @@ describe("admin navigation groups", () => {
       "/admin/library-guidance",
       "/admin/library-ads",
       "/admin/about-page",
+      "/admin/auth-pages",
     ]);
   });
 

@@ -55,8 +55,10 @@
     "vitest": "^4.1.6"
   },
   "overrides": {
+    "baseline-browser-mapping": "2.11.28",
     "eslint-plugin-react-hooks": "7.0.1",
     "postcss": "^8.5.24",
-    "sharp": "$sharp"
+    "sharp": "$sharp",
+    "source-map-js": "1.2.2"
   }
 }

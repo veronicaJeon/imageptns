@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { RadioCard } from "@/components/ui/RadioCard";
 import { buildGoogleSignupPath } from "@/lib/auth/auth-feedback";
+import { useAuthPageContent } from "@/lib/auth/use-auth-page-content";
 
 type Role = "buyer" | "photographer";
 
@@ -34,6 +35,7 @@ export default function SignupPage() {
   const { t, lang } = useLang();
   const a = t.auth.signup;
   const extra = SIGNUP_EXTRA_COPY[lang];
+  const panel = useAuthPageContent().pages.signup;
 
   const [role, setRole]           = useState<Role>("buyer");
   const [name, setName]           = useState("");
@@ -92,15 +94,15 @@ export default function SignupPage() {
     <>
       {/* ── Left panel ── */}
       <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-16 bg-on-surface">
-        <div className="absolute inset-0 z-0">
+        {panel.backgroundImageUrl && <div className="absolute inset-0 z-0">
           <Image
-            src="https://picsum.photos/seed/authbg2/1200/900"
-            alt="Archive imagery"
+            src={panel.backgroundImageUrl}
+            alt={panel.backgroundImageAlt}
             fill
             className="object-cover opacity-30"
             unoptimized
           />
-        </div>
+        </div>}
         <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-primary/20" />
 
         <Link href="/" className="relative z-10 text-lg font-headline font-black uppercase tracking-tighter text-white">
@@ -109,9 +111,9 @@ export default function SignupPage() {
 
         <div className="relative z-10">
           <p className="font-headline text-3xl font-extrabold text-white leading-snug mb-4">
-            {t.auth.brand.tagline}
+            {panel.locales[lang].headline}
           </p>
-          <p className="text-white/60 text-sm italic">{t.auth.brand.quote}</p>
+          <p className="text-white/60 text-sm">{panel.locales[lang].comment}</p>
         </div>
       </div>
 
