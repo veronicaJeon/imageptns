@@ -3,6 +3,7 @@ import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { recordAdminAuditLog } from "@/lib/admin/audit";
 import { DEFAULT_AUTH_PAGE_CONTENT, isSafeAuthBackgroundUrl, normalizeAuthPageContent } from "@/lib/auth/page-content";
 import { getAdminAuthPageState } from "@/lib/auth/page-content-server";
+import { removeUnreferencedAuthAssets, validateAuthLibraryImages } from "@/lib/auth/library-assets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET() {
@@ -30,11 +31,23 @@ async function mutate(req: NextRequest, publish: boolean) {
   const content = normalizeAuthPageContent(payload?.content);
   const admin = createAdminClient(), now = new Date().toISOString();
   const { data: before } = await admin.from("auth_page_content").select("content,draft_content,published_at").eq("slug", "auth").maybeSingle();
+  try {
+    await validateAuthLibraryImages(admin, content);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "라이브러리 이미지 정보를 확인해 주세요." }, { status: 400 });
+  }
+  const previousPublished = normalizeAuthPageContent(before?.content ?? DEFAULT_AUTH_PAGE_CONTENT);
+  const previousDraft = normalizeAuthPageContent(before?.draft_content ?? before?.content ?? DEFAULT_AUTH_PAGE_CONTENT);
   const values = publish
     ? { slug: "auth", content, draft_content: content, updated_by: user.id, updated_at: now, published_at: now }
     : { slug: "auth", content: before?.content ?? DEFAULT_AUTH_PAGE_CONTENT, draft_content: content, updated_by: user.id, updated_at: now, published_at: before?.published_at ?? null };
   const { data, error } = await admin.from("auth_page_content").upsert(values, { onConflict: "slug" }).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await removeUnreferencedAuthAssets(
+    admin,
+    [previousPublished, previousDraft],
+    publish ? [content, content] : [previousPublished, content],
+  );
   await recordAdminAuditLog(admin, { actorId: user.id, action: publish ? "auth_pages.published" : "auth_pages.draft_saved", targetType: "auth_pages", targetId: "auth", targetLabel: "로그인·회원가입 화면", before: before ?? null, after: data as Record<string, unknown> });
   return NextResponse.json(publish ? { publishedContent: content, publishedAt: now, updatedAt: now } : { draftContent: content, updatedAt: now });
 }

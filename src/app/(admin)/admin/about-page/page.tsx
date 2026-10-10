@@ -87,6 +87,7 @@ export default function AdminAboutPage() {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pickerSlot, setPickerSlot] = useState<AboutImageSlot | null>(null);
@@ -410,6 +411,10 @@ export default function AdminAboutPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <AdminButton type="button" size="md" onClick={() => setPreviewOpen(true)}>
+            <span className="material-symbols-outlined text-base">visibility</span>
+            미리보기
+          </AdminButton>
           <Link
             href="/about"
             target="_blank"
@@ -439,7 +444,7 @@ export default function AdminAboutPage() {
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
+      <div className="space-y-5">
         <div className="space-y-5">
           <AdminListSurface className="p-4">
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -664,54 +669,26 @@ export default function AdminAboutPage() {
           </AdminListSurface>
         </div>
 
-        <div className="xl:sticky xl:top-6 xl:self-start">
-          <AdminListSurface className="overflow-hidden">
-            <div className="flex flex-col gap-3 border-b border-outline-variant/30 p-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-sm font-extrabold text-on-surface">미리보기</h2>
-                <p className="mt-1 text-xs text-outline">게시 전 실제 회사소개 화면과 같은 렌더러로 확인합니다.</p>
-              </div>
-              <div className="flex rounded-lg bg-surface-container-low p-1">
-                {(["ko", "en"] as const).map((locale) => (
-                  <button
-                    key={locale}
-                    type="button"
-                    onClick={() => setPreviewLocale(locale)}
-                    className={cn(
-                      "h-8 rounded-md px-3 text-xs font-bold transition-colors",
-                      previewLocale === locale ? "bg-primary text-white" : "text-on-surface-variant hover:text-on-surface",
-                    )}
-                  >
-                    {sectionLabel(locale)}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="max-h-[calc(100vh-220px)] overflow-auto bg-surface">
-              <div className="min-w-[760px]">
-                <AboutPageView content={content} langOverride={previewLocale} showNoticePopup={false} />
-              </div>
-            </div>
-            <div className="border-t border-outline-variant/30 px-4 py-3 text-xs text-outline">
-              현재 미리보기: {previewLabel} · 게시본 마지막 반영 {formatDateTime(publishedAt)}
-            </div>
-          </AdminListSurface>
-
-          <AdminListSurface className="mt-5 p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-extrabold text-on-surface">게시본 기준</h2>
-                <p className="mt-1 text-xs leading-5 text-outline">
-                  초안 저장은 공개 페이지에 반영되지 않습니다. 게시 버튼을 눌렀을 때만 `/about`에 반영됩니다.
-                </p>
-              </div>
-              <AdminChip tone={hasUnpublishedChanges ? "warning" : "success"}>
-                {hasUnpublishedChanges ? "게시 전 변경 있음" : "게시본과 동일"}
-              </AdminChip>
-            </div>
-          </AdminListSurface>
-        </div>
+        <AdminListSurface className="p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div><h2 className="text-sm font-extrabold text-on-surface">게시본 기준</h2><p className="mt-1 text-xs leading-5 text-outline">초안 저장은 공개 페이지에 반영되지 않습니다. 게시 버튼을 눌렀을 때만 `/about`에 반영됩니다.</p></div>
+            <AdminChip tone={hasUnpublishedChanges ? "warning" : "success"}>{hasUnpublishedChanges ? "게시 전 변경 있음" : "게시본과 동일"}</AdminChip>
+          </div>
+        </AdminListSurface>
       </div>
+
+      {previewOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 md:p-6" role="dialog" aria-modal="true" aria-label="회사소개 미리보기" onMouseDown={(event) => { if (event.currentTarget === event.target) setPreviewOpen(false); }}>
+          <div className="flex max-h-[94vh] w-full max-w-[1440px] flex-col overflow-hidden rounded-xl bg-surface-container-lowest shadow-2xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/30 p-4">
+              <div><h2 className="text-base font-extrabold text-on-surface">회사소개 미리보기</h2><p className="mt-1 text-xs text-outline">게시 전 실제 화면과 같은 렌더러로 확인합니다.</p></div>
+              <div className="flex items-center gap-3"><div className="flex rounded-lg bg-surface-container-low p-1">{(["ko", "en"] as const).map((locale) => <button key={locale} type="button" onClick={() => setPreviewLocale(locale)} className={cn("h-8 rounded-md px-3 text-xs font-bold transition-colors", previewLocale === locale ? "bg-primary text-white" : "text-on-surface-variant hover:text-on-surface")}>{sectionLabel(locale)}</button>)}</div><button type="button" onClick={() => setPreviewOpen(false)} aria-label="미리보기 닫기" className="rounded-lg p-2 text-outline hover:bg-surface-container-low hover:text-on-surface"><span className="material-symbols-outlined">close</span></button></div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto bg-surface"><AboutPageView content={content} langOverride={previewLocale} showNoticePopup={false} /></div>
+            <div className="border-t border-outline-variant/30 px-4 py-3 text-xs text-outline">현재 미리보기: {previewLabel} · 게시본 마지막 반영 {formatDateTime(publishedAt)}</div>
+          </div>
+        </div>
+      )}
 
       {pickerSlot && (
         <div

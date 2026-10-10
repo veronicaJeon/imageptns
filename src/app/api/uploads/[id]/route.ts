@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { detachImageFromAboutPage } from "@/lib/about/library-assets";
+import { detachImageFromAuthPages } from "@/lib/auth/library-assets";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
@@ -187,6 +188,7 @@ export async function PATCH(
   }
   if (!nextPromotionalUseAllowed && image.promotional_use_allowed) {
     await detachImageFromAboutPage(admin, id);
+    await detachImageFromAuthPages(admin, id);
   }
 
   const categoryMap = await getImageCategoryCodeMap(admin, [id]);
@@ -268,6 +270,7 @@ export async function DELETE(
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   await detachImageFromAboutPage(admin, id);
+  await detachImageFromAuthPages(admin, id);
 
   return NextResponse.json({ ok: true, immediate: true, result });
 }

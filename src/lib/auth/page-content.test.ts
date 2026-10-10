@@ -19,4 +19,12 @@ describe("auth page content", () => {
     const content = normalizeAuthPageContent({ pages: { login: { backgroundImageUrl: "data:image/png;base64,bad" } } });
     expect(content.pages.login.backgroundImageUrl).toBe("");
   });
+
+  it("keeps a valid library derivative reference", () => {
+    const content = normalizeAuthPageContent({ pages: { login: {
+      backgroundImageUrl: "https://cdn.example.com/storage/v1/object/public/site-assets/auth/login/image-abc.webp",
+      backgroundImageSource: { source: "library", imageId: "image", derivedPath: "auth/login/image-abc.webp", credit: "작가" },
+    } } });
+    expect(content.pages.login.backgroundImageSource).toMatchObject({ source: "library", imageId: "image", derivedPath: "auth/login/image-abc.webp", credit: "작가" });
+  });
 });

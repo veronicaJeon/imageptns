@@ -1,6 +1,7 @@
 import "server-only";
 
 import { detachImageFromAboutPage } from "@/lib/about/library-assets";
+import { detachImageFromAuthPages } from "@/lib/auth/library-assets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   assessHardDeleteEligibility,
@@ -183,6 +184,11 @@ export async function removeHardDeleteStorageFiles(
     await detachImageFromAboutPage(admin, image.id);
   } catch (error) {
     errors.push(`about-page: ${error instanceof Error ? error.message : "회사소개 이미지 분리 실패"}`);
+  }
+  try {
+    await detachImageFromAuthPages(admin, image.id);
+  } catch (error) {
+    errors.push(`auth-pages: ${error instanceof Error ? error.message : "인증 화면 이미지 분리 실패"}`);
   }
 
   if (paths.originals.length > 0) {
