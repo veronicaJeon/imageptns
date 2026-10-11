@@ -464,8 +464,10 @@ export default function LibraryPage() {
           >
             <div className="min-h-0 overflow-hidden">
               <div className="flex flex-col gap-3 pt-3">
-                <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 md:justify-center" aria-label="카테고리">
-                  {categoryOptions.map((item) => <CategoryPill key={item.code} label={item.label} active={category === item.code} onClick={() => handleCategoryChange(item.code)} className="h-10 shrink-0" />)}
+                <div className="overflow-x-auto overscroll-x-contain pb-1" aria-label="카테고리">
+                  <div className="flex w-max min-w-full flex-nowrap justify-start gap-2 md:justify-center">
+                    {categoryOptions.map((item) => <CategoryPill key={item.code} label={item.label} active={category === item.code} onClick={() => handleCategoryChange(item.code)} className="h-10 shrink-0" />)}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:hidden">
