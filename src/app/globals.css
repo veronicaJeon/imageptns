@@ -4,15 +4,16 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ─────────────────────────────────────────────
-   Lumina Editorial Design System
-   "The Digital Curator" — Image Partners
+   Image Partners design tokens
+   사진이 색을 담당하도록 화면은 차분한 무채색 + 브랜드 초록 한 가지로 둔다.
+   기준 문서: docs/design-system-guidelines.md
    ───────────────────────────────────────────── */
 
 @theme {
   /* ── Colors ── */
   --color-primary:            #006d31;
-  --color-primary-highlight:  #00a84f;
-  --color-primary-container:  #00ff7b;
+  --color-primary-highlight:  #1f8a4c;
+  --color-primary-container:  #cfe5d6;
   --color-on-primary:         #ffffff;
   --color-on-primary-container: #002110;
 
@@ -47,10 +48,10 @@
   --color-on-surface-dark:            #dde4e0;
 
   /* ── Typography ── */
-  --font-display:   "Epilogue", sans-serif;
-  --font-headline:  "Epilogue", sans-serif;  /* alias */
-  --font-body:      "Inter", sans-serif;
-  --font-sans:      "Inter", sans-serif;
+  --font-display:   "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-headline:  var(--font-display);  /* alias */
+  --font-body:      var(--font-display);
+  --font-sans:      var(--font-display);
 
   /* ── Shadows ── */
   --shadow-ghost:  0px 20px 40px rgba(26, 28, 28, 0.06);
@@ -66,8 +67,6 @@
   --radius-xl:   24px;
   --radius-full: 9999px;
 
-  /* ── Backdrop Blur ── */
-  --blur-glass: 24px;
 }
 
 /* ─────────────────────────────────────────────
@@ -94,10 +93,10 @@
   --color-outline:            #5a6e66;
   --color-outline-variant:    #2e3c38;
 
-  /* primary / accent는 유지 */
-  --color-primary:           #00c957;
-  --color-primary-highlight: #00ff7b;
-  --color-primary-container: #00ff7b;
+  /* 어두운 배경에서도 형광으로 뜨지 않도록 채도를 낮춘 초록 */
+  --color-primary:           #5fb784;
+  --color-primary-highlight: #86cfa3;
+  --color-primary-container: #b9dcc6;
 }
 
 body {
@@ -197,17 +196,11 @@ svg {
    Utility Classes
    ───────────────────────────────────────────── */
 
-/* Glass morphism */
-.glass {
-  background: rgba(255, 255, 255, 0.70);
-  backdrop-filter: blur(var(--blur-glass));
-  -webkit-backdrop-filter: blur(var(--blur-glass));
-}
-
+/* 상단 내비게이션 바탕: 반투명 블러 대신 불투명 면 + 얇은 경계선 */
+.glass,
 .glass-dark {
-  background: rgba(14, 21, 18, 0.70);
-  backdrop-filter: blur(var(--blur-glass));
-  -webkit-backdrop-filter: blur(var(--blur-glass));
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-outline-variant);
 }
 
 /* Ghost shadow */
@@ -215,9 +208,9 @@ svg {
   box-shadow: var(--shadow-ghost);
 }
 
-/* Gradient CTA — primary → primary-container */
+/* 주요 버튼: 그라데이션 없이 브랜드 단색 */
 .gradient-cta {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-container) 100%);
+  background: var(--color-primary);
 }
 
 /* Masonry grid */

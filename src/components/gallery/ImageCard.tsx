@@ -163,7 +163,7 @@ export function ImageCard({
                 className="material-symbols-outlined text-lg"
                 style={{
                   fontVariationSettings: isFavorited ? "'FILL' 1" : "'FILL' 0",
-                  color: isFavorited ? "#00ff7b" : "white",
+                  color: isFavorited ? "var(--color-primary-container)" : "white",
                 }}
               >
                 favorite
