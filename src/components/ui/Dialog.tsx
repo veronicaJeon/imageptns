@@ -10,7 +10,7 @@ type DialogDensity = "comfortable" | "compact";
 type DialogChrome = "sectioned" | "seamless";
 
 const sizeClasses: Record<DialogSize, string> = {
-  compact: "max-w-md max-h-[min(76dvh,38rem)] rounded-[var(--radius-xl)]",
+  compact: "max-w-md !max-h-[min(76dvh,38rem)] rounded-[var(--radius-xl)]",
   sm: "max-w-md",
   md: "max-w-2xl",
   lg: "max-w-5xl",

@@ -41,6 +41,7 @@ describe("shared design system policy", () => {
     const noticePopup = source("src/components/ui/NoticePopup.tsx");
     const css = source("src/app/globals.css");
     expect(dialog).toContain('type DialogSize = "compact"');
+    expect(dialog).toContain('!max-h-[min(76dvh,38rem)]');
     expect(dialog).toContain('type DialogPlacement = "responsive" | "center"');
     expect(dialog).toContain('type DialogDensity = "comfortable" | "compact"');
     expect(dialog).toContain('type DialogChrome = "sectioned" | "seamless"');
