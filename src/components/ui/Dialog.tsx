@@ -7,9 +7,10 @@ import { Button } from "./Button";
 type DialogSize = "compact" | "sm" | "md" | "lg" | "xl";
 type DialogPlacement = "responsive" | "center";
 type DialogDensity = "comfortable" | "compact";
+type DialogChrome = "sectioned" | "seamless";
 
 const sizeClasses: Record<DialogSize, string> = {
-  compact: "max-w-[26rem] max-h-[min(76dvh,38rem)] rounded-[var(--radius-xl)]",
+  compact: "max-w-md max-h-[min(76dvh,38rem)] rounded-[var(--radius-xl)]",
   sm: "max-w-md",
   md: "max-w-2xl",
   lg: "max-w-5xl",
@@ -27,6 +28,7 @@ interface DialogProps {
   size?: DialogSize;
   placement?: DialogPlacement;
   density?: DialogDensity;
+  chrome?: DialogChrome;
   closeLabel?: string;
   className?: string;
   bodyClassName?: string;
@@ -52,6 +54,7 @@ export function Dialog({
   size = "md",
   placement = "responsive",
   density = "comfortable",
+  chrome = "sectioned",
   closeLabel = "닫기",
   className,
   bodyClassName,
@@ -72,8 +75,7 @@ export function Dialog({
     document.body.style.overflow = "hidden";
 
     const panel = panelRef.current;
-    const firstFocusable = panel?.querySelector<HTMLElement>(focusableSelector);
-    window.requestAnimationFrame(() => (firstFocusable ?? panel)?.focus());
+    window.requestAnimationFrame(() => panel?.focus());
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -123,29 +125,40 @@ export function Dialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className={cn("ui-modal-panel flex flex-col", sizeClasses[size], className)}
+        className={cn("ui-modal-panel flex flex-col focus:outline-none", sizeClasses[size], className)}
       >
         <header className={cn(
-          "flex shrink-0 items-start gap-4 border-b border-outline-variant/25",
-          density === "compact" ? "px-5 py-4" : "px-5 py-4 sm:px-6 sm:py-5"
+          "flex shrink-0 items-start gap-4",
+          chrome === "sectioned" && "border-b border-outline-variant/25",
+          chrome === "seamless"
+            ? "px-6 pb-2 pt-6"
+            : density === "compact" ? "px-5 py-4" : "px-5 py-4 sm:px-6 sm:py-5"
         )}>
           <div className="min-w-0 flex-1">
             {eyebrow && <p className="mb-1 text-[11px] font-extrabold uppercase tracking-[0.16em] text-primary">{eyebrow}</p>}
-            <h2 id={titleId} className="font-headline text-lg font-extrabold leading-snug text-on-surface sm:text-xl">{title}</h2>
+            <h2 id={titleId} className={cn(
+              "font-headline font-extrabold leading-snug text-on-surface",
+              chrome === "seamless" ? "text-xl tracking-tight sm:text-2xl" : "text-lg sm:text-xl"
+            )}>{title}</h2>
             {description && <p id={descriptionId} className="mt-1.5 text-sm leading-6 text-on-surface-variant">{description}</p>}
           </div>
-          <Button type="button" variant="icon" size="sm" onClick={onClose} aria-label={closeLabel} className="-mr-1 -mt-1 shrink-0">
+          <Button type="button" variant="icon" size="sm" onClick={onClose} aria-label={closeLabel} className={cn("-mr-1 shrink-0", chrome === "seamless" ? "-mt-2" : "-mt-1")}>
             <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
           </Button>
         </header>
         <div className={cn(
           "min-h-0 flex-1 overflow-y-auto",
-          density === "compact" ? "px-5 py-5" : "px-5 py-5 sm:px-6 sm:py-6",
+          chrome === "seamless"
+            ? "px-6 pb-6 pt-2"
+            : density === "compact" ? "px-5 py-5" : "px-5 py-5 sm:px-6 sm:py-6",
           bodyClassName
         )}>{children}</div>
         {footer && <footer className={cn(
-          "flex shrink-0 flex-col-reverse gap-2 border-t border-outline-variant/25 bg-surface-container-low/70 sm:flex-row sm:items-center sm:justify-end",
-          density === "compact" ? "px-5 py-4" : "px-5 py-4 sm:px-6"
+          "flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end",
+          chrome === "sectioned" && "border-t border-outline-variant/25 bg-surface-container-low/70",
+          chrome === "seamless"
+            ? "px-6 pb-6 pt-0"
+            : density === "compact" ? "px-5 py-4" : "px-5 py-4 sm:px-6"
         )}>{footer}</footer>}
       </div>
     </div>

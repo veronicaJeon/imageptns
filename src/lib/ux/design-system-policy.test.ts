@@ -43,10 +43,13 @@ describe("shared design system policy", () => {
     expect(dialog).toContain('type DialogSize = "compact"');
     expect(dialog).toContain('type DialogPlacement = "responsive" | "center"');
     expect(dialog).toContain('type DialogDensity = "comfortable" | "compact"');
+    expect(dialog).toContain('type DialogChrome = "sectioned" | "seamless"');
     expect(noticePopup).toContain('size="compact"');
     expect(noticePopup).toContain('placement="center"');
     expect(noticePopup).toContain('density="compact"');
-    expect(noticePopup).toContain("sm:justify-between");
+    expect(noticePopup).toContain('chrome="seamless"');
+    expect(noticePopup).toContain("dismiss(true)");
+    expect(noticePopup).not.toContain('type="checkbox"');
     expect(css).toContain(".ui-modal-backdrop-centered");
   });
 });

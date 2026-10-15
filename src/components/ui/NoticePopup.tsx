@@ -12,8 +12,8 @@ interface Notice {
 }
 
 const NOTICE_POPUP_COPY = {
-  ko: { title: "공지사항", hideToday: "오늘 하루 보지 않기", confirm: "확인" },
-  en: { title: "Notices", hideToday: "Do not show again today", confirm: "OK" },
+  ko: { hideToday: "오늘 하루 보지 않기", confirm: "확인" },
+  en: { hideToday: "Do not show again today", confirm: "OK" },
 } as const;
 
 function isDismissedToday(noticeId: string): boolean {
@@ -34,7 +34,6 @@ export function NoticePopup() {
   const copy = NOTICE_POPUP_COPY[lang];
   const [notice, setNotice] = useState<Notice | null>(null);
   const [visible, setVisible] = useState(false);
-  const [hideForDay, setHideForDay] = useState(false);
 
   useEffect(() => {
     fetch("/api/notices?popup=1")
@@ -49,7 +48,7 @@ export function NoticePopup() {
       .catch(() => {});
   }, []);
 
-  function dismiss() {
+  function dismiss(hideForDay = false) {
     if (notice && hideForDay) {
       try {
         localStorage.setItem(`notice_dismissed_${notice.id}`, new Date().toISOString());
@@ -67,25 +66,25 @@ export function NoticePopup() {
       size="compact"
       placement="center"
       density="compact"
-      eyebrow={copy.title}
+      chrome="seamless"
       title={notice.title}
       closeLabel={lang === "ko" ? "공지 닫기" : "Close notice"}
       footer={
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex min-h-11 cursor-pointer select-none items-center justify-center gap-2 sm:justify-start">
-            <input
-              type="checkbox"
-              checked={hideForDay}
-              onChange={(e) => setHideForDay(e.target.checked)}
-              className="h-4 w-4 rounded accent-primary"
-            />
-            <span className="text-xs text-on-surface-variant">{copy.hideToday}</span>
-          </label>
-          <Button type="button" onClick={dismiss} className="w-full sm:w-auto sm:min-w-24">{copy.confirm}</Button>
+        <div className="flex w-full items-center justify-between gap-3">
+          <Button type="button" variant="ghost" size="sm" onClick={() => dismiss(true)} className="-ml-4 min-h-11 px-4 text-xs font-medium">
+            {copy.hideToday}
+          </Button>
+          <Button type="button" onClick={() => dismiss()} className="min-w-24">{copy.confirm}</Button>
         </div>
       }
     >
-      <p className="whitespace-pre-wrap break-words text-sm leading-7 text-on-surface-variant">{notice.body}</p>
+      <div className="space-y-3">
+        {notice.body.trim().split(/\n\s*\n/).map((paragraph, index) => (
+          <p key={index} className="break-words text-[15px] leading-7 text-on-surface-variant">
+            {paragraph.replace(/\s*\n\s*/g, " ")}
+          </p>
+        ))}
+      </div>
     </Dialog>
   );
 }
