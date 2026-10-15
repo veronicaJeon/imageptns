@@ -8,11 +8,11 @@ export default function PublicLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
+    <div className="flex min-h-dvh flex-col bg-surface">
       <CartAvailabilitySync />
       <TopNavBar />
       <main className="flex-1">{children}</main>
       <Footer />
-    </>
+    </div>
   );
 }

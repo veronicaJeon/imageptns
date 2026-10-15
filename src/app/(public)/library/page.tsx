@@ -388,19 +388,20 @@ export default function LibraryPage() {
 
   return (
     <>
-      <section className="bg-surface px-4 pb-6 pt-28 md:px-8 md:pb-8 md:pt-36">
+      <section className="bg-surface px-4 pb-8 pt-28 md:px-8 md:pb-10 md:pt-36">
         <div className="mx-auto max-w-6xl text-center">
-          <h1 className="font-headline text-4xl md:text-6xl font-extrabold text-on-surface mb-4">
+          <p className="mb-3 text-xs font-extrabold uppercase tracking-[0.18em] text-primary">Image Partners Library</p>
+          <h1 className="mb-4 font-headline text-4xl font-extrabold tracking-tight text-on-surface md:text-6xl">
             {l.hero.headline}
           </h1>
           <p className="text-lg text-on-surface-variant">{guidance || l.hero.sub}</p>
         </div>
       </section>
 
-      <div data-testid="library-sticky-controls" className="sticky top-16 z-40 border-b border-outline-variant/20 bg-surface/95 shadow-sm backdrop-blur-md md:top-20">
+      <div data-testid="library-sticky-controls" className="sticky top-16 z-40 border-y border-outline-variant/20 bg-surface/95 shadow-ghost backdrop-blur-xl md:top-20">
         <div className="mx-auto max-w-7xl px-4 py-3 md:px-8 md:py-4">
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_48px] items-stretch gap-2 md:grid-cols-[160px_minmax(0,1fr)_220px_48px]">
-            <label className="order-2 flex h-12 min-w-0 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-3 text-left md:order-none md:h-16 md:px-4">
+            <label className="ui-field order-2 flex h-12 min-w-0 items-center gap-2 px-3 text-left md:order-none md:h-16 md:px-4">
               <span className="material-symbols-outlined text-xl text-outline">swap_vert</span>
               <span className="sr-only">{l.sort.label}</span>
               <select value={sort} onChange={(event) => setChosenSort(event.target.value as SortKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={l.sort.label}>
@@ -409,10 +410,10 @@ export default function LibraryPage() {
             </label>
 
             <div className="relative order-1 col-span-3 md:order-none md:col-span-1">
-              <div className="relative overflow-hidden rounded-lg border border-outline-variant/60 bg-surface-container-low shadow-ghost ring-1 ring-black/5 transition-colors focus-within:border-primary/60 focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary/20">
+              <div className="ui-field relative overflow-hidden bg-surface-container-lowest shadow-ghost">
                 <span className="material-symbols-outlined pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-2xl text-outline">search</span>
                 <input type="text" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={l.hero.searchPlaceholder} className="h-14 w-full bg-transparent pl-14 pr-24 text-base text-on-surface placeholder:text-outline outline-none md:h-16" onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }} onBlur={() => { blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 150); }} onKeyDown={(event) => { if (event.key === "Escape") setShowSuggestions(false); }} />
-                {query && <button onClick={() => { setQuery(""); setSuggestions([]); setShowSuggestions(false); }} className="absolute right-12 top-1/2 -translate-y-1/2 p-2 text-outline" aria-label="Clear search"><span className="material-symbols-outlined text-xl">close</span></button>}
+                {query && <button onClick={() => { setQuery(""); setSuggestions([]); setShowSuggestions(false); }} className="ui-interactive absolute right-12 top-1/2 -translate-y-1/2 rounded-full p-2 text-outline hover:bg-surface-container-low hover:text-on-surface" aria-label="Clear search"><span className="material-symbols-outlined text-xl">close</span></button>}
                 <input
                   ref={photoInputRef}
                   type="file"
@@ -425,17 +426,17 @@ export default function LibraryPage() {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={photoSearching}
-                  className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-outline transition-colors hover:bg-primary/10 hover:text-primary disabled:cursor-wait disabled:opacity-50"
+                  className="ui-interactive absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-outline hover:bg-primary/10 hover:text-primary disabled:cursor-wait disabled:opacity-50"
                   aria-label={photoSearching ? copy.photoSearching : copy.photoSearch}
                   title={copy.photoSearch}
                 >
                   <span className={`material-symbols-outlined text-xl ${photoSearching ? "animate-pulse" : ""}`} aria-hidden="true">photo_camera</span>
                 </button>
               </div>
-              {showSuggestions && suggestions.length > 0 && <ul className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg bg-white shadow-lg">{suggestions.map((suggestion) => <li key={suggestion}><button className="w-full px-5 py-2.5 text-left text-sm hover:bg-surface-container-low" onMouseDown={() => { if (blurTimerRef.current) clearTimeout(blurTimerRef.current); setQuery(suggestion); setShowSuggestions(false); }}>{suggestion}</button></li>)}</ul>}
+              {showSuggestions && suggestions.length > 0 && <ul className="ui-surface absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden py-1">{suggestions.map((suggestion) => <li key={suggestion}><button className="ui-list-row w-full px-5 py-3 text-left text-sm" onMouseDown={() => { if (blurTimerRef.current) clearTimeout(blurTimerRef.current); setQuery(suggestion); setShowSuggestions(false); }}>{suggestion}</button></li>)}</ul>}
             </div>
 
-            <label className="order-2 flex h-12 min-w-0 items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low px-3 text-left md:order-none md:h-16 md:px-4">
+            <label className="ui-field order-2 flex h-12 min-w-0 items-center gap-2 px-3 text-left md:order-none md:h-16 md:px-4">
               <span className="material-symbols-outlined text-xl text-outline">crop_rotate</span>
               <span className="sr-only">{copy.orientation}</span>
               <select value={orientation} onChange={(event) => setOrientation(event.target.value as OrientationKey)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-on-surface outline-none" aria-label={copy.orientation}>
@@ -446,7 +447,7 @@ export default function LibraryPage() {
             <button
               type="button"
               onClick={toggleFilterPanel}
-              className="order-2 inline-flex h-12 w-12 items-center justify-center rounded-lg border border-outline-variant/60 bg-surface-container-low text-on-surface-variant transition-colors hover:border-primary/40 hover:bg-surface-container-high hover:text-primary md:order-none md:h-16 md:w-auto"
+              className="ui-interactive ui-field order-2 inline-flex h-12 w-12 items-center justify-center text-on-surface-variant hover:border-primary/40 hover:bg-primary/5 hover:text-primary md:order-none md:h-16 md:w-auto"
               aria-expanded={!filtersCollapsed}
               aria-controls="library-secondary-filters"
               aria-label={filtersCollapsed ? copy.expandFilters : copy.collapseFilters}
@@ -465,14 +466,14 @@ export default function LibraryPage() {
             <div className="min-h-0 overflow-hidden">
               <div className="flex flex-col gap-3 pt-3">
                 <div className="overflow-x-auto overscroll-x-contain pb-1" aria-label="카테고리">
-                  <div className="flex w-max min-w-full flex-nowrap justify-start gap-2 md:justify-center">
+                  <div className="flex w-max min-w-full flex-nowrap justify-start gap-2">
                     {categoryOptions.map((item) => <CategoryPill key={item.code} label={item.label} active={category === item.code} onClick={() => handleCategoryChange(item.code)} className="h-10 shrink-0" />)}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:hidden">
                   <span className="text-xs font-medium text-outline">{loading ? "…" : images.length} {l.results}</span>
-                  <button type="button" onClick={() => setMobileFiltersOpen((value) => !value)} className={`relative inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-4 text-xs font-bold ${mobileFiltersOpen || activeFilterCount > 0 ? "border-primary bg-primary/10 text-primary" : "border-outline-variant bg-surface-container-low text-on-surface-variant"}`} aria-expanded={mobileFiltersOpen}><span className="material-symbols-outlined text-base">tune</span>{copy.filter}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button>
+                  <button type="button" onClick={() => setMobileFiltersOpen((value) => !value)} className={`ui-interactive relative inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-4 text-xs font-bold ${mobileFiltersOpen || activeFilterCount > 0 ? "border-primary bg-primary/10 text-primary" : "border-outline-variant bg-surface-container-low text-on-surface-variant"}`} aria-expanded={mobileFiltersOpen}><span className="material-symbols-outlined text-base">tune</span>{copy.filter}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button>
                 </div>
 
                 <div className={`${mobileFiltersOpen ? "flex" : "hidden"} flex-col gap-3 md:flex`}>
@@ -480,7 +481,7 @@ export default function LibraryPage() {
                     <span className="text-xs font-semibold text-outline md:mr-1">{usageLabels.title}</span>
                     <div className="grid grid-cols-2 gap-2 md:contents">
                     {usageFilters.map((filter) => (
-                      <label key={filter.label} className={`flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-bold md:h-8 md:justify-start md:rounded-full md:px-3 ${filter.checked ? "border-primary bg-primary/10 text-primary" : "border-outline-variant bg-surface-container-low text-on-surface-variant"}`}>
+                      <label key={filter.label} className={`ui-interactive flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-bold md:h-9 md:justify-start md:rounded-full md:px-3 ${filter.checked ? "border-primary bg-primary text-white" : "border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant hover:border-primary/40 hover:bg-primary/5 hover:text-primary"}`}>
                         <input type="checkbox" checked={filter.checked} onChange={(event) => filter.onChange(event.target.checked)} className="sr-only" />
                         <span className="material-symbols-outlined text-sm">{filter.icon}</span>
                         <span className="min-w-0 truncate">{filter.label}</span>
@@ -489,8 +490,9 @@ export default function LibraryPage() {
                     </div>
                     <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg bg-surface-container-low p-2 md:ml-auto md:flex md:bg-transparent md:p-0">
                       <span className="text-xs font-semibold text-outline">{copy.pageSize}</span>
-                      <div className="grid grid-cols-3 rounded-full bg-surface-container-lowest p-1 md:flex md:bg-surface-container-low">{PAGE_SIZE_OPTIONS.map((size) => <button key={size} type="button" onClick={() => setPageSize(size)} className={`h-10 min-w-0 rounded-full px-2 text-xs font-bold md:h-7 md:min-w-9 ${pageSize === size ? "bg-primary text-white" : "text-on-surface-variant"}`}>{size}</button>)}</div>
-                      <span className="hidden text-xs text-outline md:inline">{loading ? "…" : images.length} {l.results}</span>
+                      <div className="grid grid-cols-3 rounded-full bg-surface-container-lowest p-1 md:flex md:bg-surface-container-low">{PAGE_SIZE_OPTIONS.map((size) => <button key={size} type="button" onClick={() => setPageSize(size)} className={`ui-interactive h-10 min-w-0 rounded-full px-2 text-xs font-bold md:h-8 md:min-w-9 ${pageSize === size ? "bg-primary text-white shadow-sm" : "text-on-surface-variant hover:text-on-surface"}`}>{size}</button>)}</div>
+                      <span className="hidden text-xs font-semibold text-on-surface-variant md:inline">{loading ? "…" : images.length} {l.results}</span>
+                      {activeFilterCount > 0 && <button type="button" onClick={clearFilters} className="ui-interactive hidden text-xs font-bold text-primary hover:text-primary-highlight md:inline-flex">{copy.clearFilters}</button>}
                     </div>
                   </div>
                 </div>

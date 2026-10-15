@@ -8,10 +8,10 @@ export function Footer() {
   const f = t.footer;
 
   return (
-    <footer className="bg-surface-container-low w-full px-6 py-12 font-body text-sm md:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 md:flex-row md:items-start md:justify-between">
+    <footer className="w-full border-t border-outline-variant/20 bg-surface-container-low px-5 py-14 font-body text-sm md:px-8 md:py-16">
+      <div className="mx-auto flex max-w-7xl flex-col gap-10 md:flex-row md:items-start md:justify-between">
         <div className="max-w-xl">
-          <div className="text-base font-headline font-black uppercase text-on-surface mb-4">
+          <div className="mb-4 text-base font-headline font-black uppercase tracking-tight text-on-surface">
             IMAGE PARTNERS
           </div>
           <p className="text-on-surface-variant leading-relaxed mb-6">{f.tagline}</p>
@@ -28,12 +28,12 @@ export function Footer() {
           </a>
         </address>
       </div>
-      <nav className="mx-auto mt-8 flex max-w-7xl flex-wrap gap-x-5 gap-y-2 border-t border-outline-variant/30 pt-6 text-xs text-outline">
-        <Link href="/terms" className="hover:text-primary">{f.links.terms}</Link>
-        <Link href="/privacy" className="hover:text-primary">{f.links.privacy}</Link>
-        <Link href="/license-guide" className="hover:text-primary">{f.links.licenseGuide}</Link>
-        <Link href="/cookie" className="hover:text-primary">{f.links.cookie}</Link>
-        <Link href="/business-info" className="hover:text-primary">
+      <nav className="mx-auto mt-10 flex max-w-7xl flex-wrap gap-x-5 gap-y-3 border-t border-outline-variant/30 pt-6 text-xs text-outline">
+        <Link href="/terms" className="ui-interactive hover:text-primary">{f.links.terms}</Link>
+        <Link href="/privacy" className="ui-interactive hover:text-primary">{f.links.privacy}</Link>
+        <Link href="/license-guide" className="ui-interactive hover:text-primary">{f.links.licenseGuide}</Link>
+        <Link href="/cookie" className="ui-interactive hover:text-primary">{f.links.cookie}</Link>
+        <Link href="/business-info" className="ui-interactive hover:text-primary">
           {lang === "ko" ? "사업자정보·공시사항" : "Business information"}
         </Link>
       </nav>

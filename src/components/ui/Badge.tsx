@@ -21,7 +21,7 @@ export function Badge({ children, variant = "surface", className }: BadgeProps) 
       className={cn(
         "inline-block px-3 py-1",
         "text-xs font-semibold whitespace-nowrap",
-        "rounded-full",
+        "rounded-full border border-transparent",
         variantStyles[variant],
         className
       )}

@@ -132,7 +132,7 @@ export default function PricingPage() {
 
     return (
       <main className="min-h-[70vh] bg-surface px-6 pb-24 pt-36">
-        <section className="mx-auto max-w-3xl bg-surface-container-lowest p-8 shadow-ghost sm:p-12">
+        <section className="ui-surface mx-auto max-w-3xl p-8 sm:p-12">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">{copy.eyebrow}</p>
           <h1 className="mt-4 font-headline text-3xl font-extrabold tracking-tight text-on-surface sm:text-5xl">
             {copy.title}
@@ -141,13 +141,13 @@ export default function PricingPage() {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
               href="/library"
-              className="rounded bg-primary px-7 py-3.5 text-center text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90"
+              className="ui-interactive inline-flex min-h-14 items-center justify-center rounded-lg bg-primary px-7 py-3.5 text-center text-xs font-bold uppercase tracking-widest text-white shadow-sm hover:-translate-y-px hover:bg-primary-highlight hover:shadow-md"
             >
               {copy.library}
             </Link>
             <Link
               href="/contact"
-              className="rounded border border-outline-variant px-7 py-3.5 text-center text-xs font-bold uppercase tracking-widest text-on-surface transition-colors hover:bg-surface-container-low"
+              className="ui-interactive inline-flex min-h-14 items-center justify-center rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-7 py-3.5 text-center text-xs font-bold uppercase tracking-widest text-on-surface hover:-translate-y-px hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
             >
               {copy.contact}
             </Link>
@@ -161,7 +161,7 @@ export default function PricingPage() {
   return (
     <>
       {/* ── Hero ── */}
-      <section className="pt-36 pb-16 px-6 bg-surface text-center">
+      <section className="bg-surface px-6 pb-16 pt-36 text-center">
         <div className="max-w-2xl mx-auto">
           <h1 className="font-headline text-4xl md:text-5xl font-extrabold tracking-tighter text-on-surface mb-4">
             {p.hero.headline}
@@ -169,16 +169,16 @@ export default function PricingPage() {
           <p className="text-on-surface-variant mb-8">{p.hero.sub}</p>
 
           {/* Billing toggle */}
-          <div className="inline-flex items-center gap-3 bg-surface-container-low rounded-full p-1">
+          <div className="inline-flex items-center gap-1 rounded-full border border-outline-variant/30 bg-surface-container-low p-1">
             <button
               onClick={() => setAnnual(false)}
-              className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${!annual ? "bg-surface-container-lowest shadow text-on-surface" : "text-on-surface-variant"}`}
+              className={`ui-interactive min-h-10 px-5 py-2 rounded-full text-sm font-bold ${!annual ? "bg-surface-container-lowest shadow-sm text-on-surface" : "text-on-surface-variant hover:text-on-surface"}`}
             >
               {p.toggle.monthly}
             </button>
             <button
               onClick={() => setAnnual(true)}
-              className={`px-5 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${annual ? "bg-surface-container-lowest shadow text-on-surface" : "text-on-surface-variant"}`}
+              className={`ui-interactive min-h-10 px-5 py-2 rounded-full text-sm font-bold flex items-center gap-2 ${annual ? "bg-surface-container-lowest shadow-sm text-on-surface" : "text-on-surface-variant hover:text-on-surface"}`}
             >
               {p.toggle.annual}
               <span className="text-[10px] font-black text-primary-container bg-primary px-2 py-0.5 rounded-full">
@@ -191,7 +191,7 @@ export default function PricingPage() {
 
       {/* ── Plans ── */}
       <section className="pb-24 px-6 md:px-8 bg-surface">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-3">
           {p.plans.map((plan, i) => {
             const featured = i === 1;
             const isEnterprise = i === 2;
@@ -201,9 +201,9 @@ export default function PricingPage() {
               <div
                 key={plan.name}
                 className={[
-                  "flex flex-col p-8 shadow-ghost",
+                  "ui-surface flex flex-col p-7 md:p-8",
                   featured
-                    ? "bg-primary text-white scale-[1.02] md:-mt-4"
+                    ? "border-primary bg-primary text-white md:-mt-4 md:mb-4"
                     : "bg-surface-container-lowest text-on-surface",
                 ].join(" ")}
               >
@@ -251,10 +251,10 @@ export default function PricingPage() {
                   <Link
                     href="/contact"
                     className={[
-                      "block text-center py-3 text-xs font-bold uppercase tracking-widest rounded transition-all",
+                      "ui-interactive flex min-h-14 items-center justify-center rounded-lg px-4 text-center text-xs font-bold uppercase tracking-widest",
                       featured
-                        ? "bg-white text-primary hover:bg-zinc-100"
-                        : "bg-primary text-white hover:opacity-90",
+                        ? "bg-white text-primary hover:-translate-y-px hover:bg-zinc-100"
+                        : "bg-primary text-white hover:-translate-y-px hover:bg-primary-highlight",
                     ].join(" ")}
                   >
                     {plan.cta}
@@ -265,10 +265,10 @@ export default function PricingPage() {
                     onClick={() => handleSubscribe(i)}
                     disabled={isLoading || (subscribing !== null && subscribing !== i)}
                     className={[
-                      "block w-full text-center py-3 text-xs font-bold uppercase tracking-widest rounded transition-all disabled:opacity-60",
+                      "ui-interactive flex min-h-14 w-full items-center justify-center rounded-lg px-4 text-center text-xs font-bold uppercase tracking-widest disabled:opacity-60",
                       featured
-                        ? "bg-white text-primary hover:bg-zinc-100"
-                        : "bg-primary text-white hover:opacity-90",
+                        ? "bg-white text-primary hover:-translate-y-px hover:bg-zinc-100"
+                        : "bg-primary text-white hover:-translate-y-px hover:bg-primary-highlight",
                     ].join(" ")}
                   >
                     {isLoading ? (
@@ -298,7 +298,7 @@ export default function PricingPage() {
           <p className="text-on-surface-variant mb-8">{p.enterprise.sub}</p>
           <Link
             href="/contact"
-            className="inline-block px-8 py-4 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded hover:opacity-90 transition-opacity"
+            className="ui-interactive inline-flex min-h-14 items-center justify-center rounded-lg bg-primary px-8 py-4 text-xs font-bold uppercase tracking-widest text-white shadow-sm hover:-translate-y-px hover:bg-primary-highlight hover:shadow-md"
           >
             {p.enterprise.btn}
           </Link>

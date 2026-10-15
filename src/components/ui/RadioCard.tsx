@@ -21,11 +21,11 @@ export const RadioCard = forwardRef<HTMLInputElement, RadioCardProps>(
         />
         <div
           className={cn(
-            "px-4 py-5 rounded-lg border border-transparent",
-            "bg-surface-container-low text-on-surface-variant text-center",
+            "ui-interactive px-4 py-5 rounded-xl border border-outline-variant/40",
+            "bg-surface-container-lowest text-on-surface-variant text-center",
             "peer-checked:bg-primary peer-checked:text-white peer-checked:border-primary",
-            "hover:bg-surface-container-high",
-            "transition-all duration-200",
+            "peer-focus-visible:ring-4 peer-focus-visible:ring-primary/20",
+            "hover:-translate-y-px hover:border-primary/40 hover:bg-primary/5",
             className
           )}
         >

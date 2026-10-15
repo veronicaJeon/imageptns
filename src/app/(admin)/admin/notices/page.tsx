@@ -111,8 +111,8 @@ export default function AdminNoticesPage() {
 
         {/* Form modal */}
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="bg-surface-container-lowest rounded-2xl shadow-xl w-full max-w-lg p-6 flex flex-col gap-5">
+          <div className="ui-modal-backdrop" role="presentation">
+            <div className="ui-modal-panel flex max-w-lg flex-col gap-5 p-6" role="dialog" aria-modal="true" aria-label={editId ? "공지사항 수정" : "새 공지사항"}>
               <div className="flex items-center justify-between">
                 <h2 className="font-headline text-lg font-extrabold text-on-surface">
                   {editId ? "공지사항 수정" : "새 공지사항"}

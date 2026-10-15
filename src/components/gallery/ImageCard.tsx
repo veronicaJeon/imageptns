@@ -106,7 +106,7 @@ export function ImageCard({
   return (
     <div
       className={cn(
-        "masonry-item group relative overflow-hidden bg-surface-container-low cursor-pointer",
+        "masonry-item group relative overflow-hidden rounded-xl bg-surface-container-low shadow-sm ring-1 ring-outline-variant/20 cursor-pointer transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-card",
         className
       )}
     >
@@ -116,13 +116,13 @@ export function ImageCard({
         alt={displayTitle || image.alt}
         width={image.width}
         height={image.height}
-        className="w-full h-auto object-cover group-hover:scale-[1.02] transition-transform duration-700"
+        className="w-full h-auto object-cover group-hover:scale-[1.015] transition-transform duration-700"
         unoptimized
       />
 
       {/* 호버 오버레이 */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-        <div className="flex justify-between items-end backdrop-blur-md bg-white/10 p-4 rounded-lg text-white">
+      <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/75 via-black/5 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100 sm:p-4">
+        <div className="flex items-end justify-between rounded-xl border border-white/15 bg-black/20 p-4 text-white backdrop-blur-md">
           {/* 메타데이터 */}
           <div
             className="flex-1 min-w-0"

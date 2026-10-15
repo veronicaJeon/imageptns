@@ -65,7 +65,7 @@ function RoleSection({
             key={r}
             onClick={() => onDemoRoleChange(r)}
             className={cn(
-              "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
+              "ui-interactive flex-1 py-1.5 text-xs font-bold rounded-md",
               demoRole === r
                 ? "bg-primary text-white"
                 : "text-on-surface-variant hover:text-on-surface"
@@ -85,7 +85,7 @@ function RoleSection({
           <button
             onClick={() => onViewModeChange("photographer")}
             className={cn(
-              "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
+              "ui-interactive flex-1 py-1.5 text-xs font-bold rounded-md",
               viewMode === "photographer"
                 ? "bg-primary text-white"
                 : "text-on-surface-variant hover:text-on-surface"
@@ -96,7 +96,7 @@ function RoleSection({
           <button
             onClick={() => onViewModeChange("buyer")}
             className={cn(
-              "flex-1 py-1.5 text-xs font-bold rounded-md transition-all duration-200",
+              "ui-interactive flex-1 py-1.5 text-xs font-bold rounded-md",
               viewMode === "buyer"
                 ? "bg-primary text-white"
                 : "text-on-surface-variant hover:text-on-surface"
@@ -148,12 +148,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     .filter((item) => ONCHAIN_ENABLED || item.key !== "blockchain");
 
   return (
-    <div className="min-h-screen flex bg-surface-container-low">
+    <div className="min-h-screen flex bg-surface">
 
       {/* ── Sidebar ── */}
-      <aside className="hidden md:flex flex-col w-64 shrink-0 bg-surface-container-lowest shadow-ghost">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-outline-variant/25 bg-surface-container-lowest md:flex">
         {/* Brand */}
-        <div className="px-6 py-6 border-b border-outline-variant/20">
+        <div className="border-b border-outline-variant/20 px-6 py-7">
           <Link href="/" className="text-sm font-headline font-black uppercase text-on-surface hover:text-primary transition-colors">
             IMAGE PARTNERS
           </Link>
@@ -182,7 +182,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 key={href}
                 href={href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200",
+                  "ui-interactive flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium",
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
@@ -219,7 +219,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* ── Main ── */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
-        <div className="md:hidden flex items-center justify-between px-4 py-4 bg-surface-container-lowest border-b border-outline-variant/20">
+        <div className="sticky top-0 z-40 flex items-center justify-between border-b border-outline-variant/20 bg-surface-container-lowest/95 px-4 py-4 backdrop-blur-md md:hidden">
           <Link href="/" className="text-sm font-headline font-black uppercase text-on-surface">
             IMAGE PARTNERS
           </Link>
@@ -257,7 +257,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Mobile bottom nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex bg-surface-container-lowest border-t border-outline-variant/20">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-outline-variant/20 bg-surface-container-lowest/95 shadow-modal backdrop-blur-md md:hidden">
           {navItems.map(({ href, icon, key }) => {
             const isActive = pathname === href;
             return (
@@ -265,7 +265,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 key={href}
                 href={href}
                 className={cn(
-                  "flex-1 flex flex-col items-center py-3 gap-1 text-[10px] font-bold transition-colors",
+                  "ui-interactive flex min-h-14 flex-1 flex-col items-center justify-center gap-1 py-2 text-[10px] font-bold",
                   isActive ? "text-primary" : "text-on-surface-variant"
                 )}
               >

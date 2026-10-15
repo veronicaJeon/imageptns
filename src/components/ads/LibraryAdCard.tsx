@@ -85,7 +85,7 @@ export function LibraryAdCard({ campaign }: { campaign: PublicLibraryAd }) {
   return (
     <aside
       ref={cardRef}
-      className="hidden self-start overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-ghost 2xl:block"
+      className="ui-surface hidden self-start overflow-hidden 2xl:block"
       aria-label={campaign.label}
     >
       {campaign.imageUrl && (
@@ -93,7 +93,7 @@ export function LibraryAdCard({ campaign }: { campaign: PublicLibraryAd }) {
           <img
             src={campaign.imageUrl}
             alt={campaign.imageAlt}
-            className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.02]"
+            className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.015]"
             loading="lazy"
             referrerPolicy="no-referrer"
           />
@@ -123,7 +123,7 @@ export function LibraryAdCard({ campaign }: { campaign: PublicLibraryAd }) {
           target={external ? "_blank" : undefined}
           rel={external ? "noopener noreferrer sponsored" : undefined}
           onClick={() => recordAdEvent(campaign, "ad_click")}
-          className="mt-5 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-primary/90"
+          className="ui-interactive mt-5 inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-center text-xs font-bold text-white shadow-sm hover:-translate-y-px hover:bg-primary-highlight hover:shadow-md"
         >
           {campaign.cta}
           <span className="material-symbols-outlined text-base" aria-hidden="true">

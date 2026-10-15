@@ -8,3 +8,4 @@ export { CategoryPill } from "./CategoryPill";
 export { Select } from "./Select";
 export { SearchInput } from "./SearchInput";
 export { Accordion, AccordionItem } from "./Accordion";
+export { Dialog } from "./Dialog";

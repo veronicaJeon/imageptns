@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 // TEMPORARY: Toss 유료결제 우회(결제 pass). NEXT_PUBLIC_PAYMENT_PASS_ENABLED=true 일 때만 동작.
 // 실제 Toss 유료결제 연동이 완료되면 이 라우트와 호출부, env를 함께 제거할 것.
-export function isPaymentPassEnabled() {
+function isPaymentPassEnabled() {
   return process.env.NEXT_PUBLIC_PAYMENT_PASS_ENABLED === "true";
 }
 

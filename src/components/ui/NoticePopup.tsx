@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useLang } from "@/lib/i18n/store";
+import { Button } from "./Button";
+import { Dialog } from "./Dialog";
 
 interface Notice {
   id: string;
@@ -56,33 +58,18 @@ export function NoticePopup() {
     setVisible(false);
   }
 
-  if (!visible || !notice) return null;
+  if (!notice) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={dismiss}>
-      <div
-        className="bg-surface-container-lowest rounded-lg shadow-xl w-full max-w-md p-7 flex flex-col gap-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-xl text-primary">campaign</span>
-            <span className="text-xs font-semibold text-primary">{copy.title}</span>
-          </div>
-          <button type="button" onClick={dismiss} className="text-outline hover:text-on-surface transition-colors">
-            <span className="material-symbols-outlined text-xl">close</span>
-          </button>
-        </div>
-
-        {/* Body */}
-        <div>
-          <h2 className="font-headline text-lg font-extrabold text-on-surface mb-3">{notice.title}</h2>
-          <p className="text-sm text-on-surface-variant leading-relaxed whitespace-pre-wrap">{notice.body}</p>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center justify-between pt-2">
+    <Dialog
+      open={visible}
+      onClose={dismiss}
+      size="sm"
+      eyebrow={copy.title}
+      title={notice.title}
+      closeLabel={lang === "ko" ? "공지 닫기" : "Close notice"}
+      footer={
+        <>
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -92,15 +79,11 @@ export function NoticePopup() {
             />
             <span className="text-xs text-on-surface-variant">{copy.hideToday}</span>
           </label>
-          <button
-            type="button"
-            onClick={dismiss}
-            className="px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded hover:opacity-90 transition-opacity"
-          >
-            {copy.confirm}
-          </button>
-        </div>
-      </div>
-    </div>
+          <Button type="button" onClick={dismiss} className="sm:ml-auto">{copy.confirm}</Button>
+        </>
+      }
+    >
+      <p className="whitespace-pre-wrap text-sm leading-7 text-on-surface-variant">{notice.body}</p>
+    </Dialog>
   );
 }

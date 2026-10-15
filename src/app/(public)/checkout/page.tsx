@@ -1199,12 +1199,12 @@ function CheckoutContent() {
         </div>
       </div>
       {bankTransferRequest && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-xl bg-surface-container-lowest p-6 shadow-2xl">
+        <div className="ui-modal-backdrop" role="presentation">
+          <div className="ui-modal-panel max-w-md p-6" role="dialog" aria-modal="true" aria-labelledby="bank-transfer-dialog-title">
             <div className="flex items-start gap-3">
               <span className="material-symbols-outlined text-2xl text-primary">account_balance</span>
               <div>
-                <h2 className="text-lg font-headline font-extrabold text-on-surface">{copy.bankTransferModalTitle}</h2>
+                <h2 id="bank-transfer-dialog-title" className="text-lg font-headline font-extrabold text-on-surface">{copy.bankTransferModalTitle}</h2>
                 <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">{bankTransferRequest.account.notice}</p>
               </div>
             </div>

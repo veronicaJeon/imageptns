@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils/cn";
-import { InputHTMLAttributes, forwardRef, useState } from "react";
+import { InputHTMLAttributes, forwardRef, useId, useState } from "react";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -13,6 +13,8 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, hint, icon, suffix, className, type, value, onChange, ...props }, ref) => {
+    const generatedId = useId();
+    const inputId = props.id ?? generatedId;
     const [showPassword, setShowPassword] = useState(false);
     const [internalValue, setInternalValue] = useState("");
     const isPassword = type === "password";
@@ -23,7 +25,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-2 w-full">
         {label && (
-          <label className="text-xs font-semibold text-outline">
+          <label htmlFor={inputId} className="text-xs font-semibold text-on-surface-variant">
             {label}
           </label>
         )}
@@ -37,6 +39,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
           <input
             ref={ref}
+            id={inputId}
             type={inputType}
             value={value}
             onChange={(e) => {
@@ -44,13 +47,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               onChange?.(e);
             }}
             className={cn(
-              "w-full h-12 bg-surface-container-lowest",
-              "ring-1 ring-outline-variant",
-              "focus:ring-2 focus:ring-primary",
-              "rounded-lg px-4",
+              "ui-field w-full h-12 px-4",
               "text-on-surface placeholder:text-outline",
               "text-sm font-body outline-none",
-              "transition-all duration-200",
+              "outline-none",
               // Hide browser-native password reveal button
               "[&::-ms-reveal]:hidden [&::-ms-clear]:hidden",
               icon && "pl-12",

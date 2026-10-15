@@ -72,7 +72,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             type="button"
             onClick={() => toggleGroup(group.id)}
             className={cn(
-              "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors",
+              "ui-interactive flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold",
               groupActive ? "bg-primary/10 text-primary" : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
               mode === "mobile" && "rounded-none py-3",
             )}
@@ -92,7 +92,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     href={href}
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
-                      "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                      "ui-interactive flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium",
                       isActive
                         ? "bg-primary/10 text-primary"
                         : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
@@ -120,7 +120,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           href={href}
           onClick={() => setMobileMenuOpen(false)}
           className={cn(
-            "flex items-center gap-2 px-3 py-2.5 text-sm font-bold transition-colors",
+            "ui-interactive flex items-center gap-2 px-3 py-2.5 text-sm font-bold",
             mode === "desktop" ? "rounded-lg" : "border-b border-outline-variant/20",
             isActive ? "bg-primary/10 text-primary" : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
           )}
@@ -138,12 +138,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen flex bg-surface-container-low">
+    <div className="min-h-screen flex bg-surface">
 
       {/* ── Sidebar ── */}
-      <aside className="hidden md:flex flex-col w-60 shrink-0 bg-surface-container-lowest shadow-ghost">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-outline-variant/25 bg-surface-container-lowest md:flex">
         {/* Brand */}
-        <div className="px-6 py-6 border-b border-outline-variant/20">
+        <div className="border-b border-outline-variant/20 px-6 py-7">
           <Link href="/" className="text-sm font-headline font-black uppercase text-on-surface hover:text-primary transition-colors">
             IMAGE PARTNERS
           </Link>
@@ -151,7 +151,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-5">
           {renderPrimaryItems("desktop")}
           <div className="my-2 border-t border-outline-variant/20" />
           {renderNavGroups("desktop")}
@@ -181,7 +181,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* ── Main ── */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
-        <div className="md:hidden flex items-center justify-between px-4 py-4 bg-surface-container-lowest border-b border-outline-variant/20">
+        <div className="sticky top-0 z-40 flex items-center justify-between border-b border-outline-variant/20 bg-surface-container-lowest/95 px-4 py-4 backdrop-blur-md md:hidden">
           <div>
             <Link href="/" className="text-sm font-headline font-black uppercase text-on-surface">
               IMAGE PARTNERS
@@ -190,7 +190,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
         {/* Mobile accordion nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-container-lowest border-t border-outline-variant/20 shadow-ghost">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-outline-variant/20 bg-surface-container-lowest/95 shadow-modal backdrop-blur-md md:hidden">
           {mobileMenuOpen && (
             <div className="max-h-[70vh] overflow-y-auto border-b border-outline-variant/20">
               {renderPrimaryItems("mobile")}
@@ -200,7 +200,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <button
             type="button"
             onClick={() => setMobileMenuOpen((open) => !open)}
-            className="flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-bold text-on-surface"
+            className="ui-interactive flex min-h-14 w-full items-center justify-center gap-2 px-4 py-3 text-xs font-bold text-on-surface"
             aria-expanded={mobileMenuOpen}
           >
             <span className="material-symbols-outlined text-xl">{mobileMenuOpen ? "close" : "menu"}</span>

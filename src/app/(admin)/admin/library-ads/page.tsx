@@ -349,11 +349,14 @@ export default function AdminLibraryAdsPage() {
       </div>
 
       {formOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4">
-          <div className="flex min-h-full items-start justify-center py-4 md:items-center">
+        <div className="ui-modal-backdrop" role="presentation">
+          <div className="flex w-full items-start justify-center md:items-center">
             <form
               onSubmit={saveCampaign}
-              className="w-full max-w-4xl overflow-hidden rounded-2xl bg-surface-container-lowest shadow-xl"
+              className="ui-modal-panel max-w-4xl"
+              role="dialog"
+              aria-modal="true"
+              aria-label={editingId ? "광고 캠페인 수정" : "광고 캠페인 추가"}
             >
               <div className="flex items-center justify-between border-b border-outline-variant/30 px-6 py-5">
                 <div>

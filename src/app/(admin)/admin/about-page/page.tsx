@@ -678,8 +678,8 @@ export default function AdminAboutPage() {
       </div>
 
       {previewOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 md:p-6" role="dialog" aria-modal="true" aria-label="회사소개 미리보기" onMouseDown={(event) => { if (event.currentTarget === event.target) setPreviewOpen(false); }}>
-          <div className="flex max-h-[94vh] w-full max-w-[1440px] flex-col overflow-hidden rounded-xl bg-surface-container-lowest shadow-2xl">
+        <div className="ui-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setPreviewOpen(false); }}>
+          <div className="ui-modal-panel flex max-w-[1440px] flex-col" role="dialog" aria-modal="true" aria-label="회사소개 미리보기">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/30 p-4">
               <div><h2 className="text-base font-extrabold text-on-surface">회사소개 미리보기</h2><p className="mt-1 text-xs text-outline">게시 전 실제 화면과 같은 렌더러로 확인합니다.</p></div>
               <div className="flex items-center gap-3"><div className="flex rounded-lg bg-surface-container-low p-1">{(["ko", "en"] as const).map((locale) => <button key={locale} type="button" onClick={() => setPreviewLocale(locale)} className={cn("h-8 rounded-md px-3 text-xs font-bold transition-colors", previewLocale === locale ? "bg-primary text-white" : "text-on-surface-variant hover:text-on-surface")}>{sectionLabel(locale)}</button>)}</div><button type="button" onClick={() => setPreviewOpen(false)} aria-label="미리보기 닫기" className="rounded-lg p-2 text-outline hover:bg-surface-container-low hover:text-on-surface"><span className="material-symbols-outlined">close</span></button></div>
@@ -692,15 +692,13 @@ export default function AdminAboutPage() {
 
       {pickerSlot && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="회사소개 라이브러리 이미지 선택"
+          className="ui-modal-backdrop"
+          role="presentation"
           onMouseDown={(event) => {
             if (event.currentTarget === event.target && !generatingImageId) setPickerSlot(null);
           }}
         >
-          <div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-surface-container-lowest shadow-2xl">
+          <div className="ui-modal-panel flex max-w-5xl flex-col" role="dialog" aria-modal="true" aria-label="회사소개 라이브러리 이미지 선택">
             <div className="flex items-start justify-between gap-4 border-b border-outline-variant/30 p-5">
               <div>
                 <h2 className="text-base font-extrabold text-on-surface">라이브러리에서 이미지 선택</h2>

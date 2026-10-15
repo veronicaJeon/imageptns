@@ -615,8 +615,8 @@ export default function AdminImagesPage() {
       </div>
 
       {transactionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[86vh] w-full max-w-5xl overflow-hidden rounded-xl bg-surface-container-lowest shadow-ghost">
+        <div className="ui-modal-backdrop" role="presentation">
+          <div className="ui-modal-panel max-w-5xl" role="dialog" aria-modal="true" aria-label="이미지 거래 데이터">
             <div className="flex items-start justify-between gap-4 border-b border-outline-variant/20 p-5">
               <div className="min-w-0">
                 <h2 className="font-headline text-lg font-extrabold text-on-surface">이미지 거래 데이터</h2>
@@ -677,8 +677,8 @@ export default function AdminImagesPage() {
       )}
 
       {editState && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[88vh] w-full max-w-2xl overflow-hidden rounded-xl bg-surface-container-lowest shadow-ghost">
+        <div className="ui-modal-backdrop" role="presentation">
+          <div className="ui-modal-panel max-w-2xl" role="dialog" aria-modal="true" aria-label="이미지 상세 편집">
             <div className="flex items-center justify-between border-b border-outline-variant/20 p-5">
               <div>
                 <h2 className="font-headline text-lg font-extrabold text-on-surface">이미지 상세 편집</h2>

@@ -91,7 +91,7 @@ export function TopNavBar() {
   return (
     <nav
       className={cn(
-        "fixed top-0 w-full z-50 h-16 md:h-20 transition-all duration-300",
+        "fixed top-0 z-50 h-16 w-full border-b border-outline-variant/15 transition-all duration-300 md:h-20",
         isDark ? "glass-dark" : "glass"
       )}
     >
@@ -101,13 +101,13 @@ export function TopNavBar() {
         <Link
           href="/"
           onClick={() => setMobileMenuOpen(false)}
-          className="min-w-0 text-base md:text-lg font-headline font-black uppercase text-on-surface hover:text-primary transition-colors duration-200"
+        className="ui-interactive min-w-0 text-base font-headline font-black uppercase tracking-tight text-on-surface hover:text-primary md:text-lg"
         >
           IMAGE PARTNERS
         </Link>
 
         {/* Nav links */}
-        <div className="hidden md:flex items-center gap-10">
+        <div className="hidden items-center gap-1 rounded-full border border-outline-variant/20 bg-surface-container-lowest/55 p-1 md:flex">
           {NAV_LINKS.map(({ href, label, highlight }) => {
             const baseHref = href.split("?")[0];
             const isActive = pathname === baseHref || (baseHref !== "/" && pathname.startsWith(baseHref));
@@ -116,12 +116,12 @@ export function TopNavBar() {
                 key={href}
                 href={href}
                 className={cn(
-                  "group relative pb-1 text-sm font-medium leading-5 transition-colors duration-200",
+                  "ui-interactive group relative rounded-full px-4 py-2 text-sm font-semibold leading-5",
                   highlight
-                    ? "font-extrabold text-primary hover:text-primary-highlight"
+                    ? "font-extrabold text-primary hover:bg-primary/5 hover:text-primary-highlight"
                     : isActive
-                    ? "text-primary border-b-2 border-primary"
-                    : "text-on-surface-variant hover:text-on-surface"
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
                 )}
               >
                 {highlight && (

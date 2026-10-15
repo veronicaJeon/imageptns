@@ -14,8 +14,8 @@ const chipToneClasses: Record<AdminChipTone, string> = {
 };
 
 const buttonVariantClasses: Record<AdminButtonVariant, string> = {
-  primary: "bg-primary text-white hover:bg-primary/90",
-  secondary: "border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-primary/50 hover:text-primary",
+  primary: "bg-primary text-white shadow-sm hover:-translate-y-px hover:bg-primary-highlight hover:shadow-md",
+  secondary: "border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant hover:-translate-y-px hover:border-primary/50 hover:bg-primary/5 hover:text-primary",
   danger: "border border-error/30 bg-error/10 text-error hover:bg-error hover:text-on-error disabled:hover:bg-error/10 disabled:hover:text-error",
   ghost: "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface",
 };
@@ -62,7 +62,7 @@ export function AdminChipButton({
   return (
     <button
       className={cn(
-        "inline-flex h-6 max-w-full items-center rounded-full border px-2.5 text-[10px] font-bold leading-none transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        "ui-interactive inline-flex h-7 max-w-full items-center rounded-full border px-2.5 text-[10px] font-bold leading-none disabled:cursor-not-allowed disabled:opacity-50",
         chipToneClasses[tone],
         tone === "primary" || tone === "success" ? "hover:border-primary/40" : null,
         tone === "danger" ? "hover:border-error/40" : null,
@@ -86,7 +86,7 @@ export function AdminButton({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-lg font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        "ui-interactive inline-flex items-center justify-center gap-1.5 rounded-lg font-bold disabled:cursor-not-allowed disabled:opacity-50",
         buttonVariantClasses[variant],
         buttonSizeClasses[size],
         className,
@@ -127,7 +127,7 @@ export function AdminListSurface({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-lowest shadow-ghost", className)}>
+    <div className={cn("ui-surface overflow-hidden", className)}>
       {children}
     </div>
   );

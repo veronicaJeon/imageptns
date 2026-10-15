@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n/store";
+import { AccordionItem } from "@/components/ui/Accordion";
 
 interface Notice {
   id: string;
@@ -23,7 +24,6 @@ export default function NoticesPage() {
   const copy = NOTICES_COPY[lang];
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/notices")
@@ -34,17 +34,21 @@ export default function NoticesPage() {
 
   return (
     <>
-      <div className="pt-28 pb-6 px-6 md:px-12 bg-surface">
-        <nav className="flex items-center gap-2 text-xs text-outline mb-6">
+      <header className="bg-surface px-5 pb-10 pt-28 md:px-8 md:pb-14 md:pt-36">
+        <div className="reading-shell">
+        <nav className="mb-7 flex items-center gap-2 text-xs text-outline">
           <Link href="/" className="hover:text-primary transition-colors">Home</Link>
           <span className="material-symbols-outlined text-sm">chevron_right</span>
           <span className="text-on-surface-variant">{copy.title}</span>
         </nav>
-        <h1 className="font-headline text-3xl font-extrabold text-on-surface tracking-tight">{copy.title}</h1>
-      </div>
+        <p className="mb-3 text-xs font-extrabold uppercase tracking-[0.18em] text-primary">Image Partners</p>
+        <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface md:text-5xl">{copy.title}</h1>
+        {!loading && <p className="mt-4 text-sm text-on-surface-variant">{lang === "ko" ? `총 ${notices.length}개의 소식` : `${notices.length} updates`}</p>}
+        </div>
+      </header>
 
-      <section className="px-6 md:px-12 pb-24 bg-surface">
-        <div className="max-w-3xl mx-auto">
+      <section className="bg-surface px-5 pb-28 md:px-8">
+        <div className="reading-shell">
           {loading && (
             <div className="flex justify-center py-24">
               <span className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -59,16 +63,13 @@ export default function NoticesPage() {
           )}
 
           {!loading && notices.length > 0 && (
-            <div className="divide-y divide-outline-variant/20">
+            <div className="ui-surface overflow-hidden">
               {notices.map((n, idx) => (
-                <div key={n.id} className="py-6">
-                  <button
-                    type="button"
-                    onClick={() => setExpanded(expanded === n.id ? null : n.id)}
-                    className="w-full flex items-start justify-between gap-4 text-left group"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
+                <AccordionItem
+                  key={n.id}
+                  className="px-5 sm:px-6"
+                  eyebrow={
+                    <span className="flex flex-wrap items-center gap-2">
                         <span className="text-[10px] font-bold text-outline uppercase tracking-widest">
                           #{String(notices.length - idx).padStart(3, "0")}
                         </span>
@@ -82,25 +83,11 @@ export default function NoticesPage() {
                             year: "numeric", month: "2-digit", day: "2-digit",
                           })}
                         </span>
-                      </div>
-                      <h2 className="text-base font-bold text-on-surface group-hover:text-primary transition-colors">
-                        {n.title}
-                      </h2>
-                    </div>
-                    <span
-                      className="material-symbols-outlined text-xl text-outline transition-transform duration-200 shrink-0 mt-1"
-                      style={{ transform: expanded === n.id ? "rotate(180deg)" : "none" }}
-                    >
-                      expand_more
                     </span>
-                  </button>
-
-                  {expanded === n.id && (
-                    <div className="mt-4 pt-4 border-t border-outline-variant/20 text-sm text-on-surface-variant leading-relaxed whitespace-pre-wrap">
-                      {n.body}
-                    </div>
-                  )}
-                </div>
+                  }
+                  question={n.title}
+                  answer={<p className="whitespace-pre-wrap">{n.body}</p>}
+                />
               ))}
             </div>
           )}

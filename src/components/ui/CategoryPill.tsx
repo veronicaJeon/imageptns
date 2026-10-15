@@ -14,12 +14,11 @@ export function CategoryPill({ label, active, onClick, className }: CategoryPill
     <button
       onClick={onClick}
       className={cn(
-        "px-4 py-2 rounded-full",
+        "ui-interactive min-h-10 shrink-0 px-4 py-2 rounded-full border",
         "text-sm font-semibold",
-        "transition-colors duration-200",
         active
-          ? "bg-primary-container text-on-primary-container"
-          : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high",
+          ? "border-primary bg-primary text-white shadow-sm"
+          : "border-outline-variant/50 bg-surface-container-lowest text-on-surface-variant hover:border-primary/40 hover:bg-primary/5 hover:text-primary",
         className
       )}
     >

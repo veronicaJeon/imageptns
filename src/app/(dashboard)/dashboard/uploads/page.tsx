@@ -1145,7 +1145,7 @@ function UploadsPageContent() {
 
       {deletionTarget && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
+          className="ui-modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
             if (event.currentTarget === event.target && !deleting) setDeletionTarget(null);
@@ -1155,7 +1155,7 @@ function UploadsPageContent() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="deletion-dialog-title"
-            className="w-full max-w-lg rounded-xl bg-surface-container-lowest p-5 shadow-2xl md:p-6"
+            className="ui-modal-panel max-w-lg p-5 md:p-6"
           >
             <div className="flex items-start gap-3">
               <span className="material-symbols-outlined rounded-full bg-error/10 p-2 text-error">delete</span>

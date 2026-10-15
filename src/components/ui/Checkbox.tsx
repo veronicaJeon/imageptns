@@ -20,13 +20,13 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
             "text-primary bg-surface-container-lowest",
             "ring-1 ring-outline-variant checked:ring-primary",
             "focus:ring-2 focus:ring-primary",
-            "transition-all duration-200 cursor-pointer",
+            "ui-interactive cursor-pointer",
             className
           )}
           {...props}
         />
         {label && (
-          <span className="text-sm text-on-surface-variant leading-relaxed group-hover:text-on-surface transition-colors">
+          <span className="ui-interactive text-sm text-on-surface-variant leading-relaxed group-hover:text-on-surface">
             {label}
           </span>
         )}

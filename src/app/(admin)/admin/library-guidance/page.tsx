@@ -129,8 +129,8 @@ export default function AdminLibraryGuidancePage() {
       </div>
 
       {formOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <form onSubmit={saveMessage} className="w-full max-w-lg space-y-5 rounded-2xl bg-surface-container-lowest p-6 shadow-xl">
+        <div className="ui-modal-backdrop" role="presentation">
+          <form onSubmit={saveMessage} className="ui-modal-panel max-w-lg space-y-5 p-6" role="dialog" aria-modal="true" aria-label={editingId ? "안내글 수정" : "안내글 추가"}>
             <div className="flex items-center justify-between"><h2 className="text-lg font-extrabold">{editingId ? "안내글 수정" : "안내글 추가"}</h2><button type="button" onClick={() => setFormOpen(false)}><span className="material-symbols-outlined">close</span></button></div>
             <label className="block text-xs font-bold text-outline">한국어 안내글 *<textarea required maxLength={160} rows={3} value={form.content_ko} onChange={(event) => setForm((current) => ({ ...current, content_ko: event.target.value }))} className="mt-2 w-full rounded-lg bg-surface-container p-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary" /></label>
             <label className="block text-xs font-bold text-outline">영문 안내글<textarea maxLength={160} rows={3} value={form.content_en} onChange={(event) => setForm((current) => ({ ...current, content_en: event.target.value }))} className="mt-2 w-full rounded-lg bg-surface-container p-3 text-sm text-on-surface outline-none ring-1 ring-outline-variant focus:ring-2 focus:ring-primary" /></label>

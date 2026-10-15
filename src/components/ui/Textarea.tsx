@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils/cn";
-import { TextareaHTMLAttributes, forwardRef } from "react";
+import { TextareaHTMLAttributes, forwardRef, useId } from "react";
 
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
@@ -11,23 +11,23 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ label, error, hint, className, ...props }, ref) => {
+    const generatedId = useId();
+    const textareaId = props.id ?? generatedId;
     return (
       <div className="flex flex-col gap-2 w-full">
         {label && (
-          <label className="text-xs font-semibold text-outline">
+          <label htmlFor={textareaId} className="text-xs font-semibold text-on-surface-variant">
             {label}
           </label>
         )}
         <textarea
           ref={ref}
+          id={textareaId}
           className={cn(
             "w-full px-4 py-3",
-            "bg-surface-container-lowest",
-            "ring-1 ring-outline-variant focus:ring-2 focus:ring-primary",
-            "rounded-lg text-on-surface placeholder:text-outline",
+            "ui-field text-on-surface placeholder:text-outline",
             "text-sm font-body outline-none resize-none",
-            "transition-all duration-200",
-            error && "ring-error focus:ring-error",
+            error && "border-error",
             className
           )}
           {...props}

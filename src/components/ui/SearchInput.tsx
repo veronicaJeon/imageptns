@@ -15,9 +15,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     return (
       <div
         className={cn(
-          "flex items-center bg-surface-container-lowest",
-          "ring-1 ring-outline-variant focus-within:ring-2 focus-within:ring-primary",
-          "rounded-lg transition-all duration-200",
+          "ui-field flex items-center",
           isLarge ? "px-6 py-4 gap-4" : "px-4 py-2 gap-3"
         )}
       >
@@ -44,7 +42,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           <button
             type="button"
             onClick={() => onSearch((props.value as string) ?? "")}
-            className="shrink-0 rounded bg-primary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            className="ui-interactive shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-highlight hover:-translate-y-px"
           >
             Search
           </button>

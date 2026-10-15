@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils/cn";
-import { SelectHTMLAttributes, forwardRef } from "react";
+import { SelectHTMLAttributes, forwardRef, useId } from "react";
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
@@ -11,23 +11,24 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, error, options, className, ...props }, ref) => {
+    const generatedId = useId();
+    const selectId = props.id ?? generatedId;
     return (
       <div className="flex flex-col gap-2 w-full">
         {label && (
-          <label className="text-xs font-semibold text-outline">
+          <label htmlFor={selectId} className="text-xs font-semibold text-on-surface-variant">
             {label}
           </label>
         )}
         <div className="relative">
           <select
             ref={ref}
+            id={selectId}
             className={cn(
               "w-full h-12 px-4 pr-10 appearance-none",
-              "bg-surface-container-lowest",
-              "ring-1 ring-outline-variant focus:ring-2 focus:ring-primary",
-              "rounded-lg text-on-surface text-sm font-body outline-none",
-              "transition-all duration-200 cursor-pointer",
-              error && "ring-error",
+              "ui-field text-on-surface text-sm font-body outline-none",
+              "cursor-pointer",
+              error && "border-error",
               className
             )}
             {...props}
