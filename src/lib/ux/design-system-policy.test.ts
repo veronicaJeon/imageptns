@@ -35,4 +35,18 @@ describe("shared design system policy", () => {
     expect(source("src/app/(public)/notices/page.tsx")).toContain("AccordionItem");
     expect(source("src/components/ui/NoticePopup.tsx")).toContain("<Dialog");
   });
+
+  it("keeps the public notice popup compact, centered, and action-aligned", () => {
+    const dialog = source("src/components/ui/Dialog.tsx");
+    const noticePopup = source("src/components/ui/NoticePopup.tsx");
+    const css = source("src/app/globals.css");
+    expect(dialog).toContain('type DialogSize = "compact"');
+    expect(dialog).toContain('type DialogPlacement = "responsive" | "center"');
+    expect(dialog).toContain('type DialogDensity = "comfortable" | "compact"');
+    expect(noticePopup).toContain('size="compact"');
+    expect(noticePopup).toContain('placement="center"');
+    expect(noticePopup).toContain('density="compact"');
+    expect(noticePopup).toContain("sm:justify-between");
+    expect(css).toContain(".ui-modal-backdrop-centered");
+  });
 });

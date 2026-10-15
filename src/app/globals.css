@@ -335,6 +335,11 @@ svg {
   animation: ui-sheet-in var(--duration-slow) var(--ease-emphasized) both;
 }
 
+.ui-modal-backdrop-centered {
+  align-items: center;
+  padding: 1rem;
+}
+
 @keyframes ui-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

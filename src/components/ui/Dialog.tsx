@@ -4,9 +4,12 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "./Button";
 
-type DialogSize = "sm" | "md" | "lg" | "xl";
+type DialogSize = "compact" | "sm" | "md" | "lg" | "xl";
+type DialogPlacement = "responsive" | "center";
+type DialogDensity = "comfortable" | "compact";
 
 const sizeClasses: Record<DialogSize, string> = {
+  compact: "max-w-[26rem] max-h-[min(76dvh,38rem)] rounded-[var(--radius-xl)]",
   sm: "max-w-md",
   md: "max-w-2xl",
   lg: "max-w-5xl",
@@ -22,6 +25,8 @@ interface DialogProps {
   children: ReactNode;
   footer?: ReactNode;
   size?: DialogSize;
+  placement?: DialogPlacement;
+  density?: DialogDensity;
   closeLabel?: string;
   className?: string;
   bodyClassName?: string;
@@ -45,6 +50,8 @@ export function Dialog({
   children,
   footer,
   size = "md",
+  placement = "responsive",
+  density = "comfortable",
   closeLabel = "닫기",
   className,
   bodyClassName,
@@ -104,7 +111,7 @@ export function Dialog({
 
   return (
     <div
-      className="ui-modal-backdrop"
+      className={cn("ui-modal-backdrop", placement === "center" && "ui-modal-backdrop-centered")}
       onMouseDown={(event) => {
         if (event.currentTarget === event.target) onClose();
       }}
@@ -118,7 +125,10 @@ export function Dialog({
         tabIndex={-1}
         className={cn("ui-modal-panel flex flex-col", sizeClasses[size], className)}
       >
-        <header className="flex shrink-0 items-start gap-4 border-b border-outline-variant/25 px-5 py-4 sm:px-6 sm:py-5">
+        <header className={cn(
+          "flex shrink-0 items-start gap-4 border-b border-outline-variant/25",
+          density === "compact" ? "px-5 py-4" : "px-5 py-4 sm:px-6 sm:py-5"
+        )}>
           <div className="min-w-0 flex-1">
             {eyebrow && <p className="mb-1 text-[11px] font-extrabold uppercase tracking-[0.16em] text-primary">{eyebrow}</p>}
             <h2 id={titleId} className="font-headline text-lg font-extrabold leading-snug text-on-surface sm:text-xl">{title}</h2>
@@ -128,8 +138,15 @@ export function Dialog({
             <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
           </Button>
         </header>
-        <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6", bodyClassName)}>{children}</div>
-        {footer && <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-outline-variant/25 bg-surface-container-low/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-6">{footer}</footer>}
+        <div className={cn(
+          "min-h-0 flex-1 overflow-y-auto",
+          density === "compact" ? "px-5 py-5" : "px-5 py-5 sm:px-6 sm:py-6",
+          bodyClassName
+        )}>{children}</div>
+        {footer && <footer className={cn(
+          "flex shrink-0 flex-col-reverse gap-2 border-t border-outline-variant/25 bg-surface-container-low/70 sm:flex-row sm:items-center sm:justify-end",
+          density === "compact" ? "px-5 py-4" : "px-5 py-4 sm:px-6"
+        )}>{footer}</footer>}
       </div>
     </div>
   );

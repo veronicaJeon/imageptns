@@ -12,7 +12,7 @@ interface Notice {
 }
 
 const NOTICE_POPUP_COPY = {
-  ko: { title: "공지사항", hideToday: "하루동안 안보기", confirm: "확인" },
+  ko: { title: "공지사항", hideToday: "오늘 하루 보지 않기", confirm: "확인" },
   en: { title: "Notices", hideToday: "Do not show again today", confirm: "OK" },
 } as const;
 
@@ -64,26 +64,28 @@ export function NoticePopup() {
     <Dialog
       open={visible}
       onClose={dismiss}
-      size="sm"
+      size="compact"
+      placement="center"
+      density="compact"
       eyebrow={copy.title}
       title={notice.title}
       closeLabel={lang === "ko" ? "공지 닫기" : "Close notice"}
       footer={
-        <>
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <label className="flex min-h-11 cursor-pointer select-none items-center justify-center gap-2 sm:justify-start">
             <input
               type="checkbox"
               checked={hideForDay}
               onChange={(e) => setHideForDay(e.target.checked)}
-              className="w-4 h-4 accent-primary rounded"
+              className="h-4 w-4 rounded accent-primary"
             />
             <span className="text-xs text-on-surface-variant">{copy.hideToday}</span>
           </label>
-          <Button type="button" onClick={dismiss} className="sm:ml-auto">{copy.confirm}</Button>
-        </>
+          <Button type="button" onClick={dismiss} className="w-full sm:w-auto sm:min-w-24">{copy.confirm}</Button>
+        </div>
       }
     >
-      <p className="whitespace-pre-wrap text-sm leading-7 text-on-surface-variant">{notice.body}</p>
+      <p className="whitespace-pre-wrap break-words text-sm leading-7 text-on-surface-variant">{notice.body}</p>
     </Dialog>
   );
 }
