@@ -9,10 +9,13 @@ describe("operations automation policy", () => {
   const runbook = readFileSync("docs/codex-maintenance-runbook.md", "utf8");
   const prompt = readFileSync(".github/codex/prompts/maintenance-implementation.md", "utf8");
 
-  it("publishes safe release identity and daily review freshness in health", () => {
+  it("publishes provider-neutral release identity and an explicit daily-review pause", () => {
     expect(health).toContain("operations_daily_review");
+    expect(health).toContain("APP_RELEASE_SHA");
+    expect(health).toContain("APP_RELEASE_REF");
     expect(health).toContain("VERCEL_GIT_COMMIT_SHA");
     expect(health).toContain("VERCEL_GIT_COMMIT_REF");
+    expect(health).toContain('status: "paused" as const');
     expect(health).toContain("operations.status === \"stale\"");
   });
 

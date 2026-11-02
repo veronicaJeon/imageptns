@@ -2,13 +2,13 @@
 
 ## 현재 구성
 
-- `GET /api/health`: 운영 DB와 공개 `images-preview`, 비공개 `images-analysis` 스토리지를 각각 최대 5초 안에 확인한다. 15분마다 최신·최초 이미지 방향을 바꾸어 최대 12개의 실제 JPEG를 확인하고, 최근 Mistral 합성 진단·일일 운영관리자 점검·Vercel release SHA/ref도 함께 반환한다.
+- `GET /api/health`: 운영 DB와 공개 `images-preview`, 비공개 `images-analysis` 스토리지를 각각 최대 5초 안에 확인한다. 15분마다 최신·최초 이미지 방향을 바꾸어 최대 12개의 실제 JPEG를 확인하고, 최근 Mistral 합성 진단·일일 운영관리자 점검·배포 공급자와 무관한 release SHA/ref도 함께 반환한다.
 - GitHub Actions `Production monitor`: 운영 URL을 매시 7·22·37·52분에 외부에서 호출한다.
 - 수동 Production 배포 검증은 health와 공개 핵심 경로에 더해 `한강` 및 설명의 조사 없는 `한강 북단` 키워드 검색이 HTTP 200으로 `서울 한강 풍경`을 반환하는지 확인한다. 검색 API 오류를 빈 결과로 간주하지 않는다.
 - 실패 시 `[monitor] Production health check failed` GitHub 이슈를 한 건만 유지하고, 같은 장애의 추가 실패는 댓글로 누적한다. DB·Storage·이미지·AI·일일 점검 오류뿐 아니라 배포 SHA/ref가 원격 `main`과 다를 때도 실패한다. 복구되면 자동 종료한다.
 - 관리자 `로그/통계관리 > 운영 모니터링`: 최근 24시간 가용성, 응답시간, 포착된 서버 오류, AI 성공·실패와 운영 이벤트를 표시한다.
 - 관리자 `로그/통계관리 > 에이전트 활동현황`: GitHub 주간 제품·코드 검사, Grok·Gemini 자문 보고, 승인 후보 대기열과 Codex draft PR을 공개 GitHub 근거와 함께 표시한다.
-- 매일 `/api/cron/operations-review`는 고객 사진 전체의 공개 미리보기 무결성, 처리 SLA, 분석 사본·임베딩·이메일·서버 오류와 최근 핵심 활동을 개인정보 없이 집계한다. 같은 실행에서 단색 합성 JPEG로 Mistral을 확인하고 Voyage/NVIDIA 대기열도 한 건씩 처리한다. 결제 공개 전까지 사용하지 않는 구독 갱신 cron 슬롯을 이 일일 점검에 사용한다.
+- 고비용 `/api/cron/operations-review`는 유입이 거의 없는 기간과 Vercel CPU 소진 대응을 위해 2026-11-02부터 중단했다. `OPERATIONS_DAILY_REVIEW_ENABLED=false`이면 route도 `paused`를 반환하며 health의 AI·운영점검은 실패가 아닌 `paused`로 표시한다. 데이터 보존·만료 업로드 정리 `/api/cron/auto-reject-stale`는 계속 매일 실행한다.
 - 운영 이벤트에는 요청 본문, 이미지, 이메일, 사용자 식별자 또는 API 키를 저장하지 않는다. 90일이 지난 이벤트는 매일 삭제한다.
 
 ## 초기 경보 기준
@@ -18,7 +18,7 @@
 | 운영 URL | HTTP 200 | 연결 실패 또는 HTTP 5xx |
 | DB | `ok`, 5초 이내 | 오류 또는 시간 초과 |
 | 스토리지 | 공개 미리보기·비공개 분석 사본 모두 `ok`, 각각 5초 이내 | 하나라도 오류 또는 시간 초과 |
-| Mistral | 최근 36시간 진단 `ok` | 최근 진단 실패 또는 36시간 이상 미실행 |
+| Mistral | 자동 일일점검 운영 중에는 최근 36시간 진단 `ok`; 중단 중에는 `paused` | 운영 중 최근 진단 실패 또는 36시간 이상 미실행 |
 | 서버 오류 | 최근 24시간 0건 권장 | 1건 이상이면 관리자 화면 검토 |
 | 가용성 | 최근 24시간 99% 이상 | 99% 미만이면 원인 조사 |
 
@@ -28,6 +28,6 @@ GitHub 예약 실행은 정확한 분 단위 SLA를 보장하지 않으므로, �
 
 1. GitHub 장애 이슈의 실패 실행 링크와 `/api/health` 응답을 확인한다.
 2. 관리자 운영 모니터링에서 최초 실패 시각, 구성요소, 오류 코드와 직전 응답시간을 확인한다.
-3. Vercel 함수 로그와 Supabase 상태를 같은 시간대로 대조한다.
+3. Cloudflare Workers 로그, 임시 Sharp 처리 Vercel 함수 로그와 Supabase 상태를 같은 시간대로 대조한다.
 4. AI만 실패했다면 관리자 AI 운영 진단을 한 번 재실행한다. 반복 실패 시 자동 생성을 중단하고 수동 메타데이터 입력을 안내한다.
 5. 복구 뒤 장애 원인, 영향 시간, 재발 방지 조치를 감사 기록 또는 운영 문서에 남긴다.

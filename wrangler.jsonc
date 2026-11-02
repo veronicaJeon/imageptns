@@ -1,0 +1,45 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "imagepartners",
+  "main": "cloudflare-worker.ts",
+  "workers_dev": true,
+  "compatibility_date": "2026-11-02",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "imagepartners"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "imagepartners.kr",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.imagepartners.kr",
+      "custom_domain": true
+    }
+  ],
+  "images": {
+    "binding": "IMAGES"
+  },
+  "vars": {
+    "LEGACY_IMAGE_ORIGIN": "https://legacy-origin.imagepartners.kr",
+    "OPERATIONS_DAILY_REVIEW_ENABLED": "false"
+  },
+  "triggers": {
+    "crons": ["0 2 * * *"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "placement": {
+    "mode": "smart"
+  }
+}

@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import sharp from "sharp";
 import { storageBinaryBody } from "@/lib/supabase/storage-body";
 import {
   DEFAULT_ABOUT_PAGE_CONTENT,
@@ -95,6 +94,7 @@ export async function createAboutLibraryAsset(
     .digest("hex")
     .slice(0, 16);
   const derivedPath = `about/${slot}/${image.id}-${digest}.webp`;
+  const { default: sharp } = await import("sharp");
   const derivative = await sharp(source)
     .rotate()
     .resize({ width: SLOT_WIDTHS[slot], withoutEnlargement: true })

@@ -1,7 +1,7 @@
 # Image Partners 시스템 정의서
 
 > 상태: 기준
-> 기준일: 2026-10-15
+> 기준일: 2026-11-02
 > 대상 환경: `https://www.imagepartners.kr` 운영 및 로컬 Supabase 개발 환경
 > 변경 규칙: [문서 기반 개발 규칙](./document-driven-development.md)
 
@@ -48,7 +48,8 @@ flowchart LR
     A --> R
     W -. "현재 비공개" .-> T["Toss Payments"]
     W -. "현재 비공개" .-> C["Base·Arweave"]
-    V["Vercel Cron"] --> W
+    C["Cloudflare Cron Trigger"] --> W
+    W -. "Sharp 임시 분리" .-> V["Vercel 이미지 처리 origin"]
     G["GitHub Actions"] --> W
     W --> O["운영 이벤트·관리자 모니터링"]
 ```
@@ -56,11 +57,11 @@ flowchart LR
 | 계층 | 구현 기준 |
 | --- | --- |
 | 웹·API | Next.js App Router, React 19, TypeScript, `src/app`, `src/components`, `src/lib` |
-| 배포 | Vercel, 서울 실행 리전 `icn1`, 운영 도메인 `www.imagepartners.kr` |
+| 배포 | Cloudflare Workers/OpenNext 전환 준비 중. 운영 도메인은 전환 전까지 Vercel, Sharp 경로는 전환 후에도 임시 Vercel origin 사용 |
 | 인증·DB·파일 | Supabase Auth, Postgres, RLS, Storage, 순방향 SQL 마이그레이션 |
 | 상태 관리 | React Query, Zustand; 개인 목록 API는 `private, no-store` 원칙 |
 | 검증 | Vitest, ESLint, TypeScript, Next production build, fresh Supabase migration lint |
-| 운영 | `/api/health`, GitHub 외부 모니터, 관리자 운영 모니터링, Vercel Cron |
+| 운영 | `/api/health`, GitHub 외부 모니터, 관리자 운영 모니터링, Cloudflare Cron Trigger(전환 후) |
 
 로컬 개발은 `supabase/config.toml`의 Docker 기반 Supabase를 사용하고 운영 프로젝트와 분리한다. 독립 스테이징 Supabase 프로젝트는 아직 기준 환경에 포함하지 않는다.
 
@@ -164,7 +165,8 @@ DB 스키마의 유일한 변경 경로는 `supabase/migrations`의 순번 마�
 | xAI·Google Gemini | 공개 GitHub 유지보수 근거의 독립 검수·위험 반론·개선 아이디어 | 실패·키 미설정·한도 초과를 비차단 보고하며 코드 수정과 후보 승인에는 사용하지 않음 |
 | Resend | 계정·권한·정산·반려·이미지 의뢰 알림, 주문 거래문서, 문의 수신 Webhook, Auth SMTP | 주문 메일은 outbox에 성공·실패를 남기고 재전송. 업로드 완료·이미지 승인 메일은 보내지 않으며 전달 상태·Webhook 서명·운영 수신함과 핵심 메일 E2E를 정기 회귀 |
 | Google | OAuth와 운영 Gmail 수신함 | 이메일 가입과 직접 운영 수신함을 대체 경로로 유지 |
-| Vercel | 웹 호스팅·Cron | 이전 정상 배포 롤백과 GitHub 외부 헬스체크 사용 |
+| Cloudflare | 전환 후 웹 호스팅·일반 API·Cron | Workers 로그·외부 헬스체크를 사용하고 Custom Domain을 Vercel로 되돌려 롤백 |
+| Vercel | 전환 전 웹 호스팅, 전환 후 Sharp 이미지 처리 임시 origin | `legacy-origin.imagepartners.kr` 경로 오류를 별도 관찰하고 Cloudflare 이미지 처리 계층 검증 후 제거 |
 | Toss | 온라인 카드결제 | 현재 공개하지 않음 |
 | Base·Arweave | 온체인 결제·원본 증명 | 결제는 현재 공개하지 않음. 이미 존재하는 증명은 삭제 정책에서 보존 |
 
@@ -195,19 +197,20 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | 항목 | 현재 기준 |
 | --- | --- |
 | CI | main/develop push·PR에서 운영 의존성 audit, 타입, 린트, 테스트, 빌드; 새 Supabase DB 마이그레이션·lint |
-| 배포 | 검증 후 Vercel Production 수동 배포 워크플로 또는 승인된 직접 배포 |
+| 배포 | Cloudflare 전환 전에는 Vercel Production, 전환 시에는 OpenNext Worker `workers.dev` 검증 후 Custom Domain 연결. 세부 절차는 Cloudflare 전환 런북 준수 |
 | 가용성 | GitHub Actions가 15분 간격으로 `/api/health`를 호출해 DB·Storage·순환 이미지 샘플·AI·일일 운영 점검·main/Production SHA를 확인하고 실패 이슈를 자동 생성·복구 종료 |
-| 일일 운영관리 | Vercel cron이 이미지 전체 무결성, 처리 SLA, 임베딩·이메일·서버 오류와 핵심 활동을 집계한다. Codex Scheduled task는 같은 지표와 GitHub 근거를 읽기 전용으로 재검증하고 새 후보를 최대 3건 기록한다. |
+| 일일 운영관리 | 2026-11-02부터 고비용 Mistral·인덱싱·전체 운영검토를 중단한다. 데이터 보존·만료 업로드 정리만 매일 유지하며 재개 시 플래그와 스케줄을 함께 복원한다. |
 | 주간 제품 발견 | Codex Scheduled task가 신규 변경, 7일·30일 운영 추세와 구매자·사진가·관리자 여정을 종합 검토해 오류 외에도 가치·운영 효율·발견성·품질 개선 후보를 최대 3건 제안한다. |
 | 주간 유지보수 | GitHub Actions가 매일 예약 기동 후 마지막 성공으로부터 7일이 지난 경우 audit·코드·fresh DB·운영 smoke·릴리스 정합성을 실행하고 고정 ID 후보 이슈를 누적한다. 승인 후보의 실제 개발은 Codex Scheduled task가 한 건씩 수행한다. |
 | Health | DB, Storage, 최근 공개 JPEG 무결성, Mistral 합성 진단 최신성 |
-| 예약 작업 | 매일 02:00 UTC 데이터·업로드·반려·한도 정리, 매일 03:00 UTC Mistral 합성 진단 |
+| 예약 작업 | 매일 02:00 UTC 데이터·업로드·반려·한도 정리. 03:00 UTC Mistral·전체 운영점검은 중단 |
 | 관측 | 관리자 운영 모니터링에 최근 24시간 가용성·응답·서버 오류·AI 이벤트를, 에이전트 활동현황에 GitHub 검사·Grok·Gemini 자문·Codex 대기열과 PR을 표시 |
-| 리전 | Vercel `icn1`, Supabase 운영 프로젝트와 로컬 프로젝트 분리 |
+| 리전 | 전환 후 Cloudflare Smart Placement, 임시 Sharp Vercel `icn1`, Supabase 운영 프로젝트와 로컬 프로젝트 분리 |
 
 초기 목표는 최근 24시간 가용성 99% 이상, 핵심 DB·Storage 점검 5초 이내, AI 합성 진단 36시간 이내 최신 상태다. GitHub 예약 실행은 SLA를 보장하지 않으므로 유료 공개와 트래픽 증가 전 전용 오류 추적·uptime 알림을 검토한다.
 
 배포·롤백·스모크 세부 절차는 [운영 배포 인수인계](./production-deployment-handoff.md)를 따른다.
+[Cloudflare Workers 전환 런북](./cloudflare-migration-runbook.md)은 Worker 배포, 비밀값, 도메인 전환과 Sharp 임시 분리의 기준이다.
 정기 점검과 실패 후 조치 경계는 [주간 제품·코드 유지보수 루틴](./maintenance-routine.md)을 따른다.
 
 ## 9. 환경변수 분류
@@ -218,6 +221,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | --- | --- |
 | 공개 앱 설정 | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
 | 서버 비밀 | `SUPABASE_SERVICE_ROLE_KEY`, `MISTRAL_API_KEY`, `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `CRON_SECRET` |
+| 배포·운영 제어 | `APP_RELEASE_SHA`, `APP_RELEASE_REF`, `OPERATIONS_DAILY_REVIEW_ENABLED`; Cloudflare의 `LEGACY_IMAGE_ORIGIN`은 비밀이 아닌 Worker 변수 |
 | 메일 운영 | `RESEND_FROM_EMAIL`, `OPS_EMAIL`, 진단용 `GMAIL_SMTP_USER`, `GMAIL_SMTP_PASS` |
 | AI 한도 | `AI_ANALYSIS_HOURLY_LIMIT`, `AI_ANALYSIS_DAILY_LIMIT` |
 | 의미 검색·보조 캡션 | `SEMANTIC_IMAGE_SEARCH_ENABLED`, `SEMANTIC_IMAGE_INDEXING_ENABLED`, `SEMANTIC_IMAGE_QUERY_ENABLED`, `SEMANTIC_EMBEDDING_PROVIDER`, `SEMANTIC_EMBEDDING_MODEL`, `SEMANTIC_EMBEDDING_MODEL_VERSION`, `SEMANTIC_EMBEDDING_DIMENSIONS`, `KEYWORD_SEARCH_STRONG_THRESHOLD`, `SEMANTIC_SEARCH_MIN_SIMILARITY`, `VOYAGE_API_KEY`; NVIDIA는 `NVIDIA_API_KEY`, `NVIDIA_CAPTIONING_ENABLED`, `NVIDIA_API_PRODUCTION_ENTITLED`, `NVIDIA_CAPTION_MODEL`, `NVIDIA_CAPTION_MODEL_VERSION` |
@@ -226,7 +230,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | 기능 플래그 | `NEXT_PUBLIC_COMMERCE_ENABLED`, `NEXT_PUBLIC_ONCHAIN_ENABLED`, `NEXT_PUBLIC_PAYMENT_PASS_ENABLED`, `ALLOW_INCOMPLETE_DISCLOSURE_BETA` |
 | 비공개 결제·온체인 | Toss 키, Base RPC·계약·운영자 키, Arweave 설정 |
 
-환경별 값은 Vercel·Supabase의 권한 있는 설정에서 관리한다. `.env.local`, 내려받은 운영 환경 파일과 키 원문은 커밋하거나 작업 보고에 출력하지 않는다.
+환경별 값은 전환 단계에 따라 Cloudflare Workers·Vercel·Supabase의 권한 있는 설정에서 관리한다. `.env.local`, `.dev.vars`, 내려받은 운영 환경 파일과 키 원문은 커밋하거나 작업 보고에 출력하지 않는다.
 
 ## 10. 현재 확정되지 않았거나 오픈 전 필요한 사항
 
@@ -280,5 +284,6 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 - 2026-10-04 운영 의존성 audit의 신규 critical·high 공지에 대응해 `next` 16.3.8, `nodemailer` 10.0.14, `sharp` 0.35.5로 올렸다. 타입·린트·테스트·빌드와 `npm audit --omit=dev --audit-level=high` 통과로 검증한다.
 - 2026-10-04 관리자 정산 승인·반려에 상태 조건부 갱신을 적용해 중복 처리를 막고, 정산 알림 메일을 응답 전에 발송해 결과(`sent`·`failed`·`skipped`)를 감사 기록에 남겼다. 이미지 상세 편집은 변경 필드만 감사 기록에 남기고 이미지별 가격을 upsert 후 빠진 항목만 삭제하도록 바꿨다. 카테고리·안내글·온체인 클레임 검토에도 감사 기록을 추가했다. `src/lib/admin/payouts.test.ts`, `src/lib/admin/image-edit-audit.test.ts`로 회귀한다.
 - 2026-10-15 브랜드 글꼴과 색상을 유지하면서 버튼·입력·검색·목록·아코디언·팝업·전환을 공용 디자인 문법으로 통합했다. 라이브러리 우선 홈과 권한·API 동작은 유지하고, 공개·인증·대시보드·관리자 화면이 같은 표면·포커스·모션 토큰을 사용하도록 했다. `prefers-reduced-motion`, dialog 의미 구조와 포커스 관리, 왼쪽 기준 카테고리 스크롤을 정책 테스트와 전체 회귀로 보호한다.
+- 2026-11-02 Vercel CPU 소진 대응으로 Next.js 16.4와 OpenNext 기반 Cloudflare Worker 빌드를 추가했다. 일반 경로는 Worker에서 실행하고 네이티브 Sharp 경로는 `legacy-origin.imagepartners.kr`로 임시 분리한다. 고비용 일일 운영점검은 중단하고 데이터 보존 cron만 유지하며, Worker 로컬 스모크·정책 테스트·Cloudflare 전환 런북으로 경계를 보호한다.
 
 이 문서 갱신 시 날짜, 변경된 시스템 경계, 관련 마이그레이션·테스트·운영 검증을 이 절에 추가한다. 배포 ID처럼 자주 바뀌는 값은 이 문서가 아니라 배포 인수인계 기록에서 관리한다.

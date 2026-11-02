@@ -1,5 +1,7 @@
 # Vercel Deployment Runbook
 
+> Vercel은 Cloudflare 전환 뒤 Sharp 이미지 처리용 임시 origin과 롤백 대상으로만 유지한다. 공개 Worker 전환은 [Cloudflare Workers 전환 런북](./cloudflare-migration-runbook.md)을 따른다.
+
 Image Partners is linked to Vercel through the repository-local `.vercel/` project config. Do not rely on a globally installed `vercel` binary, because the local machine may not have one on `PATH`.
 
 배포 전후 전체 체크리스트, Supabase 환경 검증, 스모크 테스트, 롤백 기준과 보고 양식은 [운영 배포 인수인계](./production-deployment-handoff.md)를 따른다.

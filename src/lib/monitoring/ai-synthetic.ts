@@ -1,8 +1,8 @@
-import sharp from "sharp";
 import { analyzeWithMistral } from "../ai/mistral";
 import { recordOperationalEvent, sanitizeOperationalMessage } from "./events";
 
 async function syntheticImageDataUrl() {
+  const { default: sharp } = await import("sharp");
   const bytes = await sharp({
     create: {
       width: 160,

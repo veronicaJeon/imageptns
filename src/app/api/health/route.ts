@@ -30,6 +30,7 @@ async function timedCheck(check: () => Promise<{ error: { message: string } | nu
 export async function GET() {
   const startedAt = Date.now();
   const admin = createAdminClient();
+  const dailyReviewEnabled = process.env.OPERATIONS_DAILY_REVIEW_ENABLED === "true";
   const reversePreviewSample = Math.floor(Date.now() / (15 * 60 * 1000)) % 2 === 1;
   const [database, storage, analysisStorage, previewIntegrity, latestAiResult, latestOperationsResult] = await Promise.all([
     timedCheck(async () => {
@@ -56,40 +57,42 @@ export async function GET() {
         .limit(12);
       if (error) return { error };
 
-      for (const image of data ?? []) {
+      await Promise.all((data ?? []).map(async (image) => {
         const path = image.storage_path_preview;
-        if (!path) continue;
+        if (!path) return;
         const response = await fetch(previewUrl(`thumbs/${path}`), {
           cache: "no-store",
           headers: { Range: "bytes=0-15" },
         });
-        if (!response.ok) return { error: new Error(`Preview returned ${response.status}`) };
+        if (!response.ok) throw new Error(`Preview returned ${response.status}`);
         const bytes = new Uint8Array(await response.arrayBuffer());
         if (!hasJpegSignature(bytes)) {
-          return { error: new Error("Preview JPEG signature is invalid") };
+          throw new Error("Preview JPEG signature is invalid");
         }
-      }
+      }));
       return { error: null };
     }),
-    admin
+    dailyReviewEnabled ? admin
       .from("operational_events")
       .select("status, created_at, duration_ms")
       .eq("event_type", "ai_synthetic_check")
       .order("created_at", { ascending: false })
       .limit(1)
-      .maybeSingle(),
-    admin
+      .maybeSingle() : Promise.resolve({ data: null, error: null }),
+    dailyReviewEnabled ? admin
       .from("operational_events")
       .select("status, created_at, duration_ms, error_code, metadata")
       .eq("event_type", "operations_daily_review")
       .order("created_at", { ascending: false })
       .limit(1)
-      .maybeSingle(),
+      .maybeSingle() : Promise.resolve({ data: null, error: null }),
   ]);
 
   const latestAi = latestAiResult.data;
   const aiAgeMs = latestAi ? Date.now() - new Date(latestAi.created_at).getTime() : null;
-  const ai = !latestAi
+  const ai = !dailyReviewEnabled
+    ? { status: "paused" as const, checkedAt: null, latencyMs: null }
+    : !latestAi
     ? { status: "unknown" as const, checkedAt: null, latencyMs: null }
     : aiAgeMs != null && aiAgeMs > 36 * 60 * 60 * 1000
       ? { status: "stale" as const, checkedAt: latestAi.created_at, latencyMs: latestAi.duration_ms }
@@ -97,7 +100,9 @@ export async function GET() {
 
   const latestOperations = latestOperationsResult.data;
   const operationsAgeMs = latestOperations ? Date.now() - new Date(latestOperations.created_at).getTime() : null;
-  const operations = !latestOperations
+  const operations = !dailyReviewEnabled
+    ? { status: "paused" as const, checkedAt: null, latencyMs: null, findingCount: null }
+    : !latestOperations
     ? { status: "unknown" as const, checkedAt: null, latencyMs: null, findingCount: null }
     : operationsAgeMs != null && operationsAgeMs > 36 * 60 * 60 * 1000
       ? { status: "stale" as const, checkedAt: latestOperations.created_at, latencyMs: latestOperations.duration_ms, findingCount: null }
@@ -141,8 +146,12 @@ export async function GET() {
       status: degraded ? "degraded" : "ok",
       checks: { database, storage, analysisStorage, previewIntegrity, ai, operations },
       release: {
-        commitSha: process.env.VERCEL_GIT_COMMIT_SHA?.trim() || null,
-        commitRef: process.env.VERCEL_GIT_COMMIT_REF?.trim() || null,
+        commitSha: process.env.APP_RELEASE_SHA?.trim()
+          || process.env.VERCEL_GIT_COMMIT_SHA?.trim()
+          || null,
+        commitRef: process.env.APP_RELEASE_REF?.trim()
+          || process.env.VERCEL_GIT_COMMIT_REF?.trim()
+          || null,
       },
       durationMs,
       timestamp: new Date().toISOString(),

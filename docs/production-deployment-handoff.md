@@ -1,5 +1,7 @@
 # Image Partners 운영 배포 인수인계
 
+> 2026-11-02부터 Cloudflare Workers 전환이 진행 중이다. 공개 도메인 전환과 이후 배포는 [Cloudflare Workers 전환 런북](./cloudflare-migration-runbook.md)을 우선하고, 이 문서는 Vercel rollback origin과 기존 운영 검증 기준으로 사용한다.
+
 이 문서는 다른 에이전트가 구현 작업과 분리되어 운영 배포만 안전하게 수행하도록 돕는 체크리스트다. 저장소 루트는 `/Users/simini/Documents/Imgptns/imageptns`, 운영 도메인은 `https://www.imagepartners.kr`, Vercel 프로젝트 이름은 `imageptns`다.
 
 ## 현재 운영 기준점

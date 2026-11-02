@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import sharp from "sharp";
 import { normalizeRotationDegrees } from "./orientation";
 
 const HASH_SIZE = 8;
@@ -68,6 +67,7 @@ export async function createImageFingerprint(
   input: Buffer,
   rotationDegrees: unknown = 0,
 ): Promise<ImageFingerprint> {
+  const { default: sharp } = await import("sharp");
   const rotation = normalizeRotationDegrees(rotationDegrees);
   const metadata = await sharp(input).metadata();
   const autoWidth = metadata.autoOrient.width;

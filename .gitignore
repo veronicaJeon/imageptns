@@ -43,6 +43,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Cloudflare Workers / OpenNext
+.open-next/
+.wrangler/
+.dev.vars*
+!.dev.vars.example
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
@@ -57,8 +63,6 @@ nginx/ssl/
 
 # OS
 Thumbs.db
-
-.vercel
 
 # local feature worktrees
 .worktrees/

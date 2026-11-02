@@ -1,5 +1,8 @@
-import sharp from "sharp";
 import { normalizeRotationDegrees } from "../images/orientation";
+
+async function loadSharp() {
+  return (await import("sharp")).default;
+}
 
 const GLYPHS: Record<string, string[]> = {
   A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
@@ -62,6 +65,7 @@ function watermarkSvg(w: number, h: number) {
 }
 
 export async function applyWatermark(input: Buffer, rotationDegrees: unknown = 0): Promise<Buffer> {
+  const sharp = await loadSharp();
   const base = await sharp(input)
     .rotate()
     .rotate(normalizeRotationDegrees(rotationDegrees))
@@ -80,6 +84,7 @@ export async function applyWatermarkToAnalysisDerivative(
   knownWidth?: number,
   knownHeight?: number,
 ): Promise<Buffer> {
+  const sharp = await loadSharp();
   const metadata = knownWidth && knownHeight ? null : await sharp(input).metadata();
   const w = knownWidth ?? metadata?.width ?? 800;
   const h = knownHeight ?? metadata?.height ?? 600;
@@ -90,6 +95,7 @@ export async function applyWatermarkToAnalysisDerivative(
 }
 
 export async function createWatermarkedThumbnail(input: Buffer, width = 320, height = 240, rotationDegrees: unknown = 0): Promise<Buffer> {
+  const sharp = await loadSharp();
   const resized = await sharp(input)
     .rotate()
     .rotate(normalizeRotationDegrees(rotationDegrees))
@@ -107,6 +113,7 @@ export async function createWatermarkedThumbnail(input: Buffer, width = 320, hei
 }
 
 export async function resizeWatermarkedPreview(input: Buffer, width = 320, height = 240): Promise<Buffer> {
+  const sharp = await loadSharp();
   return sharp(input)
     .rotate()
     .resize(width, height, { fit: "inside", withoutEnlargement: true })

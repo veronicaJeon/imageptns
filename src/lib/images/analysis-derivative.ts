@@ -1,4 +1,3 @@
-import sharp from "sharp";
 import { normalizeRotationDegrees } from "./orientation";
 import {
   ANALYSIS_DERIVATIVE_JPEG_QUALITY,
@@ -41,6 +40,7 @@ export async function createAnalysisDerivative(
   input: Buffer,
   rotationDegrees: unknown = 0,
 ): Promise<AnalysisDerivative> {
+  const { default: sharp } = await import("sharp");
   const output = await sharp(input)
     .rotate()
     .rotate(normalizeRotationDegrees(rotationDegrees))

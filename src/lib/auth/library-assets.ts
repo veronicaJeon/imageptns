@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { storageBinaryBody } from "@/lib/supabase/storage-body";
 import { getCopyrightLicense } from "@/lib/licenses/creative-commons";
@@ -30,6 +29,7 @@ export async function createAuthLibraryAsset(admin: AdminClient, imageId: string
   const source = Buffer.from(await original.arrayBuffer());
   const digest = createHash("sha256").update(source).update(`auth-site-asset-v1:${slot}:1920`).digest("hex").slice(0, 16);
   const derivedPath = `auth/${slot}/${image.id}-${digest}.webp`;
+  const { default: sharp } = await import("sharp");
   const derivative = await sharp(source).rotate().resize({ width: 1920, withoutEnlargement: true }).webp({ quality: 84, effort: 4 }).toBuffer();
   const { error: uploadError } = await admin.storage.from("site-assets").upload(derivedPath, storageBinaryBody(derivative), { contentType: "image/webp", cacheControl: "31536000", upsert: true });
   if (uploadError) throw new Error(uploadError.message);

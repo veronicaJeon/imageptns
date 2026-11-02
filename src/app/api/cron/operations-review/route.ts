@@ -13,6 +13,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: authorization.error }, { status: authorization.status });
   }
 
+  if (process.env.OPERATIONS_DAILY_REVIEW_ENABLED !== "true") {
+    return NextResponse.json({ status: "paused" }, { status: 202 });
+  }
+
   const mistral = await runAiSyntheticCheck("operations-cron");
   let indexing;
   try {
