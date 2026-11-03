@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import sharp from "sharp";
-import { createImageFingerprint } from "@/lib/images/fingerprint";
+import { createImageFingerprint, type ImageFingerprint } from "@/lib/images/fingerprint";
 import { readKeywordFirstSearchThresholds } from "@/lib/images/keyword-first-search";
 import { getSemanticImageSearchConfig } from "@/lib/images/semantic-embedding";
 import { buyerCanViewImage } from "@/lib/images/state-visibility";
@@ -16,7 +15,7 @@ import {
   consumeDistributedRateLimit,
   requestIdentity,
 } from "@/lib/security/distributed-rate-limit";
-import { ALLOWED_SHARP_FORMATS, ALLOWED_UPLOAD_IMAGE_TYPES } from "@/lib/uploads/security";
+import { ALLOWED_UPLOAD_IMAGE_TYPES } from "@/lib/uploads/security";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -68,6 +67,74 @@ function firstPhotographer(
   return Array.isArray(photographer) ? photographer[0] : photographer;
 }
 
+interface WorkerSelfReference {
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+}
+
+function validFingerprint(value: unknown): value is ImageFingerprint {
+  if (!value || typeof value !== "object") return false;
+  const fingerprint = value as Partial<ImageFingerprint>;
+  return typeof fingerprint.originalSha256 === "string"
+    && /^[a-f0-9]{64}$/.test(fingerprint.originalSha256)
+    && typeof fingerprint.phash === "string"
+    && /^[01]{64}$/.test(fingerprint.phash)
+    && typeof fingerprint.dhash === "string"
+    && /^[01]{64}$/.test(fingerprint.dhash)
+    && Number.isInteger(fingerprint.width)
+    && Number(fingerprint.width) > 0
+    && Number.isInteger(fingerprint.height)
+    && Number(fingerprint.height) > 0
+    && fingerprint.algorithmVersion === "phash-dhash-jsquash-v2";
+}
+
+async function cloudflareImageService() {
+  try {
+    const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+    const context = await getCloudflareContext<Record<string, unknown>, unknown>({ async: true });
+    return (context.env as { WORKER_SELF_REFERENCE?: WorkerSelfReference }).WORKER_SELF_REFERENCE ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function cloudflareFingerprint(input: Buffer, contentType: string) {
+  const service = await cloudflareImageService();
+  if (!service) return null;
+
+  const response = await service.fetch("https://imagepartners.internal/__internal/image-fingerprint", {
+    method: "POST",
+    headers: { "Content-Type": contentType },
+    body: Uint8Array.from(input).buffer,
+  });
+  const payload = await response.json().catch(() => null) as { error?: string } | null;
+  if (!response.ok) {
+    const error = new Error(payload?.error || "The search image could not be analyzed") as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+  if (!validFingerprint(payload)) throw new Error("Invalid image fingerprint response");
+  return payload;
+}
+
+async function normalizedSemanticQuery(input: Buffer) {
+  const service = await cloudflareImageService();
+  if (service) {
+    const response = await service.fetch("https://imagepartners.internal/__internal/image-normalize", {
+      method: "POST",
+      body: Uint8Array.from(input).buffer,
+    });
+    if (!response.ok) throw new Error(`Image normalization failed with HTTP ${response.status}`);
+    return Buffer.from(await response.arrayBuffer());
+  }
+
+  const { default: sharp } = await import("sharp");
+  return sharp(input)
+    .rotate()
+    .resize({ width: 1_024, height: 1_024, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+}
+
 export async function POST(req: NextRequest) {
   const declaredLength = Number(req.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > PHOTO_SEARCH_MAX_FILE_BYTES + MULTIPART_OVERHEAD_BYTES) {
@@ -107,26 +174,26 @@ export async function POST(req: NextRequest) {
   }
 
   const input = Buffer.from(await file.arrayBuffer());
-  let metadata: Awaited<ReturnType<ReturnType<typeof sharp>["metadata"]>>;
+  let queryFingerprint: ImageFingerprint;
   try {
-    metadata = await sharp(input).metadata();
-  } catch {
-    return errorResponse("Invalid image file", 400);
-  }
-
-  const width = metadata.autoOrient.width;
-  const height = metadata.autoOrient.height;
-  if (!metadata.format || !ALLOWED_SHARP_FORMATS.has(metadata.format.toLowerCase())) {
-    return errorResponse("Unsupported image format", 415);
-  }
-  if (!width || !height || width * height > PHOTO_SEARCH_MAX_IMAGE_PIXELS) {
-    return errorResponse("Search image dimensions are too large", 413);
-  }
-
-  let queryFingerprint;
-  try {
-    queryFingerprint = await createImageFingerprint(input);
-  } catch {
+    const workerFingerprint = await cloudflareFingerprint(input, file.type);
+    if (workerFingerprint) {
+      queryFingerprint = workerFingerprint;
+    } else {
+      const { default: sharp } = await import("sharp");
+      const metadata = await sharp(input).metadata();
+      const width = metadata.autoOrient.width;
+      const height = metadata.autoOrient.height;
+      if (!width || !height || width * height > PHOTO_SEARCH_MAX_IMAGE_PIXELS) {
+        return errorResponse("Search image dimensions are too large", 413);
+      }
+      queryFingerprint = await createImageFingerprint(input);
+    }
+  } catch (error) {
+    const status = Number((error as { status?: number }).status);
+    if (status === 413 || status === 415) {
+      return errorResponse(error instanceof Error ? error.message : "Unsupported image format", status);
+    }
     return errorResponse("The search image could not be analyzed", 400);
   }
 
@@ -182,11 +249,7 @@ export async function POST(req: NextRequest) {
           windowSeconds: 60,
         });
         if (semanticRate.allowed) {
-          const normalizedQuery = await sharp(input)
-            .rotate()
-            .resize({ width: 1_024, height: 1_024, fit: "inside", withoutEnlargement: true })
-            .jpeg({ quality: 85 })
-            .toBuffer();
+          const normalizedQuery = await normalizedSemanticQuery(input);
           const provider = new VoyageMultimodalEmbeddingProvider({
             apiKey: process.env.VOYAGE_API_KEY ?? "",
             model: config.model!,
