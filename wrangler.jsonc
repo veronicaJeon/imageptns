@@ -18,6 +18,10 @@
     {
       "binding": "IMAGE_RUNTIME",
       "service": "imagepartners-image-runtime"
+    },
+    {
+      "binding": "DEFAULT_WORKER",
+      "service": "imagepartners-server"
     }
   ],
   "routes": [

@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const isCloudflareBuild = process.env.CLOUDFLARE_BUILD === "1";
+
 const sharpRuntimeFiles = [
   "./node_modules/sharp/**/*",
   "./node_modules/@img/sharp-linux-x64/**/*",
@@ -9,6 +11,9 @@ const sharpRuntimeFiles = [
 const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
+    resolveAlias: isCloudflareBuild ? {
+      sharp: "./src/lib/cloudflare/sharp-stub.ts",
+    } : undefined,
   },
   outputFileTracingIncludes: {
     "/api/images/thumbnail": sharpRuntimeFiles,

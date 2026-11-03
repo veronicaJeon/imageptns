@@ -14,6 +14,7 @@ function cleanEnvValue(value) {
 }
 
 const buildEnv = { ...process.env };
+buildEnv.CLOUDFLARE_BUILD = "1";
 
 if (existsSync(devVarsPath)) {
   const devVars = parseEnv(readFileSync(devVarsPath, "utf8"));
