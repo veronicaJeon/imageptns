@@ -2,10 +2,6 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment -- generated module may not exist before the Cloudflare build
 // @ts-ignore Generated module is intentionally not committed.
 import openNextWorker from "./.open-next/worker.js";
-import {
-  createCloudflareImageFingerprint,
-  UnsupportedCloudflareImageTypeError,
-} from "./cloudflare-image-fingerprint";
 
 // Re-export the durable objects expected by the generated OpenNext worker.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment -- generated module may not exist before the Cloudflare build
@@ -15,20 +11,9 @@ export { DOQueueHandler, DOShardedTagCache, BucketCachePurge } from "./.open-nex
 type WorkerEnv = {
   CRON_SECRET?: string;
   LEGACY_IMAGE_ORIGIN?: string;
-  IMAGES?: ImagesBinding;
-};
-
-type ImagesOutput = {
-  response(options?: { headers?: HeadersInit }): Response;
-};
-
-type ImagesTransform = {
-  transform(options: Record<string, unknown>): ImagesTransform;
-  output(options: Record<string, unknown>): Promise<ImagesOutput>;
-};
-
-type ImagesBinding = {
-  input(stream: ReadableStream): ImagesTransform;
+  IMAGE_RUNTIME?: {
+    fetch(request: Request): Promise<Response>;
+  };
 };
 
 type WorkerContext = {
@@ -57,8 +42,6 @@ const LEGACY_IMAGE_PATHS = new Set([
 
 const INTERNAL_FINGERPRINT_PATH = "/__internal/image-fingerprint";
 const INTERNAL_NORMALIZE_PATH = "/__internal/image-normalize";
-const PHOTO_SEARCH_MAX_FILE_BYTES = 3_500_000;
-const PHOTO_SEARCH_MAX_IMAGE_PIXELS = 3_000_000;
 
 function shouldUseLegacyImageRuntime(request: Request) {
   return LEGACY_IMAGE_PATHS.has(new URL(request.url).pathname);
@@ -98,74 +81,22 @@ async function proxyToLegacyImageRuntime(request: Request, env: WorkerEnv) {
   }
 }
 
-async function createFingerprintResponse(request: Request) {
+async function proxyToImageRuntime(request: Request, env: WorkerEnv) {
   const url = new URL(request.url);
-  if (url.hostname !== "imagepartners.internal" || request.method !== "POST") {
+  if (url.hostname !== "imagepartners.internal" || request.method !== "POST" || !env.IMAGE_RUNTIME) {
     return new Response("Not found", { status: 404 });
   }
-
-  const declaredLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > PHOTO_SEARCH_MAX_FILE_BYTES) {
-    return Response.json({ error: "Search image is too large" }, { status: 413 });
-  }
-
-  const contentType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() ?? "";
-  const bytes = await request.arrayBuffer();
-  if (bytes.byteLength === 0) {
-    return Response.json({ error: "Search image is required" }, { status: 400 });
-  }
-  if (bytes.byteLength > PHOTO_SEARCH_MAX_FILE_BYTES) {
-    return Response.json({ error: "Search image is too large" }, { status: 413 });
-  }
-
-  try {
-    const fingerprint = await createCloudflareImageFingerprint(bytes, contentType);
-    if (fingerprint.width * fingerprint.height > PHOTO_SEARCH_MAX_IMAGE_PIXELS) {
-      return Response.json({ error: "Search image dimensions are too large" }, { status: 413 });
-    }
-    return Response.json(fingerprint, {
-      headers: { "Cache-Control": "private, no-store" },
-    });
-  } catch (error) {
-    if (error instanceof UnsupportedCloudflareImageTypeError) {
-      return Response.json({ error: error.message }, { status: 415 });
-    }
-    console.error("[cloudflare-image] fingerprint failed", error instanceof Error ? error.message : "unknown");
-    return Response.json({ error: "Invalid image file" }, { status: 400 });
-  }
-}
-
-async function createNormalizedImageResponse(request: Request, env: WorkerEnv) {
-  const url = new URL(request.url);
-  if (url.hostname !== "imagepartners.internal" || request.method !== "POST") {
-    return new Response("Not found", { status: 404 });
-  }
-  if (!env.IMAGES) return new Response("Image normalization is unavailable", { status: 503 });
-
-  const bytes = await request.arrayBuffer();
-  if (bytes.byteLength === 0) return new Response("Image is required", { status: 400 });
-  if (bytes.byteLength > PHOTO_SEARCH_MAX_FILE_BYTES) return new Response("Image is too large", { status: 413 });
-
-  try {
-    const output = await env.IMAGES
-      .input(new Blob([bytes]).stream())
-      .transform({ width: 1_024, height: 1_024, fit: "scale-down" })
-      .output({ format: "image/jpeg", quality: 85, anim: false });
-    return output.response({ headers: { "Cache-Control": "private, no-store" } });
-  } catch (error) {
-    console.error("[cloudflare-image] normalization failed", error instanceof Error ? error.message : "unknown");
-    return new Response("Image normalization failed", { status: 400 });
-  }
+  return env.IMAGE_RUNTIME.fetch(request);
 }
 
 const worker = {
   async fetch(request: Request, env: WorkerEnv, ctx: WorkerContext) {
     const pathname = new URL(request.url).pathname;
     if (pathname === INTERNAL_FINGERPRINT_PATH) {
-      return createFingerprintResponse(request);
+      return proxyToImageRuntime(request, env);
     }
     if (pathname === INTERNAL_NORMALIZE_PATH) {
-      return createNormalizedImageResponse(request, env);
+      return proxyToImageRuntime(request, env);
     }
 
     if (shouldUseLegacyImageRuntime(request)) {

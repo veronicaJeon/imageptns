@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 describe("Cloudflare migration boundary", () => {
   const worker = readFileSync("cloudflare-worker.ts", "utf8");
   const wrangler = readFileSync("wrangler.jsonc", "utf8");
+  const imageWorker = readFileSync("cloudflare-image-worker.ts", "utf8");
+  const imageWrangler = readFileSync("wrangler.image-runtime.jsonc", "utf8");
   const packageJson = readFileSync("package.json", "utf8");
   const buildScript = readFileSync("scripts/build-cloudflare.mjs", "utf8");
 
@@ -14,12 +16,19 @@ describe("Cloudflare migration boundary", () => {
     expect(buildScript).toContain('.replace(/\\n$/g, "")');
     expect(wrangler).toContain('"main": "cloudflare-worker.ts"');
     expect(wrangler).toContain('"nodejs_compat"');
-    expect(wrangler).toContain('"binding": "IMAGES"');
+    expect(wrangler).toContain('"binding": "IMAGE_RUNTIME"');
+    expect(imageWrangler).toContain('"main": "cloudflare-image-worker.ts"');
+    expect(imageWrangler).toContain('"binding": "IMAGES"');
+    expect(imageWorker).toContain("createCloudflareImageFingerprint");
   });
 
   it("isolates native Sharp routes behind the temporary image origin", () => {
     expect(wrangler).toContain("https://legacy-origin.imagepartners.kr");
-    expect(worker).toContain('"/api/images/search-by-photo"');
+    const legacyPaths = worker.slice(
+      worker.indexOf("const LEGACY_IMAGE_PATHS"),
+      worker.indexOf("function shouldUseLegacyImageRuntime"),
+    );
+    expect(legacyPaths).not.toContain('"/api/images/search-by-photo"');
     expect(worker).toContain('"/api/images/thumbnail"');
     expect(worker).toContain('"/api/uploads"');
     expect(worker).toContain('"/api/admin/about-page/library-assets"');

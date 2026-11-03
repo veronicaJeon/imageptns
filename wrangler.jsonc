@@ -13,6 +13,10 @@
     {
       "binding": "WORKER_SELF_REFERENCE",
       "service": "imagepartners"
+    },
+    {
+      "binding": "IMAGE_RUNTIME",
+      "service": "imagepartners-image-runtime"
     }
   ],
   "routes": [
@@ -25,9 +29,6 @@
       "custom_domain": true
     }
   ],
-  "images": {
-    "binding": "IMAGES"
-  },
   "vars": {
     "LEGACY_IMAGE_ORIGIN": "https://legacy-origin.imagepartners.kr",
     "OPERATIONS_DAILY_REVIEW_ENABLED": "false"
