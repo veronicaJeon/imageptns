@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "imagepartners",
   "main": "cloudflare-worker.ts",
+  "minify": true,
   "workers_dev": true,
   "compatibility_date": "2026-11-02",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
