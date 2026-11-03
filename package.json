@@ -13,7 +13,7 @@
     "eval:semantic:smoke": "node scripts/semantic-evaluation-smoke.mjs",
     "migrate:fingerprints:v2": "node --env-file-if-exists=.dev.vars --experimental-strip-types scripts/migrate-image-fingerprints-v2.mjs",
     "e2e:production:checkout": "node scripts/production-checkout-e2e.mjs --confirm-production",
-    "build": "next build",
+    "build": "next build --webpack",
     "build:cloudflare": "node scripts/build-cloudflare.mjs",
     "preview:cloudflare": "opennextjs-cloudflare preview",
     "deploy:cloudflare": "npm run deploy:cloudflare:image-runtime && npm run deploy:cloudflare:server && npm run deploy:cloudflare:app",

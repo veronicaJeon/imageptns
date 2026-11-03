@@ -30,6 +30,12 @@ const nextConfig: NextConfig = {
     "/api/admin/images/*": sharpRuntimeFiles,
     "/api/uploads/*": sharpRuntimeFiles,
   },
+  webpack(config) {
+    if (isCloudflareBuild) {
+      config.resolve.alias.sharp = require.resolve("./src/lib/cloudflare/sharp-stub.ts");
+    }
+    return config;
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "*.supabase.co" },
