@@ -6,6 +6,8 @@ describe("Cloudflare migration boundary", () => {
   const wrangler = readFileSync("wrangler.jsonc", "utf8");
   const imageWorker = readFileSync("cloudflare-image-worker.ts", "utf8");
   const imageWrangler = readFileSync("wrangler.image-runtime.jsonc", "utf8");
+  const serverWrangler = readFileSync("wrangler.server.jsonc", "utf8");
+  const apiWrangler = readFileSync("wrangler.api.jsonc", "utf8");
   const packageJson = readFileSync("package.json", "utf8");
   const buildScript = readFileSync("scripts/build-cloudflare.mjs", "utf8");
 
@@ -17,9 +19,20 @@ describe("Cloudflare migration boundary", () => {
     expect(wrangler).toContain('"main": "cloudflare-worker.ts"');
     expect(wrangler).toContain('"nodejs_compat"');
     expect(wrangler).toContain('"binding": "IMAGE_RUNTIME"');
+    expect(wrangler).toContain('"binding": "DEFAULT_WORKER"');
+    expect(wrangler).toContain('"service": "imagepartners-server"');
+    expect(wrangler).toContain('"binding": "API_WORKER"');
+    expect(wrangler).toContain('"service": "imagepartners-api"');
+    expect(serverWrangler).toContain('"main": "cloudflare-server-worker.ts"');
+    expect(apiWrangler).toContain('"main": "cloudflare-api-worker.ts"');
     expect(imageWrangler).toContain('"main": "cloudflare-image-worker.ts"');
     expect(imageWrangler).toContain('"binding": "IMAGES"');
     expect(imageWorker).toContain("createCloudflareImageFingerprint");
+  });
+
+  it("routes API and page traffic to separate Workers", () => {
+    expect(worker).toContain('pathname.startsWith("/api/") ? env.API_WORKER : env.DEFAULT_WORKER');
+    expect(worker).toContain("env.API_WORKER.fetch");
   });
 
   it("isolates native Sharp routes behind the temporary image origin", () => {

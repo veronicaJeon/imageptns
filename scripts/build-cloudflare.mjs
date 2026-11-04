@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { parseEnv } from "node:util";
 
 const cwd = process.cwd();
@@ -15,6 +15,20 @@ function cleanEnvValue(value) {
 
 const buildEnv = { ...process.env };
 buildEnv.CLOUDFLARE_BUILD = "1";
+
+function collectApiRoutes(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return collectApiRoutes(path);
+    if (!entry.isFile() || entry.name !== "route.ts") return [];
+    return [relative(join(cwd, "src"), path).split(sep).join("/").replace(/\.ts$/, "")];
+  });
+}
+
+writeFileSync(
+  join(cwd, "open-next.api-routes.json"),
+  `${JSON.stringify(collectApiRoutes(join(cwd, "src", "app", "api")).sort(), null, 2)}\n`,
+);
 
 if (existsSync(devVarsPath)) {
   const devVars = parseEnv(readFileSync(devVarsPath, "utf8"));

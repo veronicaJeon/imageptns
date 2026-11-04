@@ -1,7 +1,19 @@
 import { defineCloudflareConfig } from "@opennextjs/cloudflare";
+import generatedApiRoutes from "./open-next.api-routes.json";
 
-export default defineCloudflareConfig({
-  // Avoid route preloading on cold start. It increases CPU usage and is not
-  // needed for the current application routing model.
-  routePreloadingBehavior: "none",
-});
+const apiRoutes = generatedApiRoutes as `app/${string}/route`[];
+const baseConfig = defineCloudflareConfig({ routePreloadingBehavior: "none" });
+
+export default {
+  ...baseConfig,
+  functions: {
+    api: {
+      ...baseConfig.default,
+      placement: "regional",
+      runtime: "node",
+      routePreloadingBehavior: "none",
+      routes: apiRoutes,
+      patterns: ["/api/*"],
+    },
+  },
+};

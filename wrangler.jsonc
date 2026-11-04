@@ -22,6 +22,10 @@
     {
       "binding": "DEFAULT_WORKER",
       "service": "imagepartners-server"
+    },
+    {
+      "binding": "API_WORKER",
+      "service": "imagepartners-api"
     }
   ],
   "routes": [
