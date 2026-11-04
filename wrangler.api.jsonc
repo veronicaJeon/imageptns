@@ -8,7 +8,7 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "alias": {
     "critters": "./src/lib/cloudflare/empty-module.ts",
-    "@opentelemetry/api": "next/dist/compiled/@opentelemetry/api"
+    "@opentelemetry/api": "./src/lib/cloudflare/opentelemetry-stub.ts"
   },
   "services": [
     {
