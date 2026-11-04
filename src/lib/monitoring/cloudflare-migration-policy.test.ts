@@ -26,7 +26,9 @@ describe("Cloudflare migration boundary", () => {
     expect(wrangler).toContain('"service": "imagepartners-api"');
     expect(serverWrangler).toContain('"main": "cloudflare-server-worker.ts"');
     expect(apiWrangler).toContain('"main": "cloudflare-api-worker.ts"');
-    expect(apiWrangler).toContain('"@opentelemetry/api": "./src/lib/cloudflare/opentelemetry-stub.ts"');
+    expect(apiWrangler).toContain('"@opentelemetry/api": "next/dist/compiled/@opentelemetry/api"');
+    expect(apiWrangler).toContain('"__dirname": "\\\"/\\\""');
+    expect(serverWrangler).toContain('"__dirname": "\\\"/\\\""');
     expect(imageWrangler).toContain('"main": "cloudflare-image-worker.ts"');
     expect(imageWrangler).toContain('"binding": "IMAGES"');
     expect(imageWorker).toContain("createCloudflareImageFingerprint");
