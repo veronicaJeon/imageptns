@@ -38,11 +38,6 @@ type ScheduledController = {
 };
 
 const LEGACY_IMAGE_PATHS = new Set([
-  "/api/admin/operations",
-  "/api/admin/semantic-indexing",
-  "/api/cron/ai-synthetic",
-  "/api/cron/operations-review",
-  "/api/cron/semantic-indexing",
   "/api/uploads",
 ]);
 

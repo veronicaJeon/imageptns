@@ -67,6 +67,11 @@ describe("Cloudflare migration boundary", () => {
     expect(legacyPaths).not.toContain('"/api/admin/about-page/library-assets"');
     expect(legacyPaths).not.toContain('"/api/admin/auth-pages/library-assets"');
     expect(legacyPaths).not.toContain('"/api/admin/repair-preview"');
+    expect(legacyPaths).not.toContain('"/api/admin/operations"');
+    expect(legacyPaths).not.toContain('"/api/admin/semantic-indexing"');
+    expect(legacyPaths).not.toContain('"/api/cron/ai-synthetic"');
+    expect(legacyPaths).not.toContain('"/api/cron/operations-review"');
+    expect(legacyPaths).not.toContain('"/api/cron/semantic-indexing"');
     expect(worker).toContain('"/__internal/image-transform"');
     expect(worker).toContain('"/__internal/image-watermark"');
     expect(imageWorker).toContain("createTransformResponse");
