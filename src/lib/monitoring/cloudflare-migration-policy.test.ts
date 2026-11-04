@@ -10,6 +10,7 @@ describe("Cloudflare migration boundary", () => {
   const apiWrangler = readFileSync("wrangler.api.jsonc", "utf8");
   const packageJson = readFileSync("package.json", "utf8");
   const buildScript = readFileSync("scripts/build-cloudflare.mjs", "utf8");
+  const secretsScript = readFileSync("scripts/upload-cloudflare-secrets.mjs", "utf8");
 
   it("builds the Next application with OpenNext on Workers", () => {
     expect(packageJson).toContain('"build:cloudflare": "node scripts/build-cloudflare.mjs"');
@@ -28,6 +29,8 @@ describe("Cloudflare migration boundary", () => {
     expect(imageWrangler).toContain('"main": "cloudflare-image-worker.ts"');
     expect(imageWrangler).toContain('"binding": "IMAGES"');
     expect(imageWorker).toContain("createCloudflareImageFingerprint");
+    expect(secretsScript).toContain('["NX_", "TURBO_", "VERCEL"]');
+    expect(secretsScript).toContain("APP_RELEASE_SHA");
   });
 
   it("routes API and page traffic to separate Workers", () => {
