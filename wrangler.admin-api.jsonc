@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "imagepartners-admin-api",
+  "account_id": "1b294f8f9f173204bcd5cde672d228dc",
   "main": "cloudflare-admin-api-worker.ts",
   "minify": true,
   "workers_dev": false,
