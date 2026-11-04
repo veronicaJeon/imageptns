@@ -21,6 +21,9 @@ type WorkerEnv = {
   API_WORKER: {
     fetch(request: Request, init?: RequestInit): Promise<Response>;
   };
+  ADMIN_API_WORKER: {
+    fetch(request: Request, init?: RequestInit): Promise<Response>;
+  };
 };
 
 type WorkerContext = {
@@ -115,7 +118,11 @@ const worker = {
       const requestOrResponse = await middlewareHandler(request, env, ctx);
       if (requestOrResponse instanceof Response) return requestOrResponse;
 
-      const target = pathname.startsWith("/api/") ? env.API_WORKER : env.DEFAULT_WORKER;
+      const target = pathname.startsWith("/api/admin/") || pathname.startsWith("/api/cron/")
+        ? env.ADMIN_API_WORKER
+        : pathname.startsWith("/api/")
+          ? env.API_WORKER
+          : env.DEFAULT_WORKER;
       const response = await target.fetch(requestOrResponse, { redirect: "manual" });
       if (pathname !== "/api/images/search-by-photo") return response;
       const marked = new Response(response.body, response);
@@ -128,7 +135,7 @@ const worker = {
     if (controller.cron !== "0 2 * * *") return;
     if (!env.CRON_SECRET) throw new Error("CRON_SECRET is not configured");
 
-    const response = await env.API_WORKER.fetch(new Request(
+    const response = await env.ADMIN_API_WORKER.fetch(new Request(
       "https://imagepartners.internal/api/cron/auto-reject-stale",
       { headers: { Authorization: `Bearer ${env.CRON_SECRET}` } },
     ));

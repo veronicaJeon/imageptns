@@ -26,6 +26,10 @@
     {
       "binding": "API_WORKER",
       "service": "imagepartners-api"
+    },
+    {
+      "binding": "ADMIN_API_WORKER",
+      "service": "imagepartners-admin-api"
     }
   ],
   "routes": [

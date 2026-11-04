@@ -25,9 +25,17 @@ function collectApiRoutes(directory) {
   });
 }
 
+const allApiRoutes = collectApiRoutes(join(cwd, "src", "app", "api")).sort();
+const isAdminApiRoute = (route) => (
+  route.startsWith("app/api/admin/") || route.startsWith("app/api/cron/")
+);
 writeFileSync(
   join(cwd, "open-next.api-routes.json"),
-  `${JSON.stringify(collectApiRoutes(join(cwd, "src", "app", "api")).sort(), null, 2)}\n`,
+  `${JSON.stringify(allApiRoutes.filter((route) => !isAdminApiRoute(route)), null, 2)}\n`,
+);
+writeFileSync(
+  join(cwd, "open-next.admin-api-routes.json"),
+  `${JSON.stringify(allApiRoutes.filter(isAdminApiRoute), null, 2)}\n`,
 );
 
 if (existsSync(devVarsPath)) {
@@ -75,11 +83,13 @@ child.on("exit", (code, signal) => {
   }
 
   try {
-    execFileSync(process.execPath, [join(cwd, "scripts", "bundle-cloudflare-api.mjs")], {
-      cwd,
-      env: buildEnv,
-      stdio: "inherit",
-    });
+    for (const functionName of ["api", "adminApi"]) {
+      execFileSync(
+        process.execPath,
+        [join(cwd, "scripts", "bundle-cloudflare-api.mjs"), functionName],
+        { cwd, env: buildEnv, stdio: "inherit" },
+      );
+    }
   } catch {
     process.exitCode = 1;
   }

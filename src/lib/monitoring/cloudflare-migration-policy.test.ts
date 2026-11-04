@@ -8,6 +8,7 @@ describe("Cloudflare migration boundary", () => {
   const imageWrangler = readFileSync("wrangler.image-runtime.jsonc", "utf8");
   const serverWrangler = readFileSync("wrangler.server.jsonc", "utf8");
   const apiWrangler = readFileSync("wrangler.api.jsonc", "utf8");
+  const adminApiWrangler = readFileSync("wrangler.admin-api.jsonc", "utf8");
   const packageJson = readFileSync("package.json", "utf8");
   const buildScript = readFileSync("scripts/build-cloudflare.mjs", "utf8");
   const secretsScript = readFileSync("scripts/upload-cloudflare-secrets.mjs", "utf8");
@@ -18,7 +19,7 @@ describe("Cloudflare migration boundary", () => {
     expect(buildScript).toContain('spawn(executable, ["build"]');
     expect(buildScript).toContain("bundle-cloudflare-api.mjs");
     expect(readFileSync("scripts/bundle-cloudflare-api.mjs", "utf8")).toContain(
-      'replaceAll(\n    ".open-next/server-functions/default",\n    ".open-next/server-functions/api"',
+      "`.open-next/server-functions/${functionName}`",
     );
     expect(buildScript).toContain('.replace(/\\\\n$/g, "")');
     expect(buildScript).toContain('.replace(/\\n$/g, "")');
@@ -29,8 +30,11 @@ describe("Cloudflare migration boundary", () => {
     expect(wrangler).toContain('"service": "imagepartners-server"');
     expect(wrangler).toContain('"binding": "API_WORKER"');
     expect(wrangler).toContain('"service": "imagepartners-api"');
+    expect(wrangler).toContain('"binding": "ADMIN_API_WORKER"');
+    expect(wrangler).toContain('"service": "imagepartners-admin-api"');
     expect(serverWrangler).toContain('"main": "cloudflare-server-worker.ts"');
     expect(apiWrangler).toContain('"main": "cloudflare-api-worker.ts"');
+    expect(adminApiWrangler).toContain('"main": "cloudflare-admin-api-worker.ts"');
     expect(apiWrangler).toContain('"@opentelemetry/api": "./src/lib/cloudflare/unavailable-module.ts"');
     expect(readFileSync("cloudflare-api-worker.ts", "utf8")).toContain(
       'server-functions/api/handler.mjs',
@@ -46,8 +50,9 @@ describe("Cloudflare migration boundary", () => {
   });
 
   it("routes API and page traffic to separate Workers", () => {
-    expect(worker).toContain('pathname.startsWith("/api/") ? env.API_WORKER : env.DEFAULT_WORKER');
-    expect(worker).toContain("env.API_WORKER.fetch");
+    expect(worker).toContain('pathname.startsWith("/api/admin/") || pathname.startsWith("/api/cron/")');
+    expect(worker).toContain("env.ADMIN_API_WORKER");
+    expect(worker).toContain("env.API_WORKER");
   });
 
   it("isolates native Sharp routes behind the temporary image origin", () => {

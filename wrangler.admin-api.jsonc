@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "imagepartners-admin-api",
+  "main": "cloudflare-admin-api-worker.ts",
+  "minify": true,
+  "workers_dev": false,
+  "compatibility_date": "2026-11-02",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "alias": {
+    "@opentelemetry/api": "./src/lib/cloudflare/unavailable-module.ts"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "imagepartners"
+    }
+  ],
+  "vars": {
+    "OPERATIONS_DAILY_REVIEW_ENABLED": "false"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "placement": {
+    "mode": "smart"
+  }
+}
