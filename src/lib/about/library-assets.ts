@@ -10,6 +10,8 @@ import {
 } from "./content";
 import { getCopyrightLicense } from "@/lib/licenses/creative-commons";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { transformImageWithCloudflare } from "@/lib/cloudflare/image-transform";
+import { downloadSiteAssetSource } from "@/lib/images/site-asset-source";
 
 export const ABOUT_IMAGE_SLOTS = ["hero", "editorial", "desk"] as const;
 
@@ -38,6 +40,7 @@ interface LibraryImageRow {
   photographer?: { full_name: string | null } | { full_name: string | null }[] | null;
   storage_path_original: string | null;
   storage_path_full: string | null;
+  storage_path_analysis: string | null;
 }
 
 export function isAboutImageSlot(value: unknown): value is AboutImageSlot {
@@ -69,7 +72,7 @@ export async function createAboutLibraryAsset(
 ) {
   const { data, error } = await admin
     .from("images")
-    .select("id, asset_id, title, status, lifecycle_status, is_published, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, promotional_use_basis, attribution_name, copyright_license, storage_path_original, storage_path_full, photographer:profiles!photographer_id(full_name)")
+    .select("id, asset_id, title, status, lifecycle_status, is_published, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, promotional_use_basis, attribution_name, copyright_license, storage_path_original, storage_path_full, storage_path_analysis, photographer:profiles!photographer_id(full_name)")
     .eq("id", imageId)
     .single();
 
@@ -79,27 +82,25 @@ export async function createAboutLibraryAsset(
     throw new Error("공개 중이며 홍보 활용에 동의한 승인 이미지만 선택할 수 있습니다.");
   }
 
-  const originalPath = image.storage_path_original ?? image.storage_path_full;
-  const { data: original, error: downloadError } = await admin.storage
-    .from("images-original")
-    .download(originalPath!);
-  if (downloadError || !original) {
-    throw new Error(downloadError?.message ?? "원본을 읽지 못했습니다.");
-  }
-
-  const source = Buffer.from(await original.arrayBuffer());
+  const source = await downloadSiteAssetSource(admin, image);
   const digest = createHash("sha256")
     .update(source)
     .update(`about-site-asset-v1:${slot}:${SLOT_WIDTHS[slot]}`)
     .digest("hex")
     .slice(0, 16);
   const derivedPath = `about/${slot}/${image.id}-${digest}.webp`;
-  const { default: sharp } = await import("sharp");
-  const derivative = await sharp(source)
-    .rotate()
-    .resize({ width: SLOT_WIDTHS[slot], withoutEnlargement: true })
-    .webp({ quality: 84, effort: 4 })
-    .toBuffer();
+  const derivative = await transformImageWithCloudflare(source, {
+    width: SLOT_WIDTHS[slot],
+    format: "image/webp",
+    quality: 84,
+  }) ?? await (async () => {
+    const { default: sharp } = await import("sharp");
+    return sharp(source)
+      .rotate()
+      .resize({ width: SLOT_WIDTHS[slot], withoutEnlargement: true })
+      .webp({ quality: 84, effort: 4 })
+      .toBuffer();
+  })();
 
   const { error: uploadError } = await admin.storage
     .from("site-assets")
@@ -135,7 +136,7 @@ export async function validateAboutLibraryImages(admin: AdminClient, content: Ab
   const ids = Array.from(new Set(selections.map((item) => item.source.imageId!)));
   const { data, error } = await admin
     .from("images")
-    .select("id, status, lifecycle_status, is_published, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, promotional_use_basis, storage_path_original, storage_path_full")
+    .select("id, status, lifecycle_status, is_published, promotional_use_allowed, promotional_use_consented_at, promotional_use_consent_version, promotional_use_revoked_at, promotional_use_basis, storage_path_original, storage_path_full, storage_path_analysis")
     .in("id", ids);
   if (error) throw new Error(error.message);
 

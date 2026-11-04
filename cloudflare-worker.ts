@@ -35,20 +35,18 @@ type ScheduledController = {
 };
 
 const LEGACY_IMAGE_PATHS = new Set([
-  "/api/admin/about-page/library-assets",
-  "/api/admin/auth-pages/library-assets",
   "/api/admin/operations",
   "/api/admin/repair-preview",
   "/api/admin/semantic-indexing",
   "/api/cron/ai-synthetic",
   "/api/cron/operations-review",
   "/api/cron/semantic-indexing",
-  "/api/images/thumbnail",
   "/api/uploads",
 ]);
 
 const INTERNAL_FINGERPRINT_PATH = "/__internal/image-fingerprint";
 const INTERNAL_NORMALIZE_PATH = "/__internal/image-normalize";
+const INTERNAL_TRANSFORM_PATH = "/__internal/image-transform";
 
 function shouldUseLegacyImageRuntime(request: Request) {
   return LEGACY_IMAGE_PATHS.has(new URL(request.url).pathname);
@@ -103,6 +101,9 @@ const worker = {
       return proxyToImageRuntime(request, env);
     }
     if (pathname === INTERNAL_NORMALIZE_PATH) {
+      return proxyToImageRuntime(request, env);
+    }
+    if (pathname === INTERNAL_TRANSFORM_PATH) {
       return proxyToImageRuntime(request, env);
     }
 

@@ -16,12 +16,9 @@ const nextConfig: NextConfig = {
     } : undefined,
   },
   outputFileTracingIncludes: {
-    "/api/images/thumbnail": sharpRuntimeFiles,
     "/api/images/search-by-photo": sharpRuntimeFiles,
     "/api/uploads": sharpRuntimeFiles,
     "/api/admin/repair-preview": sharpRuntimeFiles,
-    "/api/admin/about-page": sharpRuntimeFiles,
-    "/api/admin/about-page/library-assets": sharpRuntimeFiles,
     "/api/admin/operations": sharpRuntimeFiles,
     "/api/admin/semantic-indexing": sharpRuntimeFiles,
     "/api/cron/ai-synthetic": sharpRuntimeFiles,

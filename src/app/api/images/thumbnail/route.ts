@@ -5,6 +5,7 @@ import {
   requestIdentity,
 } from "@/lib/security/distributed-rate-limit";
 import { recordOperationalEvent } from "@/lib/monitoring/events";
+import { transformImageWithCloudflare } from "@/lib/cloudflare/image-transform";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -12,7 +13,7 @@ export const maxDuration = 30;
 const DEFAULT_WIDTH = 320;
 const DEFAULT_HEIGHT = 240;
 const MAX_SIZE = 1200;
-const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
+const MAX_SOURCE_BYTES = 20_000_000;
 
 function clampSize(value: string | null, fallback: number) {
   const parsed = Number(value);
@@ -116,7 +117,12 @@ export async function GET(req: NextRequest) {
   }
   let output: Buffer;
   try {
-    output = await resizeWatermarkedPreview(input, width, height);
+    output = await transformImageWithCloudflare(input, {
+      width,
+      height,
+      format: "image/jpeg",
+      quality: 74,
+    }) ?? await resizeWatermarkedPreview(input, width, height);
   } catch (error) {
     console.warn("[thumbnail] Invalid stored preview", error instanceof Error ? error.message : error);
     await recordOperationalEvent({

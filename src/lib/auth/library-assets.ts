@@ -6,6 +6,8 @@ import { storageBinaryBody } from "@/lib/supabase/storage-body";
 import { getCopyrightLicense } from "@/lib/licenses/creative-commons";
 import { siteAssetUrl } from "@/lib/about/library-assets";
 import { DEFAULT_AUTH_PAGE_CONTENT, normalizeAuthPageContent, type AuthPageContent, type AuthPageKey } from "./page-content";
+import { transformImageWithCloudflare } from "@/lib/cloudflare/image-transform";
+import { downloadSiteAssetSource } from "@/lib/images/site-asset-source";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 interface ImageRow {
@@ -13,24 +15,32 @@ interface ImageRow {
   promotional_use_allowed:boolean; promotional_use_consented_at:string|null; promotional_use_consent_version:string|null;
   promotional_use_revoked_at:string|null; promotional_use_basis:string|null; attribution_name:string|null; copyright_license:string|null;
   storage_path_original:string|null; storage_path_full:string|null; photographer?:{full_name:string|null}|{full_name:string|null}[]|null;
+  storage_path_analysis:string|null;
 }
 export const AUTH_PAGE_IMAGE_SLOTS = ["login", "signup"] as const;
 export function isAuthPageImageSlot(value: unknown): value is AuthPageKey { return typeof value === "string" && AUTH_PAGE_IMAGE_SLOTS.includes(value as AuthPageKey); }
 function eligible(image: ImageRow) { return image.status === "approved" && image.lifecycle_status === "active" && image.is_published && image.promotional_use_allowed && Boolean(image.promotional_use_consented_at) && Boolean(image.promotional_use_consent_version) && Boolean(image.promotional_use_basis) && !image.promotional_use_revoked_at && Boolean(image.storage_path_original ?? image.storage_path_full); }
 
 export async function createAuthLibraryAsset(admin: AdminClient, imageId: string, slot: AuthPageKey) {
-  const { data, error } = await admin.from("images").select("id,asset_id,title,status,lifecycle_status,is_published,promotional_use_allowed,promotional_use_consented_at,promotional_use_consent_version,promotional_use_revoked_at,promotional_use_basis,attribution_name,copyright_license,storage_path_original,storage_path_full,photographer:profiles!photographer_id(full_name)").eq("id", imageId).single();
+  const { data, error } = await admin.from("images").select("id,asset_id,title,status,lifecycle_status,is_published,promotional_use_allowed,promotional_use_consented_at,promotional_use_consent_version,promotional_use_revoked_at,promotional_use_basis,attribution_name,copyright_license,storage_path_original,storage_path_full,storage_path_analysis,photographer:profiles!photographer_id(full_name)").eq("id", imageId).single();
   if (error || !data) throw new Error(error?.message ?? "이미지를 찾을 수 없습니다.");
   const image = data as ImageRow;
   if (!eligible(image)) throw new Error("공개 중이며 홍보 활용에 동의한 승인 이미지만 선택할 수 있습니다.");
-  const sourcePath = image.storage_path_original ?? image.storage_path_full;
-  const { data: original, error: downloadError } = await admin.storage.from("images-original").download(sourcePath!);
-  if (downloadError || !original) throw new Error(downloadError?.message ?? "원본을 읽지 못했습니다.");
-  const source = Buffer.from(await original.arrayBuffer());
+  const source = await downloadSiteAssetSource(admin, image);
   const digest = createHash("sha256").update(source).update(`auth-site-asset-v1:${slot}:1920`).digest("hex").slice(0, 16);
   const derivedPath = `auth/${slot}/${image.id}-${digest}.webp`;
-  const { default: sharp } = await import("sharp");
-  const derivative = await sharp(source).rotate().resize({ width: 1920, withoutEnlargement: true }).webp({ quality: 84, effort: 4 }).toBuffer();
+  const derivative = await transformImageWithCloudflare(source, {
+    width: 1920,
+    format: "image/webp",
+    quality: 84,
+  }) ?? await (async () => {
+    const { default: sharp } = await import("sharp");
+    return sharp(source)
+      .rotate()
+      .resize({ width: 1920, withoutEnlargement: true })
+      .webp({ quality: 84, effort: 4 })
+      .toBuffer();
+  })();
   const { error: uploadError } = await admin.storage.from("site-assets").upload(derivedPath, storageBinaryBody(derivative), { contentType: "image/webp", cacheControl: "31536000", upsert: true });
   if (uploadError) throw new Error(uploadError.message);
   const license = getCopyrightLicense(image.copyright_license);
@@ -40,7 +50,7 @@ export async function createAuthLibraryAsset(admin: AdminClient, imageId: string
 export async function validateAuthLibraryImages(admin: AdminClient, content: AuthPageContent) {
   const selections = AUTH_PAGE_IMAGE_SLOTS.map((slot) => ({ slot, source:content.pages[slot].backgroundImageSource })).filter((item) => item.source.source === "library");
   if (!selections.length) return;
-  const { data, error } = await admin.from("images").select("id,status,lifecycle_status,is_published,promotional_use_allowed,promotional_use_consented_at,promotional_use_consent_version,promotional_use_revoked_at,promotional_use_basis,storage_path_original,storage_path_full").in("id", selections.map((item) => item.source.imageId!));
+  const { data, error } = await admin.from("images").select("id,status,lifecycle_status,is_published,promotional_use_allowed,promotional_use_consented_at,promotional_use_consent_version,promotional_use_revoked_at,promotional_use_basis,storage_path_original,storage_path_full,storage_path_analysis").in("id", selections.map((item) => item.source.imageId!));
   if (error) throw new Error(error.message);
   const images = new Map((data ?? []).map((image) => [image.id, image as ImageRow]));
   for (const { slot, source } of selections) {

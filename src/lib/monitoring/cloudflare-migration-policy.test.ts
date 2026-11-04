@@ -11,6 +11,7 @@ describe("Cloudflare migration boundary", () => {
   const packageJson = readFileSync("package.json", "utf8");
   const buildScript = readFileSync("scripts/build-cloudflare.mjs", "utf8");
   const secretsScript = readFileSync("scripts/upload-cloudflare-secrets.mjs", "utf8");
+  const siteAssetSource = readFileSync("src/lib/images/site-asset-source.ts", "utf8");
 
   it("builds the Next application with OpenNext on Workers", () => {
     expect(packageJson).toContain('"build:cloudflare": "node scripts/build-cloudflare.mjs"');
@@ -38,6 +39,8 @@ describe("Cloudflare migration boundary", () => {
     expect(imageWrangler).toContain('"main": "cloudflare-image-worker.ts"');
     expect(imageWrangler).toContain('"binding": "IMAGES"');
     expect(imageWorker).toContain("createCloudflareImageFingerprint");
+    expect(siteAssetSource).toContain("CLOUDFLARE_IMAGE_INPUT_MAX_BYTES");
+    expect(siteAssetSource).toContain('download(admin, "images-analysis"');
     expect(secretsScript).toContain('["NX_", "TURBO_", "VERCEL"]');
     expect(secretsScript).toContain("APP_RELEASE_SHA");
   });
@@ -54,10 +57,12 @@ describe("Cloudflare migration boundary", () => {
       worker.indexOf("function shouldUseLegacyImageRuntime"),
     );
     expect(legacyPaths).not.toContain('"/api/images/search-by-photo"');
-    expect(worker).toContain('"/api/images/thumbnail"');
+    expect(legacyPaths).not.toContain('"/api/images/thumbnail"');
     expect(worker).toContain('"/api/uploads"');
-    expect(worker).toContain('"/api/admin/about-page/library-assets"');
-    expect(worker).toContain('"/api/admin/auth-pages/library-assets"');
+    expect(legacyPaths).not.toContain('"/api/admin/about-page/library-assets"');
+    expect(legacyPaths).not.toContain('"/api/admin/auth-pages/library-assets"');
+    expect(worker).toContain('"/__internal/image-transform"');
+    expect(imageWorker).toContain("createTransformResponse");
     expect(worker).toContain("proxyToLegacyImageRuntime");
     expect(worker).toContain('x-imagepartners-runtime", "legacy-image"');
     expect(worker).toContain("AbortSignal.timeout(65_000)");
