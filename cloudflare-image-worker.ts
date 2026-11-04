@@ -2,6 +2,7 @@ import {
   createCloudflareImageFingerprint,
   UnsupportedCloudflareImageTypeError,
 } from "./cloudflare-image-fingerprint";
+import { watermarkSvg } from "./src/lib/images/watermark-svg";
 
 type ImagesOutput = {
   response(options?: { headers?: HeadersInit }): Response;
@@ -9,18 +10,27 @@ type ImagesOutput = {
 
 type ImagesTransform = {
   transform(options: Record<string, unknown>): ImagesTransform;
+  draw(image: ImagesTransform, options?: Record<string, unknown>): ImagesTransform;
   output(options: Record<string, unknown>): Promise<ImagesOutput>;
+};
+
+type ImagesInfo = {
+  width: number;
+  height: number;
+  format: string;
 };
 
 type ImageWorkerEnv = {
   IMAGES: {
     input(stream: ReadableStream): ImagesTransform;
+    info(stream: ReadableStream): Promise<ImagesInfo>;
   };
 };
 
 const INTERNAL_FINGERPRINT_PATH = "/__internal/image-fingerprint";
 const INTERNAL_NORMALIZE_PATH = "/__internal/image-normalize";
 const INTERNAL_TRANSFORM_PATH = "/__internal/image-transform";
+const INTERNAL_WATERMARK_PATH = "/__internal/image-watermark";
 const PHOTO_SEARCH_MAX_FILE_BYTES = 3_500_000;
 const PHOTO_SEARCH_MAX_IMAGE_PIXELS = 3_000_000;
 const TRANSFORM_MAX_FILE_BYTES = 20_000_000;
@@ -122,10 +132,57 @@ async function createTransformResponse(request: Request, env: ImageWorkerEnv) {
       fit: "scale-down",
     });
     const output = await image.output({ format, quality, anim: false });
-    return output.response({ headers: { "Cache-Control": "private, no-store" } });
+    const response = output.response({ headers: { "Cache-Control": "private, no-store" } });
+    const outputBytes = await response.arrayBuffer();
+    const info = await env.IMAGES.info(new Blob([outputBytes]).stream());
+    const headers = new Headers(response.headers);
+    headers.set("X-Image-Width", String(info.width));
+    headers.set("X-Image-Height", String(info.height));
+    return new Response(outputBytes, { status: response.status, headers });
   } catch (error) {
     console.error("[cloudflare-image] transform failed", error instanceof Error ? error.message : "unknown");
     return new Response("Image transformation failed", { status: 400 });
+  }
+}
+
+async function createWatermarkResponse(request: Request, env: ImageWorkerEnv) {
+  const bytes = await request.arrayBuffer();
+  if (bytes.byteLength === 0) return new Response("Image is required", { status: 400 });
+  if (bytes.byteLength > TRANSFORM_MAX_FILE_BYTES) return new Response("Image is too large", { status: 413 });
+
+  const mode = request.headers.get("x-image-watermark-mode");
+  const width = integerHeader(request, "x-image-width", 32, 4_096);
+  const height = integerHeader(request, "x-image-height", 32, 4_096);
+  const rotate = integerHeader(request, "x-image-rotate", 0, 270);
+  if (
+    (mode !== "preview" && mode !== "thumbnail")
+    || rotate == null
+    || ![0, 90, 180, 270].includes(rotate)
+    || (mode === "thumbnail" && (width == null || height == null))
+  ) {
+    return new Response("Invalid watermark transformation", { status: 400 });
+  }
+
+  try {
+    const sourceInfo = await env.IMAGES.info(new Blob([bytes]).stream());
+    const canvasWidth = rotate === 90 || rotate === 270 ? sourceInfo.height : sourceInfo.width;
+    const canvasHeight = rotate === 90 || rotate === 270 ? sourceInfo.width : sourceInfo.height;
+    const overlay = new TextEncoder().encode(watermarkSvg(canvasWidth, canvasHeight));
+    let image = env.IMAGES.input(new Blob([bytes]).stream());
+    if (rotate !== 0) image = image.transform({ rotate });
+    image = image.draw(env.IMAGES.input(new Blob([overlay], { type: "image/svg+xml" }).stream()));
+    if (mode === "thumbnail") {
+      image = image.transform({ width, height, fit: "scale-down" });
+    }
+    const output = await image.output({
+      format: "image/jpeg",
+      quality: mode === "preview" ? 88 : 74,
+      anim: false,
+    });
+    return output.response({ headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    console.error("[cloudflare-image] watermark failed", error instanceof Error ? error.message : "unknown");
+    return new Response("Image watermark failed", { status: 400 });
   }
 }
 
@@ -139,6 +196,9 @@ export default {
     }
     if (internalRequest(request, INTERNAL_TRANSFORM_PATH)) {
       return createTransformResponse(request, env);
+    }
+    if (internalRequest(request, INTERNAL_WATERMARK_PATH)) {
+      return createWatermarkResponse(request, env);
     }
     return new Response("Not found", { status: 404 });
   },

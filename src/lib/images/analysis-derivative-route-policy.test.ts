@@ -5,6 +5,8 @@ const uploadRoute = readFileSync("src/app/api/uploads/route.ts", "utf8");
 const semanticRepository = readFileSync("src/lib/images/semantic-indexing-repository.ts", "utf8");
 const captionWorker = readFileSync("src/lib/images/nvidia-caption-worker.ts", "utf8");
 const hardDelete = readFileSync("src/lib/images/hard-delete-server.ts", "utf8");
+const derivative = readFileSync("src/lib/images/analysis-derivative.ts", "utf8");
+const watermark = readFileSync("src/lib/utils/watermark.ts", "utf8");
 
 describe("private analysis derivative route policy", () => {
   it("creates the clean derivative before deriving public watermarked previews", () => {
@@ -15,6 +17,8 @@ describe("private analysis derivative route policy", () => {
     expect(uploadRoute).toContain('.from("images-analysis")');
     expect(uploadRoute).toContain("storage_path_analysis: analysisPath");
     expect(uploadRoute).toContain("storage_path_analysis: undefined");
+    expect(derivative).toContain("transformImageWithCloudflareDetails");
+    expect(watermark).toContain("watermarkImageWithCloudflare");
   });
 
   it("uses the private derivative for embeddings and captions", () => {

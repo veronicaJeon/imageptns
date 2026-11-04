@@ -66,8 +66,11 @@ describe("Cloudflare migration boundary", () => {
     expect(worker).toContain('"/api/uploads"');
     expect(legacyPaths).not.toContain('"/api/admin/about-page/library-assets"');
     expect(legacyPaths).not.toContain('"/api/admin/auth-pages/library-assets"');
+    expect(legacyPaths).not.toContain('"/api/admin/repair-preview"');
     expect(worker).toContain('"/__internal/image-transform"');
+    expect(worker).toContain('"/__internal/image-watermark"');
     expect(imageWorker).toContain("createTransformResponse");
+    expect(imageWorker).toContain("createWatermarkResponse");
     expect(worker).toContain("proxyToLegacyImageRuntime");
     expect(worker).toContain('x-imagepartners-runtime", "legacy-image"');
     expect(worker).toContain("AbortSignal.timeout(65_000)");
