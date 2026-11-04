@@ -16,6 +16,9 @@ describe("Cloudflare migration boundary", () => {
     expect(packageJson).toContain('"build:cloudflare": "node scripts/build-cloudflare.mjs"');
     expect(buildScript).toContain('spawn(executable, ["build"]');
     expect(buildScript).toContain("bundle-cloudflare-api.mjs");
+    expect(readFileSync("scripts/bundle-cloudflare-api.mjs", "utf8")).toContain(
+      'replaceAll(\n    ".open-next/server-functions/default",\n    ".open-next/server-functions/api"',
+    );
     expect(buildScript).toContain('.replace(/\\\\n$/g, "")');
     expect(buildScript).toContain('.replace(/\\n$/g, "")');
     expect(wrangler).toContain('"main": "cloudflare-worker.ts"');

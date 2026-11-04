@@ -1,4 +1,4 @@
-import { existsSync, renameSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bundleServer } from "../node_modules/@opennextjs/cloudflare/dist/cli/build/bundle-server.js";
 import {
@@ -29,4 +29,13 @@ try {
 } finally {
   renameSync(defaultDirectory, apiDirectory);
   renameSync(defaultBackupDirectory, defaultDirectory);
+}
+
+for (const filename of ["handler.mjs", "handler.mjs.meta.json"]) {
+  const outputPath = join(apiDirectory, filename);
+  const output = readFileSync(outputPath, "utf8").replaceAll(
+    ".open-next/server-functions/default",
+    ".open-next/server-functions/api",
+  );
+  writeFileSync(outputPath, output);
 }
