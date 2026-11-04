@@ -37,6 +37,37 @@ function pixelTextWidth(text: string, unit: number) {
   }, 0);
 }
 
+export function pixelWatermarkImage(unit: number) {
+  const label = "IMAGE PARTNERS";
+  const width = pixelTextWidth(label, unit);
+  const height = 7 * unit;
+  const data = new Uint8ClampedArray(width * height * 4);
+  let cursor = 0;
+
+  for (const char of label) {
+    const glyph = GLYPHS[char] ?? GLYPHS[" "];
+    glyph.forEach((row, rowIndex) => {
+      [...row].forEach((pixel, colIndex) => {
+        if (pixel !== "1") return;
+        for (let y = 0; y < unit; y += 1) {
+          for (let x = 0; x < unit; x += 1) {
+            const targetX = cursor + colIndex * unit + x;
+            const targetY = rowIndex * unit + y;
+            const offset = (targetY * width + targetX) * 4;
+            data[offset] = 255;
+            data[offset + 1] = 255;
+            data[offset + 2] = 255;
+            data[offset + 3] = 255;
+          }
+        }
+      });
+    });
+    cursor += (glyph[0].length + 1) * unit;
+  }
+
+  return { data, width, height };
+}
+
 export function watermarkSvg(width: number, height: number) {
   const label = "IMAGE PARTNERS";
   const unit = Math.max(3, Math.min(14, Math.round(Math.min(width, height) * 0.008)));

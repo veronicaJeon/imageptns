@@ -2,7 +2,10 @@ import {
   createCloudflareImageFingerprint,
   UnsupportedCloudflareImageTypeError,
 } from "./cloudflare-image-fingerprint";
-import { watermarkSvg } from "./src/lib/images/watermark-svg";
+import encodePng, { init as initPngEncoder } from "@jsquash/png/encode.js";
+// @ts-expect-error Wrangler loads this package asset as a WebAssembly.Module.
+import pngCodecWasm from "@jsquash/png/codec/pkg/squoosh_png_bg.wasm";
+import { pixelWatermarkImage } from "./src/lib/images/watermark-svg";
 
 type ImagesOutput = {
   response(options?: { headers?: HeadersInit }): Response;
@@ -34,6 +37,13 @@ const INTERNAL_WATERMARK_PATH = "/__internal/image-watermark";
 const PHOTO_SEARCH_MAX_FILE_BYTES = 3_500_000;
 const PHOTO_SEARCH_MAX_IMAGE_PIXELS = 3_000_000;
 const TRANSFORM_MAX_FILE_BYTES = 20_000_000;
+let pngEncoderReady: Promise<unknown> | null = null;
+
+async function encodedWatermark(unit: number) {
+  pngEncoderReady ??= initPngEncoder(pngCodecWasm);
+  await pngEncoderReady;
+  return encodePng(pixelWatermarkImage(unit) as ImageData);
+}
 
 function internalRequest(request: Request, pathname: string) {
   const url = new URL(request.url);
@@ -167,10 +177,24 @@ async function createWatermarkResponse(request: Request, env: ImageWorkerEnv) {
     const sourceInfo = await env.IMAGES.info(new Blob([bytes]).stream());
     const canvasWidth = rotate === 90 || rotate === 270 ? sourceInfo.height : sourceInfo.width;
     const canvasHeight = rotate === 90 || rotate === 270 ? sourceInfo.width : sourceInfo.height;
-    const overlay = new TextEncoder().encode(watermarkSvg(canvasWidth, canvasHeight));
     let image = env.IMAGES.input(new Blob([bytes]).stream());
     if (rotate !== 0) image = image.transform({ rotate });
-    image = image.draw(env.IMAGES.input(new Blob([overlay], { type: "image/svg+xml" }).stream()));
+    const primaryUnit = Math.max(3, Math.min(14, Math.round(Math.min(canvasWidth, canvasHeight) * 0.008)));
+    const cornerUnit = Math.max(2, Math.round(primaryUnit * 0.42));
+    const safePadding = Math.max(12, Math.round(Math.min(canvasWidth, canvasHeight) * 0.025));
+    const [primaryWatermark, cornerWatermark] = await Promise.all([
+      encodedWatermark(primaryUnit),
+      encodedWatermark(cornerUnit),
+    ]);
+    image = image
+      .draw(env.IMAGES.input(new Blob([primaryWatermark], { type: "image/png" }).stream()), {
+        opacity: 0.26,
+      })
+      .draw(env.IMAGES.input(new Blob([cornerWatermark], { type: "image/png" }).stream()), {
+        right: safePadding,
+        bottom: safePadding,
+        opacity: 0.72,
+      });
     if (mode === "thumbnail") {
       image = image.transform({ width, height, fit: "scale-down" });
     }
