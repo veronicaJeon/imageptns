@@ -1,7 +1,7 @@
 import {
   imageDimensionsWithinUploadLimit,
   MAX_UPLOAD_BATCH_FILES,
-  MAX_UPLOAD_SIZE_MB,
+  MAX_UPLOAD_FILE_BYTES,
 } from "./limits";
 
 export {
@@ -63,7 +63,7 @@ export function filterAcceptedUploadFiles(files: File[]) {
       rejected.push({ file, reason: "unsupported-type" });
       continue;
     }
-    if (file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024) {
+    if (file.size > MAX_UPLOAD_FILE_BYTES) {
       rejected.push({ file, reason: "too-large" });
       continue;
     }

@@ -13,6 +13,8 @@ describe("Cloudflare migration boundary", () => {
   const buildScript = readFileSync("scripts/build-cloudflare.mjs", "utf8");
   const secretsScript = readFileSync("scripts/upload-cloudflare-secrets.mjs", "utf8");
   const siteAssetSource = readFileSync("src/lib/images/site-asset-source.ts", "utf8");
+  const uploadRoute = readFileSync("src/app/api/uploads/route.ts", "utf8");
+  const uploadLimits = readFileSync("src/lib/uploads/limits.ts", "utf8");
 
   it("builds the Next application with OpenNext on Workers", () => {
     expect(packageJson).toContain('"build:cloudflare": "node scripts/build-cloudflare.mjs"');
@@ -55,30 +57,18 @@ describe("Cloudflare migration boundary", () => {
     expect(worker).toContain("env.API_WORKER");
   });
 
-  it("isolates native Sharp routes behind the temporary image origin", () => {
-    expect(wrangler).toContain("https://legacy-origin.imagepartners.kr");
-    const legacyPaths = worker.slice(
-      worker.indexOf("const LEGACY_IMAGE_PATHS"),
-      worker.indexOf("function shouldUseLegacyImageRuntime"),
-    );
-    expect(legacyPaths).not.toContain('"/api/images/search-by-photo"');
-    expect(legacyPaths).not.toContain('"/api/images/thumbnail"');
-    expect(worker).toContain('"/api/uploads"');
-    expect(legacyPaths).not.toContain('"/api/admin/about-page/library-assets"');
-    expect(legacyPaths).not.toContain('"/api/admin/auth-pages/library-assets"');
-    expect(legacyPaths).not.toContain('"/api/admin/repair-preview"');
-    expect(legacyPaths).not.toContain('"/api/admin/operations"');
-    expect(legacyPaths).not.toContain('"/api/admin/semantic-indexing"');
-    expect(legacyPaths).not.toContain('"/api/cron/ai-synthetic"');
-    expect(legacyPaths).not.toContain('"/api/cron/operations-review"');
-    expect(legacyPaths).not.toContain('"/api/cron/semantic-indexing"');
+  it("runs image processing without the legacy Vercel origin", () => {
+    expect(wrangler).not.toContain("LEGACY_IMAGE_ORIGIN");
+    expect(worker).not.toContain("LEGACY_IMAGE_PATHS");
+    expect(worker).not.toContain("proxyToLegacyImageRuntime");
     expect(worker).toContain('"/__internal/image-transform"');
     expect(worker).toContain('"/__internal/image-watermark"');
+    expect(worker).toContain('"/__internal/upload-fingerprint"');
     expect(imageWorker).toContain("createTransformResponse");
     expect(imageWorker).toContain("createWatermarkResponse");
-    expect(worker).toContain("proxyToLegacyImageRuntime");
-    expect(worker).toContain('x-imagepartners-runtime", "legacy-image"');
-    expect(worker).toContain("AbortSignal.timeout(65_000)");
+    expect(imageWorker).toContain("createUploadFingerprintResponse");
+    expect(uploadRoute).toContain("fingerprintUploadWithCloudflare");
+    expect(uploadLimits).toContain("MAX_UPLOAD_FILE_BYTES = 20_000_000");
   });
 
   it("runs only retention cleanup from the Cloudflare scheduled handler", () => {

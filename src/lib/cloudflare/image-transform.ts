@@ -2,6 +2,15 @@ interface WorkerSelfReference {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
 }
 
+export interface CloudflareUploadFingerprint {
+  originalSha256: string;
+  phash: string;
+  dhash: string;
+  width: number;
+  height: number;
+  algorithmVersion: string;
+}
+
 export interface CloudflareImageTransformOptions {
   width: number;
   height?: number;
@@ -109,4 +118,40 @@ export async function watermarkImageWithCloudflare(
     );
   }
   return Buffer.from(await response.arrayBuffer());
+}
+
+export async function fingerprintUploadWithCloudflare(
+  input: Buffer,
+  contentType: string,
+  rotationDegrees: number,
+): Promise<CloudflareUploadFingerprint | null> {
+  const service = await workerSelfReference();
+  if (!service) return null;
+
+  const response = await service.fetch("https://imagepartners.internal/__internal/upload-fingerprint", {
+    method: "POST",
+    headers: {
+      "Content-Type": contentType,
+      "X-Image-Rotate": String(rotationDegrees),
+    },
+    body: Uint8Array.from(input).buffer,
+  });
+  const payload = await response.json().catch(() => null) as (CloudflareUploadFingerprint & { error?: string }) | null;
+  if (!response.ok) {
+    throw new CloudflareImageTransformError(payload?.error || "Cloudflare upload validation failed", response.status);
+  }
+  if (
+    !payload
+    || !/^[a-f0-9]{64}$/.test(payload.originalSha256)
+    || !/^[01]{64}$/.test(payload.phash)
+    || !/^[01]{64}$/.test(payload.dhash)
+    || !Number.isInteger(payload.width)
+    || payload.width < 1
+    || !Number.isInteger(payload.height)
+    || payload.height < 1
+    || typeof payload.algorithmVersion !== "string"
+  ) {
+    throw new CloudflareImageTransformError("Invalid Cloudflare upload fingerprint", 502);
+  }
+  return payload;
 }

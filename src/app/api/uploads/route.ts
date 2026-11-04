@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { previewUrl } from "@/lib/supabase/storage";
@@ -20,7 +19,6 @@ import {
 import { dateValueInTimeZone, takenAtIsAllowed } from "@/lib/uploads/taken-at";
 import {
   MAX_UPLOAD_FILE_BYTES,
-  MAX_UPLOAD_IMAGE_PIXELS,
   uploadPathBelongsToUser,
   validateImageMetadata,
 } from "@/lib/uploads/security";
@@ -28,6 +26,7 @@ import { readBoundedJson, RequestBodyError } from "@/lib/security/request-body";
 import { ownerUploadBucket } from "@/lib/images/state-visibility";
 import { storageBinaryBody } from "@/lib/supabase/storage-body";
 import { createImageFingerprint } from "@/lib/images/fingerprint";
+import { fingerprintUploadWithCloudflare } from "@/lib/cloudflare/image-transform";
 
 export const maxDuration = 60;
 
@@ -43,11 +42,10 @@ interface FingerprintReservation {
   dhash_distance?: number | null;
 }
 
-const SHARP_FORMAT_CONTENT_TYPES: Record<string, string> = {
-  jpeg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
-  tiff: "image/tiff",
+const CONTENT_TYPE_FORMATS: Record<string, string> = {
+  "image/jpeg": "jpeg",
+  "image/png": "png",
+  "image/webp": "webp",
 };
 
 function validOptionalText(value: unknown, maxLength: number) {
@@ -228,19 +226,26 @@ export async function POST(req: NextRequest) {
       throw new UploadValidationError("Uploaded file size does not match the upload session");
     }
 
-    let metadata;
+    let fingerprint;
     try {
-      metadata = await sharp(buffer, { limitInputPixels: MAX_UPLOAD_IMAGE_PIXELS }).metadata();
+      fingerprint = await fingerprintUploadWithCloudflare(
+        buffer,
+        uploadSession.content_type,
+        uploadRotationDegrees,
+      ) ?? await createImageFingerprint(buffer, uploadRotationDegrees);
     } catch {
       throw new UploadValidationError("The uploaded file is not a valid supported image");
     }
-    const verifiedImage = validateImageMetadata(metadata);
+    const verifiedImage = validateImageMetadata({
+      format: CONTENT_TYPE_FORMATS[uploadSession.content_type],
+      width: fingerprint.width,
+      height: fingerprint.height,
+    });
     if (!verifiedImage.ok) throw new UploadValidationError(verifiedImage.error);
-    if (SHARP_FORMAT_CONTENT_TYPES[verifiedImage.format] !== uploadSession.content_type) {
+    if (!CONTENT_TYPE_FORMATS[uploadSession.content_type]) {
       throw new UploadValidationError("Uploaded image type does not match the upload session");
     }
 
-    const fingerprint = await createImageFingerprint(buffer, uploadRotationDegrees);
     const { data: reservationData, error: reservationError } = await admin.rpc(
       "reserve_image_fingerprint",
       {

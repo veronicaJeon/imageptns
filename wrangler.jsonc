@@ -43,7 +43,6 @@
     }
   ],
   "vars": {
-    "LEGACY_IMAGE_ORIGIN": "https://legacy-origin.imagepartners.kr",
     "OPERATIONS_DAILY_REVIEW_ENABLED": "false"
   },
   "triggers": {

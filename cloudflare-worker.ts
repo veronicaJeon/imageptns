@@ -11,7 +11,6 @@ export { DOQueueHandler, DOShardedTagCache, BucketCachePurge } from "./.open-nex
 
 type WorkerEnv = {
   CRON_SECRET?: string;
-  LEGACY_IMAGE_ORIGIN?: string;
   IMAGE_RUNTIME?: {
     fetch(request: Request): Promise<Response>;
   };
@@ -37,52 +36,11 @@ type ScheduledController = {
   noRetry(): void;
 };
 
-const LEGACY_IMAGE_PATHS = new Set([
-  "/api/uploads",
-]);
-
 const INTERNAL_FINGERPRINT_PATH = "/__internal/image-fingerprint";
 const INTERNAL_NORMALIZE_PATH = "/__internal/image-normalize";
 const INTERNAL_TRANSFORM_PATH = "/__internal/image-transform";
 const INTERNAL_WATERMARK_PATH = "/__internal/image-watermark";
-
-function shouldUseLegacyImageRuntime(request: Request) {
-  return LEGACY_IMAGE_PATHS.has(new URL(request.url).pathname);
-}
-
-async function proxyToLegacyImageRuntime(request: Request, env: WorkerEnv) {
-  if (!env.LEGACY_IMAGE_ORIGIN) {
-    return new Response("Image processing origin is not configured", { status: 503 });
-  }
-
-  const target = new URL(request.url);
-  const origin = new URL(env.LEGACY_IMAGE_ORIGIN);
-  target.protocol = origin.protocol;
-  target.host = origin.host;
-
-  const headers = new Headers(request.headers);
-  headers.delete("host");
-  headers.delete("x-forwarded-host");
-  headers.delete("x-forwarded-proto");
-
-  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(65_000)]);
-  try {
-    const upstreamRequest = new Request(new Request(target.toString(), request), {
-      headers,
-      redirect: "manual",
-      signal,
-    });
-    const response = await fetch(upstreamRequest);
-    const proxied = new Response(response.body, response);
-    proxied.headers.set("x-imagepartners-runtime", "legacy-image");
-    return proxied;
-  } catch (error) {
-    if (signal.aborted) {
-      return new Response("Image processing origin timed out", { status: 504 });
-    }
-    throw error;
-  }
-}
+const INTERNAL_UPLOAD_FINGERPRINT_PATH = "/__internal/upload-fingerprint";
 
 async function proxyToImageRuntime(request: Request, env: WorkerEnv) {
   const url = new URL(request.url);
@@ -107,9 +65,8 @@ const worker = {
     if (pathname === INTERNAL_WATERMARK_PATH) {
       return proxyToImageRuntime(request, env);
     }
-
-    if (shouldUseLegacyImageRuntime(request)) {
-      return proxyToLegacyImageRuntime(request, env);
+    if (pathname === INTERNAL_UPLOAD_FINGERPRINT_PATH) {
+      return proxyToImageRuntime(request, env);
     }
 
     return runWithCloudflareRequestContext(request, env, ctx, async () => {

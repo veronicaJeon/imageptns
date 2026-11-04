@@ -11,10 +11,9 @@ export const ALLOWED_UPLOAD_IMAGE_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
-  "image/tiff": "tif",
 };
 
-export const ALLOWED_SHARP_FORMATS = new Set(["jpeg", "png", "webp", "tiff"]);
+export const ALLOWED_SHARP_FORMATS = new Set(["jpeg", "png", "webp"]);
 
 export function uploadPathBelongsToUser(storagePath: unknown, userId: string) {
   if (typeof storagePath !== "string" || !storagePath) return false;

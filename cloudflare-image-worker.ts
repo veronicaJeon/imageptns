@@ -34,15 +34,22 @@ const INTERNAL_FINGERPRINT_PATH = "/__internal/image-fingerprint";
 const INTERNAL_NORMALIZE_PATH = "/__internal/image-normalize";
 const INTERNAL_TRANSFORM_PATH = "/__internal/image-transform";
 const INTERNAL_WATERMARK_PATH = "/__internal/image-watermark";
+const INTERNAL_UPLOAD_FINGERPRINT_PATH = "/__internal/upload-fingerprint";
 const PHOTO_SEARCH_MAX_FILE_BYTES = 3_500_000;
 const PHOTO_SEARCH_MAX_IMAGE_PIXELS = 3_000_000;
 const TRANSFORM_MAX_FILE_BYTES = 20_000_000;
+const UPLOAD_MAX_IMAGE_PIXELS = 100_000_000;
 let pngEncoderReady: Promise<unknown> | null = null;
 
 async function encodedWatermark(unit: number) {
   pngEncoderReady ??= initPngEncoder(pngCodecWasm);
   await pngEncoderReady;
   return encodePng(pixelWatermarkImage(unit) as ImageData);
+}
+
+async function sha256(bytes: ArrayBuffer) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
 
 function internalRequest(request: Request, pathname: string) {
@@ -98,6 +105,49 @@ async function createNormalizedImageResponse(request: Request, env: ImageWorkerE
   } catch (error) {
     console.error("[cloudflare-image] normalization failed", error instanceof Error ? error.message : "unknown");
     return new Response("Image normalization failed", { status: 400 });
+  }
+}
+
+async function createUploadFingerprintResponse(request: Request, env: ImageWorkerEnv) {
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > TRANSFORM_MAX_FILE_BYTES) {
+    return Response.json({ error: "Uploaded image is too large" }, { status: 413 });
+  }
+
+  const contentType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() ?? "";
+  const rotate = integerHeader(request, "x-image-rotate", 0, 270);
+  if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(contentType) || rotate == null) {
+    return Response.json({ error: "Unsupported image format" }, { status: 415 });
+  }
+
+  const bytes = await request.arrayBuffer();
+  if (bytes.byteLength === 0) return Response.json({ error: "Uploaded image is empty" }, { status: 400 });
+  if (bytes.byteLength > TRANSFORM_MAX_FILE_BYTES) {
+    return Response.json({ error: "Uploaded image is too large" }, { status: 413 });
+  }
+
+  try {
+    const sourceInfo = await env.IMAGES.info(new Blob([bytes]).stream());
+    if (!sourceInfo.width || !sourceInfo.height || sourceInfo.width * sourceInfo.height > UPLOAD_MAX_IMAGE_PIXELS) {
+      return Response.json({ error: "Image dimensions are too large" }, { status: 413 });
+    }
+
+    let normalized = env.IMAGES.input(new Blob([bytes]).stream());
+    if (rotate !== 0) normalized = normalized.transform({ rotate });
+    normalized = normalized.transform({ width: 1_024, height: 1_024, fit: "scale-down" });
+    const normalizedOutput = await normalized.output({ format: "image/jpeg", quality: 90, anim: false });
+    const normalizedBytes = await normalizedOutput.response().arrayBuffer();
+    const fingerprint = await createCloudflareImageFingerprint(normalizedBytes, "image/jpeg");
+    const swapsDimensions = rotate === 90 || rotate === 270;
+    return Response.json({
+      ...fingerprint,
+      originalSha256: await sha256(bytes),
+      width: swapsDimensions ? sourceInfo.height : sourceInfo.width,
+      height: swapsDimensions ? sourceInfo.width : sourceInfo.height,
+    }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    console.error("[cloudflare-image] upload fingerprint failed", error instanceof Error ? error.message : "unknown");
+    return Response.json({ error: "Invalid uploaded image" }, { status: 400 });
   }
 }
 
@@ -223,6 +273,9 @@ export default {
     }
     if (internalRequest(request, INTERNAL_WATERMARK_PATH)) {
       return createWatermarkResponse(request, env);
+    }
+    if (internalRequest(request, INTERNAL_UPLOAD_FINGERPRINT_PATH)) {
+      return createUploadFingerprintResponse(request, env);
     }
     return new Response("Not found", { status: 404 });
   },
