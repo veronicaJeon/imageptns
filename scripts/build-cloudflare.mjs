@@ -68,5 +68,19 @@ child.on("error", (error) => {
 });
 
 child.on("exit", (code, signal) => {
-  process.exitCode = code ?? (signal ? 1 : 0);
+  const exitCode = code ?? (signal ? 1 : 0);
+  if (exitCode !== 0) {
+    process.exitCode = exitCode;
+    return;
+  }
+
+  try {
+    execFileSync(process.execPath, [join(cwd, "scripts", "bundle-cloudflare-api.mjs")], {
+      cwd,
+      env: buildEnv,
+      stdio: "inherit",
+    });
+  } catch {
+    process.exitCode = 1;
+  }
 });

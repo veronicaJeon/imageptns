@@ -15,6 +15,7 @@ describe("Cloudflare migration boundary", () => {
   it("builds the Next application with OpenNext on Workers", () => {
     expect(packageJson).toContain('"build:cloudflare": "node scripts/build-cloudflare.mjs"');
     expect(buildScript).toContain('spawn(executable, ["build"]');
+    expect(buildScript).toContain("bundle-cloudflare-api.mjs");
     expect(buildScript).toContain('.replace(/\\\\n$/g, "")');
     expect(buildScript).toContain('.replace(/\\n$/g, "")');
     expect(wrangler).toContain('"main": "cloudflare-worker.ts"');
@@ -26,8 +27,10 @@ describe("Cloudflare migration boundary", () => {
     expect(wrangler).toContain('"service": "imagepartners-api"');
     expect(serverWrangler).toContain('"main": "cloudflare-server-worker.ts"');
     expect(apiWrangler).toContain('"main": "cloudflare-api-worker.ts"');
-    expect(apiWrangler).toContain('"@opentelemetry/api": "next/dist/compiled/@opentelemetry/api"');
-    expect(apiWrangler).toContain('"__dirname": "\\\"/\\\""');
+    expect(apiWrangler).toContain('"@opentelemetry/api": "./src/lib/cloudflare/unavailable-module.ts"');
+    expect(readFileSync("cloudflare-api-worker.ts", "utf8")).toContain(
+      'server-functions/api/handler.mjs',
+    );
     expect(serverWrangler).toContain('"__dirname": "\\\"/\\\""');
     expect(imageWrangler).toContain('"main": "cloudflare-image-worker.ts"');
     expect(imageWrangler).toContain('"binding": "IMAGES"');

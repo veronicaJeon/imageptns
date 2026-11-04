@@ -6,13 +6,8 @@
   "workers_dev": false,
   "compatibility_date": "2026-11-02",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
-  "define": {
-    "__dirname": "\"/\"",
-    "__filename": "\"/worker.js\""
-  },
   "alias": {
-    "critters": "./src/lib/cloudflare/empty-module.ts",
-    "@opentelemetry/api": "next/dist/compiled/@opentelemetry/api"
+    "@opentelemetry/api": "./src/lib/cloudflare/unavailable-module.ts"
   },
   "services": [
     {
