@@ -30,6 +30,12 @@ jobs:
         run: npx wrangler deploy --config wrangler.api.jsonc
       - name: Deploy administrator API worker
         run: npx wrangler deploy --config wrangler.admin-api.jsonc
+      - name: Stamp release metadata
+        run: |
+          release_json=$(node -e 'process.stdout.write(JSON.stringify({APP_RELEASE_REF: process.env.GITHUB_REF_NAME, APP_RELEASE_SHA: process.env.GITHUB_SHA, RELEASE_COMMIT_SHA: process.env.GITHUB_SHA}))')
+          for config in wrangler.server.jsonc wrangler.api.jsonc wrangler.admin-api.jsonc; do
+            printf '%s' "$release_json" | npx wrangler secret bulk --config "$config"
+          done
       - name: Deploy router worker
         run: npx wrangler deploy
     env:
