@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { previewUrl } from "@/lib/supabase/storage";
 import { applyWatermarkToAnalysisDerivative, createWatermarkedThumbnail } from "@/lib/utils/watermark";
 import { normalizeCopyrightLicenseCode, normalizeFreeUsagePolicy } from "@/lib/licenses/creative-commons";
-import { normalizeRotationDegrees, rotatedDimensions } from "@/lib/images/orientation";
+import { normalizeRotationDegrees } from "@/lib/images/orientation";
 import {
   analysisDerivativePath,
   createAnalysisDerivative,
@@ -275,13 +275,8 @@ export async function POST(req: NextRequest) {
       analysis.height,
     );
     const thumbnail = await createWatermarkedThumbnail(analysis.bytes, 320, 240);
-    const displayDimensions = rotatedDimensions(
-      verifiedImage.width,
-      verifiedImage.height,
-      uploadRotationDegrees,
-    );
-    const displayWidth = displayDimensions.width ?? verifiedImage.width;
-    const displayHeight = displayDimensions.height ?? verifiedImage.height;
+    const displayWidth = fingerprint.width;
+    const displayHeight = fingerprint.height;
 
     const { error: analysisError } = await admin.storage
       .from("images-analysis")
