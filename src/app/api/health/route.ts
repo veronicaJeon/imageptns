@@ -3,6 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recordOperationalEvent } from "@/lib/monitoring/events";
 import { previewUrl } from "@/lib/supabase/storage";
 import { hasJpegSignature } from "@/lib/supabase/storage-body";
+import {
+  imageR2Bucket,
+  r2ImageStorageRequested,
+} from "@/lib/storage/image-storage-server";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +36,7 @@ export async function GET() {
   const admin = createAdminClient();
   const dailyReviewEnabled = process.env.OPERATIONS_DAILY_REVIEW_ENABLED === "true";
   const reversePreviewSample = Math.floor(Date.now() / (15 * 60 * 1000)) % 2 === 1;
-  const [database, storage, analysisStorage, previewIntegrity, latestAiResult, latestOperationsResult] = await Promise.all([
+  const [database, storage, analysisStorage, r2Storage, previewIntegrity, latestAiResult, latestOperationsResult] = await Promise.all([
     timedCheck(async () => {
       const result = await admin.from("platform_commerce_settings").select("id").eq("id", true).maybeSingle();
       return { error: result.error };
@@ -45,6 +49,11 @@ export async function GET() {
       const result = await admin.storage.from("images-analysis").list("", { limit: 1 });
       return { error: result.error };
     }),
+    timedCheck(async () => ({
+      error: r2ImageStorageRequested() && !(await imageR2Bucket())
+        ? { message: "R2 binding unavailable" }
+        : null,
+    })),
     timedCheck(async () => {
       const { data, error } = await admin
         .from("images")
@@ -116,6 +125,7 @@ export async function GET() {
   const coreHealthy = database.status === "ok"
     && storage.status === "ok"
     && analysisStorage.status === "ok"
+    && r2Storage.status === "ok"
     && previewIntegrity.status === "ok";
   const degraded = !coreHealthy
     || ai.status === "error"
@@ -135,6 +145,7 @@ export async function GET() {
       database: database.status,
       storage: storage.status,
       analysisStorage: analysisStorage.status,
+      r2Storage: r2Storage.status,
       previewIntegrity: previewIntegrity.status,
       ai: ai.status,
       operations: operations.status,
@@ -144,7 +155,7 @@ export async function GET() {
   return NextResponse.json(
     {
       status: degraded ? "degraded" : "ok",
-      checks: { database, storage, analysisStorage, previewIntegrity, ai, operations },
+      checks: { database, storage, analysisStorage, r2Storage, previewIntegrity, ai, operations },
       release: {
         commitSha: process.env.APP_RELEASE_SHA?.trim()
           || process.env.VERCEL_GIT_COMMIT_SHA?.trim()
@@ -160,7 +171,7 @@ export async function GET() {
       status: coreHealthy ? 200 : 503,
       headers: {
         "Cache-Control": "no-store",
-        "Server-Timing": `total;dur=${durationMs}, db;dur=${database.latencyMs}, storage;dur=${storage.latencyMs}, analysis;dur=${analysisStorage.latencyMs}, preview;dur=${previewIntegrity.latencyMs}`,
+        "Server-Timing": `total;dur=${durationMs}, db;dur=${database.latencyMs}, storage;dur=${storage.latencyMs}, analysis;dur=${analysisStorage.latencyMs}, r2;dur=${r2Storage.latencyMs}, preview;dur=${previewIntegrity.latencyMs}`,
       },
     },
   );

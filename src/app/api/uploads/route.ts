@@ -24,9 +24,14 @@ import {
 } from "@/lib/uploads/security";
 import { readBoundedJson, RequestBodyError } from "@/lib/security/request-body";
 import { ownerUploadBucket } from "@/lib/images/state-visibility";
-import { storageBinaryBody } from "@/lib/supabase/storage-body";
 import { createImageFingerprint } from "@/lib/images/fingerprint";
 import { fingerprintUploadWithCloudflare } from "@/lib/cloudflare/image-transform";
+import { imageStorageProvider } from "@/lib/storage/image-path";
+import {
+  downloadImageObject,
+  putImageObject,
+  removeImageObjects,
+} from "@/lib/storage/image-storage-server";
 
 export const maxDuration = 60;
 
@@ -199,7 +204,7 @@ export async function POST(req: NextRequest) {
     .eq("storage_path", storage_path_original)
     .eq("status", "pending")
     .gt("expires_at", new Date().toISOString())
-    .select("id, content_type, declared_size_bytes")
+    .select("id, content_type, declared_size_bytes, storage_provider")
     .maybeSingle();
 
   if (sessionError) {
@@ -213,10 +218,15 @@ export async function POST(req: NextRequest) {
   let createdImageId: string | null = null;
   let fingerprintReservationId: string | null = null;
   try {
-    const { data: downloaded, error: downloadErr } = await admin.storage
-      .from("images-original")
-      .download(storage_path_original);
-    if (downloadErr || !downloaded) throw new UploadValidationError("Uploaded file was not found");
+    if (uploadSession.storage_provider !== imageStorageProvider(storage_path_original)) {
+      throw new UploadValidationError("Upload storage provider does not match the upload session");
+    }
+    let downloaded: Blob;
+    try {
+      downloaded = await downloadImageObject(admin, "images-original", storage_path_original);
+    } catch {
+      throw new UploadValidationError("Uploaded file was not found");
+    }
     const arrayBuffer = await downloaded.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     if (buffer.length === 0 || buffer.length > MAX_UPLOAD_FILE_BYTES) {
@@ -278,22 +288,20 @@ export async function POST(req: NextRequest) {
     const displayWidth = fingerprint.width;
     const displayHeight = fingerprint.height;
 
-    const { error: analysisError } = await admin.storage
-      .from("images-analysis")
-      .upload(analysisPath, storageBinaryBody(analysis.bytes), {
-        contentType: analysis.mimeType,
-        upsert: true,
-      });
-    if (analysisError) throw analysisError;
+    await putImageObject(admin, "images-analysis", analysisPath, analysis.bytes, {
+      contentType: analysis.mimeType,
+      cacheControl: "private, no-store",
+    });
+    await putImageObject(admin, "images-preview", storage_path_original, watermarked, {
+      contentType: "image/jpeg",
+      cacheControl: "public, max-age=31536000, immutable",
+    });
+    await putImageObject(admin, "images-preview", `thumbs/${storage_path_original}`, thumbnail, {
+      contentType: "image/jpeg",
+      cacheControl: "public, max-age=31536000, immutable",
+    });
 
-    const { error: previewError } = await admin.storage
-      .from("images-preview")
-      .upload(storage_path_original, storageBinaryBody(watermarked), { contentType: "image/jpeg", upsert: true });
-    if (previewError) throw previewError;
-    const { error: thumbnailError } = await admin.storage
-      .from("images-preview")
-      .upload(`thumbs/${storage_path_original}`, storageBinaryBody(thumbnail), { contentType: "image/jpeg", upsert: true });
-    if (thumbnailError) throw thumbnailError;
+    const storageProvider = imageStorageProvider(storage_path_original);
 
     const { data, error } = await supabase
       .from("images")
@@ -310,11 +318,15 @@ export async function POST(req: NextRequest) {
         tags_ko: Array.isArray(tags_ko) && tags_ko.length > 0 ? tags_ko : tags ?? [],
         tags_en: Array.isArray(tags_en) && tags_en.length > 0 ? tags_en : tags ?? [],
         storage_path_original,
+        storage_provider_original: storageProvider,
         original_filename: typeof original_filename === "string" ? original_filename.trim().slice(0, 255) : null,
         storage_path_preview: storage_path_original,
+        storage_provider_preview: storageProvider,
         storage_path_analysis: analysisPath,
+        storage_provider_analysis: storageProvider,
         analysis_derivative_version: analysis.version,
         storage_path_full: storage_path_original,
+        storage_provider_full: storageProvider,
         width: displayWidth,
         height: displayHeight,
         resolution_mp: Number(((displayWidth * displayHeight) / 1_000_000).toFixed(1)),
@@ -393,13 +405,13 @@ export async function POST(req: NextRequest) {
     if (fingerprintReservationId) {
       await admin.from("image_fingerprints").delete().eq("id", fingerprintReservationId);
     }
-    await Promise.all([
-      admin.storage.from("images-original").remove([storage_path_original]),
-      admin.storage.from("images-preview").remove([
+    const cleanupResults = await Promise.allSettled([
+      removeImageObjects(admin, "images-original", [storage_path_original]),
+      removeImageObjects(admin, "images-preview", [
         storage_path_original,
         `thumbs/${storage_path_original}`,
       ]),
-      admin.storage.from("images-analysis").remove([
+      removeImageObjects(admin, "images-analysis", [
         analysisDerivativePath(storage_path_original),
       ]),
       admin
@@ -415,6 +427,11 @@ export async function POST(req: NextRequest) {
         })
         .eq("id", uploadSession.id),
     ]);
+    for (const result of cleanupResults) {
+      if (result.status === "rejected") {
+        console.error("[uploads] Failed to clean up rejected upload", result.reason);
+      }
+    }
 
     const duplicate = err instanceof DuplicateUploadError;
     const message = duplicate

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { createStoredZip, sanitizeZipFilename, uniqueZipFilename, type ZipFileEntry } from "@/lib/download/zip";
+import { downloadImageObject } from "@/lib/storage/image-storage-server";
 
 export const maxDuration = 60;
 
@@ -94,8 +95,12 @@ export async function POST(req: NextRequest) {
     const storagePath = image?.storage_path_full ?? image?.storage_path_original ?? item.image_original_path_snapshot;
     if (!storagePath) continue;
 
-    const { data, error } = await admin.storage.from("images-original").download(storagePath);
-    if (error || !data) continue;
+    let data: Blob;
+    try {
+      data = await downloadImageObject(admin, "images-original", storagePath);
+    } catch {
+      continue;
+    }
 
     const arrayBuffer = await data.arrayBuffer();
     const fallbackName = `${image?.asset_id ?? id}${fileExtension(storagePath)}`;

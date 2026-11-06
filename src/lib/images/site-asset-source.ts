@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { downloadImageObject } from "@/lib/storage/image-storage-server";
+import type { ImageStorageBucket } from "@/lib/storage/image-path";
 
 export const CLOUDFLARE_IMAGE_INPUT_MAX_BYTES = 20_000_000;
 
@@ -12,10 +14,12 @@ interface SiteAssetSourceRow {
   storage_path_analysis: string | null;
 }
 
-async function download(admin: AdminClient, bucket: string, path: string) {
-  const { data, error } = await admin.storage.from(bucket).download(path);
-  if (error || !data) throw new Error(error?.message ?? "이미지 원본을 읽지 못했습니다.");
-  return data;
+async function download(admin: AdminClient, bucket: ImageStorageBucket, path: string) {
+  try {
+    return await downloadImageObject(admin, bucket, path);
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : "이미지 원본을 읽지 못했습니다.");
+  }
 }
 
 export async function downloadSiteAssetSource(

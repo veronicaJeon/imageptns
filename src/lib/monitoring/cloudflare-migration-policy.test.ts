@@ -46,8 +46,9 @@ describe("Cloudflare migration boundary", () => {
     expect(imageWrangler).toContain('"binding": "IMAGES"');
     expect(imageWorker).toContain("createCloudflareImageFingerprint");
     expect(siteAssetSource).toContain("CLOUDFLARE_IMAGE_INPUT_MAX_BYTES");
-    expect(siteAssetSource).toContain('download(admin, "images-analysis"');
+    expect(siteAssetSource).toContain('downloadImageObject(admin, bucket, path)');
     expect(secretsScript).toContain('["NX_", "TURBO_", "VERCEL"]');
+    expect(secretsScript).toContain('"R2_IMAGE_STORAGE_ENABLED"');
     expect(secretsScript).toContain("APP_RELEASE_SHA");
   });
 

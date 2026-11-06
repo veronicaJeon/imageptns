@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { imageStorageProvider } from "@/lib/storage/image-path";
+import { downloadImageObject } from "@/lib/storage/image-storage-server";
 
 type DownloadRecord = {
   id: string;
@@ -24,7 +26,7 @@ type DownloadOrderItem = {
 };
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ orderItemId: string }> }
 ) {
   const { orderItemId } = await params;
@@ -75,6 +77,38 @@ export async function GET(
   // App-level checks above authorize the buyer. Service role bypasses storage RLS
   // for the private originals bucket when issuing the short-lived URL.
   const admin = createAdminClient();
+  if (imageStorageProvider(storagePath) === "r2") {
+    if (req.nextUrl.searchParams.get("file") === "1") {
+      try {
+        const file = await downloadImageObject(admin, "images-original", storagePath);
+        const filename = image?.original_filename
+          ?? orderItem.image_original_filename_snapshot
+          ?? image?.asset_id
+          ?? "image";
+        return new NextResponse(file.stream(), {
+          headers: {
+            "Content-Type": file.type || "application/octet-stream",
+            "Content-Length": String(file.size),
+            "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+      } catch {
+        return NextResponse.json({ error: "Could not read downloadable file" }, { status: 503 });
+      }
+    }
+
+    await admin
+      .from("downloads")
+      .update({ download_count: download.download_count + 1 })
+      .eq("id", download.id);
+    return NextResponse.json({
+      url: `/api/download/${encodeURIComponent(orderItemId)}?file=1`,
+      expiresAt: download.expires_at,
+    });
+  }
+
   const { data: signed, error: signError } = await admin.storage
     .from("images-original")
     .createSignedUrl(storagePath, 60 * 60, {

@@ -10,6 +10,8 @@ import {
 describe("upload security", () => {
   it("accepts only a single object directly under the current user folder", () => {
     expect(uploadPathBelongsToUser("user-1/file.jpg", "user-1")).toBe(true);
+    expect(uploadPathBelongsToUser("r2/user-1/file.jpg", "user-1")).toBe(true);
+    expect(uploadPathBelongsToUser("r2/user-2/file.jpg", "user-1")).toBe(false);
     expect(uploadPathBelongsToUser("user-2/file.jpg", "user-1")).toBe(false);
     expect(uploadPathBelongsToUser("user-1/nested/file.jpg", "user-1")).toBe(false);
     expect(uploadPathBelongsToUser("user-1/../user-2/file.jpg", "user-1")).toBe(false);

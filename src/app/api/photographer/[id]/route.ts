@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { previewUrl } from "@/lib/supabase/storage";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 interface PhotographerProfileRow {
@@ -68,12 +69,6 @@ export async function GET(
 
   const totalSales = imageList.reduce((sum, img) => sum + (img.sales_count ?? 0), 0);
   const totalViews = imageList.reduce((sum, img) => sum + (img.views_count ?? 0), 0);
-
-  function previewUrl(path: string | null | undefined): string {
-    if (!path) return "";
-    const { data } = supabase.storage.from("images-preview").getPublicUrl(path);
-    return data.publicUrl;
-  }
 
   return NextResponse.json({
     photographer: {

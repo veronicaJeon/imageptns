@@ -10,6 +10,7 @@ import { authorizeCronRequest } from "@/lib/security/cron";
 import { uploadPathBelongsToUser } from "@/lib/uploads/security";
 import { dispatchPendingOrderEmails } from "@/lib/orders/email-outbox";
 import { analysisDerivativePath } from "@/lib/images/analysis-derivative";
+import { removeImageObjects } from "@/lib/storage/image-storage-server";
 
 export const maxDuration = 60;
 
@@ -57,29 +58,26 @@ async function purgeExpiredUploadSessions(admin: ReturnType<typeof createAdminCl
   const analysisPaths = rows.map((row) => analysisDerivativePath(row.storage_path));
 
   for (let index = 0; index < originalPaths.length; index += 100) {
-    const { error: storageError } = await admin.storage
-      .from("images-original")
-      .remove(originalPaths.slice(index, index + 100));
-    if (storageError) {
-      console.error("[auto-reject-stale] expired original cleanup failed:", storageError.message);
+    try {
+      await removeImageObjects(admin, "images-original", originalPaths.slice(index, index + 100));
+    } catch (storageError) {
+      console.error("[auto-reject-stale] expired original cleanup failed:", storageError);
       return { ok: false as const };
     }
   }
   for (let index = 0; index < previewPaths.length; index += 100) {
-    const { error: storageError } = await admin.storage
-      .from("images-preview")
-      .remove(previewPaths.slice(index, index + 100));
-    if (storageError) {
-      console.error("[auto-reject-stale] expired preview cleanup failed:", storageError.message);
+    try {
+      await removeImageObjects(admin, "images-preview", previewPaths.slice(index, index + 100));
+    } catch (storageError) {
+      console.error("[auto-reject-stale] expired preview cleanup failed:", storageError);
       return { ok: false as const };
     }
   }
   for (let index = 0; index < analysisPaths.length; index += 100) {
-    const { error: storageError } = await admin.storage
-      .from("images-analysis")
-      .remove(analysisPaths.slice(index, index + 100));
-    if (storageError) {
-      console.error("[auto-reject-stale] expired analysis derivative cleanup failed:", storageError.message);
+    try {
+      await removeImageObjects(admin, "images-analysis", analysisPaths.slice(index, index + 100));
+    } catch (storageError) {
+      console.error("[auto-reject-stale] expired analysis derivative cleanup failed:", storageError);
       return { ok: false as const };
     }
   }

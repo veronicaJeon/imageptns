@@ -25,6 +25,7 @@
   "app/api/favorites/[imageId]/route",
   "app/api/favorites/route",
   "app/api/health/route",
+  "app/api/image-assets/[...path]/route",
   "app/api/images/[id]/deletion-request/route",
   "app/api/images/[id]/route",
   "app/api/images/[id]/transactions/route",
@@ -61,6 +62,7 @@
   "app/api/subscription/route",
   "app/api/uploads/[id]/route",
   "app/api/uploads/presign/route",
+  "app/api/uploads/r2/[sessionId]/route",
   "app/api/uploads/route",
   "app/api/webhooks/resend-inbound/route"
 ]

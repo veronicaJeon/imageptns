@@ -10,6 +10,11 @@ import {
 } from "@/lib/uploads/security";
 import { consumeDistributedRateLimit } from "@/lib/security/distributed-rate-limit";
 import { readBoundedJson, RequestBodyError } from "@/lib/security/request-body";
+import { r2ImagePath } from "@/lib/storage/image-path";
+import {
+  r2ImageStorageAvailable,
+  r2ImageStorageRequested,
+} from "@/lib/storage/image-storage-server";
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -63,23 +68,24 @@ export async function POST(req: NextRequest) {
   }
 
   const ext = ALLOWED_UPLOAD_IMAGE_TYPES[contentType];
-  const objectPath = `${user.id}/${randomUUID()}.${ext}`;
-  const expiresAt = uploadSessionExpiresAt();
-
-  // Upload the original file to images-original, then generate public previews separately.
-  const { data, error } = await admin.storage
-    .from("images-original")
-    .createSignedUploadUrl(objectPath);
-
-  if (error || !data) {
-    return NextResponse.json({ error: error?.message ?? "Failed" }, { status: 500 });
+  const r2Requested = r2ImageStorageRequested();
+  const useR2 = r2Requested && await r2ImageStorageAvailable();
+  if (r2Requested && !useR2) {
+    return NextResponse.json({ error: "Image storage temporarily unavailable" }, { status: 503 });
   }
+
+  const objectName = `${randomUUID()}.${ext}`;
+  const objectPath = useR2
+    ? r2ImagePath(user.id, objectName)
+    : `${user.id}/${objectName}`;
+  const expiresAt = uploadSessionExpiresAt();
 
   const { data: uploadSession, error: sessionError } = await admin
     .from("upload_sessions")
     .insert({
       user_id: user.id,
       storage_path: objectPath,
+      storage_provider: useR2 ? "r2" : "supabase",
       content_type: contentType,
       declared_size_bytes: normalizedFileSize,
       expires_at: expiresAt,
@@ -90,6 +96,26 @@ export async function POST(req: NextRequest) {
   if (sessionError || !uploadSession) {
     console.error("[uploads/presign] Failed to create upload session", sessionError);
     return NextResponse.json({ error: "Failed to create upload session" }, { status: 500 });
+  }
+
+  if (useR2) {
+    return NextResponse.json({
+      uploadUrl: `/api/uploads/r2/${uploadSession.id}`,
+      storagePath: objectPath,
+      uploadSessionId: uploadSession.id,
+      token: null,
+      expiresAt,
+    });
+  }
+
+  // Legacy fallback: upload directly to Supabase until R2 is enabled for the environment.
+  const { data, error } = await admin.storage
+    .from("images-original")
+    .createSignedUploadUrl(objectPath);
+
+  if (error || !data) {
+    await admin.from("upload_sessions").delete().eq("id", uploadSession.id);
+    return NextResponse.json({ error: error?.message ?? "Failed" }, { status: 500 });
   }
 
   return NextResponse.json({

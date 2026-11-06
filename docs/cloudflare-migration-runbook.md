@@ -1,17 +1,29 @@
 # Cloudflare Workers 전환 런북
 
-> 기준일: 2026-11-03
+> 기준일: 2026-11-06
 > 목표: 공개 웹·일반 API·예약 정리를 Cloudflare Workers로 옮기고 Vercel CPU 소비를 최소화한다.
 
 ## 전환 구조
 
 - Next.js 16.4는 `@opennextjs/cloudflare`로 Worker 번들을 만든다.
 - 공개 페이지, 인증, 일반 API, Supabase·Resend·외부 API 호출은 `imagepartners` Worker가 처리한다.
-- 네이티브 Sharp가 필요한 업로드 후처리, 사진 검색, 워터마크·썸네일, 관리자 전시 이미지 생성은 임시로 `https://legacy-origin.imagepartners.kr`의 Vercel 런타임에 전달한다.
+- 사진 검색, 업로드 지문, 방향 보정, 워터마크·썸네일은 `imagepartners-image-runtime`의 Cloudflare Images binding이 처리한다.
+- 기존 이미지 파일은 Supabase Storage에 유지하고, R2 활성화 뒤 신규 원본·분석본·워터마크 미리보기·썸네일은 `imagepartners-images` R2 버킷에 저장한다.
 - 데이터·만료 업로드 정리는 Cloudflare Cron Trigger가 매일 02:00 UTC에 `/api/cron/auto-reject-stale`를 내부 호출한다.
 - Mistral 합성 진단·의미색인·전체 운영검토를 묶은 고비용 일일 점검은 `OPERATIONS_DAILY_REVIEW_ENABLED=false`로 중단한다. 재개할 때는 비용·필요성을 검토한 뒤 별도 스케줄과 플래그를 함께 복원한다.
 
-이 분리는 최종 구조가 아니다. Vercel 의존성을 완전히 없애려면 Sharp 경로를 별도 Cloudflare 이미지 처리 Worker/Container로 옮기고 100MB 원본, 워터마크, 지문 정확도, 메모리·CPU 한도를 운영 이미지로 검증해야 한다.
+TIFF·RAW의 웹 파생본 생성과 20MB를 넘는 입력 처리는 아직 범위 밖이다. R2는 해당 원본을 보관할 수 있지만 실제 업로드 허용 형식과 처리 한도는 별도 회귀 뒤 확장한다.
+
+## R2 신규 이미지 전환
+
+1. Cloudflare Dashboard의 **Storage & databases > R2**에서 R2 구독을 활성화한다. 무료 구간을 우선하며 결제수단 등록이나 유료 플랜 전환은 별도 승인한다.
+2. `npx wrangler r2 bucket create imagepartners-images`로 버킷을 만든다.
+3. 일반 API·관리자 API·기본 서버 Worker에 `IMAGE_STORAGE` R2 binding을 추가한다.
+4. Supabase 마이그레이션 `081_r2_image_storage_provider.sql`을 적용한다. 기존 행은 `supabase` 기본값을 유지한다.
+5. binding이 배포되고 `/api/health`의 `r2Storage`가 `ok`인지 확인한 뒤에만 `R2_IMAGE_STORAGE_ENABLED=true`를 설정하고 다시 배포한다.
+6. 승인된 사진작가 임시 계정으로 원본 업로드→분석본·미리보기 생성→관리자 승인→공개 썸네일→구매자/관리자 원본 다운로드→완전삭제를 확인한다.
+
+롤백은 `R2_IMAGE_STORAGE_ENABLED=false`로 되돌려 신규 업로드를 Supabase로 복귀한다. 이미 R2에 저장된 경로는 이중 읽기 계층으로 계속 제공하므로 R2 객체나 DB 공급자 필드를 삭제·되돌리지 않는다.
 
 ## 준비 조건
 
@@ -48,7 +60,7 @@ npx wrangler dev --local --port 8787
 
 - `/`, `/about`, `/library`, `/login`: HTTP 200
 - `/api/categories`: HTTP 200
-- `/api/health`: DB·두 Storage·미리보기 무결성 `ok`; 일일 AI·운영점검 `paused`
+- `/api/health`: DB·Supabase 두 Storage·활성화된 R2 binding·미리보기 무결성 `ok`; 일일 AI·운영점검 `paused`
 - `/api/images/search-by-photo`: 응답 헤더와 상태가 Vercel 이미지 런타임과 같고 Worker의 Sharp 로드 500이 아님
 - 비로그인 `/api/uploads/presign`: 401이며 500이 아님
 
@@ -68,6 +80,7 @@ Cloudflare Worker Secrets에는 `.env.example`의 실제 운영 서버 비밀과
 - `MISTRAL_API_KEY`, `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`
 - 메일·검색·기능 플래그·계좌이체·비공개 온체인 설정 중 현재 Vercel Production에 존재하는 값
 - `APP_RELEASE_SHA=<배포한 main SHA>`, `APP_RELEASE_REF=main`
+- R2 binding 검증 전 `R2_IMAGE_STORAGE_ENABLED=false`, 전환 배포에서만 `true`
 
 `VERCEL_*`, `VERCEL_OIDC_TOKEN`, `NX_*`, `TURBO_*`는 옮기지 않는다. 비밀 등록 시 값 끝의 실제 줄바꿈과 `\\n`을 제거한다. 특히 `NEXT_PUBLIC_SUPABASE_*`는 Next.js 빌드에도 고정되므로 비밀 등록 후 `npm run build:cloudflare`와 Worker 배포를 모두 다시 실행하고 `workers.dev` URL에서 스모크 테스트한다.
 

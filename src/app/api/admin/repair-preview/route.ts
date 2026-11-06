@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { applyWatermarkToAnalysisDerivative, createWatermarkedThumbnail } from "@/lib/utils/watermark";
-import { storageBinaryBody } from "@/lib/supabase/storage-body";
 import { authorizeCronRequest } from "@/lib/security/cron";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { recordOperationalEvent } from "@/lib/monitoring/events";
 import { ensureAnalysisDerivative } from "@/lib/images/analysis-derivative-server";
+import { putImageObject } from "@/lib/storage/image-storage-server";
 
 export const maxDuration = 60;
 
@@ -64,20 +64,19 @@ export async function POST(req: NextRequest) {
   );
   const thumbnail = await createWatermarkedThumbnail(analysis.bytes);
 
-  const { error: uploadErr } = await admin.storage
-    .from("images-preview")
-    .upload(originalPath, storageBinaryBody(watermarked), { contentType: "image/jpeg", upsert: true });
-
-  if (uploadErr) {
-    return NextResponse.json({ error: `Preview upload failed: ${uploadErr.message}` }, { status: 500 });
-  }
-
-  const { error: thumbUploadErr } = await admin.storage
-    .from("images-preview")
-    .upload(`thumbs/${originalPath}`, storageBinaryBody(thumbnail), { contentType: "image/jpeg", upsert: true });
-
-  if (thumbUploadErr) {
-    return NextResponse.json({ error: `Thumbnail upload failed: ${thumbUploadErr.message}` }, { status: 500 });
+  try {
+    await putImageObject(admin, "images-preview", originalPath, watermarked, {
+      contentType: "image/jpeg",
+      cacheControl: "public, max-age=31536000, immutable",
+    });
+    await putImageObject(admin, "images-preview", `thumbs/${originalPath}`, thumbnail, {
+      contentType: "image/jpeg",
+      cacheControl: "public, max-age=31536000, immutable",
+    });
+  } catch (uploadError) {
+    return NextResponse.json({
+      error: `Preview upload failed: ${uploadError instanceof Error ? uploadError.message : "unknown"}`,
+    }, { status: 500 });
   }
 
   await recordOperationalEvent({

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { removeImageObjects } from "@/lib/storage/image-storage-server";
+
 import { detachImageFromAboutPage } from "@/lib/about/library-assets";
 import { detachImageFromAuthPages } from "@/lib/auth/library-assets";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -192,21 +194,30 @@ export async function removeHardDeleteStorageFiles(
   }
 
   if (paths.originals.length > 0) {
-    const { error } = await admin.storage.from("images-original").remove(paths.originals);
-    if (error) errors.push(`original: ${error.message}`);
-    else removed += paths.originals.length;
+    try {
+      await removeImageObjects(admin, "images-original", paths.originals);
+      removed += paths.originals.length;
+    } catch (error) {
+      errors.push(`original: ${error instanceof Error ? error.message : "remove failed"}`);
+    }
   }
 
   if (paths.previews.length > 0) {
-    const { error } = await admin.storage.from("images-preview").remove(paths.previews);
-    if (error) errors.push(`preview: ${error.message}`);
-    else removed += paths.previews.length;
+    try {
+      await removeImageObjects(admin, "images-preview", paths.previews);
+      removed += paths.previews.length;
+    } catch (error) {
+      errors.push(`preview: ${error instanceof Error ? error.message : "remove failed"}`);
+    }
   }
 
   if (paths.analysis.length > 0) {
-    const { error } = await admin.storage.from("images-analysis").remove(paths.analysis);
-    if (error) errors.push(`analysis: ${error.message}`);
-    else removed += paths.analysis.length;
+    try {
+      await removeImageObjects(admin, "images-analysis", paths.analysis);
+      removed += paths.analysis.length;
+    } catch (error) {
+      errors.push(`analysis: ${error instanceof Error ? error.message : "remove failed"}`);
+    }
   }
 
   return { paths, errors, removed };

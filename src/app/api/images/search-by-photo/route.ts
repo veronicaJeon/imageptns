@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { previewUrl } from "@/lib/supabase/storage";
 import { createImageFingerprint, type ImageFingerprint } from "@/lib/images/fingerprint";
 import { readKeywordFirstSearchThresholds } from "@/lib/images/keyword-first-search";
 import { getSemanticImageSearchConfig } from "@/lib/images/semantic-embedding";
@@ -286,7 +287,7 @@ export async function POST(req: NextRequest) {
             const images = semanticIds.flatMap((imageId) => {
               const image = semanticById.get(imageId);
               if (!image || !buyerCanViewImage(image) || !image.storage_path_preview) return [];
-              const src = admin.storage.from("images-preview").getPublicUrl(image.storage_path_preview).data.publicUrl;
+              const src = previewUrl(image.storage_path_preview);
               return [{
                 id: image.id,
                 assetId: image.asset_id,
@@ -320,7 +321,7 @@ export async function POST(req: NextRequest) {
     if (!image) return [];
     let src = "";
     if (image.storage_path_preview) {
-      src = admin.storage.from("images-preview").getPublicUrl(image.storage_path_preview).data.publicUrl;
+      src = previewUrl(image.storage_path_preview);
     }
     return [{
       id: image.id,

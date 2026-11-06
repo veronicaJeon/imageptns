@@ -9,10 +9,15 @@ if (!configPath) {
 }
 
 const buildOnlyPrefixes = ["NX_", "TURBO_", "VERCEL"];
+const plainTextVariableNames = new Set([
+  "OPERATIONS_DAILY_REVIEW_ENABLED",
+  "R2_IMAGE_STORAGE_ENABLED",
+]);
 const source = parseEnv(readFileSync(".dev.vars", "utf8"));
 const secrets = Object.fromEntries(
   Object.entries(source).filter(
-    ([key]) => !buildOnlyPrefixes.some((prefix) => key.startsWith(prefix)),
+    ([key]) => !buildOnlyPrefixes.some((prefix) => key.startsWith(prefix))
+      && !plainTextVariableNames.has(key),
   ),
 );
 

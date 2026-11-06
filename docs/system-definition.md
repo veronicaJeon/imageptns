@@ -42,14 +42,15 @@ flowchart LR
     U["비회원·구매자·사진작가·관리자"] --> W["Next.js 16 웹·Route Handlers"]
     W --> A["Supabase Auth"]
     W --> D["Supabase Postgres·RLS"]
-    W --> S["Supabase Storage"]
+    W --> S["Supabase Storage: 기존 이미지·사이트 자산"]
+    W --> R2["Cloudflare R2: 신규 원본·분석본·미리보기"]
     W --> M["Mistral 이미지 분석 API"]
     W --> R["Resend 발신·수신 Webhook"]
     A --> R
     W -. "현재 비공개" .-> T["Toss Payments"]
     W -. "현재 비공개" .-> C["Base·Arweave"]
     C["Cloudflare Cron Trigger"] --> W
-    W -. "Sharp 임시 분리" .-> V["Vercel 이미지 처리 origin"]
+    W --> I["Cloudflare Images 이미지 처리 Worker"]
     G["GitHub Actions"] --> W
     W --> O["운영 이벤트·관리자 모니터링"]
 ```
@@ -57,8 +58,8 @@ flowchart LR
 | 계층 | 구현 기준 |
 | --- | --- |
 | 웹·API | Next.js App Router, React 19, TypeScript, `src/app`, `src/components`, `src/lib` |
-| 배포 | Cloudflare Workers/OpenNext 전환 준비 중. 운영 도메인은 전환 전까지 Vercel, Sharp 경로는 전환 후에도 임시 Vercel origin 사용 |
-| 인증·DB·파일 | Supabase Auth, Postgres, RLS, Storage, 순방향 SQL 마이그레이션 |
+| 배포 | Cloudflare Workers/OpenNext가 운영 도메인과 일반·관리자·이미지 처리 API를 담당 |
+| 인증·DB·파일 | Supabase Auth·Postgres·RLS, 기존 Supabase Storage와 신규 Cloudflare R2의 이중 읽기, 순방향 SQL 마이그레이션 |
 | 상태 관리 | React Query, Zustand; 개인 목록 API는 `private, no-store` 원칙 |
 | 검증 | Vitest, ESLint, TypeScript, Next production build, fresh Supabase migration lint |
 | 운영 | `/api/health`, GitHub 외부 모니터, 관리자 운영 모니터링, Cloudflare Cron Trigger(전환 후) |
@@ -147,6 +148,7 @@ flowchart LR
 
 Storage 경계:
 
+- 기존 이미지 경로는 Supabase Storage에 유지한다. `r2/`로 시작하는 신규 경로는 Cloudflare R2의 동일 논리 버킷 아래 저장하며, 코드가 경로와 DB 공급자 필드로 저장소를 선택한다.
 - `images-original`: 업로드 원본. 소유자 업로드와 서버 처리 전용이며 공개 읽기 금지
 - `images-analysis`: 방향 보정·축소·메타데이터 제거를 마친 무워터마크 분석 사본. 서비스 역할의 임베딩·캡션·워터마크 생성 경로만 읽고 공개·로그인 사용자 읽기 정책은 두지 않음
 - `images-preview`: 공개 가능한 워터마크·썸네일 파생본
@@ -154,19 +156,21 @@ Storage 경계:
 - `avatars`: 공개 프로필 이미지
 - `site-assets`: 회사소개 등 사이트 전시용 파생 자산
 
+`R2_IMAGE_STORAGE_ENABLED=false`에서는 신규 업로드도 기존 Supabase 경로를 사용한다. R2 버킷 binding, 마이그레이션 081, 헬스체크와 인증된 업로드 E2E가 준비된 뒤에만 `true`로 바꾼다. 전환 후 신규 원본·분석본·워터마크 미리보기·썸네일은 R2에 저장하고, 기존 Supabase 파일은 별도 검증된 백필 전까지 이동하거나 삭제하지 않는다. R2의 원본·분석본은 비공개이며 공개 API는 `images-preview` 경로만 제공한다.
+
 DB 스키마의 유일한 변경 경로는 `supabase/migrations`의 순번 마이그레이션이다. 운영에 적용된 마이그레이션은 수정하지 않는다.
 
 ## 6. 외부 연동과 장애 시 동작
 
 | 연동 | 현재 용도 | 실패 시 기준 |
 | --- | --- | --- |
-| Supabase | 인증, DB, Storage | 핵심 기능 장애. health·외부 모니터 경보 후 Vercel·Supabase 상태와 로그 대조 |
+| Supabase | 인증, DB, 기존 이미지·사이트 자산 Storage | 핵심 기능 장애. health·외부 모니터 경보 후 Supabase 상태와 로그 대조 |
 | Mistral | 선택적 이미지 메타데이터 생성 | 업로드 자체를 막지 않고 수동 입력을 제공. 합성 진단 36시간 초과 또는 실패 시 운영 경보 |
 | xAI·Google Gemini | 공개 GitHub 유지보수 근거의 독립 검수·위험 반론·개선 아이디어 | 실패·키 미설정·한도 초과를 비차단 보고하며 코드 수정과 후보 승인에는 사용하지 않음 |
 | Resend | 계정·권한·정산·반려·이미지 의뢰 알림, 주문 거래문서, 문의 수신 Webhook, Auth SMTP | 주문 메일은 outbox에 성공·실패를 남기고 재전송. 업로드 완료·이미지 승인 메일은 보내지 않으며 전달 상태·Webhook 서명·운영 수신함과 핵심 메일 E2E를 정기 회귀 |
 | Google | OAuth와 운영 Gmail 수신함 | 이메일 가입과 직접 운영 수신함을 대체 경로로 유지 |
-| Cloudflare | 전환 후 웹 호스팅·일반 API·Cron | Workers 로그·외부 헬스체크를 사용하고 Custom Domain을 Vercel로 되돌려 롤백 |
-| Vercel | 전환 전 웹 호스팅, 전환 후 Sharp 이미지 처리 임시 origin | `legacy-origin.imagepartners.kr` 경로 오류를 별도 관찰하고 Cloudflare 이미지 처리 계층 검증 후 제거 |
+| Cloudflare | 웹 호스팅·일반 API·이미지 처리·Cron·신규 R2 이미지 저장 | Workers 로그·외부 헬스체크를 사용한다. R2 장애 시 신규 업로드를 503으로 중단하고 기존 Supabase 이미지는 계속 제공한다. |
+| Vercel | 과거 운영 origin과 롤백 이력 | 신규 저장·일반 요청 경로로 사용하지 않음 |
 | Toss | 온라인 카드결제 | 현재 공개하지 않음 |
 | Base·Arweave | 온체인 결제·원본 증명 | 결제는 현재 공개하지 않음. 이미 존재하는 증명은 삭제 정책에서 보존 |
 
@@ -178,6 +182,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 - 연락처·활동 지역·소개 같은 개인정보는 URL 쿼리나 OAuth `redirectTo`에 싣지 않는다.
 - 비공개 원본과 서비스 역할 키는 클라이언트에 노출하지 않는다.
 - 비공개 분석 사본 경로와 무워터마크 파일은 공개 API·브라우저·로그에 노출하지 않고, 완전삭제·실패·만료 정리에서 원본과 함께 제거한다.
+- R2 공개 조회 route는 `images-preview`의 `r2/`·`thumbs/r2/` 경로만 허용한다. 원본·분석본은 구매자·관리자 권한을 다시 검사하는 서버 route에서만 읽는다.
 - AI 분석은 승인된 사진작가만 사용하며 요청 크기·형식과 시간·일간 쿼터를 검사한다.
 - 업로드는 소유권, 만료, 미사용 세션을 확인하고 실패·만료 원본을 자동 정리한다.
 - 중복 후보는 `duplicate_review_status=required`인 동안 DB 제약으로 공개할 수 없다. 관리자가 후보와 비교하고 사유를 남겨 `overridden`으로 승인한 경우에만 공개할 수 있다.
@@ -198,11 +203,11 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | --- | --- |
 | CI | main/develop push·PR에서 운영 의존성 audit, 타입, 린트, 테스트, 빌드; 새 Supabase DB 마이그레이션·lint |
 | 배포 | Cloudflare 전환 전에는 Vercel Production, 전환 시에는 OpenNext Worker `workers.dev` 검증 후 Custom Domain 연결. 세부 절차는 Cloudflare 전환 런북 준수 |
-| 가용성 | GitHub Actions가 15분 간격으로 `/api/health`를 호출해 DB·Storage·순환 이미지 샘플·AI·일일 운영 점검·main/Production SHA를 확인하고 실패 이슈를 자동 생성·복구 종료 |
+| 가용성 | GitHub Actions가 15분 간격으로 `/api/health`를 호출해 DB·Supabase Storage·R2 binding·순환 이미지 샘플·AI·일일 운영 점검·main/Production SHA를 확인하고 실패 이슈를 자동 생성·복구 종료 |
 | 일일 운영관리 | 2026-11-02부터 고비용 Mistral·인덱싱·전체 운영검토를 중단한다. 데이터 보존·만료 업로드 정리만 매일 유지하며 재개 시 플래그와 스케줄을 함께 복원한다. |
 | 주간 제품 발견 | Codex Scheduled task가 신규 변경, 7일·30일 운영 추세와 구매자·사진가·관리자 여정을 종합 검토해 오류 외에도 가치·운영 효율·발견성·품질 개선 후보를 최대 3건 제안한다. |
 | 주간 유지보수 | GitHub Actions가 매일 예약 기동 후 마지막 성공으로부터 7일이 지난 경우 audit·코드·fresh DB·운영 smoke·릴리스 정합성을 실행하고 고정 ID 후보 이슈를 누적한다. 승인 후보의 실제 개발은 Codex Scheduled task가 한 건씩 수행한다. |
-| Health | DB, Storage, 최근 공개 JPEG 무결성, Mistral 합성 진단 최신성 |
+| Health | DB, Supabase Storage, 활성화된 R2 binding, 최근 공개 JPEG 무결성, Mistral 합성 진단 최신성 |
 | 예약 작업 | 매일 02:00 UTC 데이터·업로드·반려·한도 정리. 03:00 UTC Mistral·전체 운영점검은 중단 |
 | 관측 | 관리자 운영 모니터링에 최근 24시간 가용성·응답·서버 오류·AI 이벤트를, 에이전트 활동현황에 GitHub 검사·Grok·Gemini 자문·Codex 대기열과 PR을 표시 |
 | 리전 | 전환 후 Cloudflare Smart Placement, 임시 Sharp Vercel `icn1`, Supabase 운영 프로젝트와 로컬 프로젝트 분리 |
@@ -221,7 +226,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | --- | --- |
 | 공개 앱 설정 | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
 | 서버 비밀 | `SUPABASE_SERVICE_ROLE_KEY`, `MISTRAL_API_KEY`, `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `CRON_SECRET` |
-| 배포·운영 제어 | `APP_RELEASE_SHA`, `APP_RELEASE_REF`, `OPERATIONS_DAILY_REVIEW_ENABLED`; Cloudflare의 `LEGACY_IMAGE_ORIGIN`은 비밀이 아닌 Worker 변수 |
+| 배포·운영 제어 | `APP_RELEASE_SHA`, `APP_RELEASE_REF`, `OPERATIONS_DAILY_REVIEW_ENABLED`, `R2_IMAGE_STORAGE_ENABLED` |
 | 메일 운영 | `RESEND_FROM_EMAIL`, `OPS_EMAIL`, 진단용 `GMAIL_SMTP_USER`, `GMAIL_SMTP_PASS` |
 | AI 한도 | `AI_ANALYSIS_HOURLY_LIMIT`, `AI_ANALYSIS_DAILY_LIMIT` |
 | 의미 검색·보조 캡션 | `SEMANTIC_IMAGE_SEARCH_ENABLED`, `SEMANTIC_IMAGE_INDEXING_ENABLED`, `SEMANTIC_IMAGE_QUERY_ENABLED`, `SEMANTIC_EMBEDDING_PROVIDER`, `SEMANTIC_EMBEDDING_MODEL`, `SEMANTIC_EMBEDDING_MODEL_VERSION`, `SEMANTIC_EMBEDDING_DIMENSIONS`, `KEYWORD_SEARCH_STRONG_THRESHOLD`, `SEMANTIC_SEARCH_MIN_SIMILARITY`, `VOYAGE_API_KEY`; NVIDIA는 `NVIDIA_API_KEY`, `NVIDIA_CAPTIONING_ENABLED`, `NVIDIA_API_PRODUCTION_ENTITLED`, `NVIDIA_CAPTION_MODEL`, `NVIDIA_CAPTION_MODEL_VERSION` |

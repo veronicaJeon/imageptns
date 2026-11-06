@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { previewUrl as publicPreviewUrl } from "@/lib/supabase/storage";
 import { categoryCodesForImage, getImageCategoryCodeMap, getImageIdsForCategory } from "@/lib/images/category-server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -198,13 +199,6 @@ export async function GET(
     })),
   ).slice(0, 4).map(({ image: candidate }) => candidate);
 
-  // Convert storage paths → public URLs
-  function previewUrl(path: string | null | undefined): string {
-    if (!path) return "";
-    const { data } = admin.storage.from("images-preview").getPublicUrl(path);
-    return data.publicUrl;
-  }
-
   // Photographer display name: full_name → email prefix fallback
   const photographer = imagePhotographer(image.photographer);
   let photographerName: string = photographer?.full_name?.trim() ?? "";
@@ -217,7 +211,7 @@ export async function GET(
     image: {
       ...image,
       category_codes: currentCategoryCodes,
-      storage_path_preview: previewUrl(image.storage_path_preview),
+      storage_path_preview: publicPreviewUrl(image.storage_path_preview),
       photographer: photographer
         ? { ...photographer, display_name: photographerName }
         : null,
@@ -231,7 +225,7 @@ export async function GET(
       categoryCodes: categoryCodesForImage(similarCategoryMap, s.id, s.category),
       photographerId: s.photographer_id,
       photographer: firstPhotographer(s.photographer)?.full_name ?? "",
-      src: previewUrl(s.storage_path_preview),
+      src: publicPreviewUrl(s.storage_path_preview),
       alt: s.title,
       width: s.width ?? 600,
       height: s.height ?? 400,

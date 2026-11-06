@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { downloadImageObject } from "@/lib/storage/image-storage-server";
 import { getAddress } from "viem";
 import { forbidden, requireAdminUser } from "@/lib/admin/auth";
 import { assertArweaveConfigured, uploadBufferToArweave, verifyArweaveTransactions } from "@/lib/arweave/client";
@@ -317,10 +318,8 @@ export async function POST(req: NextRequest) {
 
   try {
     for (const image of eligible) {
-      const original = await admin.storage.from("images-original").download(image.storage_path_original!);
-      if (original.error || !original.data) throw original.error ?? new Error("Original image download failed");
-
-      const originalBuffer = Buffer.from(await original.data.arrayBuffer());
+      const original = await downloadImageObject(admin, "images-original", image.storage_path_original!);
+      const originalBuffer = Buffer.from(await original.arrayBuffer());
       const originalFileSha256 = sha256Buffer(originalBuffer);
       const contentHash = canonicalImageProofHash({
         assetId: image.asset_id!,

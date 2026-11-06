@@ -3,6 +3,7 @@ import "server-only";
 import { detachImageFromAboutPage } from "@/lib/about/library-assets";
 import { detachImageFromAuthPages } from "@/lib/auth/library-assets";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { removeImageObjects } from "@/lib/storage/image-storage-server";
 import {
   assessImageDeletion,
   deletionImpactMessage,
@@ -54,9 +55,12 @@ async function removeStorageFiles(
 
   const originalPaths = uniqueStrings([image.storage_path_original, image.storage_path_full]);
   if (originalPaths.length > 0) {
-    const { error } = await admin.storage.from("images-original").remove(originalPaths);
-    if (error) errors.push(`original: ${error.message}`);
-    else removed = true;
+    try {
+      await removeImageObjects(admin, "images-original", originalPaths);
+      removed = true;
+    } catch (error) {
+      errors.push(`original: ${error instanceof Error ? error.message : "remove failed"}`);
+    }
   }
 
   const previewPaths = uniqueStrings([
@@ -64,9 +68,12 @@ async function removeStorageFiles(
     image.storage_path_preview ? `thumbs/${image.storage_path_preview}` : null,
   ]);
   if (previewPaths.length > 0) {
-    const { error } = await admin.storage.from("images-preview").remove(previewPaths);
-    if (error) errors.push(`preview: ${error.message}`);
-    else removed = true;
+    try {
+      await removeImageObjects(admin, "images-preview", previewPaths);
+      removed = true;
+    } catch (error) {
+      errors.push(`preview: ${error instanceof Error ? error.message : "remove failed"}`);
+    }
   }
 
   return { removed, errors };

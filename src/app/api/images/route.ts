@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { previewUrl } from "@/lib/supabase/storage";
 import { categoryCodesForImage, getImageCategoryCodeMap, getImageIdsForCategory } from "@/lib/images/category-server";
 import { resolveOrientationSearch, type OrientationFilter } from "@/lib/images/orientation-search";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -134,13 +135,7 @@ export async function GET(req: NextRequest) {
       const hasMoreRpc = rawRpc.length > limit;
       const slicedRpc = hasMoreRpc ? rawRpc.slice(0, limit) : rawRpc;
       const images = (slicedRpc as SearchImageRpcRow[]).map((img) => {
-        let src = "";
-        if (img.storage_path_preview) {
-          const { data: urlData } = supabase.storage
-            .from("images-preview")
-            .getPublicUrl(img.storage_path_preview);
-          src = urlData.publicUrl;
-        }
+        const src = previewUrl(img.storage_path_preview);
         return {
           id:           img.id,
           assetId:      img.asset_id,
@@ -182,13 +177,7 @@ export async function GET(req: NextRequest) {
   const categoryMap = await getImageCategoryCodeMap(supabase, sliced.map((img) => img.id));
 
   const images = (sliced as ImageListRow[]).map((img) => {
-    let src = "";
-    if (img.storage_path_preview) {
-      const { data: urlData } = supabase.storage
-        .from("images-preview")
-        .getPublicUrl(img.storage_path_preview);
-      src = urlData.publicUrl;
-    }
+    const src = previewUrl(img.storage_path_preview);
     return {
       id:           img.id,
       assetId:      img.asset_id,

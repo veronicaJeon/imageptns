@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import type { createAdminClient } from "@/lib/supabase/admin";
-import { storageBinaryBody } from "@/lib/supabase/storage-body";
+import { downloadImageObject, putImageObject } from "@/lib/storage/image-storage-server";
 import {
   ANALYSIS_DERIVATIVE_MAX_BYTES,
   ANALYSIS_DERIVATIVE_VERSION,
@@ -27,8 +27,13 @@ export interface StoredAnalysisDerivative extends AnalysisDerivative {
 }
 
 async function downloadStoredDerivative(admin: AdminClient, path: string): Promise<StoredAnalysisDerivative> {
-  const { data, error } = await admin.storage.from("images-analysis").download(path);
-  if (error || !data || data.size < 1 || data.size > ANALYSIS_DERIVATIVE_MAX_BYTES) {
+  let data: Blob;
+  try {
+    data = await downloadImageObject(admin, "images-analysis", path);
+  } catch {
+    throw new AnalysisDerivativeError("ANALYSIS_DERIVATIVE_DOWNLOAD_FAILED", true);
+  }
+  if (data.size < 1 || data.size > ANALYSIS_DERIVATIVE_MAX_BYTES) {
     throw new AnalysisDerivativeError("ANALYSIS_DERIVATIVE_DOWNLOAD_FAILED", true);
   }
   const bytes = Buffer.from(await data.arrayBuffer());
@@ -57,12 +62,13 @@ export async function ensureAnalysisDerivative(
     throw new AnalysisDerivativeError("ANALYSIS_SOURCE_MISSING", false);
   }
 
-  const { data: original, error: downloadError } = await admin.storage
-    .from("images-original")
-    .download(image.storage_path_original);
-  if (downloadError || !original || original.size < 1) {
+  let original: Blob;
+  try {
+    original = await downloadImageObject(admin, "images-original", image.storage_path_original);
+  } catch {
     throw new AnalysisDerivativeError("ANALYSIS_SOURCE_DOWNLOAD_FAILED", true);
   }
+  if (original.size < 1) throw new AnalysisDerivativeError("ANALYSIS_SOURCE_DOWNLOAD_FAILED", true);
 
   let derivative;
   try {
@@ -74,13 +80,14 @@ export async function ensureAnalysisDerivative(
     throw new AnalysisDerivativeError("ANALYSIS_DERIVATIVE_INVALID", false);
   }
   const path = analysisDerivativePath(image.storage_path_original);
-  const { error: uploadError } = await admin.storage
-    .from("images-analysis")
-    .upload(path, storageBinaryBody(derivative.bytes), {
+  try {
+    await putImageObject(admin, "images-analysis", path, derivative.bytes, {
       contentType: derivative.mimeType,
-      upsert: true,
+      cacheControl: "private, no-store",
     });
-  if (uploadError) throw new AnalysisDerivativeError("ANALYSIS_DERIVATIVE_UPLOAD_FAILED", true);
+  } catch {
+    throw new AnalysisDerivativeError("ANALYSIS_DERIVATIVE_UPLOAD_FAILED", true);
+  }
 
   const { error: updateError } = await admin.from("images").update({
     storage_path_analysis: path,

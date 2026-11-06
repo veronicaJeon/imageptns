@@ -1,4 +1,5 @@
 import path from "node:path";
+import { R2_STORAGE_PATH_PREFIX } from "../storage/image-path";
 import {
   MAX_UPLOAD_FILE_BYTES,
   MAX_UPLOAD_IMAGE_PIXELS,
@@ -24,8 +25,16 @@ export function uploadPathBelongsToUser(storagePath: unknown, userId: string) {
     return false;
   }
 
-  const [ownerId, filename, ...rest] = normalized.split("/");
-  return ownerId === userId && Boolean(filename) && rest.length === 0;
+  const parts = normalized.split("/");
+  if (parts.length === 2) {
+    const [ownerId, filename] = parts;
+    return ownerId === userId && Boolean(filename);
+  }
+  if (parts.length === 3 && `${parts[0]}/` === R2_STORAGE_PATH_PREFIX) {
+    const [, ownerId, filename] = parts;
+    return ownerId === userId && Boolean(filename);
+  }
+  return false;
 }
 
 export function normalizeUploadFileSize(value: unknown) {

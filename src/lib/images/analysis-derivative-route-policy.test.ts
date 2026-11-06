@@ -14,7 +14,7 @@ describe("private analysis derivative route policy", () => {
     expect(uploadRoute.indexOf("createAnalysisDerivative(buffer")).toBeLessThan(
       uploadRoute.indexOf("const watermarked = await applyWatermarkToAnalysisDerivative"),
     );
-    expect(uploadRoute).toContain('.from("images-analysis")');
+    expect(uploadRoute).toContain('putImageObject(admin, "images-analysis", analysisPath');
     expect(uploadRoute).toContain("storage_path_analysis: analysisPath");
     expect(uploadRoute).toContain("storage_path_analysis: undefined");
     expect(derivative).toContain("transformImageWithCloudflareDetails");
@@ -30,6 +30,6 @@ describe("private analysis derivative route policy", () => {
 
   it("removes clean derivatives during hard deletion", () => {
     expect(hardDelete).toContain("analysis: uniqueStrings([image.storage_path_analysis])");
-    expect(hardDelete).toContain('.from("images-analysis").remove(paths.analysis)');
+    expect(hardDelete).toContain('removeImageObjects(admin, "images-analysis", paths.analysis)');
   });
 });

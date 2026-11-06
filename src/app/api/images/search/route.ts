@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { previewUrl } from "@/lib/supabase/storage";
 import { getImageIdsForCategory } from "@/lib/images/category-server";
 import {
   chooseKeywordFirstSearchResults,
@@ -51,10 +52,8 @@ function boundedInteger(value: string | null, fallback: number, minimum: number,
   return Number.isInteger(parsed) ? Math.min(Math.max(parsed, minimum), maximum) : fallback;
 }
 
-function imageResponse(admin: ReturnType<typeof createAdminClient>, image: ImageRow) {
-  const src = image.storage_path_preview
-    ? admin.storage.from("images-preview").getPublicUrl(image.storage_path_preview).data.publicUrl
-    : "";
+function imageResponse(_admin: ReturnType<typeof createAdminClient>, image: ImageRow) {
+  const src = previewUrl(image.storage_path_preview);
   return {
     id: image.id,
     assetId: image.asset_id,
