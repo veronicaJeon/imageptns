@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync("supabase/migrations/072_semantic_backfill_and_caption_queue.sql", "utf8");
+const triggerSecurityMigration = readFileSync(
+  "supabase/migrations/082_secure_image_search_trigger.sql",
+  "utf8",
+);
 
 describe("semantic production queue migration", () => {
   it("backfills only approved active published previews in bounded batches", () => {
@@ -24,5 +28,18 @@ describe("semantic production queue migration", () => {
     expect(migration).toContain("for update skip locked");
     expect(migration).toContain("attempt_count < 3");
     expect(migration).toContain("caption_row.claim_token = p_claim_token");
+  });
+
+  it("lets the image trigger read private captions without exposing the table", () => {
+    expect(triggerSecurityMigration).toContain(
+      "alter function public.update_image_fts() security definer",
+    );
+    expect(triggerSecurityMigration).toContain(
+      "alter function public.update_image_fts() set search_path = public",
+    );
+    expect(triggerSecurityMigration).toContain(
+      "revoke all on function public.update_image_fts() from public, anon, authenticated",
+    );
+    expect(triggerSecurityMigration).not.toMatch(/grant\s+.*image_ai_captions/i);
   });
 });

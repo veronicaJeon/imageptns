@@ -22,6 +22,9 @@ describe("Cloudflare migration boundary", () => {
 
   it("builds the Next application with OpenNext on Workers", () => {
     expect(packageJson).toContain('"build:cloudflare": "node scripts/build-cloudflare.mjs"');
+    expect(packageJson).toContain(
+      '"deploy:cloudflare": "npm run build:cloudflare && npm run deploy:cloudflare:image-runtime',
+    );
     expect(buildScript).toContain('spawn(executable, ["build"]');
     expect(buildScript).toContain("bundle-cloudflare-api.mjs");
     expect(readFileSync("scripts/bundle-cloudflare-api.mjs", "utf8")).toContain(

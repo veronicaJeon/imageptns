@@ -403,6 +403,9 @@ async function main() {
         });
         assert(archived.response.status === 200, `Archive cleanup expected 200, got ${archived.response.status}`);
       });
+      await cleanup("completed deletion request", () =>
+        admin.from("image_deletion_requests").delete().eq("image_id", createdImageId),
+      );
       await cleanup("purge uploaded image", async () => {
         const purged = await api(`/api/uploads/${createdImageId}`, {
           cookie: approvedCookie,

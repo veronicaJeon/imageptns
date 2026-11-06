@@ -156,7 +156,7 @@ Storage 경계:
 - `avatars`: 공개 프로필 이미지
 - `site-assets`: 회사소개 등 사이트 전시용 파생 자산
 
-`R2_IMAGE_STORAGE_ENABLED=false`에서는 신규 업로드도 기존 Supabase 경로를 사용한다. R2 버킷 binding, 마이그레이션 081, 헬스체크와 인증된 업로드 E2E가 준비된 뒤에만 `true`로 바꾼다. 전환 후 신규 원본·분석본·워터마크 미리보기·썸네일은 R2에 저장하고, 기존 Supabase 파일은 별도 검증된 백필 전까지 이동하거나 삭제하지 않는다. R2의 원본·분석본은 비공개이며 공개 API는 `images-preview` 경로만 제공한다.
+`R2_IMAGE_STORAGE_ENABLED=false`에서는 신규 업로드도 기존 Supabase 경로를 사용한다. 2026-11-06 R2 버킷 binding, 마이그레이션 081·082, 헬스체크와 인증된 업로드 E2E를 확인하고 운영을 `true`로 전환했다. 신규 원본·분석본·워터마크 미리보기·썸네일은 R2에 저장하고, 기존 Supabase 파일은 별도 검증된 백필 전까지 이동하거나 삭제하지 않는다. R2의 원본·분석본은 비공개이며 공개 API는 `images-preview` 경로만 제공한다.
 
 DB 스키마의 유일한 변경 경로는 `supabase/migrations`의 순번 마이그레이션이다. 운영에 적용된 마이그레이션은 수정하지 않는다.
 
