@@ -22,6 +22,9 @@ describe("R2 image storage transition policy", () => {
     expect(presign).toContain("Image storage temporarily unavailable");
     expect(r2Upload).toContain('storage_provider", "r2"');
     expect(r2Upload).toContain("requireApprovedPhotographer");
+    expect(r2Upload).toContain("await req.arrayBuffer()");
+    expect(r2Upload).toContain("uploadBytes.byteLength !== declaredSize");
+    expect(r2Upload).toContain("r2.put(key, uploadBytes");
     for (const config of [apiWrangler, adminWrangler]) {
       expect(config).toContain('"binding": "IMAGE_STORAGE"');
       expect(config).toContain('"bucket_name": "imagepartners-images"');

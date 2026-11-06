@@ -59,8 +59,12 @@ export async function PUT(
   if (contentLength != null && (!Number.isFinite(contentLength) || contentLength !== declaredSize)) {
     return NextResponse.json({ error: "Uploaded file size does not match the upload session" }, { status: 400 });
   }
-  if (!req.body) {
+  const uploadBytes = await req.arrayBuffer();
+  if (uploadBytes.byteLength === 0) {
     return NextResponse.json({ error: "Uploaded file is empty" }, { status: 400 });
+  }
+  if (uploadBytes.byteLength !== declaredSize) {
+    return NextResponse.json({ error: "Uploaded file size does not match the upload session" }, { status: 400 });
   }
 
   const r2 = await imageR2Bucket();
@@ -68,7 +72,7 @@ export async function PUT(
 
   const key = imageStorageObjectKey("images-original", session.storage_path);
   try {
-    const object = await r2.put(key, req.body, {
+    const object = await r2.put(key, uploadBytes, {
       httpMetadata: { contentType: session.content_type, cacheControl: "private, no-store" },
     });
     if (object.size !== declaredSize) {

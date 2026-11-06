@@ -3,6 +3,8 @@
 // Usage:
 // PRODUCTION_ENV_FILE=/secure/vercel-production.env \
 //   node scripts/production-photographer-e2e.mjs --confirm-production
+// Or provide NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and
+// SUPABASE_SERVICE_ROLE_KEY directly in the process environment.
 //
 // The script always attempts to remove its temporary users, image objects,
 // upload sessions, and rate-limit bucket, including after a failed assertion.
@@ -59,9 +61,9 @@ async function main() {
     "Pass --confirm-production to acknowledge that this creates temporary users and upload sessions in production",
   );
   const envPath = process.env.PRODUCTION_ENV_FILE;
-  assert(envPath, "PRODUCTION_ENV_FILE must point to a Vercel production env file");
-
-  const fileEnv = parseEnvFile(await readFile(envPath, "utf8"));
+  const fileEnv = envPath
+    ? parseEnvFile(await readFile(envPath, "utf8"))
+    : process.env;
   const supabaseUrl = fileEnv.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = fileEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceRoleKey = fileEnv.SUPABASE_SERVICE_ROLE_KEY;
@@ -109,6 +111,7 @@ async function main() {
   const createdUserIds = [];
   const createdStoragePaths = new Set();
   let createdImageId = null;
+  let approvedCookie = null;
   let testError = null;
   const results = [];
 
@@ -174,11 +177,13 @@ async function main() {
     for (const key of Object.keys(accounts)) await createAccount(key);
     results.push("임시 계정 3개 생성 및 운영 인증: 통과");
 
-    const [pendingCookie, approvedCookie, reviewerCookie] = await Promise.all([
+    const cookies = await Promise.all([
       authenticatedCookies(accounts.pending),
       authenticatedCookies(accounts.approved),
       authenticatedCookies(accounts.reviewer),
     ]);
+    const [pendingCookie, approvedCookieValue, reviewerCookie] = cookies;
+    approvedCookie = approvedCookieValue;
 
     const pendingList = await api("/api/uploads", { cookie: pendingCookie });
     assert(pendingList.response.status === 403, `Pending upload list expected 403, got ${pendingList.response.status}`);
@@ -216,26 +221,42 @@ async function main() {
       .toBuffer();
     const title = `운영 E2E 업로드 ${runId}`;
     const presign = await api("/api/uploads/presign", {
-      cookie: approvedCookie,
+      cookie: approvedCookieValue,
       method: "POST",
       body: { filename: `${runId}.jpg`, contentType: "image/jpeg", fileSize: jpeg.length },
     });
     assert(presign.response.status === 200, `Approved presign expected 200, got ${presign.response.status}`);
-    assert(presign.data?.storagePath && presign.data?.token && presign.data?.uploadSessionId, "Presign payload is incomplete");
+    assert(
+      presign.data?.storagePath && presign.data?.uploadUrl && presign.data?.uploadSessionId,
+      "Presign payload is incomplete",
+    );
     createdStoragePaths.add(presign.data.storagePath);
 
-    const { error: storageError } = await publicClient.storage
-      .from("images-original")
-      .uploadToSignedUrl(
-        presign.data.storagePath,
-        presign.data.token,
-        jpeg.buffer.slice(jpeg.byteOffset, jpeg.byteOffset + jpeg.byteLength),
-        { contentType: "image/jpeg" },
-      );
-    if (storageError) throw storageError;
+    if (presign.data.uploadUrl.startsWith("/api/uploads/r2/")) {
+      const r2Upload = await fetch(`${baseUrl}${presign.data.uploadUrl}`, {
+        method: "PUT",
+        headers: {
+          Cookie: approvedCookieValue,
+          "Content-Type": "image/jpeg",
+        },
+        body: jpeg,
+      });
+      assert(r2Upload.ok, `R2 upload expected 2xx, got ${r2Upload.status}: ${await r2Upload.text()}`);
+    } else {
+      assert(presign.data.token, "Supabase presign token is missing");
+      const { error: storageError } = await publicClient.storage
+        .from("images-original")
+        .uploadToSignedUrl(
+          presign.data.storagePath,
+          presign.data.token,
+          jpeg.buffer.slice(jpeg.byteOffset, jpeg.byteOffset + jpeg.byteLength),
+          { contentType: "image/jpeg" },
+        );
+      if (storageError) throw storageError;
+    }
 
     const upload = await api("/api/uploads", {
-      cookie: approvedCookie,
+      cookie: approvedCookieValue,
       method: "POST",
       body: {
         title,
@@ -257,7 +278,25 @@ async function main() {
     assert(createdImageId, "Uploaded image id is missing");
     assert(upload.data.image.status === "pending" && upload.data.image.is_published === false, "New upload state is incorrect");
 
-    const ownerPending = await api("/api/uploads", { cookie: approvedCookie });
+    const { data: storedImage, error: storedImageError } = await admin
+      .from("images")
+      .select("storage_provider_original, storage_provider_analysis, storage_provider_preview, storage_provider_full, storage_path_original")
+      .eq("id", createdImageId)
+      .single();
+    if (storedImageError) throw storedImageError;
+    assert(
+      [
+        storedImage.storage_provider_original,
+        storedImage.storage_provider_analysis,
+        storedImage.storage_provider_preview,
+        storedImage.storage_provider_full,
+      ].every((provider) => provider === "r2"),
+      `Expected every image asset provider to be r2: ${JSON.stringify(storedImage)}`,
+    );
+    assert(storedImage.storage_path_original.startsWith("r2/"), "R2 image path prefix is missing");
+    results.push("신규 원본·분석·미리보기·전체 이미지 R2 저장: 통과");
+
+    const ownerPending = await api("/api/uploads", { cookie: approvedCookieValue });
     assert(ownerPending.response.status === 200, `Owner uploads expected 200, got ${ownerPending.response.status}`);
     const ownerPendingImage = ownerPending.data?.uploads?.find((image) => image.id === createdImageId);
     assert(ownerPendingImage?.status === "pending", "New image is missing from photographer uploads");
@@ -295,7 +334,7 @@ async function main() {
     assert(reject.data?.image?.status === "rejected" && reject.data?.image?.is_published === false, "Rejection state is incorrect");
 
     const [ownerRejected, adminRejected, publicAfterRejection] = await Promise.all([
-      api("/api/uploads", { cookie: approvedCookie }),
+      api("/api/uploads", { cookie: approvedCookieValue }),
       api(`/api/admin/images?status=rejected&query=${encodeURIComponent(title)}`, { cookie: reviewerCookie }),
       api(`/api/images/${createdImageId}`),
     ]);
@@ -317,7 +356,7 @@ async function main() {
       const batch = await Promise.all(
         Array.from({ length: Math.min(10, 110 - offset) }, (_, index) =>
           api("/api/uploads/presign", {
-            cookie: approvedCookie,
+            cookie: approvedCookieValue,
             method: "POST",
             body: {
               filename: `quota-${offset + index}.jpg`,
@@ -356,15 +395,37 @@ async function main() {
       }
     };
 
+    if (createdImageId && approvedCookie) {
+      await cleanup("archive uploaded image", async () => {
+        const archived = await api(`/api/uploads/${createdImageId}`, {
+          cookie: approvedCookie,
+          method: "DELETE",
+        });
+        assert(archived.response.status === 200, `Archive cleanup expected 200, got ${archived.response.status}`);
+      });
+      await cleanup("purge uploaded image", async () => {
+        const purged = await api(`/api/uploads/${createdImageId}`, {
+          cookie: approvedCookie,
+          method: "DELETE",
+        });
+        assert(purged.response.status === 200, `Purge cleanup expected 200, got ${purged.response.status}`);
+        assert(purged.data?.hardDeleted === true, "Cleanup did not hard-delete the uploaded image");
+      });
+    }
     if (createdImageId) {
       await cleanup("user_events", () => admin.from("user_events").delete().eq("image_id", createdImageId));
     }
     if (createdStoragePaths.size > 0) {
-      const paths = [...createdStoragePaths];
-      await cleanup("original storage", () => admin.storage.from("images-original").remove(paths));
-      await cleanup("preview storage", () =>
-        admin.storage.from("images-preview").remove([...paths, ...paths.map((path) => `thumbs/${path}`)]),
-      );
+      const legacyPaths = [...createdStoragePaths].filter((path) => !path.startsWith("r2/"));
+      if (legacyPaths.length > 0) {
+        await cleanup("original storage", () => admin.storage.from("images-original").remove(legacyPaths));
+        await cleanup("preview storage", () =>
+          admin.storage.from("images-preview").remove([
+            ...legacyPaths,
+            ...legacyPaths.map((path) => `thumbs/${path}`),
+          ]),
+        );
+      }
     }
     if (createdImageId) {
       await cleanup("image row", () => admin.from("images").delete().eq("id", createdImageId));
