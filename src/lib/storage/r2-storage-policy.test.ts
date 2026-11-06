@@ -25,7 +25,7 @@ describe("R2 image storage transition policy", () => {
     for (const config of [apiWrangler, adminWrangler]) {
       expect(config).toContain('"binding": "IMAGE_STORAGE"');
       expect(config).toContain('"bucket_name": "imagepartners-images"');
-      expect(config).toContain('"R2_IMAGE_STORAGE_ENABLED": "false"');
+      expect(config).toContain('"R2_IMAGE_STORAGE_ENABLED": "true"');
     }
   });
 
