@@ -50,6 +50,15 @@ const bindings = [
     service,
     ...(environment ? { environment } : {}),
   })),
+  ...(config.r2_buckets ?? []).map(
+    ({ binding, bucket_name, jurisdiction, raw }) => ({
+      type: "r2_bucket",
+      name: binding,
+      bucket_name,
+      ...(jurisdiction ? { jurisdiction } : {}),
+      ...(raw ? { raw } : {}),
+    }),
+  ),
 ];
 
 if (!config.account_id) {

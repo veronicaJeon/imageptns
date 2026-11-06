@@ -12,6 +12,10 @@ describe("Cloudflare migration boundary", () => {
   const packageJson = readFileSync("package.json", "utf8");
   const buildScript = readFileSync("scripts/build-cloudflare.mjs", "utf8");
   const secretsScript = readFileSync("scripts/upload-cloudflare-secrets.mjs", "utf8");
+  const workerUploadScript = readFileSync(
+    "scripts/upload-cloudflare-worker-with-curl.mjs",
+    "utf8",
+  );
   const siteAssetSource = readFileSync("src/lib/images/site-asset-source.ts", "utf8");
   const uploadRoute = readFileSync("src/app/api/uploads/route.ts", "utf8");
   const uploadLimits = readFileSync("src/lib/uploads/limits.ts", "utf8");
@@ -50,6 +54,9 @@ describe("Cloudflare migration boundary", () => {
     expect(secretsScript).toContain('["NX_", "TURBO_", "VERCEL"]');
     expect(secretsScript).toContain('"R2_IMAGE_STORAGE_ENABLED"');
     expect(secretsScript).toContain("APP_RELEASE_SHA");
+    expect(workerUploadScript).toContain("config.r2_buckets");
+    expect(workerUploadScript).toContain('type: "r2_bucket"');
+    expect(workerUploadScript).toContain("bucket_name");
   });
 
   it("routes API and page traffic to separate Workers", () => {
