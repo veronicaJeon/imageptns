@@ -4,6 +4,7 @@
   "app/api/admin/about-page/translate/route",
   "app/api/admin/activity/route",
   "app/api/admin/agent-activity/route",
+  "app/api/admin/analytics/route",
   "app/api/admin/audit/route",
   "app/api/admin/auth-pages/library-assets/route",
   "app/api/admin/auth-pages/route",

@@ -32,13 +32,14 @@ describe("admin navigation groups", () => {
     ]);
   });
 
-  it("shows general, photo, and bank-transfer work queues as separate primary links", () => {
+  it("shows the analytics landing page and work queues as separate primary links", () => {
     expect(ADMIN_NAV_PRIMARY_ITEMS.map((item) => item.href)).toEqual([
+      "/admin",
       "/admin/support",
       "/admin/photo-requests",
       "/admin/payment-requests",
     ]);
-    expect(ADMIN_NAV_PRIMARY_ITEMS.map((item) => item.countKey)).toEqual(["general", "photo", "payment"]);
+    expect(ADMIN_NAV_PRIMARY_ITEMS.map((item) => item.countKey)).toEqual([undefined, "general", "photo", "payment"]);
     expect(ADMIN_NAV_GROUPS.find((group) => group.id === "finance")?.items.map((item) => item.href))
       .toEqual(["/admin/payouts"]);
     expect(ADMIN_NAV_GROUPS.some((group) => group.id === "content")).toBe(false);

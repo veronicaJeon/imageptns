@@ -8,6 +8,7 @@ export interface AdminNavItem {
 export type AdminPendingCountKey = "general" | "photo" | "payment";
 
 export const ADMIN_NAV_PRIMARY_ITEMS: AdminNavItem[] = [
+  { href: "/admin", icon: "space_dashboard", label: "분석 대시보드" },
   { href: "/admin/support", icon: "support_agent", label: "일반 문의", countKey: "general" },
   { href: "/admin/photo-requests", icon: "add_photo_alternate", label: "이미지 문의", countKey: "photo" },
   { href: "/admin/payment-requests", icon: "account_balance", label: "입금 확인 요청", countKey: "payment" },
@@ -26,7 +27,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     icon: "photo_library",
     label: "이미지관리",
     items: [
-      { href: "/admin", icon: "pending_actions", label: "이미지 검토" },
+      { href: "/admin/image-review", icon: "pending_actions", label: "이미지 검토" },
       { href: "/admin/images", icon: "photo_library", label: "이미지 상세 관리" },
       { href: "/admin/categories", icon: "category", label: "카테고리 관리" },
       { href: "/admin/image-cleanup", icon: "cleaning_services", label: "이미지 정리" },

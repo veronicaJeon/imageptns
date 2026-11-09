@@ -62,7 +62,7 @@ flowchart LR
 | 인증·DB·파일 | Supabase Auth·Postgres·RLS, 기존 Supabase Storage와 신규 Cloudflare R2의 이중 읽기, 순방향 SQL 마이그레이션 |
 | 상태 관리 | React Query, Zustand; 개인 목록 API는 `private, no-store` 원칙 |
 | 검증 | Vitest, ESLint, TypeScript, Next production build, fresh Supabase migration lint |
-| 운영 | `/api/health`, GitHub 외부 모니터, 관리자 운영 모니터링, Cloudflare Cron Trigger(전환 후) |
+| 운영 | `/api/health`, GitHub 외부 모니터, 관리자 운영 모니터링·이용 분석 대시보드, Cloudflare Cron Trigger |
 
 로컬 개발은 `supabase/config.toml`의 Docker 기반 Supabase를 사용하고 운영 프로젝트와 분리한다. 독립 스테이징 Supabase 프로젝트는 아직 기준 환경에 포함하지 않는다.
 
@@ -189,6 +189,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 - 삭제된 이미지의 지문은 재등록 우회를 줄이기 위해 1년간 보관하며, 사진가 화면에는 타 사진가나 후보 이미지 정보를 노출하지 않는다.
 - 사진 검색은 최대 25MB 원본을 브라우저에서 긴 변 1,600px, 3.5MB 이하 검색본으로 축소해 EXIF와 원래 파일명을 제거한 뒤 전송하고 서버에서 3메가픽셀 한도를 다시 검사한다. IP당 분당 20회 한도를 적용하며 원본·검색본·EXIF·파일명·계산한 지문을 DB, Storage, 로그와 응답에 남기지 않고 공개·승인·활성 이미지의 지문만 비교한다.
 - 관리자 API는 서버에서 관리자 역할을 확인하고 중요 변경은 감사 기록을 남긴다. 정산 승인·반려, 이미지 상세 편집(제목·설명·카테고리·태그·공개 여부·이미지별 가격), 카테고리 생성·수정, 라이브러리 안내글 생성·수정·삭제, 온체인 클레임 검토는 변경 전후 값과 함께 `admin_audit_logs`에 기록한다.
+- 관리자 첫 화면은 Supabase의 `user_events`, 회원, 완료 주문을 7·30·90일 단위로 서버 집계해 방문 추세, 이용 전환, 인기 페이지·이미지, 검색 수요와 무결과 검색어를 표시한다. 원시 식별자는 브라우저에 전달하지 않으며 봇 user agent, `/admin` 경로, localhost·Vercel preview·Cloudflare Pages preview 유입은 집계에서 제외한다. Cloudflare Web Analytics는 전체 방문량과 웹 성능을 교차 확인하는 보조 지표이고, 주문·검색·다운로드의 운영 기준은 Supabase 기록이다.
 - 정산은 `pending`·`processing` 상태에서만 승인·반려할 수 있다. 이미 지급·반려·실패된 정산을 다시 처리하면 409로 거절해 지급일 덮어쓰기와 알림 메일 재발송을 막는다.
 - 공개 쓰기 API는 입력 크기, 스키마, 분산 rate limit을 적용한다.
 - 일반 사용자는 `orders`를 직접 insert할 수 없고 서버 전용 원자적 주문 함수를 통해서만 표준 주문을 생성한다.
@@ -209,7 +210,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | 주간 유지보수 | GitHub Actions가 매일 예약 기동 후 마지막 성공으로부터 7일이 지난 경우 audit·코드·fresh DB·운영 smoke·릴리스 정합성을 실행하고 고정 ID 후보 이슈를 누적한다. 승인 후보의 실제 개발은 Codex Scheduled task가 한 건씩 수행한다. |
 | Health | DB, Supabase Storage, 활성화된 R2 binding, 최근 공개 JPEG 무결성, Mistral 합성 진단 최신성 |
 | 예약 작업 | 매일 02:00 UTC 데이터·업로드·반려·한도 정리. 03:00 UTC Mistral·전체 운영점검은 중단 |
-| 관측 | 관리자 운영 모니터링에 최근 24시간 가용성·응답·서버 오류·AI 이벤트를, 에이전트 활동현황에 GitHub 검사·Grok·Gemini 자문·Codex 대기열과 PR을 표시 |
+| 관측 | 관리자 첫 화면에 7·30·90일 방문·전환·검색·주문 분석을, 운영 모니터링에 최근 24시간 가용성·응답·서버 오류·AI 이벤트를, 에이전트 활동현황에 GitHub 검사·Grok·Gemini 자문·Codex 대기열과 PR을 표시 |
 | 리전 | 전환 후 Cloudflare Smart Placement, 임시 Sharp Vercel `icn1`, Supabase 운영 프로젝트와 로컬 프로젝트 분리 |
 
 초기 목표는 최근 24시간 가용성 99% 이상, 핵심 DB·Storage 점검 5초 이내, AI 합성 진단 36시간 이내 최신 상태다. GitHub 예약 실행은 SLA를 보장하지 않으므로 유료 공개와 트래픽 증가 전 전용 오류 추적·uptime 알림을 검토한다.
@@ -289,6 +290,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 - 2026-10-04 운영 의존성 audit의 신규 critical·high 공지에 대응해 `next` 16.3.8, `nodemailer` 10.0.14, `sharp` 0.35.5로 올렸다. 타입·린트·테스트·빌드와 `npm audit --omit=dev --audit-level=high` 통과로 검증한다.
 - 2026-10-04 관리자 정산 승인·반려에 상태 조건부 갱신을 적용해 중복 처리를 막고, 정산 알림 메일을 응답 전에 발송해 결과(`sent`·`failed`·`skipped`)를 감사 기록에 남겼다. 이미지 상세 편집은 변경 필드만 감사 기록에 남기고 이미지별 가격을 upsert 후 빠진 항목만 삭제하도록 바꿨다. 카테고리·안내글·온체인 클레임 검토에도 감사 기록을 추가했다. `src/lib/admin/payouts.test.ts`, `src/lib/admin/image-edit-audit.test.ts`로 회귀한다.
 - 2026-10-15 브랜드 글꼴과 색상을 유지하면서 버튼·입력·검색·목록·아코디언·팝업·전환을 공용 디자인 문법으로 통합했다. 라이브러리 우선 홈과 권한·API 동작은 유지하고, 공개·인증·대시보드·관리자 화면이 같은 표면·포커스·모션 토큰을 사용하도록 했다. `prefers-reduced-motion`, dialog 의미 구조와 포커스 관리, 왼쪽 기준 카테고리 스크롤을 정책 테스트와 전체 회귀로 보호한다.
+- 2026-11-09 관리자 첫 화면을 기간형 분석 대시보드로 전환하고 기존 이미지 검토는 `/admin/image-review`로 분리했다. Supabase 서버 집계로 방문·퍼널·검색·주문을 연결하고 봇·관리자·개발 환경 유입을 제외한다. Cloudflare Web Analytics는 무료 보조 지표로만 사용하며 별도 오픈소스 분석 서버는 운영하지 않는다.
 - 2026-11-02 Vercel CPU 소진 대응으로 Next.js 16.4와 OpenNext 기반 Cloudflare Worker 빌드를 추가했다. 일반 경로는 Worker에서 실행하고 네이티브 Sharp 경로는 `legacy-origin.imagepartners.kr`로 임시 분리한다. 고비용 일일 운영점검은 중단하고 데이터 보존 cron만 유지하며, Worker 로컬 스모크·정책 테스트·Cloudflare 전환 런북으로 경계를 보호한다.
 
 이 문서 갱신 시 날짜, 변경된 시스템 경계, 관련 마이그레이션·테스트·운영 검증을 이 절에 추가한다. 배포 ID처럼 자주 바뀌는 값은 이 문서가 아니라 배포 인수인계 기록에서 관리한다.

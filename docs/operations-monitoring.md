@@ -7,6 +7,8 @@
 - 수동 Production 배포 검증은 health와 공개 핵심 경로에 더해 `한강` 및 설명의 조사 없는 `한강 북단` 키워드 검색이 HTTP 200으로 `서울 한강 풍경`을 반환하는지 확인한다. 검색 API 오류를 빈 결과로 간주하지 않는다.
 - 실패 시 `[monitor] Production health check failed` GitHub 이슈를 한 건만 유지하고, 같은 장애의 추가 실패는 댓글로 누적한다. DB·Storage·이미지·AI·일일 점검 오류뿐 아니라 배포 SHA/ref가 원격 `main`과 다를 때도 실패한다. 복구되면 자동 종료한다.
 - 관리자 `로그/통계관리 > 운영 모니터링`: 최근 24시간 가용성, 응답시간, 포착된 서버 오류, AI 성공·실패와 운영 이벤트를 표시한다.
+- 관리자 첫 화면 `분석 대시보드`: Supabase `user_events`·회원·완료 주문을 7·30·90일로 집계해 방문 추세, 이용 전환, 인기 페이지·이미지, 검색어와 무결과 검색어를 표시한다. 봇, 관리자 경로, 로컬·프리뷰 호스트는 제외하며 원시 사용자 식별자는 화면에 반환하지 않는다.
+- Cloudflare Web Analytics는 전체 방문량과 실제 사용자 웹 성능을 교차 확인하는 무료 보조 지표다. 커스텀 행동·검색·주문·다운로드의 기준 수치는 Supabase 분석 대시보드를 사용한다.
 - 관리자 `로그/통계관리 > 에이전트 활동현황`: GitHub 주간 제품·코드 검사, Grok·Gemini 자문 보고, 승인 후보 대기열과 Codex draft PR을 공개 GitHub 근거와 함께 표시한다.
 - 고비용 `/api/cron/operations-review`는 유입이 거의 없는 기간과 Vercel CPU 소진 대응을 위해 2026-11-02부터 중단했다. `OPERATIONS_DAILY_REVIEW_ENABLED=false`이면 route도 `paused`를 반환하며 health의 AI·운영점검은 실패가 아닌 `paused`로 표시한다. 데이터 보존·만료 업로드 정리 `/api/cron/auto-reject-stale`는 계속 매일 실행한다.
 - 운영 이벤트에는 요청 본문, 이미지, 이메일, 사용자 식별자 또는 API 키를 저장하지 않는다. 90일이 지난 이벤트는 매일 삭제한다.
