@@ -17,8 +17,11 @@ interface OperationalEvent {
 }
 
 interface OperationsPayload {
+  dailyReviewEnabled: boolean;
   summary: {
     availabilityChecks: number;
+    expectedAvailabilityChecks: number;
+    availabilityCoveragePercent: number;
     availabilityPercent: number | null;
     averageLatencyMs: number | null;
     requestErrors: number;
@@ -41,6 +44,10 @@ interface OperationsPayload {
 }
 
 interface EmailDiagnosticsPayload {
+  summary: Record<"resend" | "inbound" | "smtpFallback", {
+    status: "ok" | "warning" | "error";
+    detail: string;
+  }>;
   gmail: {
     ok: boolean;
     reason?: string;
@@ -82,6 +89,12 @@ const STATUS_STYLE = {
   ok: "bg-emerald-50 text-emerald-700",
   warning: "bg-amber-50 text-amber-700",
   error: "bg-red-50 text-red-700",
+};
+
+const STATUS_LABEL = {
+  ok: "정상",
+  warning: "확인 제한",
+  error: "조치 필요",
 };
 
 export default function OperationsPage() {
@@ -142,7 +155,11 @@ export default function OperationsPage() {
 
   const summary = payload?.summary;
   const cards = [
-    ["가용성", summary?.availabilityPercent == null ? "측정 전" : `${summary.availabilityPercent}%`, `${summary?.availabilityChecks ?? 0}회 검사`],
+    [
+      "가용성",
+      summary?.availabilityPercent == null ? "측정 전" : `${summary.availabilityPercent}%`,
+      `${summary?.availabilityChecks ?? 0}/${summary?.expectedAvailabilityChecks ?? 96}회 · 표본 ${summary?.availabilityCoveragePercent ?? 0}%`,
+    ],
     ["평균 응답", summary?.averageLatencyMs == null ? "측정 전" : `${summary.averageLatencyMs.toLocaleString()}ms`, "최근 24시간"],
     ["서버 오류", `${summary?.requestErrors ?? 0}건`, "포착된 5xx 예외"],
     ["AI 실패", `${summary?.aiFailures ?? 0} / ${summary?.aiChecks ?? 0}`, "실사용·진단 합계"],
@@ -176,13 +193,13 @@ export default function OperationsPage() {
       <section className="mt-6 rounded-xl bg-surface-container-lowest p-5 shadow-ghost">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-sm font-bold text-on-surface">일일 운영관리자 점검</h2>
-            <p className="mt-1 text-xs text-outline">이미지 무결성, 처리 지연, 임베딩·이메일 실패와 최근 활동을 매일 확인합니다.</p>
+            <h2 className="text-sm font-bold text-on-surface">심층 운영관리자 점검</h2>
+            <p className="mt-1 text-xs text-outline">이미지 무결성, 처리 지연, 임베딩·이메일 실패와 최근 활동을 종합 확인합니다.</p>
           </div>
           <span className={`w-fit rounded-full px-3 py-1 text-[10px] font-bold ${
             summary?.dailyReview?.status ? STATUS_STYLE[summary.dailyReview.status] : STATUS_STYLE.warning
           }`}>
-            {summary?.dailyReview?.status === "ok" ? "정상" : summary?.dailyReview?.status === "error" ? "즉시 조치" : summary?.dailyReview ? "확인 필요" : "실행 전"}
+            {!payload?.dailyReviewEnabled ? "당분간 중단" : summary?.dailyReview?.status === "ok" ? "정상" : summary?.dailyReview?.status === "error" ? "즉시 조치" : summary?.dailyReview ? "확인 필요" : "실행 전"}
           </span>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -206,7 +223,13 @@ export default function OperationsPage() {
             ))}
           </div>
         ) : (
-          <p className="mt-4 text-xs text-outline">{summary?.dailyReview ? "현재 조치가 필요한 운영 항목이 없습니다." : "새 일일 cron 배포 후 첫 결과가 표시됩니다."}</p>
+          <p className="mt-4 text-xs text-outline">{
+            !payload?.dailyReviewEnabled
+              ? "유입이 적은 기간에는 고비용 AI·인덱싱 심층 점검을 실행하지 않습니다. 데이터 정리와 15분 가용성 점검은 계속됩니다."
+              : summary?.dailyReview
+                ? "현재 조치가 필요한 운영 항목이 없습니다."
+                : "첫 심층 점검 결과가 표시되기 전입니다."
+          }</p>
         )}
         {summary?.dailyReview?.checkedAt && <p className="mt-3 text-[10px] text-outline">최근 실행 {new Date(summary.dailyReview.checkedAt).toLocaleString("ko-KR")}</p>}
       </section>
@@ -232,35 +255,25 @@ export default function OperationsPage() {
           {[
             {
               label: "Resend 발송",
-              ok: emailDiagnostics?.resend.ok ?? false,
-              detail: emailDiagnostics?.resend.ok
-                ? "도메인과 API 정상"
-                : emailDiagnostics?.resend.reason ?? "확인 중",
+              result: emailDiagnostics?.summary.resend,
             },
             {
               label: "contact@ 수신",
-              ok: Boolean(
-                emailDiagnostics?.resend.inboundWebhook &&
-                emailDiagnostics?.resend.domain?.capabilities?.receiving === "enabled",
-              ),
-              detail: emailDiagnostics?.resend.inboundWebhook ? "수신 웹훅 연결됨" : "수신 웹훅 또는 도메인 미설정",
+              result: emailDiagnostics?.summary.inbound,
             },
             {
               label: "Gmail 비상 SMTP",
-              ok: emailDiagnostics?.gmail.ok ?? false,
-              detail: emailDiagnostics?.gmail.ok
-                ? "연결 정상"
-                : emailDiagnostics?.gmail.error?.code ?? emailDiagnostics?.gmail.reason ?? "확인 중",
+              result: emailDiagnostics?.summary.smtpFallback,
             },
           ].map((item) => (
             <div key={item.label} className="rounded-lg bg-surface-container-low p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-bold text-on-surface">{item.label}</p>
-                <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${item.ok ? STATUS_STYLE.ok : STATUS_STYLE.error}`}>
-                  {item.ok ? "정상" : "조치 필요"}
+                <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${STATUS_STYLE[item.result?.status ?? "warning"]}`}>
+                  {item.result ? STATUS_LABEL[item.result.status] : "확인 중"}
                 </span>
               </div>
-              <p className="mt-2 break-all text-[11px] text-outline">{item.detail}</p>
+              <p className="mt-2 break-all text-[11px] text-outline">{item.result?.detail ?? "확인 중"}</p>
             </div>
           ))}
         </div>

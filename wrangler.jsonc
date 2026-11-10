@@ -46,7 +46,7 @@
     "OPERATIONS_DAILY_REVIEW_ENABLED": "false"
   },
   "triggers": {
-    "crons": ["0 2 * * *"]
+    "crons": ["7,22,37,52 * * * *", "0 2 * * *"]
   },
   "observability": {
     "enabled": true,

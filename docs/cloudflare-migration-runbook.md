@@ -1,6 +1,6 @@
 # Cloudflare Workers 전환 런북
 
-> 기준일: 2026-11-06
+> 기준일: 2026-11-10
 > 목표: 공개 웹·일반 API·예약 정리를 Cloudflare Workers로 옮기고 Vercel CPU 소비를 최소화한다.
 
 ## 전환 구조
@@ -10,6 +10,7 @@
 - 사진 검색, 업로드 지문, 방향 보정, 워터마크·썸네일은 `imagepartners-image-runtime`의 Cloudflare Images binding이 처리한다.
 - 기존 이미지 파일은 Supabase Storage에 유지하고, R2 활성화 뒤 신규 원본·분석본·워터마크 미리보기·썸네일은 `imagepartners-images` R2 버킷에 저장한다.
 - 데이터·만료 업로드 정리는 Cloudflare Cron Trigger가 매일 02:00 UTC에 `/api/cron/auto-reject-stale`를 내부 호출한다.
+- 가용성 감시는 같은 Worker의 Cron Trigger가 매시 07·22·37·52분에 `/api/health`를 서비스 바인딩으로 호출한다. 실패 응답은 Cron 실행 실패로 남고 관리자 운영 모니터링은 최근 24시간 96회 기준 커버리지를 표시한다.
 - Mistral 합성 진단·의미색인·전체 운영검토를 묶은 고비용 일일 점검은 `OPERATIONS_DAILY_REVIEW_ENABLED=false`로 중단한다. 재개할 때는 비용·필요성을 검토한 뒤 별도 스케줄과 플래그를 함께 복원한다.
 
 TIFF·RAW의 웹 파생본 생성과 20MB를 넘는 입력 처리는 아직 범위 밖이다. R2는 해당 원본을 보관할 수 있지만 실제 업로드 허용 형식과 처리 한도는 별도 회귀 뒤 확장한다.
@@ -30,7 +31,7 @@ TIFF·RAW의 웹 파생본 생성과 20MB를 넘는 입력 처리는 아직 범�
 ## 준비 조건
 
 1. 최초 전환은 현재 계정의 Workers Free 플랜으로 검증할 수 있다. 압축 Worker 번들은 약 3.2MB이고 배포는 성공했지만, 일 10만 요청과 CPU 사용량을 관찰해 한도에 가까워지면 Workers Paid 전환을 별도로 승인받는다.
-2. `imagepartners.kr`을 Cloudflare에 추가하고 Cloudflare가 안내하는 nameserver로 변경할 권한을 확보한다.
+2. `imagepartners.kr` zone과 nameserver가 Cloudflare에서 Active인지 확인한다.
 3. Wrangler 인증을 완료한다.
 
 ```bash
@@ -88,11 +89,14 @@ Cloudflare Worker Secrets에는 `.env.example`의 실제 운영 서버 비밀과
 
 ## 도메인 전환
 
+2026-11-06 현재 `www.imagepartners.kr`과 apex의 Cloudflare Workers 전환은 완료됐다. 아래 절차는 재연결·롤백 후 복구 때도 같은 기준으로 사용한다.
+
 1. Cloudflare zone이 `Active`인지 확인한다.
 2. `legacy-origin.imagepartners.kr`은 Vercel origin을 가리키는 DNS-only 레코드로 유지한다. 이 호스트에 Cloudflare Worker route나 proxy를 적용하면 재귀 호출이 생긴다.
 3. `www.imagepartners.kr`과 apex를 `imagepartners` Worker Custom Domain에 연결한다.
 4. apex는 기존 정책대로 `www`로 307 이동되는지 확인한다.
-5. Supabase OAuth·Auth redirect allowlist, Resend webhook, 외부 모니터가 기존 운영 도메인을 계속 사용하므로 도메인 문자열은 바꾸지 않는다.
+5. `http://` 요청은 같은 호스트의 `https://`로 이동하고 HTTPS 응답에 HSTS·프레임 차단·MIME 스니핑 차단·제한된 권한 정책이 있는지 확인한다.
+6. Supabase OAuth·Auth redirect allowlist, Resend webhook, 외부 모니터가 기존 운영 도메인을 계속 사용하므로 도메인 문자열은 바꾸지 않는다.
 
 전환 직후 공개 페이지, 로그인 콜백, 라이브러리 검색, 관리자 조회, 사진 업로드·썸네일·사진 검색, 문의 메일, `/api/health`를 확인한다. Cloudflare Workers 로그에서 5xx·CPU·메모리·Subrequest 오류를 보고 Vercel Functions 호출량이 Sharp 경로 외에는 감소하는지 확인한다.
 

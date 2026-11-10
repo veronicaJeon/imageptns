@@ -82,9 +82,11 @@ describe("Cloudflare migration boundary", () => {
     expect(uploadLimits).toContain("MAX_UPLOAD_FILE_BYTES = 20_000_000");
   });
 
-  it("runs only retention cleanup from the Cloudflare scheduled handler", () => {
-    expect(worker).toContain('controller.cron !== "0 2 * * *"');
+  it("runs retention cleanup and the low-cost availability monitor from Cloudflare schedules", () => {
+    expect(wrangler).toContain('"7,22,37,52 * * * *"');
+    expect(worker).toContain('controller.cron === "7,22,37,52 * * * *"');
+    expect(worker).toContain('"https://www.imagepartners.kr/api/health"');
+    expect(worker).toContain('controller.cron === "0 2 * * *"');
     expect(worker).toContain("/api/cron/auto-reject-stale");
-    expect(worker).not.toContain('controller.cron !== "0 3 * * *"');
   });
 });

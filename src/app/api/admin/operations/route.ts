@@ -48,11 +48,19 @@ export async function GET() {
   const averageLatencyMs = availability.length
     ? Math.round(availability.reduce((sum, event) => sum + (event.duration_ms ?? 0), 0) / availability.length)
     : null;
+  const expectedAvailabilityChecks = 96;
+  const availabilityCoveragePercent = Number(Math.min(
+    100,
+    (availability.length / expectedAvailabilityChecks) * 100,
+  ).toFixed(1));
 
   return NextResponse.json({
     windowHours: 24,
+    dailyReviewEnabled: process.env.OPERATIONS_DAILY_REVIEW_ENABLED === "true",
     summary: {
       availabilityChecks: availability.length,
+      expectedAvailabilityChecks,
+      availabilityCoveragePercent,
       availabilityPercent: availability.length ? Number(((successfulAvailability / availability.length) * 100).toFixed(2)) : null,
       averageLatencyMs,
       requestErrors: requestErrors.length,

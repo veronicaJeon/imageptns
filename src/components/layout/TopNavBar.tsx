@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element -- user-supplied avatar URLs must render without an optimizer allowlist */
 "use client";
 
 import Link from "next/link";

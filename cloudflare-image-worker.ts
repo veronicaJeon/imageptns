@@ -260,7 +260,7 @@ async function createWatermarkResponse(request: Request, env: ImageWorkerEnv) {
   }
 }
 
-export default {
+const imageWorker = {
   async fetch(request: Request, env: ImageWorkerEnv) {
     if (internalRequest(request, INTERNAL_FINGERPRINT_PATH)) {
       return createFingerprintResponse(request);
@@ -280,3 +280,5 @@ export default {
     return new Response("Not found", { status: 404 });
   },
 };
+
+export default imageWorker;

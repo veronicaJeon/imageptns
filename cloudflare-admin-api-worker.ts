@@ -10,8 +10,10 @@ type AdminApiContext = {
   passThroughOnException(): void;
 };
 
-export default {
+const adminApiWorker = {
   async fetch(request: Request, env: Record<string, unknown>, ctx: AdminApiContext) {
     return runWithCloudflareRequestContext(request, env, ctx, () => handler(request, env, ctx));
   },
 };
+
+export default adminApiWorker;

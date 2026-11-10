@@ -34,6 +34,15 @@ describe("canonical routing helpers", () => {
     );
   });
 
+  it("upgrades HTTP requests on the canonical domain to HTTPS", () => {
+    expect(getCanonicalRedirectUrl("http://www.imagepartners.kr/login")?.toString()).toBe(
+      "https://www.imagepartners.kr/login"
+    );
+    expect(getCanonicalRedirectOrigin("http://www.imagepartners.kr")).toBe(
+      "https://www.imagepartners.kr"
+    );
+  });
+
   it("canonicalizes callback redirect origins", () => {
     expect(getCanonicalRedirectOrigin("https://imageptns.vercel.app")).toBe(
       "https://www.imagepartners.kr"

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useLang } from "@/lib/i18n/store";
 import { Button } from "@/components/ui/Button";
@@ -32,6 +33,7 @@ const SIGNUP_EXTRA_COPY = {
 } as const;
 
 export default function SignupPage() {
+  const router = useRouter();
   const { t, lang } = useLang();
   const a = t.auth.signup;
   const extra = SIGNUP_EXTRA_COPY[lang];
@@ -80,7 +82,7 @@ export default function SignupPage() {
       setLoading(false);
     } else if (result?.status === "signed_in") {
       // Email confirmations disabled — session issued immediately
-      window.location.href = "/dashboard";
+      router.replace("/dashboard");
     } else if (result?.status === "existing_account") {
       setError(result.message ?? "가입 이력이 있는 이메일입니다. 로그인 또는 비밀번호 재설정을 이용해주세요.");
       setLoading(false);

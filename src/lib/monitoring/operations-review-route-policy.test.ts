@@ -19,7 +19,7 @@ describe("daily operations review route policy", () => {
     expect(schedule).not.toContain('"path": "/api/cron/operations-review"');
     expect(schedule).not.toContain('"path": "/api/cron/ai-synthetic"');
     expect(schedule).toContain('"path": "/api/cron/auto-reject-stale"');
-    expect(cloudflare).toContain('"crons": ["0 2 * * *"]');
+    expect(cloudflare).toContain('"crons": ["7,22,37,52 * * * *", "0 2 * * *"]');
     expect(cloudflare).toContain('"OPERATIONS_DAILY_REVIEW_ENABLED": "false"');
   });
 });

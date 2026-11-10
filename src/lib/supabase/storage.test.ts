@@ -3,7 +3,9 @@ import { previewUrl, thumbnailUrlFromPreviewUrl } from "./storage";
 
 describe("thumbnailUrlFromPreviewUrl", () => {
   it("serves R2 previews through the same-origin public asset route", () => {
-    expect(previewUrl("r2/user/photo.jpg")).toBe("/api/image-assets/r2/user/photo.jpg");
+    const url = new URL(previewUrl("r2/user/photo.jpg"), "https://www.imagepartners.kr");
+    expect(url.pathname).toBe("/api/image-assets/r2/user/photo.jpg");
+    expect(url.origin).toBe(process.env.NEXT_PUBLIC_APP_URL ?? "https://www.imagepartners.kr");
   });
 
   it("uses the stored R2 thumbnail instead of the transform proxy", () => {

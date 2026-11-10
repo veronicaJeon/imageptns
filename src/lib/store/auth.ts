@@ -120,6 +120,6 @@ export const useAuth = create<AuthStore>((set) => ({
     const supabase = createClient();
     await supabase.auth.signOut();
     set({ user: null });
-    window.location.href = "/login";
+    window.location.replace(new URL("/login", window.location.origin));
   },
 }));

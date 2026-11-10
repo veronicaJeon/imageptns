@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { previewUrl } from "@/lib/supabase/storage";
 
@@ -21,7 +21,7 @@ function firstJoinedImage(image: CollectionItemSummary["image"]) {
   return Array.isArray(image) ? image[0] : image;
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

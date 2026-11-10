@@ -196,12 +196,12 @@ export default function PhotographerProfilePage({ params }: { params: Promise<{ 
           ) : (
             <MasonryGrid>
               {images.map((img) => (
-                <Link key={img.id} href={`/library/${img.id}`}>
-                  <ImageCard
-                    image={img}
-                    className="mb-4 break-inside-avoid"
-                  />
-                </Link>
+                <ImageCard
+                  key={img.id}
+                  href={`/library/${img.id}`}
+                  image={img}
+                  className="mb-4 break-inside-avoid"
+                />
               ))}
             </MasonryGrid>
           )}

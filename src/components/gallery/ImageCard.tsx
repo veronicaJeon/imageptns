@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { useState } from "react";
 import { useCart } from "@/lib/store/cart";
@@ -8,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { thumbnailUrlFromPreviewUrl } from "@/lib/supabase/storage";
 import { buyerUsageConditions, creditLineForName, getLocalizedCopyrightLicense, getLocalizedFreeUsagePolicy } from "@/lib/licenses/creative-commons";
 import { useLang } from "@/lib/i18n/store";
+import { imageCategoryLabel } from "@/lib/images/categories";
 
 export interface ImageCardData {
   id: string;
@@ -28,6 +30,7 @@ export interface ImageCardData {
 
 interface ImageCardProps {
   image: ImageCardData;
+  href?: string;
   initialFavorited?: boolean;
   onFavorite?: (id: string, favorited: boolean) => void;
   onAddToCart?: (id: string) => void;
@@ -37,6 +40,7 @@ interface ImageCardProps {
 
 export function ImageCard({
   image,
+  href,
   initialFavorited = false,
   onFavorite,
   onAddToCart,
@@ -52,6 +56,7 @@ export function ImageCard({
   const displayTitle = lang === "ko"
     ? image.titleKo || image.title
     : image.titleEn || image.title;
+  const displayCategory = imageCategoryLabel(image.category, lang);
 
   async function handleFavorite() {
     if (favoriting) return;
@@ -110,6 +115,15 @@ export function ImageCard({
         className
       )}
     >
+      {href && (
+        <Link
+          href={href}
+          aria-label={lang === "ko" ? `${displayTitle} 상세 보기` : `View details for ${displayTitle}`}
+          className="absolute inset-0 z-10 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          onClick={() => onQuickView?.(image.id)}
+        />
+      )}
+
       {/* 이미지 */}
       <Image
         src={thumbnailUrlFromPreviewUrl(image.src, 640, 480)}
@@ -121,15 +135,12 @@ export function ImageCard({
       />
 
       {/* 호버 오버레이 */}
-      <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/75 via-black/5 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100 sm:p-4">
+      <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black/75 via-black/5 to-transparent p-3 opacity-100 transition-opacity duration-300 sm:p-4 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
         <div className="flex items-end justify-between rounded-xl border border-white/15 bg-black/20 p-4 text-white backdrop-blur-md">
           {/* 메타데이터 */}
-          <div
-            className="flex-1 min-w-0"
-            onClick={() => onQuickView?.(image.id)}
-          >
+          <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80 mb-1">
-              {image.category}
+              {displayCategory}
             </p>
             <h3 className="font-headline font-bold text-sm tracking-tight truncate">
               {displayTitle}
@@ -152,8 +163,9 @@ export function ImageCard({
           </div>
 
           {/* 액션 버튼 */}
-          <div className="flex gap-2 ml-3 shrink-0">
+          <div className="pointer-events-auto relative z-30 ml-3 flex shrink-0 gap-2">
             <button
+              type="button"
               onClick={handleFavorite}
               disabled={favoriting}
               className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/30 transition-colors flex items-center justify-center disabled:opacity-50"
@@ -171,6 +183,7 @@ export function ImageCard({
             </button>
 
             <button
+              type="button"
               onClick={handleAddToCart}
               className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center transition-all",

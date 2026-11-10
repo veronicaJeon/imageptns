@@ -203,17 +203,17 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 | 항목 | 현재 기준 |
 | --- | --- |
 | CI | main/develop push·PR에서 운영 의존성 audit, 타입, 린트, 테스트, 빌드; 새 Supabase DB 마이그레이션·lint |
-| 배포 | Cloudflare 전환 전에는 Vercel Production, 전환 시에는 OpenNext Worker `workers.dev` 검증 후 Custom Domain 연결. 세부 절차는 Cloudflare 전환 런북 준수 |
-| 가용성 | GitHub Actions가 15분 간격으로 `/api/health`를 호출해 DB·Supabase Storage·R2 binding·순환 이미지 샘플·AI·일일 운영 점검·main/Production SHA를 확인하고 실패 이슈를 자동 생성·복구 종료 |
+| 배포 | OpenNext Cloudflare Worker를 `workers.dev`에서 검증한 뒤 운영 Custom Domain에 배포. Vercel은 Sharp 롤백 origin으로만 유지 |
+| 가용성 | Cloudflare Cron Trigger가 매시 07·22·37·52분 `/api/health`를 내부 호출하고 관리자 화면이 최근 24시간 96회 기준 커버리지를 표시한다. GitHub Production monitor는 독립적인 2차 확인·이슈 기록을 담당한다. |
 | 일일 운영관리 | 2026-11-02부터 고비용 Mistral·인덱싱·전체 운영검토를 중단한다. 데이터 보존·만료 업로드 정리만 매일 유지하며 재개 시 플래그와 스케줄을 함께 복원한다. |
 | 주간 제품 발견 | Codex Scheduled task가 신규 변경, 7일·30일 운영 추세와 구매자·사진가·관리자 여정을 종합 검토해 오류 외에도 가치·운영 효율·발견성·품질 개선 후보를 최대 3건 제안한다. |
 | 주간 유지보수 | GitHub Actions가 매일 예약 기동 후 마지막 성공으로부터 7일이 지난 경우 audit·코드·fresh DB·운영 smoke·릴리스 정합성을 실행하고 고정 ID 후보 이슈를 누적한다. 승인 후보의 실제 개발은 Codex Scheduled task가 한 건씩 수행한다. |
-| Health | DB, Supabase Storage, 활성화된 R2 binding, 최근 공개 JPEG 무결성, Mistral 합성 진단 최신성 |
+| Health | DB, Supabase Storage, 활성화된 R2 binding, 최근 공개 JPEG 무결성, Mistral 합성 진단 또는 의도적 중단 상태 |
 | 예약 작업 | 매일 02:00 UTC 데이터·업로드·반려·한도 정리. 03:00 UTC Mistral·전체 운영점검은 중단 |
 | 관측 | 관리자 첫 화면에 7·30·90일 방문·전환·검색·주문 분석을, 운영 모니터링에 최근 24시간 가용성·응답·서버 오류·AI 이벤트를, 에이전트 활동현황에 GitHub 검사·Grok·Gemini 자문·Codex 대기열과 PR을 표시 |
 | 리전 | 전환 후 Cloudflare Smart Placement, 임시 Sharp Vercel `icn1`, Supabase 운영 프로젝트와 로컬 프로젝트 분리 |
 
-초기 목표는 최근 24시간 가용성 99% 이상, 핵심 DB·Storage 점검 5초 이내, AI 합성 진단 36시간 이내 최신 상태다. GitHub 예약 실행은 SLA를 보장하지 않으므로 유료 공개와 트래픽 증가 전 전용 오류 추적·uptime 알림을 검토한다.
+초기 목표는 최근 24시간 가용성 99% 이상, Cloudflare 감시 커버리지 95% 이상, 핵심 DB·Storage 점검 5초 이내다. GitHub 예약 실행은 SLA를 보장하지 않으므로 유료 공개와 트래픽 증가 전 전용 오류 추적·호출 알림을 검토한다.
 
 배포·롤백·스모크 세부 절차는 [운영 배포 인수인계](./production-deployment-handoff.md)를 따른다.
 [Cloudflare Workers 전환 런북](./cloudflare-migration-runbook.md)은 Worker 배포, 비밀값, 도메인 전환과 Sharp 임시 분리의 기준이다.
@@ -242,7 +242,7 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 
 현재 사실과 미래 계획을 혼동하지 않도록 아래는 시스템 정의가 아니라 미완료 조건으로 둔다.
 
-- 대표자명, 사업자등록번호, 공개 전화번호, 통신판매업 신고 확인정보와 거래정책의 공개
+- 대표자명, 사업자등록번호, 공개 전화번호, 통신판매업 신고 확인정보와 거래정책의 공개(계좌 관리인의 수동 승인으로 통제하는 제한 베타에서는 운영자가 수용한 잔여 위험이며 자동 오픈 차단으로 다루지 않음)
 - 계좌이체 주문 생성부터 관리자 입금 확인·메일·다운로드까지 구매자 운영 E2E의 정기 회귀
 - Supabase DB와 Storage 참조를 포함한 격리 복구 훈련 및 RTO/RPO 확정
 - main 브랜치 보호와 필수 CI·운영 배포 승인 게이트
@@ -292,5 +292,6 @@ Mistral의 제2 공급자 자동 전환은 아직 기준 기능이 아니다. �
 - 2026-10-15 브랜드 글꼴과 색상을 유지하면서 버튼·입력·검색·목록·아코디언·팝업·전환을 공용 디자인 문법으로 통합했다. 라이브러리 우선 홈과 권한·API 동작은 유지하고, 공개·인증·대시보드·관리자 화면이 같은 표면·포커스·모션 토큰을 사용하도록 했다. `prefers-reduced-motion`, dialog 의미 구조와 포커스 관리, 왼쪽 기준 카테고리 스크롤을 정책 테스트와 전체 회귀로 보호한다.
 - 2026-11-09 관리자 첫 화면을 기간형 분석 대시보드로 전환하고 기존 이미지 검토는 `/admin/image-review`로 분리했다. Supabase 서버 집계로 방문·퍼널·검색·주문을 연결하고 봇·관리자·개발 환경 유입을 제외한다. Cloudflare Web Analytics는 무료 보조 지표로만 사용하며 별도 오픈소스 분석 서버는 운영하지 않는다.
 - 2026-11-02 Vercel CPU 소진 대응으로 Next.js 16.4와 OpenNext 기반 Cloudflare Worker 빌드를 추가했다. 일반 경로는 Worker에서 실행하고 네이티브 Sharp 경로는 `legacy-origin.imagepartners.kr`로 임시 분리한다. 고비용 일일 운영점검은 중단하고 데이터 보존 cron만 유지하며, Worker 로컬 스모크·정책 테스트·Cloudflare 전환 런북으로 경계를 보호한다.
+- 2026-11-10 HTTPS 강제와 공통 보안 헤더, 공개 페이지별 메타데이터·robots·sitemap·브랜드 404, 언어 속성 동기화를 공통 계층에 추가했다. Cloudflare 15분 health Cron을 주 감시로 전환하고 관리자 화면에 96회 기준 커버리지를 표시하며, Resend 제한 키와 Workers의 SMTP 제약은 장애가 아닌 경고로 구분한다. 라이브러리 카드는 중첩 링크를 제거하고 모바일에서도 작업 버튼과 현지화 카테고리를 제공한다.
 
 이 문서 갱신 시 날짜, 변경된 시스템 경계, 관련 마이그레이션·테스트·운영 검증을 이 절에 추가한다. 배포 ID처럼 자주 바뀌는 값은 이 문서가 아니라 배포 인수인계 기록에서 관리한다.

@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/i18n/store";
 import { useAuth } from "@/lib/store/auth";
 import { buildPhotoRequestSubject, draftPhotoRequestFromSearchParams } from "@/lib/contact/photo-request-draft";
@@ -148,6 +148,7 @@ function dateInputValue(daysFromToday: number) {
 }
 
 function ContactPageContent() {
+  const router = useRouter();
   const { t, lang } = useLang();
   const c = t.contact;
   const f = c.form;
@@ -280,7 +281,7 @@ function ContactPageContent() {
     if (!user) {
       window.sessionStorage.setItem(PHOTO_REQUEST_DRAFT_KEY, JSON.stringify({ photoForm, advancedUsage }));
       const next = encodeURIComponent("/contact?mode=photo");
-      window.location.assign(`/login?next=${next}`);
+      router.push(`/login?next=${next}`);
       setLoading(false);
       return;
     }

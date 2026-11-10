@@ -66,7 +66,7 @@ console.log(`\n🚀 프로젝트: ${PROJECT_REF}`);
 console.log(`   API:      ${API_URL}\n`);
 
 // ── SQL 실행 ──────────────────────────────────────────────────────────────
-async function runSql(sql, label) {
+async function runSql(sql) {
   const res = await fetch(API_URL, {
     method: "POST",
     headers: {
@@ -109,7 +109,7 @@ for (const file of files) {
 
   process.stdout.write(`⏳ ${file} ... `);
   try {
-    await runSql(sql, file);
+    await runSql(sql);
     console.log("✅ 완료");
     passed++;
   } catch (err) {

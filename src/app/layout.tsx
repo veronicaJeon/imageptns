@@ -20,8 +20,30 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Image Partners — The Digital Curator",
+  metadataBase: new URL("https://www.imagepartners.kr"),
+  title: {
+    default: "Image Partners — The Digital Curator",
+    template: "%s | Image Partners",
+  },
   description: "프리미엄 스톡 이미지 플랫폼. 큐레이션된 고품질 이미지를 찾아보세요.",
+  applicationName: "Image Partners",
+  keywords: ["이미지파트너스", "스톡 이미지", "에디토리얼 이미지", "이미지 라이선스", "사진 라이브러리"],
+  openGraph: {
+    type: "website",
+    siteName: "Image Partners",
+    locale: "ko_KR",
+    title: "Image Partners — The Digital Curator",
+    description: "출처와 권리를 검토한 이미지를 검색하고 프로젝트에 맞는 사용권을 확인하세요.",
+    url: "https://www.imagepartners.kr",
+    images: [{ url: "/icon.png", width: 512, height: 512, alt: "Image Partners" }],
+  },
+  twitter: {
+    card: "summary",
+    title: "Image Partners — The Digital Curator",
+    description: "출처와 권리를 검토한 이미지 라이브러리",
+    images: ["/icon.png"],
+  },
+  robots: { index: true, follow: true },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

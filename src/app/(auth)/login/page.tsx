@@ -120,7 +120,7 @@ function LoginForm() {
           setLoading(true);
           setHideQueryError(true);
           setError(null);
-          window.location.assign(googleLoginUrl);
+          window.location.assign(new URL(googleLoginUrl, window.location.origin));
         }}
         disabled={loading}
         className="w-full min-w-0 min-h-12 px-4 py-3 flex items-center justify-center gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low transition-colors text-sm font-semibold leading-snug text-center text-on-surface disabled:opacity-50 disabled:cursor-not-allowed mb-6"

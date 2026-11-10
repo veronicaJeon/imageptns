@@ -5,6 +5,10 @@ import { latestReportByAgent, parseAgentReportComment } from "@/lib/agents/githu
 const REPOSITORY = "veronicaJeon/imageptns";
 const API_ROOT = `https://api.github.com/repos/${REPOSITORY}`;
 const REPOSITORY_URL = `https://github.com/${REPOSITORY}`;
+const CACHE_TTL_MS = 5 * 60 * 1_000;
+
+let cachedPayload: Record<string, unknown> | null = null;
+let cachedAt = 0;
 
 interface GitHubLabel { name: string }
 interface GitHubIssue {
@@ -68,6 +72,10 @@ function labelNames(issue: GitHubIssue) {
 export async function GET() {
   if (!await requireAdminUser()) return forbidden();
 
+  if (cachedPayload && Date.now() - cachedAt < CACHE_TTL_MS) {
+    return NextResponse.json({ ...cachedPayload, cacheStatus: "fresh" });
+  }
+
   try {
     const [issuesResponse, runsResponse, pulls] = await Promise.all([
       githubJson<GitHubIssue[]>("/issues?state=all&labels=maintenance&per_page=100"),
@@ -112,7 +120,7 @@ export async function GET() {
     const approvalCount = candidates.filter((candidate) => candidate.state === "open" && candidate.labels.includes("approval-required")).length;
     const inProgressCount = candidates.filter((candidate) => candidate.state === "open" && candidate.labels.includes("maintenance-in-progress")).length;
 
-    return NextResponse.json({
+    const payload = {
       source: "github",
       repositoryUrl: REPOSITORY_URL,
       refreshedAt: new Date().toISOString(),
@@ -163,8 +171,20 @@ export async function GET() {
         url: run.html_url,
         commit: run.head_sha.slice(0, 7),
       })),
-    });
+    };
+
+    cachedPayload = payload;
+    cachedAt = Date.now();
+    return NextResponse.json({ ...payload, cacheStatus: "refreshed" });
   } catch (error) {
+    if (cachedPayload) {
+      return NextResponse.json({
+        ...cachedPayload,
+        cacheStatus: "stale",
+        warning: "GitHub 최신 동기화가 지연되어 마지막 정상 데이터를 표시합니다.",
+      });
+    }
+
     return NextResponse.json({
       error: error instanceof Error ? error.message : "에이전트 활동을 불러오지 못했습니다.",
     }, { status: 502 });

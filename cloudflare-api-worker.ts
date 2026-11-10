@@ -10,8 +10,10 @@ type ApiContext = {
   passThroughOnException(): void;
 };
 
-export default {
+const apiWorker = {
   async fetch(request: Request, env: Record<string, unknown>, ctx: ApiContext) {
     return runWithCloudflareRequestContext(request, env, ctx, () => handler(request, env, ctx));
   },
 };
+
+export default apiWorker;

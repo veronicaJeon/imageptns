@@ -10,8 +10,10 @@ type ServerContext = {
   passThroughOnException(): void;
 };
 
-export default {
+const serverWorker = {
   async fetch(request: Request, env: Record<string, unknown>, ctx: ServerContext) {
     return runWithCloudflareRequestContext(request, env, ctx, () => handler(request, env, ctx));
   },
 };
+
+export default serverWorker;

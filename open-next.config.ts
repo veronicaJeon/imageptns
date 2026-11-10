@@ -6,7 +6,7 @@ const apiRoutes = generatedApiRoutes as `app/${string}/route`[];
 const adminApiRoutes = generatedAdminApiRoutes as `app/${string}/route`[];
 const baseConfig = defineCloudflareConfig({ routePreloadingBehavior: "none" });
 
-export default {
+const cloudflareConfig = {
   ...baseConfig,
   functions: {
     api: {
@@ -25,3 +25,5 @@ export default {
     },
   },
 };
+
+export default cloudflareConfig;

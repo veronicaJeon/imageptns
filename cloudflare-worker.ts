@@ -87,16 +87,29 @@ const worker = {
   },
 
   async scheduled(controller: ScheduledController, env: WorkerEnv) {
-    if (controller.cron !== "0 2 * * *") return;
-    if (!env.CRON_SECRET) throw new Error("CRON_SECRET is not configured");
+    if (controller.cron === "7,22,37,52 * * * *") {
+      const response = await env.API_WORKER.fetch(new Request(
+        "https://www.imagepartners.kr/api/health",
+        { headers: { "User-Agent": "ImagePartners-Cloudflare-Monitor/1.0" } },
+      ));
 
-    const response = await env.ADMIN_API_WORKER.fetch(new Request(
-      "https://imagepartners.internal/api/cron/auto-reject-stale",
-      { headers: { Authorization: `Bearer ${env.CRON_SECRET}` } },
-    ));
+      if (!response.ok) {
+        throw new Error(`production health check failed with HTTP ${response.status}`);
+      }
+      return;
+    }
 
-    if (!response.ok) {
-      throw new Error(`auto-reject-stale failed with HTTP ${response.status}`);
+    if (controller.cron === "0 2 * * *") {
+      if (!env.CRON_SECRET) throw new Error("CRON_SECRET is not configured");
+
+      const response = await env.ADMIN_API_WORKER.fetch(new Request(
+        "https://imagepartners.internal/api/cron/auto-reject-stale",
+        { headers: { Authorization: `Bearer ${env.CRON_SECRET}` } },
+      ));
+
+      if (!response.ok) {
+        throw new Error(`auto-reject-stale failed with HTTP ${response.status}`);
+      }
     }
   },
 };

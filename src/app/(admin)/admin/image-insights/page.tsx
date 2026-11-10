@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element -- signed preview URLs must bypass Next image optimization */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

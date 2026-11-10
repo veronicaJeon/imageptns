@@ -575,12 +575,12 @@ export default function LibraryPage() {
               <>
                 <MasonryGrid>
                   {images.map((img) => (
-                    <Link key={img.id} href={`/library/${img.id}`}>
-                      <ImageCard
-                        image={img}
-                        className="mb-4 break-inside-avoid"
-                      />
-                    </Link>
+                    <ImageCard
+                      key={img.id}
+                      href={`/library/${img.id}`}
+                      image={img}
+                      className="mb-4 break-inside-avoid"
+                    />
                   ))}
                 </MasonryGrid>
                 <div ref={loadMoreSentinelRef} className="flex min-h-28 flex-col items-center justify-center gap-3 pt-8" aria-live="polite">

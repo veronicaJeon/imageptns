@@ -6,7 +6,7 @@
 
 ## 목적과 경계
 
-일일 운영관리자 점검과 15분 장애 감시에서 누적된 근거를 주 1회 코드·DB·공급망 검사와 대조해, 개선 후보 도출 → 결정 요청 → 작은 변경 → 검증 → 승인된 배포 → 결과 회고를 반복한다. 각 후보와 결정, PR, 배포 결과는 GitHub 이슈에 누적되어 다음 주기의 입력이 된다.
+Cloudflare의 15분 장애 감시와 관리자 운영 기록에서 누적된 근거를 주 1회 코드·DB·공급망 검사와 대조해, 개선 후보 도출 → 결정 요청 → 작은 변경 → 검증 → 승인된 배포 → 결과 회고를 반복한다. 각 후보와 결정, PR, 배포 결과는 GitHub 이슈에 누적되어 다음 주기의 입력이 된다. 고비용 AI·인덱싱 심층 점검은 당분간 중단하지만 가용성 감시와 데이터 정리는 계속한다.
 
 GitHub Actions는 재현 가능한 검사와 개선 후보 관리만 담당한다. 실제 개발은 Codex Scheduled task가 격리된 worktree에서 수행하며, 예약 실행이 곧바로 임의 코드를 운영에 반영하지 않도록 다음 범위로 제한한다.
 
@@ -52,7 +52,7 @@ flowchart LR
 | 공급망 | lockfile 기반 설치, 전체 의존성 high 이상 audit |
 | 코드 | TypeScript, ESLint, Vitest, Next.js production build |
 | DB | 고정 Supabase CLI로 빈 로컬 DB에 전체 migration 적용, schema lint |
-| 운영 | `/api/health`의 DB·Storage·순환 미리보기·AI·일일 운영 점검 상태 |
+| 운영 | `/api/health`의 DB·Storage·순환 미리보기·AI·심층 운영 점검 상태 |
 | 공개 화면 | 홈, 라이브러리, 문의, 이용약관, 개인정보처리방침, 사업자정보, 이미지 API smoke |
 | 거래 경계 | 계좌정보와 공시 또는 제한 베타 플래그가 모순 없이 유료 주문 가능 상태를 구성하는지 검사 |
 | 변경 통제 | `main` branch protection과 현재 Production release SHA/ref 정합성을 확인 |
@@ -88,7 +88,7 @@ Codex 작업의 상세 후보 선택, 변경 허용 범위, 검증과 실패 처
 
 ## 배포와 결과 누적
 
-`.github/workflows/deploy.yml`은 수동 실행만 허용하고 `production` Environment를 사용한다. 실행 시 승인 근거를 필수로 입력하고, 유지보수 후보라면 이슈 번호도 입력한다. 배포 전 전체 검증, Vercel 운영 배포, health와 공개 핵심 경로 스모크를 수행하고 성공·실패, 커밋, 실행 URL, 배포 URL을 후보 이슈에 댓글로 남긴다.
+`.github/workflows/deploy.yml`은 수동 실행만 허용하고 `production` Environment를 사용한다. 실행 시 승인 근거를 필수로 입력하고, 유지보수 후보라면 이슈 번호도 입력한다. 배포 전 전체 검증, Cloudflare Workers 운영 배포, health와 공개 핵심 경로 스모크를 수행하고 성공·실패, 커밋, 실행 URL, 배포 URL을 후보 이슈에 댓글로 남긴다. Vercel은 현재 Sharp 롤백 origin으로만 남긴다.
 
 GitHub 저장소 설정에서 `production` Environment required reviewer를 지정해야 UI 승인 게이트도 강제된다. 설정 전에는 수동 `workflow_dispatch` 자체가 명시적 실행 동작이지만 별도 승인자가 강제되는 것은 아니다. DB migration과 데이터 작업은 이 배포 워크플로 범위 밖이며 각각 별도 계획·승인이 필요하다.
 
@@ -117,7 +117,7 @@ GitHub 저장소 설정에서 `production` Environment required reviewer를 지�
 - Grok·Gemini 보고가 성공뿐 아니라 키 미설정·한도·API 오류도 추적 이슈와 관리자 화면에 남기는지
 - `production` Environment에 required reviewer가 설정돼 있는지
 
-워크플로 자체가 장기간 실행되지 않으면 GitHub Actions 비활성화, 저장소 일정 실행 지연 또는 권한 변경을 먼저 확인한다. GitHub 예약 실행은 정확한 시각의 SLA가 아니므로 장애 감시는 기존 15분 운영 health 모니터가 계속 담당한다.
+워크플로 자체가 장기간 실행되지 않으면 GitHub Actions 비활성화, 저장소 일정 실행 지연 또는 권한 변경을 먼저 확인한다. GitHub 예약 실행은 정확한 시각의 SLA가 아니므로 장애 감시는 매시 07·22·37·52분에 실행되는 Cloudflare Cron Trigger가 담당한다. GitHub Production monitor는 독립적인 2차 확인과 이슈 기록용이다.
 
 ## 최초 활성화 검증
 

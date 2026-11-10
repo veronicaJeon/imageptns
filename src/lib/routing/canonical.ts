@@ -9,7 +9,10 @@ const REDIRECT_TO_CANONICAL_HOSTS = new Set([
 export function getCanonicalRedirectUrl(input: string | URL): URL | null {
   const url = new URL(input.toString());
 
-  if (!REDIRECT_TO_CANONICAL_HOSTS.has(url.hostname)) {
+  const shouldRedirectHost = REDIRECT_TO_CANONICAL_HOSTS.has(url.hostname);
+  const shouldUpgradeCanonicalProtocol = url.hostname === CANONICAL_HOST && url.protocol !== "https:";
+
+  if (!shouldRedirectHost && !shouldUpgradeCanonicalProtocol) {
     return null;
   }
 

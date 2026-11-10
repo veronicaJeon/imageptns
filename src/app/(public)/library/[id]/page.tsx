@@ -554,9 +554,7 @@ export default function ImageDetailPage({ params }: { params: Promise<{ id: stri
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {similar.map((img) => (
-                <Link key={img.id} href={`/library/${img.id}`}>
-                  <ImageCard image={img} />
-                </Link>
+                <ImageCard key={img.id} href={`/library/${img.id}`} image={img} />
               ))}
             </div>
           </div>
