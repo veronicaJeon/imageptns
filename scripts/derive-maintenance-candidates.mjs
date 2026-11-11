@@ -47,8 +47,14 @@ function makeCandidate({ source, priority, title, evidence, proposal, acceptance
 
 const candidates = [];
 
+function checkNeedsCandidate(key, value) {
+  if (!value || value === "success") return false;
+  if (key === "operations_review" && value === "paused") return false;
+  return true;
+}
+
 for (const [key, definition] of Object.entries(checkDefinitions)) {
-  if (results[key] && results[key] !== "success") {
+  if (checkNeedsCandidate(key, results[key])) {
     const [priority, title, proposal] = definition;
     candidates.push(makeCandidate({
       source: `check:${key}`,

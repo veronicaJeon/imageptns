@@ -1,4 +1,7 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("operations automation policy", () => {
@@ -31,6 +34,29 @@ describe("operations automation policy", () => {
     expect(weekly).toContain("release_alignment");
     expect(candidates).toContain("일일 운영관리자 경고 조사");
     expect(candidates).toContain("main·Production 릴리스 정합성 복구");
+    expect(candidates).toContain('key === "operations_review" && value === "paused"');
+  });
+
+  it("does not turn an intentionally paused deep review into an incident candidate", () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "maintenance-candidates-"));
+    const outputPath = join(tempDirectory, "candidates.json");
+
+    try {
+      execFileSync(process.execPath, ["scripts/derive-maintenance-candidates.mjs", outputPath], {
+        env: {
+          ...process.env,
+          MAINTENANCE_RESULTS: JSON.stringify({
+            operations_review: "paused",
+            audit: "success",
+          }),
+        },
+      });
+
+      const derived = JSON.parse(readFileSync(outputPath, "utf8")) as Array<{ source: string }>;
+      expect(derived.some((candidate) => candidate.source === "check:operations_review")).toBe(false);
+    } finally {
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
   });
 
   it("requires a weekly human-like product discovery review", () => {

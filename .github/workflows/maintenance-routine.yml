@@ -306,7 +306,7 @@ jobs:
             echo "| Fresh DB migration | $DATABASE_START |"
             echo "| DB schema lint | $DATABASE_LINT |"
             echo "| 운영 health | $HEALTH |"
-            echo "| 일일 운영관리자 점검 | $OPERATIONS_REVIEW |"
+            echo "| 심층 운영관리자 점검 | $OPERATIONS_REVIEW |"
             echo "| main·Production 정합성 | $RELEASE_ALIGNMENT |"
             echo "| 공개 경로 smoke | $SMOKE |"
             echo "| 계좌이체 공개 경계 | $CHECKOUT_READINESS |"
