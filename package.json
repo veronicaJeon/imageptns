@@ -17,6 +17,8 @@
     "build:cloudflare": "node scripts/build-cloudflare.mjs",
     "preview:cloudflare": "opennextjs-cloudflare preview",
     "deploy:cloudflare": "npm run build:cloudflare && npm run deploy:cloudflare:image-runtime && npm run deploy:cloudflare:server && npm run deploy:cloudflare:api && npm run deploy:cloudflare:admin-api && npm run deploy:cloudflare:app",
+    "drill:backup-restore": "node scripts/backup-restore-drill.mjs",
+    "drill:r2-restore": "node scripts/run-r2-restore-drill.mjs",
     "deploy:cloudflare:app": "wrangler deploy",
     "deploy:cloudflare:image-runtime": "wrangler deploy --config wrangler.image-runtime.jsonc",
     "deploy:cloudflare:server": "wrangler deploy --config wrangler.server.jsonc && node scripts/upload-cloudflare-secrets.mjs wrangler.server.jsonc",
